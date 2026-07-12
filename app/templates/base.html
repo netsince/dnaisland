@@ -33,6 +33,17 @@
             {% endif %}
             {% block nav_items %}{% endblock %}
           </ul>
+          <form class="d-flex me-lg-3 my-2 my-lg-0 position-relative" id="navSearchForm"
+                role="search" action="{{ url_for('main.search') }}" method="get" autocomplete="off">
+            <div class="input-group input-group-sm">
+              <input class="form-control" type="search" name="q" id="navSearchInput"
+                     placeholder="搜索角色卡 / 作者" value="{{ search_query|default('') }}" aria-label="搜索"
+                     aria-autocomplete="list" aria-expanded="false" aria-controls="navSearchSuggest">
+              <button class="btn btn-outline-light" type="submit">搜索</button>
+            </div>
+            <div id="navSearchSuggest" class="dropdown-menu w-100 show d-none shadow"
+                 style="position:absolute;top:100%;left:0;right:0;z-index:1050;"></div>
+          </form>
           <ul class="navbar-nav mb-2 mb-lg-0 align-items-center">
             {% if current_user.is_authenticated %}
               <li class="nav-item">
@@ -96,6 +107,73 @@
   </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    (function () {
+      var input = document.getElementById("navSearchInput");
+      var box = document.getElementById("navSearchSuggest");
+      var form = document.getElementById("navSearchForm");
+      if (!input || !box || !form) return;
+      var timer = null;
+
+      function closeBox() {
+        box.classList.add("d-none");
+        box.setAttribute("aria-expanded", "false");
+      }
+      function openBox() {
+        box.classList.remove("d-none");
+        box.setAttribute("aria-expanded", "true");
+      }
+      function escapeHtml(s) {
+        return s.replace(/[&<>"']/g, function (c) {
+          return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+        });
+      }
+      function render(data) {
+        var cards = data.cards || [], users = data.users || [];
+        if (!cards.length && !users.length) { closeBox(); return; }
+        var html = "";
+        if (cards.length) {
+          html += '<div class="dropdown-header small text-muted">角色卡</div>';
+          cards.forEach(function (c) {
+            html += '<a class="dropdown-item" href="' + c.url + '">' +
+              escapeHtml(c.name) + ' <span class="text-muted small">' + escapeHtml(c.gender || "") + '</span></a>';
+          });
+        }
+        if (users.length) {
+          html += '<div class="dropdown-header small text-muted">作者</div>';
+          users.forEach(function (u) {
+            var tick = u.verified ? ' <span class="badge bg-info">✓</span>' : "";
+            html += '<a class="dropdown-item" href="' + u.url + '">@' +
+              escapeHtml(u.nickname) + tick + '</a>';
+          });
+        }
+        html += '<div class="dropdown-divider"></div>' +
+          '<a class="dropdown-item text-primary" href="#" id="navSearchAll">查看全部结果 →</a>';
+        box.innerHTML = html;
+        openBox();
+        var allLink = document.getElementById("navSearchAll");
+        if (allLink) allLink.addEventListener("click", function (e) { e.preventDefault(); form.submit(); });
+      }
+
+      input.addEventListener("input", function () {
+        var q = input.value.trim();
+        clearTimeout(timer);
+        if (q.length < 1) { closeBox(); return; }
+        timer = setTimeout(function () {
+          fetch('{{ url_for("main.search_suggest") }}?q=' + encodeURIComponent(q))
+            .then(function (r) { return r.json(); })
+            .then(render)
+            .catch(closeBox);
+        }, 200);
+      });
+      document.addEventListener("click", function (e) {
+        if (!form.contains(e.target)) closeBox();
+      });
+      input.addEventListener("keydown", function (e) {
+        if (e.key === "Escape") closeBox();
+      });
+    })();
+  </script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

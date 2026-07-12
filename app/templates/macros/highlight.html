@@ -1,0 +1,11 @@
+{% macro hl(text, q) %}
+  {%- if q and text -%}
+    {%- set parts = text.split(q) -%}
+    {%- for i in range(parts|length) -%}
+      {{- parts[i] -}}
+      {%- if not loop.last -%}<mark class="bg-warning-subtle">{{ q }}</mark>{%- endif -%}
+    {%- endfor -%}
+  {%- else -%}
+    {{- text -}}
+  {%- endif -%}
+{% endmacro %}
