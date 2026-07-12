@@ -8,6 +8,7 @@ class Config:
         "DATABASE_URL", "mysql+pymysql://root:root@localhost:3306/dnaisland"
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    SQLALCHEMY_ENGINE_OPTIONS = {"pool_pre_ping": True, "pool_recycle": 280}
 
     MAIL_SERVER = os.environ.get("MAIL_SERVER", "smtp.example.com")
     MAIL_PORT = int(os.environ.get("MAIL_PORT", 587))

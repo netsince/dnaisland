@@ -10,7 +10,7 @@
 <div class="row justify-content-center">
   <div class="col-12 col-lg-8">
     <h2 class="h4 mb-4">编辑角色卡</h2>
-    <form method="post" action="{{ url_for('publish.edit') }}" id="cardForm">
+    <form method="post" action="{{ action_url or url_for('publish.edit') }}" id="cardForm">
       <input type="hidden" name="card_id" value="{{ prefill.id if prefill else '' }}">
       <input type="hidden" name="original_link" value="{{ prefill.original_link if prefill else '' }}">
       <input type="hidden" name="images_json" id="imagesJson" value="">

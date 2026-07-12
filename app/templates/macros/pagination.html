@@ -1,0 +1,28 @@
+{% macro render_pagination(pagination, endpoint, args=None) %}
+  {% if pagination.pages > 1 %}
+  <nav aria-label="分页导航" class="mt-3">
+    <ul class="pagination justify-content-center flex-wrap">
+      <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+        <a class="page-link"
+           href="{{ url_for(endpoint, page=pagination.prev_num, **(args or {})) }}">上一页</a>
+      </li>
+      {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+        {% if p %}
+        <li class="page-item {% if p == pagination.page %}active{% endif %}">
+          <a class="page-link" href="{{ url_for(endpoint, page=p, **(args or {})) }}">{{ p }}</a>
+        </li>
+        {% else %}
+        <li class="page-item disabled"><span class="page-link">…</span></li>
+        {% endif %}
+      {% endfor %}
+      <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+        <a class="page-link"
+           href="{{ url_for(endpoint, page=pagination.next_num, **(args or {})) }}">下一页</a>
+      </li>
+    </ul>
+  </nav>
+  <div class="text-center text-muted small">
+    共 {{ pagination.total }} 条 · 第 {{ pagination.page }} / {{ pagination.pages }} 页
+  </div>
+  {% endif %}
+{% endmacro %}

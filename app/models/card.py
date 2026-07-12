@@ -20,6 +20,7 @@ class Card(db.Model):
         db.DateTime, server_default=db.func.now(), onupdate=db.func.now()
     )
     status = db.Column(db.String(20), server_default="pending")
+    is_hidden = db.Column(db.Boolean, server_default="0", nullable=False, index=True)
     view_count = db.Column(db.Integer, server_default="0")
 
     author = db.relationship("User", backref="cards")
@@ -49,3 +50,30 @@ class CardImage(db.Model):
     card_id = db.Column(db.String(36), db.ForeignKey("cards.id"), nullable=False)
     slot = db.Column(db.String(20), nullable=False)  # square | landscape | portrait
     data = db.Column(LONGTEXT, nullable=False)  # base64 data URI
+
+
+class CardLike(db.Model):
+    __tablename__ = "card_likes"
+
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), primary_key=True)
+    card_id = db.Column(db.String(36), db.ForeignKey("cards.id"), primary_key=True)
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
+
+
+class CardFavorite(db.Model):
+    __tablename__ = "card_favorites"
+
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), primary_key=True)
+    card_id = db.Column(db.String(36), db.ForeignKey("cards.id"), primary_key=True)
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
+
+
+class Comment(db.Model):
+    __tablename__ = "comments"
+
+    id = db.Column(db.Integer, primary_key=True)
+    card_id = db.Column(db.String(36), db.ForeignKey("cards.id"), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
+    author = db.relationship("User", backref="comments")

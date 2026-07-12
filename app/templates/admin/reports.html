@@ -1,0 +1,74 @@
+{% extends "admin/base.html" %}
+{% from "macros/pagination.html" import render_pagination %}
+
+{% block title %}举报管理 · DNAISLAND{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2 class="h4 mb-0">举报管理</h2>
+</div>
+
+<form class="row g-2 mb-3 align-items-end" method="get">
+  <div class="col-auto">
+    <label class="form-label small text-muted mb-1">状态</label>
+    <select class="form-select" name="status">
+      <option value="pending" {% if status == 'pending' %}selected{% endif %}>待处理</option>
+      <option value="all" {% if status == 'all' %}selected{% endif %}>全部</option>
+      <option value="resolved" {% if status == 'resolved' %}selected{% endif %}>已处理</option>
+    </select>
+  </div>
+  <div class="col-auto">
+    <label class="form-label small text-muted mb-1">类型</label>
+    <select class="form-select" name="type">
+      <option value="" {% if not target_type %}selected{% endif %}>全部</option>
+      <option value="card" {% if target_type == 'card' %}selected{% endif %}>角色卡</option>
+      <option value="comment" {% if target_type == 'comment' %}selected{% endif %}>评论</option>
+      <option value="user" {% if target_type == 'user' %}selected{% endif %}>用户</option>
+    </select>
+  </div>
+  <div class="col-auto">
+    <button class="btn btn-outline-secondary" type="submit">筛选</button>
+  </div>
+</form>
+
+<div class="text-muted small mb-3">
+  待处理：{{ stats.get('pending', 0) }} · 已处理：{{ stats.get('resolved', 0) }}
+</div>
+
+<div class="table-responsive">
+  <table class="table table-hover align-middle">
+    <thead>
+      <tr>
+        <th>ID</th><th>类型</th><th>对象</th><th>原因</th><th>举报人</th><th>状态</th><th>时间</th><th>操作</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in reports %}
+      <tr>
+        <td>{{ r.id }}</td>
+        <td>
+          {% if r.target_type == 'card' %}角色卡
+          {% elif r.target_type == 'comment' %}评论
+          {% else %}用户{% endif %}
+        </td>
+        <td>{{ r.target_id }}</td>
+        <td>{{ r.reason }}</td>
+        <td>{{ r.reporter.nickname if r.reporter else r.reporter_id }}</td>
+        <td>
+          {% if r.status == 'pending' %}<span class="badge bg-warning text-dark">待处理</span>
+          {% else %}<span class="badge bg-secondary">已处理</span>{% endif %}
+        </td>
+        <td>{{ r.created_at.strftime('%Y-%m-%d %H:%M') if r.created_at else '' }}</td>
+        <td>
+          <a class="btn btn-sm btn-outline-primary" href="{{ url_for('admin.report_detail', report_id=r.id) }}">查看</a>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="8" class="text-center text-muted">暂无举报</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{{ render_pagination(pagination, 'admin.reports', args) }}
+{% endblock %}

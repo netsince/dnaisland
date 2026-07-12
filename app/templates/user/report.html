@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}举报 · DNAISLAND{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-lg-7">
+    <a class="btn btn-sm btn-outline-secondary mb-3" href="{{ target_url }}">← 返回</a>
+    <div class="card">
+      <div class="card-header fw-semibold">举报{{ '角色卡' if target_type=='card' else '评论' if target_type=='comment' else '用户' }}</div>
+      <div class="card-body">
+        <p class="text-muted small mb-3">
+          举报对象：<strong>{{ display }}</strong><br>
+          我们会尽快核实处理，感谢你维护社区环境。
+        </p>
+        <form method="post" action="{{ url_for('user.report', type=target_type, id=raw_id) }}">
+          <div class="mb-3">
+            <label class="form-label">举报原因</label>
+            <select class="form-select" name="reason" required>
+              <option value="">请选择…</option>
+              {% for value, label in reasons %}
+              <option value="{{ value }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">补充说明（可选）</label>
+            <textarea class="form-control" name="detail" rows="4"
+                      placeholder="请补充具体描述，便于管理员判断…"></textarea>
+          </div>
+          <button class="btn btn-danger" type="submit">提交举报</button>
+          <a class="btn btn-outline-secondary" href="{{ target_url }}">取消</a>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

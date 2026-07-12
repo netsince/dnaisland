@@ -1,4 +1,5 @@
 {% extends "admin/base.html" %}
+{% from "macros/pagination.html" import render_pagination %}
 
 {% block title %}审核 · DNAISLAND{% endblock %}
 
@@ -37,4 +38,6 @@
   <div class="text-center text-muted py-4">暂无角色卡</div>
   {% endfor %}
 </div>
+
+{{ render_pagination(pagination, 'admin.review', args) }}
 {% endblock %}

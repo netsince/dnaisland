@@ -1,0 +1,76 @@
+{% extends "admin/base.html" %}
+
+{% block title %}举报详情 · DNAISLAND{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2 class="h4 mb-0">举报 #{{ report.id }}</h2>
+  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin.reports') }}">← 返回列表</a>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <div class="row g-2 small">
+      <div class="col-6"><span class="text-muted">类型：</span>
+        {% if report.target_type == 'card' %}角色卡
+        {% elif report.target_type == 'comment' %}评论
+        {% else %}用户{% endif %}
+      </div>
+      <div class="col-6"><span class="text-muted">状态：</span>
+        {% if report.status == 'pending' %}待处理{% else %}已处理{% endif %}
+      </div>
+      <div class="col-6"><span class="text-muted">举报人：</span>{{ report.reporter.nickname if report.reporter else report.reporter_id }}</div>
+      <div class="col-6"><span class="text-muted">原因：</span>{{ report.reason }}</div>
+      <div class="col-12"><span class="text-muted">提交时间：</span>{{ report.created_at.strftime('%Y-%m-%d %H:%M') if report.created_at else '' }}</div>
+      {% if report.detail %}
+      <div class="col-12"><span class="text-muted">补充说明：</span><br>{{ report.detail }}</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header">被举报对象</div>
+  <div class="card-body">
+    <pre class="mb-2" style="white-space:pre-wrap;">{{ target_info.snippet }}</pre>
+    {% if target_info.link %}
+    <a class="btn btn-sm btn-outline-info" href="{{ target_info.link }}" target="_blank" rel="noopener">查看对象</a>
+    {% endif %}
+  </div>
+</div>
+
+{% if report.status == 'pending' %}
+<div class="d-flex flex-wrap gap-2">
+  <form method="post" action="{{ url_for('admin.report_resolve', report_id=report.id) }}" class="d-inline">
+    <button class="btn btn-sm btn-outline-secondary">标记已处理（不采取措施）</button>
+  </form>
+
+  {% if report.target_type == 'user' %}
+  <form method="post" action="{{ url_for('admin.report_action', report_id=report.id) }}" class="d-inline"
+        onsubmit="return confirm('确认封禁该用户？');">
+    <input type="hidden" name="action" value="ban_user">
+    <button class="btn btn-sm btn-outline-danger">封禁该用户</button>
+  </form>
+  {% elif report.target_type == 'card' %}
+  <form method="post" action="{{ url_for('admin.report_action', report_id=report.id) }}" class="d-inline"
+        onsubmit="return confirm('确认隐藏该角色卡？');">
+    <input type="hidden" name="action" value="hide_card">
+    <button class="btn btn-sm btn-outline-warning">隐藏角色卡</button>
+  </form>
+  <form method="post" action="{{ url_for('admin.report_action', report_id=report.id) }}" class="d-inline"
+        onsubmit="return confirm('确认删除该角色卡？');">
+    <input type="hidden" name="action" value="delete_card">
+    <button class="btn btn-sm btn-outline-danger">删除角色卡</button>
+  </form>
+  {% elif report.target_type == 'comment' %}
+  <form method="post" action="{{ url_for('admin.report_action', report_id=report.id) }}" class="d-inline"
+        onsubmit="return confirm('确认删除该评论？');">
+    <input type="hidden" name="action" value="delete_comment">
+    <button class="btn btn-sm btn-outline-danger">删除评论</button>
+  </form>
+  {% endif %}
+</div>
+{% else %}
+<p class="text-muted">该举报已处理。</p>
+{% endif %}
+{% endblock %}

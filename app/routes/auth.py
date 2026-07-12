@@ -31,6 +31,22 @@ def load_user(user_id: str):
     return db.session.get(User, int(user_id))
 
 
+@auth_bp.before_app_request
+def enforce_banned():
+    """被封禁的账号访问任何页面时自动退出登录。"""
+    if not current_user.is_authenticated:
+        return
+    try:
+        banned = current_user.is_banned
+    except Exception:
+        # 用户对象与会话失联（如连接中断）时，不阻断请求
+        return
+    if banned:
+        logout_user()
+        flash("该账号已被封禁，已自动退出登录", "danger")
+        return redirect(url_for("main.index"))
+
+
 @auth_bp.route("/send-code", methods=["POST"])
 def send_code():
     payload = request.get_json(silent=True) or {}
@@ -126,6 +142,10 @@ def login():
 
         if user is None or not user.check_password(password):
             flash("用户名/邮箱或密码错误", "danger")
+            return render_template("auth/login.html")
+
+        if user.is_banned:
+            flash("该账号已被封禁，无法登录", "danger")
             return render_template("auth/login.html")
 
         login_user(user)

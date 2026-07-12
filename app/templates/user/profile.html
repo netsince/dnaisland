@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "macros/pagination.html" import render_pagination %}
 
 {% block title %}{{ u.nickname }} · DNAISLAND{% endblock %}
 
@@ -16,14 +17,30 @@
     <span class="badge bg-danger mb-3">管理员</span>
     {% endif %}
 
-    <h5 class="mt-3">发布的角色卡（{{ cards|length }}）</h5>
+    <div class="d-flex align-items-center gap-3 mb-3">
+      <div><strong>{{ following_count }}</strong> <span class="text-muted">关注</span></div>
+      <div><strong>{{ follower_count }}</strong> <span class="text-muted">粉丝</span></div>
+      <div><strong>{{ pagination.total }}</strong> <span class="text-muted">角色卡</span></div>
+      {% if not is_self and not u.is_banned %}
+      <form method="post" action="{{ url_for('user.user_follow', username=u.username) }}" class="d-inline ms-2">
+        <button class="btn btn-sm btn-outline-{{ 'primary' if is_following else 'success' }}">
+          {{ '取消关注' if is_following else '关注' }}
+        </button>
+      </form>
+      <a class="btn btn-sm btn-outline-danger ms-2" href="{{ url_for('user.report', type='user', id=u.username) }}">举报</a>
+      {% endif %}
+    </div>
+
+    <h5 class="mt-3">发布的角色卡（{{ pagination.total }}）</h5>
     <div class="row g-3">
       {% for card in cards %}
       <div class="col-12 col-md-6">
         <div class="card h-100">
           {% set img = None %}
           <div class="card-body">
-            <h6 class="card-title">{{ card.name }}</h6>
+            <h6 class="card-title">
+              <a class="text-decoration-none" href="{{ url_for('user.card_detail', card_id=card.id) }}">{{ card.name }}</a>
+            </h6>
             <p class="text-muted small mb-1">{{ card.gender }}</p>
             <p class="card-text small" style="white-space:pre-wrap;">{{ card.intro[:80] }}</p>
             {% if card.status == 'approved' %}<span class="badge bg-success">已通过</span>
@@ -36,6 +53,8 @@
       <div class="col-12 text-muted">还没有发布任何角色卡。</div>
       {% endfor %}
     </div>
+
+    {{ render_pagination(pagination, 'user.profile', args) }}
   </div>
 </div>
 {% endblock %}

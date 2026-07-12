@@ -20,8 +20,20 @@ class User(db.Model, UserMixin):
     def is_super_admin(self) -> bool:
         return self.role == "super_admin"
 
+    @property
+    def is_banned(self) -> bool:
+        return self.role == "banned"
+
     def set_password(self, password):
         self.password_hash = bcrypt.generate_password_hash(password).decode("utf-8")
 
     def check_password(self, password):
         return bcrypt.check_password_hash(self.password_hash, password)
+
+
+class UserFollow(db.Model):
+    __tablename__ = "user_follows"
+
+    follower_id = db.Column(db.Integer, db.ForeignKey("users.id"), primary_key=True)
+    following_id = db.Column(db.Integer, db.ForeignKey("users.id"), primary_key=True)
+    created_at = db.Column(db.DateTime, server_default=db.func.now())

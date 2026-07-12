@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "macros/pagination.html" import render_pagination %}
 
 {% block title %}我的发布 · DNAISLAND{% endblock %}
 
@@ -34,23 +35,48 @@
       </div>
     </div>
 
-    <a class="btn btn-primary btn-sm mb-3" href="{{ url_for('publish.start') }}">+ 发布新角色卡</a>
+    <div class="d-flex flex-wrap gap-2 mb-3">
+      <a class="btn btn-primary btn-sm" href="{{ url_for('publish.start') }}">+ 发布新角色卡</a>
+      <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('user.my_favorites') }}">我的收藏</a>
+      <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('user.my_likes') }}">我点赞的</a>
+    </div>
 
     <div class="list-group">
       {% for card in cards %}
-      <div class="list-group-item d-flex justify-content-between align-items-center">
-        <span>
-          <strong>{{ card.name }}</strong>
-          <span class="text-muted">· {{ card.created_at.strftime('%Y-%m-%d') if card.created_at else '' }}</span>
-        </span>
-        {% if card.status == 'approved' %}<span class="badge bg-success">已通过</span>
-        {% elif card.status == 'rejected' %}<span class="badge bg-danger">已拒绝</span>
-        {% else %}<span class="badge bg-warning text-dark">审核中</span>{% endif %}
+      <div class="list-group-item">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <a class="text-decoration-none" href="{{ url_for('user.card_detail', card_id=card.id) }}">{{ card.name }}</a>
+            {% if card.is_hidden %}<span class="badge bg-secondary ms-1">已隐藏</span>{% endif %}
+            <span class="text-muted">· {{ card.created_at.strftime('%Y-%m-%d') if card.created_at else '' }}</span>
+          </div>
+          <div class="text-nowrap">
+            {% if card.status == 'approved' %}<span class="badge bg-success">已通过</span>
+            {% elif card.status == 'rejected' %}<span class="badge bg-danger">已拒绝</span>
+            {% else %}<span class="badge bg-warning text-dark">审核中</span>{% endif %}
+          </div>
+        </div>
+        <div class="mt-2 d-flex flex-wrap gap-2">
+          <a class="btn btn-sm btn-outline-primary" href="{{ url_for('user.card_edit', card_id=card.id) }}">编辑</a>
+          {% if card.status == 'rejected' %}
+          <form method="post" action="{{ url_for('user.card_resubmit', card_id=card.id) }}" class="d-inline">
+            <button class="btn btn-sm btn-outline-success">重新提审</button>
+          </form>
+          {% endif %}
+          <form method="post" action="{{ url_for('user.card_toggle_hidden', card_id=card.id) }}" class="d-inline"
+                onsubmit="return confirm('确认{{ '取消隐藏' if card.is_hidden else '隐藏' }}该角色卡？');">
+            <button class="btn btn-sm btn-outline-{{ 'secondary' if card.is_hidden else 'warning' }}">
+              {{ '取消隐藏' if card.is_hidden else '隐藏' }}
+            </button>
+          </form>
+        </div>
       </div>
       {% else %}
       <div class="text-center text-muted py-4">还没有发布任何角色卡。</div>
       {% endfor %}
     </div>
+
+    {{ render_pagination(pagination, 'user.my_cards', args) }}
   </div>
 </div>
 {% endblock %}

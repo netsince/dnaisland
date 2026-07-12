@@ -19,6 +19,10 @@
             <a class="nav-link {% if request.endpoint.startswith('admin.review') %}active{% endif %}"
                href="{{ url_for('admin.review') }}">审核</a>
           </li>
+          <li class="nav-item">
+            <a class="nav-link {% if request.endpoint.startswith('admin.reports') %}active{% endif %}"
+               href="{{ url_for('admin.reports') }}">举报管理</a>
+          </li>
         </ul>
       </div>
     </nav>

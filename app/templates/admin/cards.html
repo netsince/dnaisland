@@ -1,15 +1,32 @@
 {% extends "admin/base.html" %}
+{% from "macros/pagination.html" import render_pagination %}
 
 {% block title %}角色卡管理 · DNAISLAND{% endblock %}
 
 {% block admin_content %}
 <h2 class="h4 mb-3">角色卡管理</h2>
 
-<form class="row g-2 mb-3" method="get">
+<form class="row g-2 mb-3 align-items-end" method="get">
   <div class="col-auto flex-grow-1">
+    <label class="form-label small text-muted mb-1">名称</label>
     <input type="text" class="form-control" name="q" value="{{ q }}" placeholder="搜索名称">
   </div>
   <div class="col-auto">
+    <label class="form-label small text-muted mb-1">作者</label>
+    <input type="text" class="form-control" name="author" value="{{ author }}" placeholder="作者用户名">
+  </div>
+  <div class="col-auto">
+    <label class="form-label small text-muted mb-1">性别</label>
+    <select class="form-select" name="gender">
+      <option value="" {% if not gender %}selected{% endif %}>全部</option>
+      <option value="男" {% if gender == '男' %}selected{% endif %}>男</option>
+      <option value="女" {% if gender == '女' %}selected{% endif %}>女</option>
+      <option value="无性" {% if gender == '无性' %}selected{% endif %}>无性</option>
+      <option value="其他" {% if gender == '其他' %}selected{% endif %}>其他</option>
+    </select>
+  </div>
+  <div class="col-auto">
+    <label class="form-label small text-muted mb-1">状态</label>
     <select class="form-select" name="status">
       <option value="" {% if not status %}selected{% endif %}>全部状态</option>
       <option value="pending" {% if status == 'pending' %}selected{% endif %}>pending</option>
@@ -30,7 +47,9 @@
     <tbody>
       {% for card in cards %}
       <tr>
-        <td>{{ card.name }}</td>
+        <td>
+          <a class="text-decoration-none" href="{{ url_for('user.card_detail', card_id=card.id) }}">{{ card.name }}</a>
+        </td>
         <td>{{ card.author.username if card.author else card.author_id }}</td>
         <td>{{ card.gender }}</td>
         <td>
@@ -53,4 +72,6 @@
     </tbody>
   </table>
 </div>
+
+{{ render_pagination(pagination, 'admin.cards', args) }}
 {% endblock %}

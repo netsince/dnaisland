@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "macros/pagination.html" import render_pagination %}
 
 {% block title %}通知 · DNAISLAND{% endblock %}
 
@@ -24,6 +25,8 @@
       <div class="text-center text-muted py-4">暂时没有通知。</div>
       {% endfor %}
     </div>
+
+    {{ render_pagination(pagination, 'user.notifications', args) }}
   </div>
 </div>
 {% endblock %}
