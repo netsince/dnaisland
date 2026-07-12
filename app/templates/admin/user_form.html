@@ -32,6 +32,17 @@
     <input type="text" class="form-control" name="status"
            value="{{ user.status if user else 'active' }}">
   </div>
+  <div class="mb-3 form-check">
+    <input type="checkbox" class="form-check-input" name="verified" id="verified"
+           value="1" {% if user and user.verified %}checked{% endif %}>
+    <label class="form-check-label" for="verified">平台认证（在昵称旁显示认证徽章）</label>
+  </div>
+  <div class="mb-3">
+    <label class="form-label">认证说明（可选）</label>
+    <input type="text" class="form-control" name="verified_label" maxlength="50"
+           value="{{ user.verified_label if user and user.verified_label else '' }}"
+           placeholder="如：官方 / 知名创作者">
+  </div>
   <div class="mb-3">
     <label class="form-label">密码{% if user %}（留空则不修改）{% endif %}</label>
     <input type="password" class="form-control" name="password" {% if not user %}required{% endif %}>

@@ -23,9 +23,18 @@ class User(db.Model, UserMixin):
     website = db.Column(db.String(200), server_default="", nullable=True)  # 个人网站
     birthday = db.Column(db.Date, nullable=True)  # 生日
 
+    # 平台认证：由管理员授予，区别于 email_verified（邮箱验证）
+    verified = db.Column(db.Boolean, server_default="0", nullable=False, index=True)
+    verified_label = db.Column(db.String(50), nullable=True)  # 认证说明，如「官方」「知名创作者」
+
     @property
     def is_super_admin(self) -> bool:
         return self.role == "super_admin"
+
+    @property
+    def is_verified(self) -> bool:
+        """平台认证用户：由管理员授予的认证标记。"""
+        return bool(self.verified)
 
     @property
     def active_punishments(self):

@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "macros/pagination.html" import render_pagination %}
+{% from "macros/verified.html" import badge %}
 
 {% block title %}{{ u.nickname }} · DNAISLAND{% endblock %}
 
@@ -31,7 +32,7 @@
         {% endif %}
       </div>
       <div>
-        <h2 class="h4 mb-0">{{ u.nickname }}</h2>
+        <h2 class="h4 mb-0">{{ u.nickname }}{{ badge(u) }}</h2>
         <div class="text-muted">@{{ u.username }}{% if is_self %} · <span class="badge bg-primary">这是你</span>{% endif %}</div>
       </div>
     </div>

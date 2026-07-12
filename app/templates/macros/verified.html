@@ -1,0 +1,8 @@
+{% macro badge(user) %}
+  {% if user and user.verified %}
+    <span class="badge rounded-pill text-bg-primary align-middle ms-1"
+          title="{{ user.verified_label or '平台认证用户' }}">
+      ✓ 认证{% if user.verified_label %} · {{ user.verified_label }}{% endif %}
+    </span>
+  {% endif %}
+{% endmacro %}

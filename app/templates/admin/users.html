@@ -1,5 +1,6 @@
 {% extends "admin/base.html" %}
 {% from "macros/pagination.html" import render_pagination %}
+{% from "macros/verified.html" import badge %}
 
 {% block title %}用户管理 · DNAISLAND{% endblock %}
 
@@ -53,7 +54,7 @@
         <td>
           <a class="text-decoration-none" href="{{ url_for('user.profile', username=u.username) }}">{{ u.username }}</a>
         </td>
-        <td>{{ u.nickname }}</td>
+        <td>{{ u.nickname }}{{ badge(u) }}</td>
         <td>{{ u.email }}</td>
         <td>
           {% if u.role == 'super_admin' %}

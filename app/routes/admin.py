@@ -101,6 +101,9 @@ def user_create():
         if role not in ("user", "super_admin"):
             role = "user"
         u = User(username=username, nickname=nickname, email=email, role=role, status=status)
+        u.verified = request.form.get("verified") == "1"
+        label = (request.form.get("verified_label") or "").strip()
+        u.verified_label = label or None
         u.set_password(password)
         db.session.add(u)
         db.session.commit()
@@ -123,6 +126,9 @@ def user_edit(user_id):
         if u.role not in ("user", "super_admin"):
             u.role = "user"
         u.status = request.form.get("status") or u.status
+        u.verified = request.form.get("verified") == "1"
+        label = (request.form.get("verified_label") or "").strip()
+        u.verified_label = label or None
         new_pwd = request.form.get("password") or ""
         if new_pwd:
             u.set_password(new_pwd)
