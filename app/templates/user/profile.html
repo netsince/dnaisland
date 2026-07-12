@@ -7,6 +7,13 @@
 <div class="row justify-content-center">
   <div class="col-12 col-lg-8">
     <div class="d-flex align-items-center mb-3">
+      <div class="me-3 flex-shrink-0">
+        {% if u.avatar %}
+        <img src="{{ u.avatar }}" alt="头像" class="rounded-circle" style="width:96px;height:96px;object-fit:cover;">
+        {% else %}
+        <div class="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center" style="width:96px;height:96px;font-size:2.2rem;">{{ u.nickname[:1] }}</div>
+        {% endif %}
+      </div>
       <div>
         <h2 class="h4 mb-0">{{ u.nickname }}</h2>
         <div class="text-muted">@{{ u.username }}{% if is_self %} · <span class="badge bg-primary">这是你</span>{% endif %}</div>
@@ -17,11 +24,25 @@
     <span class="badge bg-danger mb-3">管理员</span>
     {% endif %}
 
-    <div class="d-flex align-items-center gap-3 mb-3">
+    <div class="card mb-3">
+      <div class="card-body">
+        {% if u.bio %}<p class="mb-2" style="white-space:pre-wrap;">{{ u.bio }}</p>{% endif %}
+        <ul class="list-unstyled mb-0 small text-muted">
+          {% if u.location %}<li class="mb-1">📍 {{ u.location }}</li>{% endif %}
+          {% if u.website %}<li class="mb-1">🔗 <a href="{{ u.website }}" target="_blank" rel="noopener">{{ u.website }}</a></li>{% endif %}
+          {% if u.birthday %}<li class="mb-1">🎂 {{ u.birthday.strftime('%Y-%m-%d') }}</li>{% endif %}
+          <li class="mb-1">📅 加入于 {{ u.created_at.strftime('%Y-%m-%d') if u.created_at else '—' }}</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
       <div><strong>{{ following_count }}</strong> <span class="text-muted">关注</span></div>
       <div><strong>{{ follower_count }}</strong> <span class="text-muted">粉丝</span></div>
       <div><strong>{{ pagination.total }}</strong> <span class="text-muted">角色卡</span></div>
-      {% if not is_self and not u.is_banned %}
+      {% if is_self %}
+      <a class="btn btn-sm btn-outline-secondary ms-2" href="{{ url_for('user.profile_edit') }}">编辑资料</a>
+      {% elif not u.is_banned %}
       <form method="post" action="{{ url_for('user.user_follow', username=u.username) }}" class="d-inline ms-2">
         <button class="btn btn-sm btn-outline-{{ 'primary' if is_following else 'success' }}">
           {{ '取消关注' if is_following else '关注' }}
@@ -36,7 +57,6 @@
       {% for card in cards %}
       <div class="col-12 col-md-6">
         <div class="card h-100">
-          {% set img = None %}
           <div class="card-body">
             <h6 class="card-title">
               <a class="text-decoration-none" href="{{ url_for('user.card_detail', card_id=card.id) }}">{{ card.name }}</a>

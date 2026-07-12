@@ -1,5 +1,7 @@
 import json
+import re
 
+from datetime import datetime
 from flask import (
     Blueprint,
     abort,
@@ -26,6 +28,7 @@ from ..models import (
     UserFollow,
 )
 from ..services.notification_service import notify
+from ..services.image_service import compress_image, crop_square_and_compress
 
 user_bp = Blueprint("user", __name__)
 
@@ -73,6 +76,52 @@ def profile(username):
         following_count=following_count,
         is_following=is_following,
     )
+
+
+@user_bp.route("/settings/profile", methods=["GET", "POST"])
+@login_required
+def profile_edit():
+    u = current_user
+    if request.method == "POST":
+        u.nickname = (request.form.get("nickname") or "").strip() or u.nickname
+        u.bio = (request.form.get("bio") or "").strip()
+        u.location = (request.form.get("location") or "").strip()
+
+        website = (request.form.get("website") or "").strip()
+        if website:
+            if not re.match(r"^https?://", website):
+                website = "https://" + website
+            u.website = website
+        else:
+            u.website = None
+
+        birthday_raw = (request.form.get("birthday") or "").strip()
+        if birthday_raw:
+            try:
+                u.birthday = datetime.strptime(birthday_raw, "%Y-%m-%d").date()
+            except ValueError:
+                flash("生日格式不正确，应为 YYYY-MM-DD", "warning")
+                return render_template("user/profile_edit.html", u=u)
+        else:
+            u.birthday = None
+
+        # 头像：移除 / 裁剪后上传 / 保留原值
+        if request.form.get("remove_avatar"):
+            u.avatar = None
+        else:
+            avatar_data = (request.form.get("avatar_data") or "").strip()
+            if avatar_data:
+                try:
+                    u.avatar = crop_square_and_compress(avatar_data)
+                except Exception:
+                    flash("头像处理失败，请重试", "warning")
+                    return render_template("user/profile_edit.html", u=u)
+
+        db.session.commit()
+        flash("个人资料已更新", "success")
+        return redirect(url_for("user.profile", username=u.username))
+
+    return render_template("user/profile_edit.html", u=u)
 
 
 @user_bp.route("/card/<card_id>")
@@ -366,7 +415,11 @@ def card_edit(card_id):
         for slot in ("square", "landscape", "portrait"):
             if img_dict.get(slot):
                 db.session.add(
-                    CardImage(card_id=card.id, slot=slot, data=str(img_dict[slot]))
+                    CardImage(
+                        card_id=card.id,
+                        slot=slot,
+                        data=compress_image(str(img_dict[slot])),
+                    )
                 )
 
         db.session.commit()

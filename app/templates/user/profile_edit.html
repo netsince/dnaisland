@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.css">
+{% endblock %}
+
+{% block title %}编辑资料 · DNAISLAND{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-lg-8">
+    <h2 class="h4 mb-3">编辑个人资料</h2>
+    <form method="post" id="profileForm">
+      <div class="mb-3">
+        <label class="form-label">头像</label>
+        <div class="mb-2">
+          <img id="avatarPreview" class="rounded-circle" alt="头像"
+               style="width:80px;height:80px;object-fit:cover;display:{% if u.avatar %}block{% else %}none{% endif %};"
+               src="{{ u.avatar or '' }}">
+          {% if not u.avatar %}
+          <div id="avatarPlaceholder" class="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center" style="width:80px;height:80px;font-size:1.8rem;">{{ u.nickname[:1] }}</div>
+          {% endif %}
+        </div>
+        <input class="form-control" type="file" id="avatarFile" accept="image/png,image/jpeg,image/gif,image/webp">
+        <div class="form-text">选择图片后会弹出裁剪框，按 1:1 裁剪为正方形头像。</div>
+        <input type="hidden" name="avatar_data" id="avatarData" value="">
+        {% if u.avatar %}
+        <div class="form-check mt-2">
+          <input class="form-check-input" type="checkbox" name="remove_avatar" id="removeAvatar">
+          <label class="form-check-label" for="removeAvatar">移除头像</label>
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">昵称</label>
+        <input class="form-control" type="text" name="nickname" value="{{ u.nickname }}" maxlength="80" required>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">个人简介</label>
+        <textarea class="form-control" name="bio" rows="4" maxlength="500" placeholder="介绍一下自己…">{{ u.bio or '' }}</textarea>
+      </div>
+
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <label class="form-label">所在地区</label>
+          <input class="form-control" type="text" name="location" value="{{ u.location or '' }}" maxlength="80" placeholder="如：上海">
+        </div>
+        <div class="col-md-6 mb-3">
+          <label class="form-label">生日</label>
+          <input class="form-control" type="date" name="birthday" value="{{ u.birthday.strftime('%Y-%m-%d') if u.birthday else '' }}">
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">个人网站</label>
+        <input class="form-control" type="url" name="website" value="{{ u.website or '' }}" maxlength="200" placeholder="https://example.com">
+      </div>
+
+      <div class="d-flex gap-2">
+        <button class="btn btn-primary" type="submit">保存</button>
+        <a class="btn btn-outline-secondary" href="{{ url_for('user.profile', username=u.username) }}">取消</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- 头像裁剪模态框 -->
+<div class="modal fade" id="cropModal" tabindex="-1" aria-labelledby="cropModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="cropModalLabel">裁剪头像</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+      </div>
+      <div class="modal-body">
+        <div style="max-height:60vh;">
+          <img id="cropImage" class="w-100">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+        <button type="button" class="btn btn-primary" id="cropConfirm">确认裁剪</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.js"></script>
+<script>
+  let cropper = null;
+  const avatarFile = document.getElementById('avatarFile');
+  const avatarData = document.getElementById('avatarData');
+  const preview = document.getElementById('avatarPreview');
+  const placeholder = document.getElementById('avatarPlaceholder');
+  const cropImg = document.getElementById('cropImage');
+  const cropModalEl = document.getElementById('cropModal');
+  const cropModal = new bootstrap.Modal(cropModalEl);
+
+  avatarFile.addEventListener('change', e => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      cropImg.src = ev.target.result;
+      cropModal.show();
+    };
+    reader.readAsDataURL(file);
+  });
+
+  cropModalEl.addEventListener('shown.bs.modal', () => {
+    if (cropper) cropper.destroy();
+    cropper = new Cropper(cropImg, { aspectRatio: 1, viewMode: 1, autoCropArea: 1 });
+  });
+
+  document.getElementById('cropConfirm').addEventListener('click', () => {
+    if (!cropper) return;
+    const canvas = cropper.getCroppedCanvas({ width: 512, height: 512 });
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+    avatarData.value = dataUrl;
+    preview.src = dataUrl;
+    preview.style.display = 'block';
+    if (placeholder) placeholder.style.display = 'none';
+    cropper.destroy();
+    cropper = null;
+    cropModal.hide();
+  });
+</script>
+{% endblock %}

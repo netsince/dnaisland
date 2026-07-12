@@ -16,6 +16,12 @@ class User(db.Model, UserMixin):
     status = db.Column(db.String(20), server_default="active")
     role = db.Column(db.String(20), server_default="user", nullable=False, index=True)
 
+    avatar = db.Column(db.Text, nullable=True)  # 头像（base64 data URL），可空
+    bio = db.Column(db.Text, nullable=True)  # 个人简介
+    location = db.Column(db.String(80), server_default="", nullable=True)  # 所在地区
+    website = db.Column(db.String(200), server_default="", nullable=True)  # 个人网站
+    birthday = db.Column(db.Date, nullable=True)  # 生日
+
     @property
     def is_super_admin(self) -> bool:
         return self.role == "super_admin"

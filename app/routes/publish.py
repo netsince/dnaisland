@@ -16,6 +16,7 @@ from sqlalchemy.exc import IntegrityError
 from ..extensions import db
 from ..models import Card, CardDialogueStyle, CardImage, CardTag
 from ..services.card_import_service import parse_export_package
+from ..services.image_service import compress_image
 
 publish_bp = Blueprint("publish", __name__, url_prefix="/publish")
 
@@ -88,7 +89,7 @@ def edit():
         if isinstance(img_dict, dict):
             for slot in ("square", "landscape", "portrait"):
                 if img_dict.get(slot):
-                    images[slot] = str(img_dict[slot])
+                    images[slot] = compress_image(str(img_dict[slot]))
     except json.JSONDecodeError:
         images = {}
 
