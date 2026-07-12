@@ -503,6 +503,14 @@ def report():
         valid_reasons = {r[0] for r in REPORT_REASONS}
         if reason not in valid_reasons:
             flash("请选择举报原因", "warning")
+        elif Report.query.filter_by(
+            reporter_id=current_user.id,
+            target_type=target_type,
+            target_id=canonical_id,
+            status="pending",
+        ).first():
+            flash("你已经举报过该对象，请勿重复提交", "info")
+            return redirect(target_url)
         else:
             db.session.add(
                 Report(

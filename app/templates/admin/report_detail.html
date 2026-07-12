@@ -39,6 +39,19 @@
   </div>
 </div>
 
+<div class="card mb-3">
+  <div class="card-header">重复举报情况</div>
+  <div class="card-body small">
+    <p class="mb-1">
+      该对象共被 <strong>{{ related_total }}</strong> 人举报，其中
+      <strong>{{ related_pending }}</strong> 条待处理。
+    </p>
+    {% if related_reporters %}
+    <div class="text-break">举报人：{{ related_reporters | join('、') }}</div>
+    {% endif %}
+  </div>
+</div>
+
 {% if report.status == 'pending' %}
 <div class="d-flex flex-wrap gap-2">
   <form method="post" action="{{ url_for('admin.report_resolve', report_id=report.id) }}" class="d-inline">

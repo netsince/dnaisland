@@ -51,7 +51,13 @@
           {% elif r.target_type == 'comment' %}评论
           {% else %}用户{% endif %}
         </td>
-        <td>{{ r.target_id }}</td>
+        <td>
+          {{ r.target_id }}
+          {% set _key = r.target_type ~ ':' ~ r.target_id %}
+          {% if counts.get(_key, 1) > 1 %}
+          <span class="badge bg-danger ms-1" title="同一对象被多人举报">×{{ counts[_key] }}</span>
+          {% endif %}
+        </td>
         <td>{{ r.reason }}</td>
         <td>{{ r.reporter.nickname if r.reporter else r.reporter_id }}</td>
         <td>

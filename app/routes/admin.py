@@ -329,6 +329,35 @@ def review_reject(card_id):
 
 
 # ---------------- 举报处理 ----------------
+def _resolve_target_reports(target_type, target_id, handler_id, notice=None):
+    """同一被举报对象（角色卡/评论/用户）的所有待处理举报，随本次处理一并标记完成，
+    并向举报人发送通知。
+
+    解决“一个对象被多人举报”时，管理员处理一条后其余仍显示待处理，
+    且举报人无法得知处理结果的问题。
+    """
+    pending = Report.query.filter_by(
+        target_type=target_type, target_id=str(target_id), status="pending"
+    ).all()
+    reporter_ids = sorted({r.reporter_id for r in pending})
+    if pending:
+        Report.query.filter_by(
+            target_type=target_type, target_id=str(target_id), status="pending"
+        ).update(
+            {
+                Report.status: "resolved",
+                Report.handled_at: db.func.now(),
+                Report.handled_by: handler_id,
+            },
+            synchronize_session=False,
+        )
+    if notice:
+        for rid in reporter_ids:
+            notify(rid, notice, type_="report")
+    db.session.commit()
+    return reporter_ids
+
+
 @admin_bp.route("/reports")
 @super_admin_required
 def reports():
@@ -348,6 +377,13 @@ def reports():
         .group_by(Report.status)
         .all()
     )
+    # 统计同一被举报对象被举报的次数，用于在列表中提示“多人举报”
+    rows = (
+        db.session.query(Report.target_type, Report.target_id, func.count(Report.id))
+        .group_by(Report.target_type, Report.target_id)
+        .all()
+    )
+    counts = {f"{t}:{i}": c for t, i, c in rows}
     return render_template(
         "admin/reports.html",
         reports=pagination.items,
@@ -356,6 +392,7 @@ def reports():
         status=status,
         target_type=target_type,
         stats=stats,
+        counts=counts,
     )
 
 
@@ -383,8 +420,23 @@ def report_detail(report_id):
             target_info["link"] = url_for("user.profile", username=u.username)
             target_info["snippet"] = f"用户名：{u.username}\n昵称：{u.nickname}\n邮箱：{u.email}"
 
+    # 统计同一被举报对象被多少人举报，便于管理员判断严重程度
+    related = Report.query.filter_by(
+        target_type=r.target_type, target_id=r.target_id
+    ).all()
+    related_total = len(related)
+    related_pending = sum(1 for x in related if x.status == "pending")
+    related_reporters = [
+        (x.reporter.nickname if x.reporter else x.reporter_id) for x in related
+    ]
+
     return render_template(
-        "admin/report_detail.html", report=r, target_info=target_info
+        "admin/report_detail.html",
+        report=r,
+        target_info=target_info,
+        related_total=related_total,
+        related_pending=related_pending,
+        related_reporters=related_reporters,
     )
 
 
@@ -394,11 +446,16 @@ def report_resolve(report_id):
     r = db.session.get(Report, report_id)
     if not r:
         abort(404)
-    r.status = "resolved"
-    r.handled_at = db.func.now()
-    r.handled_by = current_user.id
-    db.session.commit()
-    flash("已标记为该举报处理完毕（未采取额外措施）", "success")
+    _resolve_target_reports(
+        r.target_type,
+        r.target_id,
+        current_user.id,
+        notice="你举报的内容经平台审核已处理完毕，感谢你的反馈。",
+    )
+    flash(
+        "已标记为该举报处理完毕（未采取额外措施），同一对象的其他举报也已一并处理，并已通知举报人",
+        "success",
+    )
     return redirect(url_for("admin.reports"))
 
 
@@ -433,9 +490,19 @@ def report_action(report_id):
         flash("无效的处理操作", "warning")
         return redirect(url_for("admin.report_detail", report_id=report_id))
 
-    r.status = "resolved"
-    r.handled_at = db.func.now()
-    r.handled_by = current_user.id
     db.session.commit()
-    flash("已对举报对象采取处理措施", "success")
+    # 同一对象被多人举报时，本次处理一并解决所有待处理举报，并通知举报人
+    notice_map = {
+        "ban_user": "你举报的用户已被平台封禁处理，感谢你的反馈。",
+        "hide_card": "你举报的角色卡已被平台下架处理，感谢你的反馈。",
+        "delete_card": "你举报的角色卡已被平台删除处理，感谢你的反馈。",
+        "delete_comment": "你举报的评论已被平台删除处理，感谢你的反馈。",
+    }
+    _resolve_target_reports(
+        r.target_type, r.target_id, current_user.id, notice=notice_map.get(action)
+    )
+    flash(
+        "已对举报对象采取处理措施，同一对象的其他举报也已一并处理，并已通知举报人",
+        "success",
+    )
     return redirect(url_for("admin.reports"))
