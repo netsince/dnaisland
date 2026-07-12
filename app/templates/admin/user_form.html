@@ -1,0 +1,42 @@
+{% extends "admin/base.html" %}
+
+{% block title %}编辑用户 · DNAISLAND{% endblock %}
+
+{% block admin_content %}
+<h2 class="h4 mb-3">{{ '新建用户' if not user else '编辑用户 #' ~ user.id }}</h2>
+<form method="post" class="col-12 col-md-8">
+  <div class="mb-3">
+    <label class="form-label">用户名</label>
+    <input type="text" class="form-control" name="username"
+           value="{{ user.username if user else '' }}" required>
+  </div>
+  <div class="mb-3">
+    <label class="form-label">昵称</label>
+    <input type="text" class="form-control" name="nickname"
+           value="{{ user.nickname if user else '' }}" required>
+  </div>
+  <div class="mb-3">
+    <label class="form-label">邮箱</label>
+    <input type="email" class="form-control" name="email"
+           value="{{ user.email if user else '' }}" required>
+  </div>
+  <div class="mb-3">
+    <label class="form-label">角色</label>
+    <select class="form-select" name="role">
+      <option value="user" {% if user and user.role == 'user' %}selected{% endif %}>user</option>
+      <option value="super_admin" {% if user and user.role == 'super_admin' %}selected{% endif %}>super_admin</option>
+    </select>
+  </div>
+  <div class="mb-3">
+    <label class="form-label">状态</label>
+    <input type="text" class="form-control" name="status"
+           value="{{ user.status if user else 'active' }}">
+  </div>
+  <div class="mb-3">
+    <label class="form-label">密码{% if user %}（留空则不修改）{% endif %}</label>
+    <input type="password" class="form-control" name="password" {% if not user %}required{% endif %}>
+  </div>
+  <button class="btn btn-primary" type="submit">保存</button>
+  <a class="btn btn-link" href="{{ url_for('admin.users') }}">返回</a>
+</form>
+{% endblock %}

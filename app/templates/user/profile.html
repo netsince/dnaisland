@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}{{ u.nickname }} · DNAISLAND{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-lg-8">
+    <div class="d-flex align-items-center mb-3">
+      <div>
+        <h2 class="h4 mb-0">{{ u.nickname }}</h2>
+        <div class="text-muted">@{{ u.username }}{% if is_self %} · <span class="badge bg-primary">这是你</span>{% endif %}</div>
+      </div>
+    </div>
+
+    {% if u.role == 'super_admin' %}
+    <span class="badge bg-danger mb-3">管理员</span>
+    {% endif %}
+
+    <h5 class="mt-3">发布的角色卡（{{ cards|length }}）</h5>
+    <div class="row g-3">
+      {% for card in cards %}
+      <div class="col-12 col-md-6">
+        <div class="card h-100">
+          {% set img = None %}
+          <div class="card-body">
+            <h6 class="card-title">{{ card.name }}</h6>
+            <p class="text-muted small mb-1">{{ card.gender }}</p>
+            <p class="card-text small" style="white-space:pre-wrap;">{{ card.intro[:80] }}</p>
+            {% if card.status == 'approved' %}<span class="badge bg-success">已通过</span>
+            {% elif card.status == 'rejected' %}<span class="badge bg-danger">已拒绝</span>
+            {% else %}<span class="badge bg-warning text-dark">审核中</span>{% endif %}
+          </div>
+        </div>
+      </div>
+      {% else %}
+      <div class="col-12 text-muted">还没有发布任何角色卡。</div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

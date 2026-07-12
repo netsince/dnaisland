@@ -1,0 +1,40 @@
+{% extends "admin/base.html" %}
+
+{% block title %}审核 · DNAISLAND{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <h2 class="h4 mb-0">审核队列</h2>
+  <div class="btn-group btn-group-sm" role="group">
+    <a class="btn btn-outline-secondary {% if status == 'pending' %}active{% endif %}"
+       href="{{ url_for('admin.review', status='pending') }}">待审核</a>
+    <a class="btn btn-outline-secondary {% if status == 'approved' %}active{% endif %}"
+       href="{{ url_for('admin.review', status='approved') }}">已通过</a>
+    <a class="btn btn-outline-secondary {% if status == 'rejected' %}active{% endif %}"
+       href="{{ url_for('admin.review', status='rejected') }}">已拒绝</a>
+    <a class="btn btn-outline-secondary {% if status == 'all' %}active{% endif %}"
+       href="{{ url_for('admin.review', status='all') }}">全部</a>
+  </div>
+</div>
+
+<div class="mb-3 small text-muted">
+  统计：待审核 {{ stats.get('pending', 0) }} · 已通过 {{ stats.get('approved', 0) }} · 已拒绝 {{ stats.get('rejected', 0) }}
+</div>
+
+<div class="list-group">
+  {% for card in cards %}
+  <a href="{{ url_for('admin.review_detail', card_id=card.id) }}"
+     class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+    <span>
+      <strong>{{ card.name }}</strong>
+      <span class="text-muted">· {{ card.author.username if card.author else card.author_id }}</span>
+    </span>
+    {% if card.status == 'approved' %}<span class="badge bg-success">approved</span>
+    {% elif card.status == 'rejected' %}<span class="badge bg-danger">rejected</span>
+    {% else %}<span class="badge bg-warning text-dark">pending</span>{% endif %}
+  </a>
+  {% else %}
+  <div class="text-center text-muted py-4">暂无角色卡</div>
+  {% endfor %}
+</div>
+{% endblock %}

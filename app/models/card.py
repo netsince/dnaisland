@@ -19,8 +19,10 @@ class Card(db.Model):
     updated_at = db.Column(
         db.DateTime, server_default=db.func.now(), onupdate=db.func.now()
     )
-    status = db.Column(db.String(20), server_default="published")
+    status = db.Column(db.String(20), server_default="pending")
     view_count = db.Column(db.Integer, server_default="0")
+
+    author = db.relationship("User", backref="cards")
 
 
 class CardTag(db.Model):

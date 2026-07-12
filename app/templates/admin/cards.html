@@ -1,0 +1,56 @@
+{% extends "admin/base.html" %}
+
+{% block title %}角色卡管理 · DNAISLAND{% endblock %}
+
+{% block admin_content %}
+<h2 class="h4 mb-3">角色卡管理</h2>
+
+<form class="row g-2 mb-3" method="get">
+  <div class="col-auto flex-grow-1">
+    <input type="text" class="form-control" name="q" value="{{ q }}" placeholder="搜索名称">
+  </div>
+  <div class="col-auto">
+    <select class="form-select" name="status">
+      <option value="" {% if not status %}selected{% endif %}>全部状态</option>
+      <option value="pending" {% if status == 'pending' %}selected{% endif %}>pending</option>
+      <option value="approved" {% if status == 'approved' %}selected{% endif %}>approved</option>
+      <option value="rejected" {% if status == 'rejected' %}selected{% endif %}>rejected</option>
+    </select>
+  </div>
+  <div class="col-auto">
+    <button class="btn btn-outline-secondary" type="submit">筛选</button>
+  </div>
+</form>
+
+<div class="table-responsive">
+  <table class="table table-hover align-middle">
+    <thead>
+      <tr><th>名称</th><th>作者</th><th>性别</th><th>状态</th><th>提交时间</th><th>操作</th></tr>
+    </thead>
+    <tbody>
+      {% for card in cards %}
+      <tr>
+        <td>{{ card.name }}</td>
+        <td>{{ card.author.username if card.author else card.author_id }}</td>
+        <td>{{ card.gender }}</td>
+        <td>
+          {% if card.status == 'approved' %}<span class="badge bg-success">approved</span>
+          {% elif card.status == 'rejected' %}<span class="badge bg-danger">rejected</span>
+          {% else %}<span class="badge bg-warning text-dark">pending</span>{% endif %}
+        </td>
+        <td>{{ card.created_at.strftime('%Y-%m-%d %H:%M') if card.created_at else '' }}</td>
+        <td>
+          <a class="btn btn-sm btn-outline-primary" href="{{ url_for('admin.card_edit', card_id=card.id) }}">编辑</a>
+          <form method="post" action="{{ url_for('admin.card_delete', card_id=card.id) }}" class="d-inline"
+                onsubmit="return confirm('确认删除该角色卡？');">
+            <button class="btn btn-sm btn-outline-danger">删除</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="text-center text-muted">暂无角色卡</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

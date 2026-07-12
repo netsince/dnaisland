@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}通知 · DNAISLAND{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-lg-8">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h2 class="h4 mb-0">通知{% if unread %}<span class="badge bg-danger ms-1">{{ unread }} 未读</span>{% endif %}</h2>
+      <form method="post" action="{{ url_for('user.notifications_read_all') }}">
+        <button class="btn btn-sm btn-outline-secondary" type="submit">全部标为已读</button>
+      </form>
+    </div>
+
+    <div class="list-group">
+      {% for n in items %}
+      <div class="list-group-item {% if not n.is_read %}list-group-item-primary{% endif %}">
+        <div class="d-flex justify-content-between">
+          <span style="white-space:pre-wrap;">{{ n.message }}</span>
+          <small class="text-muted">{{ n.created_at.strftime('%Y-%m-%d %H:%M') if n.created_at else '' }}</small>
+        </div>
+      </div>
+      {% else %}
+      <div class="text-center text-muted py-4">暂时没有通知。</div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

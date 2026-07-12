@@ -2,6 +2,7 @@ import os
 
 from dotenv import load_dotenv
 from flask import Flask
+from flask_login import current_user
 
 from .config import config
 from .extensions import bcrypt, db, login_manager, mail, migrate
@@ -33,14 +34,27 @@ def create_app(config_object=None):
     bcrypt.init_app(app)
     mail.init_app(app)
 
-    from .routes import auth_bp, main_bp, publish_bp
+    from .routes import admin_bp, auth_bp, main_bp, publish_bp, user_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(publish_bp)
+    app.register_blueprint(admin_bp)
+    app.register_blueprint(user_bp)
 
     from .commands import init_commands
 
     init_commands(app)
+
+    @app.context_processor
+    def inject_unread():
+        from .services.notification_service import unread_count
+
+        if current_user.is_authenticated:
+            try:
+                return {"unread_notifications": unread_count(current_user.id)}
+            except Exception:
+                return {"unread_notifications": 0}
+        return {"unread_notifications": 0}
 
     return app

@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}我的发布 · DNAISLAND{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-lg-8">
+    <h2 class="h4 mb-3">我的发布</h2>
+
+    <div class="row g-3 mb-4">
+      <div class="col-4">
+        <div class="card text-center">
+          <div class="card-body">
+            <div class="h3 mb-0">{{ pending }}</div>
+            <div class="small text-muted">审核中</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-4">
+        <div class="card text-center">
+          <div class="card-body">
+            <div class="h3 mb-0 text-success">{{ approved }}</div>
+            <div class="small text-muted">已通过</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-4">
+        <div class="card text-center">
+          <div class="card-body">
+            <div class="h3 mb-0 text-danger">{{ rejected }}</div>
+            <div class="small text-muted">已拒绝</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <a class="btn btn-primary btn-sm mb-3" href="{{ url_for('publish.start') }}">+ 发布新角色卡</a>
+
+    <div class="list-group">
+      {% for card in cards %}
+      <div class="list-group-item d-flex justify-content-between align-items-center">
+        <span>
+          <strong>{{ card.name }}</strong>
+          <span class="text-muted">· {{ card.created_at.strftime('%Y-%m-%d') if card.created_at else '' }}</span>
+        </span>
+        {% if card.status == 'approved' %}<span class="badge bg-success">已通过</span>
+        {% elif card.status == 'rejected' %}<span class="badge bg-danger">已拒绝</span>
+        {% else %}<span class="badge bg-warning text-dark">审核中</span>{% endif %}
+      </div>
+      {% else %}
+      <div class="text-center text-muted py-4">还没有发布任何角色卡。</div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

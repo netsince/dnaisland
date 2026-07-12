@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+  <div class="row">
+    <nav class="col-md-3 col-lg-2 d-md-block bg-light sidebar py-3" style="min-height: calc(100vh - 56px);">
+      <div class="position-sticky">
+        <div class="px-3 mb-3 text-muted small text-uppercase">管理后台</div>
+        <ul class="nav flex-column nav-pills">
+          <li class="nav-item">
+            <a class="nav-link {% if request.endpoint.startswith('admin.users') %}active{% endif %}"
+               href="{{ url_for('admin.users') }}">用户管理</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% if request.endpoint.startswith('admin.cards') %}active{% endif %}"
+               href="{{ url_for('admin.cards') }}">角色卡管理</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% if request.endpoint.startswith('admin.review') %}active{% endif %}"
+               href="{{ url_for('admin.review') }}">审核</a>
+          </li>
+        </ul>
+      </div>
+    </nav>
+    <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-3">
+      {% block admin_content %}{% endblock %}
+    </main>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,47 @@
+{% extends "admin/base.html" %}
+
+{% block title %}编辑角色卡 · DNAISLAND{% endblock %}
+
+{% block admin_content %}
+<h2 class="h4 mb-3">编辑角色卡 #{{ card.id }}</h2>
+<form method="post" class="col-12 col-lg-8">
+  <div class="mb-3">
+    <label class="form-label">名称</label>
+    <input type="text" class="form-control" name="name" value="{{ card.name }}" required>
+  </div>
+  <div class="mb-3">
+    <label class="form-label">性别</label>
+    <select class="form-select" name="gender">
+      {% for g in ['男','女','无性','其他'] %}
+      <option value="{{ g }}" {% if card.gender == g %}selected{% endif %}>{{ g }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="mb-3">
+    <label class="form-label">人设</label>
+    <textarea class="form-control" name="persona" rows="6">{{ card.persona }}</textarea>
+  </div>
+  <div class="mb-3">
+    <label class="form-label">介绍</label>
+    <textarea class="form-control" name="intro" rows="3">{{ card.intro }}</textarea>
+  </div>
+  <div class="mb-3">
+    <label class="form-label">开场白</label>
+    <textarea class="form-control" name="opening" rows="3">{{ card.opening }}</textarea>
+  </div>
+  <div class="mb-3">
+    <label class="form-label">标签（逗号分隔）</label>
+    <input type="text" class="form-control" name="tags" value="{{ tags }}">
+  </div>
+  <div class="mb-3">
+    <label class="form-label">状态</label>
+    <select class="form-select" name="status">
+      <option value="pending" {% if card.status == 'pending' %}selected{% endif %}>pending</option>
+      <option value="approved" {% if card.status == 'approved' %}selected{% endif %}>approved</option>
+      <option value="rejected" {% if card.status == 'rejected' %}selected{% endif %}>rejected</option>
+    </select>
+  </div>
+  <button class="btn btn-primary" type="submit">保存</button>
+  <a class="btn btn-link" href="{{ url_for('admin.cards') }}">返回</a>
+</form>
+{% endblock %}
