@@ -1,0 +1,302 @@
+{% extends "base.html" %}
+
+{% block head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.css">
+{% endblock %}
+
+{% block title %}编辑角色卡 · DNAISLAND{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-lg-8">
+    <h2 class="h4 mb-4">编辑角色卡</h2>
+    <form method="post" action="{{ url_for('publish.edit') }}" id="cardForm">
+      <input type="hidden" name="card_id" value="{{ prefill.id if prefill else '' }}">
+      <input type="hidden" name="original_link" value="{{ prefill.original_link if prefill else '' }}">
+      <input type="hidden" name="images_json" id="imagesJson" value="">
+      <input type="hidden" name="dialogue_style_json" id="dialogueStyleJson" value="">
+      <input type="hidden" name="tags" id="tagsInput" value="{{ prefill.tags|join(',') if prefill else '' }}">
+
+      <div class="mb-3">
+        <label class="form-label">名称</label>
+        <input type="text" class="form-control" name="name"
+               value="{{ prefill.name if prefill else '' }}" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">性别</label>
+        <select class="form-select" name="gender" required>
+          {% set g = prefill.gender if prefill else '无性' %}
+          <option value="男" {% if g == '男' %}selected{% endif %}>男</option>
+          <option value="女" {% if g == '女' %}selected{% endif %}>女</option>
+          <option value="无性" {% if g == '无性' %}selected{% endif %}>无性</option>
+          <option value="其他" {% if g == '其他' %}selected{% endif %}>其他</option>
+        </select>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">人设</label>
+        <textarea class="form-control" name="persona" rows="6">{{ prefill.persona if prefill else '' }}</textarea>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">介绍</label>
+        <textarea class="form-control" name="intro" rows="3">{{ prefill.intro if prefill else '' }}</textarea>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">开场白</label>
+        <textarea class="form-control" name="opening" rows="3">{{ prefill.opening if prefill else '' }}</textarea>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">标签</label>
+        <div id="tagChips" class="d-flex flex-wrap gap-2 mb-2"></div>
+        <input type="text" class="form-control" id="tagInput"
+               placeholder="输入标签后按回车或逗号添加，例如：温柔、傲娇">
+        <div class="form-text">点击标签上的 × 可移除。</div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">对话风格</label>
+        <div id="dialogueList"></div>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="addTurn">+ 添加一组</button>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">图片</label>
+        <div class="row g-3" id="imageGrid">
+          {% for slot in ["square", "landscape", "portrait"] %}
+          <div class="col-12 col-md-4">
+            <div class="border rounded p-2 h-100">
+              <div class="form-label small">
+                {% if slot == 'square' %}1:1 形象
+                {% elif slot == 'landscape' %}16:9 形象
+                {% else %}9:16 形象{% endif %}
+              </div>
+              <img class="img-fluid rounded mb-2 bg-light" id="img-preview-{{ slot }}"
+                   alt="{{ slot }}" style="min-height:80px;width:100%;object-fit:cover;">
+              <input type="file" class="form-control form-control-sm mb-2"
+                     accept="image/*" data-slot="{{ slot }}">
+              <button type="button" class="btn btn-sm btn-outline-danger w-100"
+                      data-clear="{{ slot }}">移除</button>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="form-text">选择图片后会弹出裁剪框，按对应比例裁剪后确认。</div>
+      </div>
+
+      <button type="submit" class="btn btn-primary">提交</button>
+    </form>
+  </div>
+</div>
+
+<!-- 裁剪模态框 -->
+<div class="modal fade" id="cropModal" tabindex="-1" aria-labelledby="cropModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="cropModalLabel">裁剪图片</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+      </div>
+      <div class="modal-body">
+        <div class="form-check form-check-inline mb-2">
+          <input class="form-check-input" type="checkbox" id="cropFree">
+          <label class="form-check-label" for="cropFree">自由比例</label>
+        </div>
+        <div style="max-height:60vh;">
+          <img id="cropImage" class="w-100">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+        <button type="button" class="btn btn-primary" id="cropConfirm">确认裁剪</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.js"></script>
+<script>
+  const dialogueInitial = {{ dialogue_initial|tojson|safe }};
+  const imagesInitial = {{ images_initial|tojson|safe }};
+  const ASPECT = { square: 1, landscape: 16 / 9, portrait: 9 / 16 };
+
+  // ---- 图片 ----
+  let imagesObj = Object.assign({}, imagesInitial);
+  function syncImages() {
+    document.getElementById('imagesJson').value = JSON.stringify(imagesObj);
+  }
+  function refreshPreview(slot) {
+    const el = document.getElementById('img-preview-' + slot);
+    if (imagesObj[slot]) {
+      el.src = imagesObj[slot];
+      el.style.display = '';
+    } else {
+      el.removeAttribute('src');
+      el.style.display = 'none';
+    }
+  }
+
+  let cropper = null;
+  let currentSlot = null;
+  const cropImg = document.getElementById('cropImage');
+  const cropModalEl = document.getElementById('cropModal');
+  const cropModal = new bootstrap.Modal(cropModalEl);
+
+  document.querySelectorAll('input[type="file"][data-slot]').forEach(inp => {
+    inp.addEventListener('change', e => {
+      const slot = e.target.dataset.slot;
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      currentSlot = slot;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        cropImg.src = ev.target.result;
+        cropModal.show();
+      };
+      reader.readAsDataURL(file);
+    });
+  });
+
+  cropModalEl.addEventListener('shown.bs.modal', () => {
+    if (cropper) cropper.destroy();
+    const free = document.getElementById('cropFree').checked;
+    cropper = new Cropper(cropImg, {
+      aspectRatio: free ? NaN : (ASPECT[currentSlot] || NaN),
+      viewMode: 1,
+      autoCropArea: 1,
+    });
+  });
+
+  document.getElementById('cropFree').addEventListener('change', () => {
+    if (!cropper) return;
+    cropper.setAspectRatio(document.getElementById('cropFree').checked ? NaN : (ASPECT[currentSlot] || NaN));
+  });
+
+  document.getElementById('cropConfirm').addEventListener('click', () => {
+    if (!cropper) return;
+    const canvas = cropper.getCroppedCanvas();
+    const dataUrl = canvas.toDataURL('image/png');
+    imagesObj[currentSlot] = dataUrl;
+    refreshPreview(currentSlot);
+    syncImages();
+    cropper.destroy();
+    cropper = null;
+    cropModal.hide();
+  });
+
+  document.querySelectorAll('[data-clear]').forEach(btn => {
+    btn.addEventListener('click', e => {
+      const slot = e.target.dataset.clear;
+      imagesObj[slot] = "";
+      const fi = document.querySelector('input[type="file"][data-slot="' + slot + '"]');
+      if (fi) fi.value = "";
+      refreshPreview(slot);
+      syncImages();
+    });
+  });
+  ["square", "landscape", "portrait"].forEach(refreshPreview);
+  syncImages();
+
+  // ---- 标签 chips ----
+  let tagsArr = (document.getElementById('tagsInput').value || "")
+    .split(",").map(s => s.trim()).filter(Boolean);
+  const tagChips = document.getElementById('tagChips');
+  const tagInput = document.getElementById('tagInput');
+  function syncTags() {
+    document.getElementById('tagsInput').value = tagsArr.join(",");
+  }
+  function renderTags() {
+    tagChips.innerHTML = "";
+    tagsArr.forEach((t, i) => {
+      const chip = document.createElement('span');
+      chip.className = 'badge bg-primary d-inline-flex align-items-center gap-1';
+      chip.innerHTML = '<span>' + escapeHtml(t) + '</span>' +
+        '<button type="button" class="btn-close btn-close-white" ' +
+        'style="font-size:.6rem" data-idx="' + i + '" aria-label="移除"></button>';
+      tagChips.appendChild(chip);
+    });
+    tagChips.querySelectorAll('[data-idx]').forEach(b => {
+      b.addEventListener('click', ev => {
+        tagsArr.splice(+ev.target.dataset.idx, 1);
+        renderTags();
+        syncTags();
+      });
+    });
+  }
+  function addTag(raw) {
+    const t = (raw || "").trim();
+    if (!t) return;
+    if (tagsArr.includes(t)) return;
+    tagsArr.push(t);
+    renderTags();
+    syncTags();
+  }
+  tagInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      addTag(tagInput.value);
+      tagInput.value = "";
+    } else if (e.key === 'Backspace' && tagInput.value === '' && tagsArr.length) {
+      tagsArr.pop();
+      renderTags();
+      syncTags();
+    }
+  });
+  tagInput.addEventListener('blur', () => {
+    if (tagInput.value.trim()) { addTag(tagInput.value); tagInput.value = ""; }
+  });
+  renderTags();
+  syncTags();
+
+  // ---- 对话风格 ----
+  let dialogueItems = JSON.parse(JSON.stringify(dialogueInitial));
+  const dialogueList = document.getElementById('dialogueList');
+  const dialogueStyleJson = document.getElementById('dialogueStyleJson');
+  dialogueStyleJson.value = JSON.stringify(dialogueItems);
+
+  function escapeHtml(s) {
+    return (s || '').replace(/[&<>"']/g, c => (
+      {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]
+    ));
+  }
+
+  function renderDialogue() {
+    dialogueList.innerHTML = '';
+    dialogueItems.forEach((t, i) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'border rounded p-2 mb-2';
+      wrap.innerHTML =
+        '<div class="mb-2"><label class="form-label small">用户</label>' +
+        '<textarea class="form-control" data-i="' + i + '" data-k="user" rows="2">' +
+        escapeHtml(t.user) + '</textarea></div>' +
+        '<div class="mb-2"><label class="form-label small">角色</label>' +
+        '<textarea class="form-control" data-i="' + i + '" data-k="assistant" rows="2">' +
+        escapeHtml(t.assistant) + '</textarea></div>' +
+        '<button type="button" class="btn btn-sm btn-outline-danger" data-del="' + i + '">删除</button>';
+      dialogueList.appendChild(wrap);
+    });
+    dialogueList.querySelectorAll('textarea').forEach(ta => {
+      ta.addEventListener('input', e => {
+        dialogueItems[+e.target.dataset.i][e.target.dataset.k] = e.target.value;
+        dialogueStyleJson.value = JSON.stringify(dialogueItems);
+      });
+    });
+    dialogueList.querySelectorAll('[data-del]').forEach(btn => {
+      btn.addEventListener('click', e => {
+        dialogueItems.splice(+e.target.dataset.del, 1);
+        dialogueStyleJson.value = JSON.stringify(dialogueItems);
+        renderDialogue();
+      });
+    });
+  }
+
+  document.getElementById('addTurn').addEventListener('click', () => {
+    dialogueItems.push({user: '', assistant: ''});
+    dialogueStyleJson.value = JSON.stringify(dialogueItems);
+    renderDialogue();
+  });
+
+  renderDialogue();
+</script>
+{% endblock %}

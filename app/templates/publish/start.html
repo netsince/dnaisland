@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}发布角色卡 · DNAISLAND{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-md-8 col-lg-6">
+    <h2 class="h4 mb-4 text-center">发布角色卡</h2>
+    <div class="d-grid gap-3">
+      <button type="button" class="btn btn-primary btn-lg" id="btnJson">从 JSON 识别</button>
+      <a href="{{ url_for('publish.edit') }}" class="btn btn-outline-primary btn-lg text-center">直接开始编辑</a>
+    </div>
+
+    <form method="post" action="{{ url_for('publish.parse') }}" class="mt-4" id="jsonForm" style="display:none">
+      <label for="json" class="form-label">粘贴从客户端导出的 JSON</label>
+      <textarea class="form-control" id="json" name="json" rows="12"
+                placeholder="在此粘贴从 DNA 客户端复制出的角色卡 JSON…"></textarea>
+      <button type="submit" class="btn btn-primary mt-3">识别并继续</button>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const btn = document.getElementById('btnJson');
+  const form = document.getElementById('jsonForm');
+  btn.addEventListener('click', () => {
+    form.style.display = form.style.display === 'none' ? 'block' : 'none';
+  });
+</script>
+{% endblock %}

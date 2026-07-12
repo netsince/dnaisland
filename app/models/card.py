@@ -1,3 +1,5 @@
+from sqlalchemy.dialects.mysql import LONGTEXT
+
 from ..extensions import db
 
 
@@ -44,4 +46,4 @@ class CardImage(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     card_id = db.Column(db.String(36), db.ForeignKey("cards.id"), nullable=False)
     slot = db.Column(db.String(20), nullable=False)  # square | landscape | portrait
-    data = db.Column(db.Text, nullable=False)  # base64 或外链路径
+    data = db.Column(LONGTEXT, nullable=False)  # base64 data URI

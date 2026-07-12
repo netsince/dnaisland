@@ -14,6 +14,11 @@ class User(db.Model, UserMixin):
     password_hash = db.Column(db.String(255), nullable=False)
     created_at = db.Column(db.DateTime, server_default=db.func.now())
     status = db.Column(db.String(20), server_default="active")
+    role = db.Column(db.String(20), server_default="user", nullable=False, index=True)
+
+    @property
+    def is_super_admin(self) -> bool:
+        return self.role == "super_admin"
 
     def set_password(self, password):
         self.password_hash = bcrypt.generate_password_hash(password).decode("utf-8")
