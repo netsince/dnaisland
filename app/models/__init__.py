@@ -8,6 +8,7 @@ from .card import (
     Comment,
 )
 from .notification import Notification
+from .punishment import Punishment
 from .report import Report
 from .user import User, UserFollow
 from .verification_code import VerificationCode
@@ -23,6 +24,7 @@ __all__ = [
     "CardFavorite",
     "Comment",
     "Notification",
+    "Punishment",
     "Report",
     "VerificationCode",
 ]

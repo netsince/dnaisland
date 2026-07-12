@@ -59,11 +59,7 @@
   </form>
 
   {% if report.target_type == 'user' %}
-  <form method="post" action="{{ url_for('admin.report_action', report_id=report.id) }}" class="d-inline"
-        onsubmit="return confirm('确认封禁该用户？');">
-    <input type="hidden" name="action" value="ban_user">
-    <button class="btn btn-sm btn-outline-danger">封禁该用户</button>
-  </form>
+  <a class="btn btn-sm btn-outline-danger" href="{{ url_for('admin.user_punish', user_id=report.target_id) }}">管理该用户处罚</a>
   {% elif report.target_type == 'card' %}
   <form method="post" action="{{ url_for('admin.report_action', report_id=report.id) }}" class="d-inline"
         onsubmit="return confirm('确认隐藏该角色卡？');">

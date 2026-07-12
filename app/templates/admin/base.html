@@ -23,6 +23,10 @@
             <a class="nav-link {% if request.endpoint.startswith('admin.reports') %}active{% endif %}"
                href="{{ url_for('admin.reports') }}">举报管理</a>
           </li>
+          <li class="nav-item">
+            <a class="nav-link {% if request.endpoint.startswith('admin.punish_appeals') %}active{% endif %}"
+               href="{{ url_for('admin.punish_appeals') }}">处罚申诉</a>
+          </li>
         </ul>
       </div>
     </nav>

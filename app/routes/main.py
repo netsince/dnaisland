@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request
+from flask_login import current_user
 
-from ..extensions import db
-from ..models import Card, CardImage, User
+from ..models import Card, CardImage
 
 main_bp = Blueprint("main", __name__)
 
@@ -9,9 +9,9 @@ main_bp = Blueprint("main", __name__)
 @main_bp.route("/")
 def index():
     page = request.args.get("page", 1, type=int)
+    # 信息层面统一过滤：被「屏蔽全部角色卡」作者的卡片不会出现在首页
     pagination = (
-        Card.query.join(User, Card.author_id == User.id)
-        .filter(Card.status == "approved", Card.is_hidden.is_(False), User.role != "banned")
+        Card.visible_to(current_user)
         .order_by(Card.view_count.desc(), Card.created_at.desc())
         .paginate(page=page, per_page=12, error_out=False)
     )

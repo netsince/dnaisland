@@ -1,0 +1,56 @@
+{% extends "admin/base.html" %}
+
+{% block title %}处罚管理 · DNAISLAND{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2 class="h4 mb-0">处罚管理 · {{ u.nickname }}</h2>
+  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin.users') }}">← 返回用户列表</a>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header">当前生效的处罚</div>
+  <div class="card-body">
+    {% if active %}
+    <ul class="list-group">
+      {% for p in active %}
+      <li class="list-group-item d-flex justify-content-between align-items-center">
+        <div>
+          <strong>{{ punishment_types[p.type] }}</strong>
+          {% if p.reason %}<span class="text-muted small"> · {{ p.reason }}</span>{% endif %}
+          <div class="small text-muted">施加于 {{ p.created_at.strftime('%Y-%m-%d %H:%M') if p.created_at else '—' }}</div>
+        </div>
+        <form method="post" action="{{ url_for('admin.punish_revoke', punishment_id=p.id) }}"
+              onsubmit="return confirm('确认解除该处罚？');">
+          <button class="btn btn-sm btn-outline-success">解除</button>
+        </form>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-muted mb-0">该用户当前没有任何生效中的处罚。</p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">施加新处罚（可多选，叠加生效）</div>
+  <div class="card-body">
+    <form method="post">
+      {% for key, label in punishment_types.items() %}
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" name="types" value="{{ key }}"
+               id="pt_{{ key }}"
+               {% if active|selectattr('type','equalto',key)|list %}checked disabled{% endif %}>
+        <label class="form-check-label" for="pt_{{ key }}">{{ label }}</label>
+      </div>
+      {% endfor %}
+      <div class="mb-3 mt-2">
+        <label class="form-label">处罚理由（可选，将通知用户）</label>
+        <textarea class="form-control" name="reason" rows="2"></textarea>
+      </div>
+      <button class="btn btn-danger" type="submit">施加处罚</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

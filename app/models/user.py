@@ -1,6 +1,7 @@
 from flask_login import UserMixin
 
 from ..extensions import bcrypt, db
+from .punishment import Punishment
 
 
 class User(db.Model, UserMixin):
@@ -27,8 +28,46 @@ class User(db.Model, UserMixin):
         return self.role == "super_admin"
 
     @property
-    def is_banned(self) -> bool:
-        return self.role == "banned"
+    def active_punishments(self):
+        """该用户当前生效的全部处罚（Punishment 对象列表）。"""
+        return (
+            Punishment.query.filter_by(user_id=self.id, status="active")
+            .order_by(Punishment.created_at.desc())
+            .all()
+        )
+
+    @property
+    def active_punishment_types(self):
+        return {p.type for p in self.active_punishments}
+
+    def has_punishment(self, ptype: str) -> bool:
+        return ptype in self.active_punishment_types
+
+    # —— 各项具体限制（由生效处罚推导）——
+    @property
+    def is_muted(self) -> bool:
+        """禁言：无法发表评论。"""
+        return self.has_punishment("mute")
+
+    @property
+    def is_profile_banned(self) -> bool:
+        """禁止主页被访问：他人打开其主页时仅可见受限提示与处罚列表。"""
+        return self.has_punishment("profile_banned")
+
+    @property
+    def is_edit_profile_banned(self) -> bool:
+        """禁止更改资料。"""
+        return self.has_punishment("no_edit_profile")
+
+    @property
+    def is_comments_hidden(self) -> bool:
+        """屏蔽全部评论：其评论对他人不可见。"""
+        return self.has_punishment("hide_comments")
+
+    @property
+    def is_cards_hidden(self) -> bool:
+        """屏蔽全部角色卡：其角色卡对他人不可见，且不出现在首页。"""
+        return self.has_punishment("hide_cards")
 
     def set_password(self, password):
         self.password_hash = bcrypt.generate_password_hash(password).decode("utf-8")

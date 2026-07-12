@@ -19,8 +19,15 @@ from ..models import (
     CardTag,
     Comment,
     Notification,
+    Punishment,
     Report,
     User,
+)
+from ..models.punishment import (
+    APPEAL_ACCEPTED,
+    APPEAL_PENDING,
+    APPEAL_REJECTED,
+    PUNISHMENT_TYPES,
 )
 from ..services.notification_service import notify
 
@@ -91,7 +98,7 @@ def user_create():
         if User.query.filter_by(email=email).first():
             flash("邮箱已存在", "danger")
             return render_template("admin/user_form.html", user=None)
-        if role not in ("user", "super_admin", "banned"):
+        if role not in ("user", "super_admin"):
             role = "user"
         u = User(username=username, nickname=nickname, email=email, role=role, status=status)
         u.set_password(password)
@@ -113,7 +120,7 @@ def user_edit(user_id):
         u.nickname = (request.form.get("nickname") or "").strip() or u.nickname
         u.email = (request.form.get("email") or "").strip() or u.email
         u.role = request.form.get("role") or u.role
-        if u.role not in ("user", "super_admin", "banned"):
+        if u.role not in ("user", "super_admin"):
             u.role = "user"
         u.status = request.form.get("status") or u.status
         new_pwd = request.form.get("password") or ""
@@ -140,31 +147,135 @@ def user_delete(user_id):
     return redirect(url_for("admin.users"))
 
 
-@admin_bp.route("/users/<int:user_id>/ban", methods=["POST"])
+@admin_bp.route("/users/<int:user_id>/punish", methods=["GET", "POST"])
 @super_admin_required
-def user_ban(user_id):
+def user_punish(user_id):
     u = db.session.get(User, user_id)
     if not u:
         abort(404)
-    if u.id == current_user.id:
-        flash("不能封禁当前登录的账号", "danger")
-        return redirect(url_for("admin.users"))
-    u.role = "banned"
-    db.session.commit()
-    flash(f'已封禁用户"{u.username}"', "success")
-    return redirect(url_for("admin.users"))
+
+    if request.method == "POST":
+        selected = request.form.getlist("types")
+        reason = (request.form.get("reason") or "").strip()
+        valid = [t for t in selected if t in PUNISHMENT_TYPES]
+        if not valid:
+            flash("请至少选择一项处罚", "warning")
+            return redirect(url_for("admin.user_punish", user_id=user_id))
+
+        active = {p.type for p in u.active_punishments}
+        applied = []
+        for ptype in valid:
+            if ptype in active:
+                continue
+            p = Punishment(
+                user_id=u.id,
+                type=ptype,
+                reason=reason,
+                handled_by=current_user.id,
+            )
+            db.session.add(p)
+            applied.append(ptype)
+        # 施加副作用（重置资料 / 清除头像）
+        for ptype in valid:
+            if ptype == "reset_profile":
+                u.nickname = f"UID{u.id}"
+                u.bio = None
+                u.location = None
+                u.website = None
+                u.birthday = None
+            elif ptype == "clear_avatar":
+                u.avatar = None
+        db.session.commit()
+
+        if applied:
+            summary = "、".join(PUNISHMENT_TYPES[t] for t in applied)
+            notify(
+                u.id,
+                f"你被平台施加了以下处罚：{summary}。可在「我的处罚」中查看与申诉。",
+                type_="punish",
+            )
+            db.session.commit()
+            flash(f'已对用户"{u.username}"施加处罚：{summary}', "success")
+        else:
+            flash("所选处罚均已生效，未做改动", "info")
+        return redirect(url_for("admin.user_punish", user_id=user_id))
+
+    return render_template(
+        "admin/user_punish.html",
+        u=u,
+        punishment_types=PUNISHMENT_TYPES,
+        active=u.active_punishments,
+    )
 
 
-@admin_bp.route("/users/<int:user_id>/unban", methods=["POST"])
+@admin_bp.route("/punish/<int:punishment_id>/revoke", methods=["POST"])
 @super_admin_required
-def user_unban(user_id):
-    u = db.session.get(User, user_id)
-    if not u:
+def punish_revoke(punishment_id):
+    p = db.session.get(Punishment, punishment_id)
+    if not p:
         abort(404)
-    u.role = "user"
-    db.session.commit()
-    flash(f'已解除封禁用户"{u.username}"', "success")
-    return redirect(url_for("admin.users"))
+    if p.is_active:
+        p.status = "revoked"
+        db.session.commit()
+        notify(
+            p.user_id,
+            f"你的一项处罚已被解除：{PUNISHMENT_TYPES.get(p.type, p.type)}。",
+            type_="punish",
+        )
+        db.session.commit()
+        flash("已解除该处罚", "success")
+    return redirect(url_for("admin.user_punish", user_id=p.user_id))
+
+
+@admin_bp.route("/punish/appeals")
+@super_admin_required
+def punish_appeals():
+    items = (
+        Punishment.query.filter_by(appeal_status=APPEAL_PENDING)
+        .order_by(Punishment.appeal_at.asc())
+        .all()
+    )
+    return render_template("admin/punish_appeals.html", items=items)
+
+
+@admin_bp.route("/punish/<int:punishment_id>/appeal-resolve", methods=["POST"])
+@super_admin_required
+def punish_appeal_resolve(punishment_id):
+    p = db.session.get(Punishment, punishment_id)
+    if not p or p.appeal_status != APPEAL_PENDING:
+        abort(404)
+    action = (request.form.get("action") or "").strip()
+    reply = (request.form.get("reply") or "").strip()
+
+    if action == "accept":
+        p.status = "revoked"
+        p.appeal_status = APPEAL_ACCEPTED
+        p.appeal_handled_at = db.func.now()
+        p.appeal_handled_by = current_user.id
+        p.appeal_reply = reply
+        db.session.commit()
+        notify(
+            p.user_id,
+            f"你的申诉已通过，处罚「{PUNISHMENT_TYPES.get(p.type, p.type)}」已解除。",
+            type_="punish",
+        )
+        flash("已通过该申诉并解除处罚", "success")
+    elif action == "reject":
+        p.appeal_status = APPEAL_REJECTED
+        p.appeal_handled_at = db.func.now()
+        p.appeal_handled_by = current_user.id
+        p.appeal_reply = reply
+        db.session.commit()
+        notify(
+            p.user_id,
+            f"你的申诉未通过。"
+            + (f"管理员回复：{reply}" if reply else ""),
+            type_="punish",
+        )
+        flash("已驳回该申诉", "success")
+    else:
+        flash("无效操作", "warning")
+    return redirect(url_for("admin.punish_appeals"))
 
 
 # ---------------- 角色卡管理 ----------------
@@ -467,11 +578,7 @@ def report_action(report_id):
         abort(404)
     action = (request.form.get("action") or "").strip()
 
-    if action == "ban_user" and r.target_type == "user":
-        u = db.session.get(User, int(r.target_id))
-        if u and u.id != current_user.id:
-            u.role = "banned"
-    elif action == "hide_card" and r.target_type == "card":
+    if action == "hide_card" and r.target_type == "card":
         card = db.session.get(Card, r.target_id)
         if card:
             card.is_hidden = True
@@ -493,7 +600,6 @@ def report_action(report_id):
     db.session.commit()
     # 同一对象被多人举报时，本次处理一并解决所有待处理举报，并通知举报人
     notice_map = {
-        "ban_user": "你举报的用户已被平台封禁处理，感谢你的反馈。",
         "hide_card": "你举报的角色卡已被平台下架处理，感谢你的反馈。",
         "delete_card": "你举报的角色卡已被平台删除处理，感谢你的反馈。",
         "delete_comment": "你举报的评论已被平台删除处理，感谢你的反馈。",

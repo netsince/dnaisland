@@ -1,0 +1,45 @@
+{% extends "admin/base.html" %}
+
+{% block title %}处罚申诉 · DNAISLAND{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2 class="h4 mb-0">处罚申诉处理</h2>
+  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin.users') }}">← 返回</a>
+</div>
+
+{% if not items %}
+<div class="alert alert-success">当前没有待处理的申诉。</div>
+{% else %}
+<div class="d-flex flex-column gap-3">
+  {% for p in items %}
+  <div class="card">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h5 class="card-title mb-0">
+          {{ p.user.nickname if p.user else p.user_id }} · {{ p.type_label }}
+        </h5>
+        <span class="badge bg-danger">生效中</span>
+      </div>
+      <p class="text-muted small mb-1">
+        处罚施加于：{{ p.created_at.strftime('%Y-%m-%d %H:%M') if p.created_at else '—' }}
+        {% if p.reason %} · 理由：{{ p.reason }}{% endif %}
+      </p>
+      <p class="mb-2"><span class="text-muted">用户申诉理由：</span>{{ p.appeal_reason }}</p>
+      <form method="post" action="{{ url_for('admin.punish_appeal_resolve', punishment_id=p.id) }}" class="row g-2 align-items-end">
+        <div class="col-12 col-md-8">
+          <label class="form-label small mb-1">处理回复（可选）</label>
+          <input type="text" class="form-control" name="reply" placeholder="驳回时建议填写理由">
+        </div>
+        <div class="col-12 col-md-4 d-flex gap-2">
+          <button class="btn btn-success flex-fill" type="submit" name="action" value="accept"
+                  onclick="return confirm('通过该申诉将解除此处罚，确认？');">通过并解除</button>
+          <button class="btn btn-outline-danger flex-fill" type="submit" name="action" value="reject">驳回</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

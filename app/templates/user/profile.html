@@ -6,6 +6,22 @@
 {% block content %}
 <div class="row justify-content-center">
   <div class="col-12 col-lg-8">
+    {% if restricted %}
+    {# 他人访问被「禁止主页被访问」的用户：仅展示受限提示与处罚列表 #}
+    <div class="alert alert-warning">
+      <h4 class="alert-heading">该用户主页已被限制访问</h4>
+      <p class="mb-0">该用户当前受到以下平台处罚：</p>
+    </div>
+    <ul class="list-group mb-3">
+      {% for p in punishments %}
+      <li class="list-group-item d-flex justify-content-between align-items-center">
+        <span>{{ p.type_label }}</span>
+        <span class="text-muted small">{{ p.created_at.strftime('%Y-%m-%d') if p.created_at else '' }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+
     <div class="d-flex align-items-center mb-3">
       <div class="me-3 flex-shrink-0">
         {% if u.avatar %}
@@ -22,6 +38,16 @@
 
     {% if u.role == 'super_admin' %}
     <span class="badge bg-danger mb-3">管理员</span>
+    {% endif %}
+
+    {% if punishments %}
+    <div class="alert alert-danger">
+      <strong>{{ '你' if is_self else '该用户' }}当前受到的处罚：</strong>
+      <ul class="mb-1">
+        {% for p in punishments %}<li>{{ p.type_label }}</li>{% endfor %}
+      </ul>
+      {% if is_self %}<a href="{{ url_for('user.my_punishments') }}">查看详情与申诉 →</a>{% endif %}
+    </div>
     {% endif %}
 
     <div class="card mb-3">
@@ -41,8 +67,12 @@
       <div><strong>{{ follower_count }}</strong> <span class="text-muted">粉丝</span></div>
       <div><strong>{{ pagination.total }}</strong> <span class="text-muted">角色卡</span></div>
       {% if is_self %}
-      <a class="btn btn-sm btn-outline-secondary ms-2" href="{{ url_for('user.profile_edit') }}">编辑资料</a>
-      {% elif not u.is_banned %}
+        {% if u.is_edit_profile_banned %}
+        <span class="text-muted small ms-2">你被禁止更改资料</span>
+        {% else %}
+        <a class="btn btn-sm btn-outline-secondary ms-2" href="{{ url_for('user.profile_edit') }}">编辑资料</a>
+        {% endif %}
+      {% else %}
       <form method="post" action="{{ url_for('user.user_follow', username=u.username) }}" class="d-inline ms-2">
         <button class="btn btn-sm btn-outline-{{ 'primary' if is_following else 'success' }}">
           {{ '取消关注' if is_following else '关注' }}
@@ -53,6 +83,9 @@
     </div>
 
     <h5 class="mt-3">发布的角色卡（{{ pagination.total }}）</h5>
+    {% if pagination.total == 0 %}
+    <div class="text-muted">还没有发布任何角色卡。</div>
+    {% else %}
     <div class="row g-3">
       {% for card in cards %}
       <div class="col-12 col-md-6">
@@ -69,12 +102,11 @@
           </div>
         </div>
       </div>
-      {% else %}
-      <div class="col-12 text-muted">还没有发布任何角色卡。</div>
       {% endfor %}
     </div>
-
     {{ render_pagination(pagination, 'user.profile', args) }}
+    {% endif %}
+    {% endif %}
   </div>
 </div>
 {% endblock %}

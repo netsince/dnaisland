@@ -1,3 +1,4 @@
+from sqlalchemy import or_
 from sqlalchemy.dialects.mysql import LONGTEXT
 
 from ..extensions import db
@@ -24,6 +25,34 @@ class Card(db.Model):
     view_count = db.Column(db.Integer, server_default="0")
 
     author = db.relationship("User", backref="cards")
+
+    @classmethod
+    def visible_to(cls, viewer=None):
+        """信息层面的可见性过滤：返回对 viewer 可见的「已通过且未隐藏」角色卡查询。
+
+        自动排除处于 hide_cards 处罚下作者的卡片；viewer 为作者本人或超级管理员时不过滤。
+        单卡详情访问的权限（如 card_detail 的 404 拦截）仍由路由单独把关，本方法仅用于列表检索。
+        """
+        from .punishment import Punishment
+        from .user import User
+
+        q = (
+            cls.query.join(User, cls.author_id == User.id)
+            .filter(cls.status == "approved", cls.is_hidden.is_(False))
+        )
+        hidden_ids = (
+            db.session.query(Punishment.user_id)
+            .filter(Punishment.status == "active", Punishment.type == "hide_cards")
+            .distinct()
+        )
+        if viewer is not None and getattr(viewer, "is_authenticated", False):
+            if viewer.is_super_admin:
+                return q
+            # 排除他人中被屏蔽作者的卡；本人自己的卡（即便被处罚）仍可见
+            q = q.filter(or_(cls.author_id == viewer.id, cls.author_id.notin_(hidden_ids)))
+        else:
+            q = q.filter(cls.author_id.notin_(hidden_ids))
+        return q
 
 
 class CardTag(db.Model):

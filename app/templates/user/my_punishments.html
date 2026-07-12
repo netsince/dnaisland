@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}我的处罚 · DNAISLAND{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-lg-8">
+    <h2 class="h4 mb-3">我的处罚</h2>
+
+    {% if not items %}
+    <div class="alert alert-success">你当前没有任何处罚记录。</div>
+    {% else %}
+    <div class="d-flex flex-column gap-3">
+      {% for p in items %}
+      <div class="card">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <h5 class="card-title mb-0">{{ punishment_types[p.type] }}</h5>
+            {% if p.status == 'active' %}
+              <span class="badge bg-danger">生效中</span>
+            {% else %}
+              <span class="badge bg-secondary">已解除</span>
+            {% endif %}
+          </div>
+          <p class="text-muted small mb-1">
+            施加时间：{{ p.created_at.strftime('%Y-%m-%d %H:%M') if p.created_at else '—' }}
+          </p>
+          {% if p.reason %}
+          <p class="mb-1"><span class="text-muted">处罚理由：</span>{{ p.reason }}</p>
+          {% endif %}
+
+          {% if p.appeal_status == appeal_pending %}
+          <div class="alert alert-info py-2 mb-2">
+            申诉审核中。你提交的申诉理由：{{ p.appeal_reason }}
+          </div>
+          {% elif p.appeal_status == appeal_accepted %}
+          <div class="alert alert-success py-2 mb-2">
+            申诉已通过，该处罚已解除。
+            {% if p.appeal_reply %}<br>管理员回复：{{ p.appeal_reply }}{% endif %}
+          </div>
+          {% elif p.appeal_status == appeal_rejected %}
+          <div class="alert alert-warning py-2 mb-2">
+            申诉未通过。
+            {% if p.appeal_reply %}<br>管理员回复：{{ p.appeal_reply }}{% endif %}
+          </div>
+          {% elif p.can_appeal %}
+          <form method="post" action="{{ url_for('user.punish_appeal', punishment_id=p.id) }}" class="mt-2">
+            <div class="mb-2">
+              <label class="form-label small mb-1">提交申诉理由（仅可申诉一次）</label>
+              <textarea class="form-control" name="appeal_reason" rows="2" required></textarea>
+            </div>
+            <button class="btn btn-sm btn-primary" type="submit">提交申诉</button>
+          </form>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <a class="btn btn-link mt-3" href="{{ url_for('user.profile', username=current_user.username) }}">← 返回我的主页</a>
+  </div>
+</div>
+{% endblock %}

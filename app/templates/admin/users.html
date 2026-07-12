@@ -20,7 +20,6 @@
       <option value="" {% if not role %}selected{% endif %}>全部</option>
       <option value="user" {% if role == 'user' %}selected{% endif %}>user</option>
       <option value="super_admin" {% if role == 'super_admin' %}selected{% endif %}>super_admin</option>
-      <option value="banned" {% if role == 'banned' %}selected{% endif %}>banned</option>
     </select>
   </div>
   <div class="col-auto">
@@ -59,8 +58,6 @@
         <td>
           {% if u.role == 'super_admin' %}
             <span class="badge bg-danger">super_admin</span>
-          {% elif u.role == 'banned' %}
-            <span class="badge bg-dark">banned</span>
           {% else %}
             <span class="badge bg-secondary">user</span>
           {% endif %}
@@ -69,18 +66,9 @@
         <td>
           <a class="btn btn-sm btn-outline-info" href="{{ url_for('admin.cards', author=u.username) }}">查看他发布的角色</a>
           <a class="btn btn-sm btn-outline-primary" href="{{ url_for('admin.user_edit', user_id=u.id) }}">编辑</a>
-          {% if u.id != current_user.id %}
-            {% if u.role == 'banned' %}
-            <form method="post" action="{{ url_for('admin.user_unban', user_id=u.id) }}" class="d-inline">
-              <button class="btn btn-sm btn-outline-success">解封</button>
-            </form>
-            {% else %}
-            <form method="post" action="{{ url_for('admin.user_ban', user_id=u.id) }}" class="d-inline"
-                  onsubmit="return confirm('确认封禁该用户？封禁后其将无法登录且主页不可访问。');">
-              <button class="btn btn-sm btn-outline-warning">封禁</button>
-            </form>
-            {% endif %}
-          {% endif %}
+          <a class="btn btn-sm btn-outline-warning" href="{{ url_for('admin.user_punish', user_id=u.id) }}">
+            处罚{% if u.active_punishments %} <span class="badge bg-dark">{{ u.active_punishments|length }}</span>{% endif %}
+          </a>
           <form method="post" action="{{ url_for('admin.user_delete', user_id=u.id) }}" class="d-inline"
                 onsubmit="return confirm('确认删除该用户？');">
             <button class="btn btn-sm btn-outline-danger">删除</button>

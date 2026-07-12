@@ -24,8 +24,16 @@ from ..models import (
     CardTag,
     Comment,
     Notification,
+    Punishment,
     Report,
+    User,
     UserFollow,
+)
+from ..models.punishment import (
+    APPEAL_ACCEPTED,
+    APPEAL_PENDING,
+    APPEAL_REJECTED,
+    PUNISHMENT_TYPES,
 )
 from ..services.notification_service import notify
 from ..services.image_service import compress_image, crop_square_and_compress
@@ -47,15 +55,23 @@ REPORT_REASONS = [
 @user_bp.route("/user/<username>")
 def profile(username):
     u = User_query_by_username(username)
-    if not u or u.is_banned:
+    if not u:
         abort(404)
+    is_self = current_user.is_authenticated and current_user.id == u.id
+    is_admin = current_user.is_authenticated and current_user.is_super_admin
+    # 禁止主页被访问：他人仅可见受限提示与处罚列表；本人与管理员可见完整主页
+    restricted = (not is_self) and (not is_admin) and u.is_profile_banned
+
     page = request.args.get("page", 1, type=int)
-    pagination = (
-        Card.query.filter_by(author_id=u.id)
-        .filter(Card.is_hidden.is_(False))
-        .order_by(Card.created_at.desc())
-        .paginate(page=page, per_page=12, error_out=False)
+    if is_self or is_admin:
+        card_query = Card.query.filter_by(author_id=u.id)
+    else:
+        # 信息层面过滤：被「屏蔽全部角色卡」作者的卡片对他人不可见
+        card_query = Card.visible_to(current_user).filter(Card.author_id == u.id)
+    pagination = card_query.order_by(Card.created_at.desc()).paginate(
+        page=page, per_page=12, error_out=False
     )
+
     follower_count = UserFollow.query.filter_by(following_id=u.id).count()
     following_count = UserFollow.query.filter_by(follower_id=u.id).count()
     is_following = (
@@ -71,7 +87,10 @@ def profile(username):
         cards=pagination.items,
         pagination=pagination,
         args={"username": username},
-        is_self=(current_user.is_authenticated and current_user.id == u.id),
+        is_self=is_self,
+        is_admin=is_admin,
+        restricted=restricted,
+        punishments=u.active_punishments,
         follower_count=follower_count,
         following_count=following_count,
         is_following=is_following,
@@ -82,6 +101,9 @@ def profile(username):
 @login_required
 def profile_edit():
     u = current_user
+    if u.is_edit_profile_banned:
+        flash("你当前被禁止更改资料", "warning")
+        return redirect(url_for("user.profile", username=u.username))
     if request.method == "POST":
         u.nickname = (request.form.get("nickname") or "").strip() or u.nickname
         u.bio = (request.form.get("bio") or "").strip()
@@ -124,6 +146,57 @@ def profile_edit():
     return render_template("user/profile_edit.html", u=u)
 
 
+@user_bp.route("/my/punishments")
+@login_required
+def my_punishments():
+    from ..models import User as _User
+
+    items = (
+        Punishment.query.filter_by(user_id=current_user.id)
+        .order_by(Punishment.created_at.desc())
+        .all()
+    )
+    return render_template(
+        "user/my_punishments.html",
+        items=items,
+        punishment_types=PUNISHMENT_TYPES,
+        appeal_pending=APPEAL_PENDING,
+        appeal_accepted=APPEAL_ACCEPTED,
+        appeal_rejected=APPEAL_REJECTED,
+    )
+
+
+@user_bp.route("/my/punishments/<int:punishment_id>/appeal", methods=["POST"])
+@login_required
+def punish_appeal(punishment_id):
+    from ..models import User as _User
+
+    p = db.session.get(Punishment, punishment_id)
+    if not p or p.user_id != current_user.id:
+        abort(404)
+    if not p.can_appeal:
+        flash("该处罚不可申诉或你已提交过申诉", "warning")
+        return redirect(url_for("user.my_punishments"))
+    reason = (request.form.get("appeal_reason") or "").strip()
+    if not reason:
+        flash("请填写申诉理由", "warning")
+        return redirect(url_for("user.my_punishments"))
+    p.appealed = True
+    p.appeal_reason = reason
+    p.appeal_status = APPEAL_PENDING
+    p.appeal_at = db.func.now()
+    db.session.commit()
+    for admin in _User.query.filter_by(role="super_admin").all():
+        notify(
+            admin.id,
+            f'用户 {current_user.nickname} 对处罚「{PUNISHMENT_TYPES.get(p.type, p.type)}」提交了申诉，请到「处罚申诉」处理。',
+            type_="punish",
+        )
+    db.session.commit()
+    flash("申诉已提交，等待管理员处理（仅可申诉一次）", "success")
+    return redirect(url_for("user.my_punishments"))
+
+
 @user_bp.route("/card/<card_id>")
 def card_detail(card_id):
     card = db.session.get(Card, card_id)
@@ -136,7 +209,7 @@ def card_detail(card_id):
     is_public = (
         card.status == "approved"
         and not card.is_hidden
-        and not (author and author.is_banned)
+        and not (author and (author.is_cards_hidden or author.is_profile_banned))
     )
 
     # 隐藏卡、未通过审核的卡、以及被封禁作者的卡，仅对作者与管理员可见
@@ -162,6 +235,17 @@ def card_detail(card_id):
         .order_by(Comment.created_at.asc())
         .all()
     )
+    # 屏蔽全部评论：被处罚用户的评论对他人不可见（本人与管理员可见）
+    visible_comments = [
+        c
+        for c in comments
+        if not (
+            c.author
+            and c.author.is_comments_hidden
+            and not (current_user.is_authenticated and current_user.id == c.author.id)
+            and not is_admin
+        )
+    ]
     liked = (
         current_user.is_authenticated
         and CardLike.query.filter_by(user_id=current_user.id, card_id=card.id).first()
@@ -191,8 +275,8 @@ def card_detail(card_id):
         is_admin=is_admin,
         like_count=like_count,
         favorite_count=favorite_count,
-        comment_count=len(comments),
-        comments=comments,
+        comment_count=len(visible_comments),
+        comments=visible_comments,
         liked=liked,
         favorited=favorited,
         following=following,
@@ -231,7 +315,8 @@ def my_cards():
 def my_favorites():
     page = request.args.get("page", 1, type=int)
     pagination = (
-        Card.query.join(CardFavorite)
+        Card.visible_to(current_user)
+        .join(CardFavorite)
         .filter(CardFavorite.user_id == current_user.id)
         .order_by(CardFavorite.created_at.desc())
         .paginate(page=page, per_page=12, error_out=False)
@@ -250,7 +335,8 @@ def my_favorites():
 def my_likes():
     page = request.args.get("page", 1, type=int)
     pagination = (
-        Card.query.join(CardLike)
+        Card.visible_to(current_user)
+        .join(CardLike)
         .filter(CardLike.user_id == current_user.id)
         .order_by(CardLike.created_at.desc())
         .paginate(page=page, per_page=12, error_out=False)
@@ -302,7 +388,7 @@ def card_favorite(card_id):
 @login_required
 def user_follow(username):
     target = User_query_by_username(username)
-    if not target or target.is_banned:
+    if not target or target.is_profile_banned:
         abort(404)
     if str(target.id) == str(current_user.get_id()):
         flash("不能关注自己", "warning")
@@ -329,6 +415,9 @@ def card_comment(card_id):
     card = db.session.get(Card, card_id)
     if not card:
         abort(404)
+    if current_user.is_muted:
+        flash("你已被禁言，暂时无法评论", "warning")
+        return redirect(url_for("user.card_detail", card_id=card_id))
     content = (request.form.get("content") or "").strip()
     if not content:
         flash("评论内容不能为空", "warning")
