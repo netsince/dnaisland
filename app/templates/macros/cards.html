@@ -1,0 +1,53 @@
+{# 角色卡展示复用组件：全站列表统一使用，避免各页重复手写网格 #}
+{% from "macros/highlight.html" import hl %}
+
+{# 审核状态徽章 #}
+{% macro status_badge(status, is_hidden=False) %}
+  {%- if status == 'approved' -%}<span class="badge bg-success">已通过</span>
+  {%- elif status == 'rejected' -%}<span class="badge bg-danger">已拒绝</span>
+  {%- else -%}<span class="badge bg-warning text-dark">审核中</span>{%- endif -%}
+  {%- if is_hidden %} <span class="badge bg-secondary">已隐藏</span>{% endif -%}
+{% endmacro %}
+
+{# 单张角色卡瓦片。
+   card 需具备 id/name/gender/intro/persona/view_count/status/cover（由 card_service.attach_covers 附加）。
+   q：搜索关键词，用于高亮；show_status：是否叠加审核状态角标。 #}
+{% macro card_tile(card, q=None, show_status=False) %}
+<a class="dna-tile" href="{{ url_for('user.card_detail', card_id=card.id) }}">
+  <div class="dna-tile__media">
+    {% if card.cover %}
+      <img src="{{ card.cover }}" alt="{{ card.name }}" loading="lazy">
+    {% else %}
+      <div class="dna-tile__ph">{{ card.name[:1] if card.name else '?' }}</div>
+    {% endif %}
+    {% if show_status %}
+      <div class="dna-tile__status">{{ status_badge(card.status, card.is_hidden) }}</div>
+    {% endif %}
+  </div>
+  <div class="dna-tile__body">
+    <h3 class="dna-tile__title">{% if q %}{{ hl(card.name, q) }}{% else %}{{ card.name }}{% endif %}</h3>
+    <div class="dna-tile__meta">{{ card.gender or '未知' }} · 浏览 {{ card.view_count or 0 }}</div>
+    {% set desc = card.intro or card.persona %}
+    {% if desc %}
+    <p class="dna-tile__desc">{% if q %}{{ hl(desc, q) }}{% else %}{{ desc }}{% endif %}</p>
+    {% endif %}
+  </div>
+</a>
+{% endmacro %}
+
+{# 网格容器：传入一组卡片直接渲染成响应式网格 #}
+{% macro card_grid(cards, q=None, show_status=False, cols='col-6 col-md-4 col-xl-3') %}
+<div class="row g-3">
+  {% for card in cards %}
+  <div class="{{ cols }}">{{ card_tile(card, q=q, show_status=show_status) }}</div>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+{# 空状态 #}
+{% macro empty_state(text='这里空空如也～', icon='✨') %}
+<div class="dna-empty">
+  <div class="dna-empty__icon">{{ icon }}</div>
+  <div>{{ text }}</div>
+</div>
+{% endmacro %}

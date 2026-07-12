@@ -1,56 +1,42 @@
 {% extends "base.html" %}
 {% from "macros/pagination.html" import render_pagination %}
+{% from "macros/cards.html" import card_grid, empty_state %}
 
 {% block title %}首页 · DNAISLAND{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-  <div class="col-12 col-md-8 col-lg-6 text-center">
-    <h1 class="display-5 fw-bold mb-3">欢迎来到 DNAISLAND</h1>
-    <p class="lead text-secondary">
-      与汝共奏（DNA）的角色卡分享社区。在这里发现、收藏并分享你的 TA。
-    </p>
-    {% if not current_user.is_authenticated %}
-      <div class="d-flex gap-2 justify-content-center mt-4">
-        <a class="btn btn-primary" href="{{ url_for('auth.register') }}">立即注册</a>
-        <a class="btn btn-outline-secondary" href="{{ url_for('auth.login') }}">去登录</a>
-      </div>
-    {% else %}
-      <p class="mt-4">
-        你好，<strong>{{ current_user.nickname }}</strong>。发现下方为你推荐的角色卡。
-      </p>
-    {% endif %}
+<section class="dna-hero mb-5">
+  <span class="dna-hero__eyebrow">◆ DNA · 与汝共奏</span>
+  <h1 class="dna-hero__title">
+    在 <span class="dna-gradient-text">DNAISLAND</span><br>
+    遇见你的下一位 TA
+  </h1>
+  <p class="lead text-secondary mb-4" style="max-width: 640px;">
+    一个专注角色卡的二次元创作社区。发现、收藏、分享独一无二的角色人格，
+    让每一次对话都有灵魂。
+  </p>
+  {% if not current_user.is_authenticated %}
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-primary btn-lg" href="{{ url_for('auth.register') }}">立即加入 →</a>
+    <a class="btn btn-outline-light btn-lg" href="{{ url_for('auth.login') }}">登录</a>
   </div>
+  {% else %}
+  <div class="d-flex flex-wrap gap-2 align-items-center">
+    <a class="btn btn-primary btn-lg" href="{{ url_for('publish.start') }}">＋ 发布角色卡</a>
+    <span class="text-secondary">欢迎回来，<strong class="text-light">{{ current_user.nickname }}</strong></span>
+  </div>
+  {% endif %}
+</section>
+
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h2 class="dna-section-title h4 mb-0">热门推荐</h2>
+  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('main.search', q='', sort='hot') }}">浏览全部</a>
 </div>
 
 {% if pagination.items %}
-<div class="row justify-content-center mt-5">
-  <div class="col-12 col-lg-9">
-    <h3 class="h5 mb-3">推荐角色卡</h3>
-    <div class="row g-3">
-      {% for card in cards %}
-      <div class="col-12 col-sm-6 col-lg-4">
-        <a class="text-decoration-none text-reset" href="{{ url_for('user.card_detail', card_id=card.id) }}">
-          <div class="card h-100">
-            {% set img = images.get(card.id) %}
-            {% if img %}
-              <img src="{{ img }}" class="card-img-top" alt="{{ card.name }}"
-                   style="height:160px;object-fit:cover;">
-            {% endif %}
-            <div class="card-body">
-              <h6 class="card-title">{{ card.name }}</h6>
-              <p class="text-muted small mb-1">{{ card.gender }}</p>
-              <p class="card-text small text-truncate-3" style="white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;">{{ card.intro or card.persona }}</p>
-              <div class="text-muted small mt-2">浏览 {{ card.view_count }}</div>
-            </div>
-          </div>
-        </a>
-      </div>
-      {% endfor %}
-    </div>
-
-    {{ render_pagination(pagination, 'main.index', args) }}
-  </div>
-</div>
+  {{ card_grid(cards) }}
+  {{ render_pagination(pagination, 'main.index', args) }}
+{% else %}
+  {{ empty_state('还没有公开的角色卡，来发布第一张吧！', '🎴') }}
 {% endif %}
 {% endblock %}

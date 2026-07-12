@@ -3,7 +3,8 @@ from flask_login import current_user
 from sqlalchemy import case, or_
 
 from ..extensions import db
-from ..models import Card, CardImage, CardTag, Punishment, User
+from ..models import Card, CardTag, Punishment, User
+from ..services.card_service import attach_covers
 
 main_bp = Blueprint("main", __name__)
 
@@ -17,19 +18,11 @@ def index():
         .order_by(Card.view_count.desc(), Card.created_at.desc())
         .paginate(page=page, per_page=12, error_out=False)
     )
-    images = {
-        i.card_id: i.data
-        for i in CardImage.query.filter(
-            CardImage.slot == "square",
-            CardImage.card_id.in_([c.id for c in pagination.items]),
-        ).all()
-    }
     return render_template(
         "index.html",
-        cards=pagination.items,
+        cards=attach_covers(pagination.items),
         pagination=pagination,
         args={},
-        images=images,
     )
 
 
@@ -119,7 +112,6 @@ def search():
 
     cards = []
     cards_pagination = None
-    card_images = {}
     users = []
     users_pagination = None
 
@@ -127,14 +119,7 @@ def search():
         cards_pagination = _card_search_query(q, sort, tag).paginate(
             page=page, per_page=12, error_out=False
         )
-        cards = cards_pagination.items
-        card_images = {
-            i.card_id: i.data
-            for i in CardImage.query.filter(
-                CardImage.slot == "square",
-                CardImage.card_id.in_([c.id for c in cards]),
-            ).all()
-        }
+        cards = attach_covers(cards_pagination.items)
 
     if q and search_type in ("all", "user"):
         users_pagination = _user_search_query(q, sort).paginate(
@@ -151,7 +136,6 @@ def search():
         tag=tag,
         cards=cards,
         cards_pagination=cards_pagination,
-        card_images=card_images,
         users=users,
         users_pagination=users_pagination,
         args=args,

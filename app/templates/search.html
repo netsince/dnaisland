@@ -2,6 +2,7 @@
 {% from "macros/pagination.html" import render_pagination %}
 {% from "macros/verified.html" import badge %}
 {% from "macros/highlight.html" import hl %}
+{% from "macros/cards.html" import card_grid, empty_state %}
 
 {% block title %}搜索：{{ q }} · DNAISLAND{% endblock %}
 
@@ -11,99 +12,77 @@
 } %}
 
 {% block content %}
-<div class="row justify-content-center">
-  <div class="col-12 col-lg-9">
-    <h2 class="h4 mb-1">搜索结果</h2>
-    <p class="text-muted">关键词：<strong>{{ q }}</strong>{% if tag %} · 标签 <span class="badge bg-secondary">#{{ tag }}</span>{% endif %}</p>
-
-    {# 类型切换 + 排序 #}
-    <div class="d-flex flex-wrap align-items-center gap-2 mb-4">
-      <div class="btn-group btn-group-sm" role="group" aria-label="搜索类型">
-        <a class="btn {{ 'btn-primary' if search_type=='all' else 'btn-outline-primary' }}" href="{{ url_for('main.search', q=q, type='all', sort=sort, tag=tag) }}">全部{% if cards_pagination or users_pagination %} <span class="badge bg-light text-dark">{{ counts.card + counts.user }}</span>{% endif %}</a>
-        <a class="btn {{ 'btn-primary' if search_type=='card' else 'btn-outline-primary' }}" href="{{ url_for('main.search', q=q, type='card', sort=sort, tag=tag) }}">角色卡 <span class="badge bg-light text-dark">{{ counts.card }}</span></a>
-        <a class="btn {{ 'btn-primary' if search_type=='user' else 'btn-outline-primary' }}" href="{{ url_for('main.search', q=q, type='user', sort=sort, tag=tag) }}">作者 <span class="badge bg-light text-dark">{{ counts.user }}</span></a>
-      </div>
-      {% if search_type in ('all','card') %}
-      <div class="btn-group btn-group-sm ms-auto" role="group" aria-label="排序">
-        <span class="btn btn-outline-secondary disabled">排序</span>
-        <a class="btn {{ 'btn-secondary' if sort=='relevance' else 'btn-outline-secondary' }}" href="{{ url_for('main.search', q=q, type=search_type, sort='relevance', tag=tag) }}">相关度</a>
-        <a class="btn {{ 'btn-secondary' if sort=='hot' else 'btn-outline-secondary' }}" href="{{ url_for('main.search', q=q, type=search_type, sort='hot', tag=tag) }}">最热</a>
-        <a class="btn {{ 'btn-secondary' if sort=='new' else 'btn-outline-secondary' }}" href="{{ url_for('main.search', q=q, type=search_type, sort='new', tag=tag) }}">最新</a>
-      </div>
-      {% endif %}
-    </div>
-
-    {% if not q %}
-      <div class="alert alert-info">请输入关键词开始搜索。</div>
-    {% endif %}
-
-    {# 角色卡 #}
-    {% if search_type in ('all','card') %}
-    <section class="mb-5">
-      {% if search_type == 'all' %}<h3 class="h5 mb-3">角色卡 <span class="text-muted small">（{{ counts.card }}）</span></h3>{% endif %}
-      {% if cards %}
-      <div class="row g-3">
-        {% for card in cards %}
-        <div class="col-12 col-sm-6 col-lg-4">
-          <a class="text-decoration-none text-reset" href="{{ url_for('user.card_detail', card_id=card.id) }}">
-            <div class="card h-100">
-              {% set img = card_images.get(card.id) %}
-              {% if img %}
-              <img src="{{ img }}" class="card-img-top" alt="{{ card.name }}"
-                   style="height:160px;object-fit:cover;">
-              {% endif %}
-              <div class="card-body">
-                <h6 class="card-title">{{ hl(card.name, q) }}</h6>
-                <p class="text-muted small mb-1">{{ hl(card.gender, q) }}</p>
-                <p class="card-text small text-truncate-3" style="white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;">{{ hl(card.intro or card.persona, q) }}</p>
-                <div class="text-muted small mt-2">浏览 {{ card.view_count }}</div>
-              </div>
-            </div>
-          </a>
-        </div>
-        {% endfor %}
-      </div>
-      {% if cards_pagination %}{{ render_pagination(cards_pagination, 'main.search', args) }}{% endif %}
-      {% elif q %}
-      <p class="text-muted">没有找到相关角色卡。</p>
-      {% endif %}
-    </section>
-    {% endif %}
-
-    {# 作者 #}
-    {% if search_type in ('all','user') %}
-    <section>
-      {% if search_type == 'all' %}<h3 class="h5 mb-3">作者 <span class="text-muted small">（{{ counts.user }}）</span></h3>{% endif %}
-      {% if users %}
-      <div class="row g-3">
-        {% for u in users %}
-        <div class="col-12 col-sm-6 col-md-4">
-          <a class="text-decoration-none text-reset" href="{{ url_for('user.profile', username=u.username) }}">
-            <div class="card h-100">
-              <div class="card-body d-flex align-items-center gap-3">
-                {% if u.avatar %}
-                <img src="{{ u.avatar }}" class="rounded-circle" alt="{{ u.nickname }}"
-                     style="width:48px;height:48px;object-fit:cover;">
-                {% else %}
-                <div class="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center"
-                     style="width:48px;height:48px;">{{ u.nickname[:1] }}</div>
-                {% endif %}
-                <div class="overflow-hidden">
-                  <div class="fw-semibold text-truncate">{{ hl(u.nickname, q) }}{{ badge(u) }}</div>
-                  <div class="text-muted small text-truncate">@{{ hl(u.username, q) }}</div>
-                </div>
-              </div>
-            </div>
-          </a>
-        </div>
-        {% endfor %}
-      </div>
-      {% if users_pagination %}{{ render_pagination(users_pagination, 'main.search', args) }}{% endif %}
-      {% elif q %}
-      <p class="text-muted">没有找到相关作者。</p>
-      {% endif %}
-    </section>
-    {% endif %}
-  </div>
+<div class="mb-4">
+  <h1 class="h4 mb-1">搜索结果</h1>
+  <p class="text-secondary mb-0">
+    关键词：<strong class="text-light">{{ q or '（空）' }}</strong>
+    {% if tag %} · 标签 <span class="dna-chip">#{{ tag }}</span>{% endif %}
+  </p>
 </div>
+
+{# 类型切换 + 排序 #}
+<div class="d-flex flex-wrap align-items-center gap-2 mb-4">
+  <div class="btn-group btn-group-sm" role="group" aria-label="搜索类型">
+    <a class="btn {{ 'btn-primary' if search_type=='all' else 'btn-outline-primary' }}" href="{{ url_for('main.search', q=q, type='all', sort=sort, tag=tag) }}">全部{% if cards_pagination or users_pagination %} <span class="badge text-bg-dark">{{ counts.card + counts.user }}</span>{% endif %}</a>
+    <a class="btn {{ 'btn-primary' if search_type=='card' else 'btn-outline-primary' }}" href="{{ url_for('main.search', q=q, type='card', sort=sort, tag=tag) }}">角色卡 <span class="badge text-bg-dark">{{ counts.card }}</span></a>
+    <a class="btn {{ 'btn-primary' if search_type=='user' else 'btn-outline-primary' }}" href="{{ url_for('main.search', q=q, type='user', sort=sort, tag=tag) }}">作者 <span class="badge text-bg-dark">{{ counts.user }}</span></a>
+  </div>
+  {% if search_type in ('all','card') %}
+  <div class="btn-group btn-group-sm ms-auto" role="group" aria-label="排序">
+    <span class="btn btn-outline-secondary disabled">排序</span>
+    <a class="btn {{ 'btn-secondary' if sort=='relevance' else 'btn-outline-secondary' }}" href="{{ url_for('main.search', q=q, type=search_type, sort='relevance', tag=tag) }}">相关度</a>
+    <a class="btn {{ 'btn-secondary' if sort=='hot' else 'btn-outline-secondary' }}" href="{{ url_for('main.search', q=q, type=search_type, sort='hot', tag=tag) }}">最热</a>
+    <a class="btn {{ 'btn-secondary' if sort=='new' else 'btn-outline-secondary' }}" href="{{ url_for('main.search', q=q, type=search_type, sort='new', tag=tag) }}">最新</a>
+  </div>
+  {% endif %}
+</div>
+
+{% if not q %}
+  {{ empty_state('请输入关键词开始搜索。', '🔍') }}
+{% endif %}
+
+{# 角色卡 #}
+{% if search_type in ('all','card') %}
+<section class="mb-5">
+  {% if search_type == 'all' %}<h2 class="dna-section-title h5">角色卡 <span class="text-muted small">（{{ counts.card }}）</span></h2>{% endif %}
+  {% if cards %}
+    {{ card_grid(cards, q=q) }}
+    {% if cards_pagination %}{{ render_pagination(cards_pagination, 'main.search', args) }}{% endif %}
+  {% elif q %}
+    {{ empty_state('没有找到相关角色卡。', '🎴') }}
+  {% endif %}
+</section>
+{% endif %}
+
+{# 作者 #}
+{% if search_type in ('all','user') %}
+<section>
+  {% if search_type == 'all' %}<h2 class="dna-section-title h5">作者 <span class="text-muted small">（{{ counts.user }}）</span></h2>{% endif %}
+  {% if users %}
+  <div class="row g-3">
+    {% for u in users %}
+    <div class="col-12 col-sm-6 col-lg-4">
+      <a class="dna-tile" href="{{ url_for('user.profile', username=u.username) }}" style="flex-direction:row;">
+        <div class="d-flex align-items-center gap-3 p-3 w-100">
+          {% if u.avatar %}
+          <img src="{{ u.avatar }}" class="dna-avatar flex-shrink-0" alt="{{ u.nickname }}"
+               style="width:52px;height:52px;">
+          {% else %}
+          <div class="dna-avatar-ph flex-shrink-0" style="width:52px;height:52px;font-size:1.3rem;">{{ u.nickname[:1] }}</div>
+          {% endif %}
+          <div class="overflow-hidden">
+            <div class="fw-semibold text-truncate text-light">{{ hl(u.nickname, q) }}{{ badge(u) }}</div>
+            <div class="text-muted small text-truncate">@{{ hl(u.username, q) }}</div>
+          </div>
+        </div>
+      </a>
+    </div>
+    {% endfor %}
+  </div>
+  {% if users_pagination %}{{ render_pagination(users_pagination, 'main.search', args) }}{% endif %}
+  {% elif q %}
+    {{ empty_state('没有找到相关作者。', '👤') }}
+  {% endif %}
+</section>
+{% endif %}
 {% endblock %}

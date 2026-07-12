@@ -1,12 +1,13 @@
 {% extends "base.html" %}
 {% from "macros/pagination.html" import render_pagination %}
 {% from "macros/verified.html" import badge %}
+{% from "macros/cards.html" import card_grid, empty_state %}
 
 {% block title %}{{ u.nickname }} · DNAISLAND{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
-  <div class="col-12 col-lg-8">
+  <div class="col-12 col-lg-9">
     {% if restricted %}
     {# 他人访问被「禁止主页被访问」的用户：仅展示受限提示与处罚列表 #}
     <div class="alert alert-warning">
@@ -23,23 +24,57 @@
     </ul>
     {% else %}
 
-    <div class="d-flex align-items-center mb-3">
-      <div class="me-3 flex-shrink-0">
-        {% if u.avatar %}
-        <img src="{{ u.avatar }}" alt="头像" class="rounded-circle" style="width:96px;height:96px;object-fit:cover;">
-        {% else %}
-        <div class="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center" style="width:96px;height:96px;font-size:2.2rem;">{{ u.nickname[:1] }}</div>
+    {# 资料头 #}
+    <div class="card mb-4">
+      <div class="card-body p-4">
+        <div class="d-flex flex-wrap align-items-center gap-3">
+          {% if u.avatar %}
+          <img src="{{ u.avatar }}" alt="头像" class="dna-avatar" style="width:96px;height:96px;">
+          {% else %}
+          <div class="dna-avatar-ph" style="width:96px;height:96px;font-size:2.4rem;">{{ u.nickname[:1] }}</div>
+          {% endif %}
+          <div class="flex-grow-1">
+            <h1 class="h4 mb-1">
+              {{ u.nickname }}{{ badge(u) }}
+              {% if u.role == 'super_admin' %}<span class="badge bg-danger align-middle ms-1">管理员</span>{% endif %}
+            </h1>
+            <div class="text-muted">@{{ u.username }}{% if is_self %} · <span class="dna-chip">这是你</span>{% endif %}</div>
+            <div class="d-flex align-items-center gap-4 mt-3 flex-wrap">
+              <div><strong class="text-light">{{ following_count }}</strong> <span class="text-muted small">关注</span></div>
+              <div><strong class="text-light">{{ follower_count }}</strong> <span class="text-muted small">粉丝</span></div>
+              <div><strong class="text-light">{{ pagination.total }}</strong> <span class="text-muted small">角色卡</span></div>
+            </div>
+          </div>
+          <div class="ms-auto d-flex flex-column gap-2">
+            {% if is_self %}
+              {% if u.is_edit_profile_banned %}
+              <span class="text-muted small">你被禁止更改资料</span>
+              {% else %}
+              <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('user.profile_edit') }}">编辑资料</a>
+              {% endif %}
+            {% else %}
+            <form method="post" action="{{ url_for('user.user_follow', username=u.username) }}">
+              <button class="btn btn-sm btn-{{ 'outline-secondary' if is_following else 'primary' }} w-100">
+                {{ '取消关注' if is_following else '＋ 关注' }}
+              </button>
+            </form>
+            <a class="btn btn-sm btn-outline-danger" href="{{ url_for('user.report', type='user', id=u.username) }}">举报</a>
+            {% endif %}
+          </div>
+        </div>
+
+        {% if u.bio or u.location or u.website or u.birthday %}
+        <hr class="border-secondary opacity-25">
+        {% if u.bio %}<p class="mb-2" style="white-space:pre-wrap;">{{ u.bio }}</p>{% endif %}
+        <ul class="list-inline mb-0 small text-muted">
+          {% if u.location %}<li class="list-inline-item me-3">📍 {{ u.location }}</li>{% endif %}
+          {% if u.website %}<li class="list-inline-item me-3">🔗 <a href="{{ u.website }}" target="_blank" rel="noopener">{{ u.website }}</a></li>{% endif %}
+          {% if u.birthday %}<li class="list-inline-item me-3">🎂 {{ u.birthday.strftime('%Y-%m-%d') }}</li>{% endif %}
+          <li class="list-inline-item">📅 加入于 {{ u.created_at.strftime('%Y-%m-%d') if u.created_at else '—' }}</li>
+        </ul>
         {% endif %}
       </div>
-      <div>
-        <h2 class="h4 mb-0">{{ u.nickname }}{{ badge(u) }}</h2>
-        <div class="text-muted">@{{ u.username }}{% if is_self %} · <span class="badge bg-primary">这是你</span>{% endif %}</div>
-      </div>
     </div>
-
-    {% if u.role == 'super_admin' %}
-    <span class="badge bg-danger mb-3">管理员</span>
-    {% endif %}
 
     {% if punishments %}
     <div class="alert alert-danger">
@@ -51,61 +86,12 @@
     </div>
     {% endif %}
 
-    <div class="card mb-3">
-      <div class="card-body">
-        {% if u.bio %}<p class="mb-2" style="white-space:pre-wrap;">{{ u.bio }}</p>{% endif %}
-        <ul class="list-unstyled mb-0 small text-muted">
-          {% if u.location %}<li class="mb-1">📍 {{ u.location }}</li>{% endif %}
-          {% if u.website %}<li class="mb-1">🔗 <a href="{{ u.website }}" target="_blank" rel="noopener">{{ u.website }}</a></li>{% endif %}
-          {% if u.birthday %}<li class="mb-1">🎂 {{ u.birthday.strftime('%Y-%m-%d') }}</li>{% endif %}
-          <li class="mb-1">📅 加入于 {{ u.created_at.strftime('%Y-%m-%d') if u.created_at else '—' }}</li>
-        </ul>
-      </div>
-    </div>
-
-    <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
-      <div><strong>{{ following_count }}</strong> <span class="text-muted">关注</span></div>
-      <div><strong>{{ follower_count }}</strong> <span class="text-muted">粉丝</span></div>
-      <div><strong>{{ pagination.total }}</strong> <span class="text-muted">角色卡</span></div>
-      {% if is_self %}
-        {% if u.is_edit_profile_banned %}
-        <span class="text-muted small ms-2">你被禁止更改资料</span>
-        {% else %}
-        <a class="btn btn-sm btn-outline-secondary ms-2" href="{{ url_for('user.profile_edit') }}">编辑资料</a>
-        {% endif %}
-      {% else %}
-      <form method="post" action="{{ url_for('user.user_follow', username=u.username) }}" class="d-inline ms-2">
-        <button class="btn btn-sm btn-outline-{{ 'primary' if is_following else 'success' }}">
-          {{ '取消关注' if is_following else '关注' }}
-        </button>
-      </form>
-      <a class="btn btn-sm btn-outline-danger ms-2" href="{{ url_for('user.report', type='user', id=u.username) }}">举报</a>
-      {% endif %}
-    </div>
-
-    <h5 class="mt-3">发布的角色卡（{{ pagination.total }}）</h5>
+    <h2 class="dna-section-title h5">发布的角色卡（{{ pagination.total }}）</h2>
     {% if pagination.total == 0 %}
-    <div class="text-muted">还没有发布任何角色卡。</div>
+      {{ empty_state('还没有发布任何角色卡。', '🎴') }}
     {% else %}
-    <div class="row g-3">
-      {% for card in cards %}
-      <div class="col-12 col-md-6">
-        <div class="card h-100">
-          <div class="card-body">
-            <h6 class="card-title">
-              <a class="text-decoration-none" href="{{ url_for('user.card_detail', card_id=card.id) }}">{{ card.name }}</a>
-            </h6>
-            <p class="text-muted small mb-1">{{ card.gender }}</p>
-            <p class="card-text small" style="white-space:pre-wrap;">{{ card.intro[:80] }}</p>
-            {% if card.status == 'approved' %}<span class="badge bg-success">已通过</span>
-            {% elif card.status == 'rejected' %}<span class="badge bg-danger">已拒绝</span>
-            {% else %}<span class="badge bg-warning text-dark">审核中</span>{% endif %}
-          </div>
-        </div>
-      </div>
-      {% endfor %}
-    </div>
-    {{ render_pagination(pagination, 'user.profile', args) }}
+      {{ card_grid(cards, show_status=(is_self or is_admin)) }}
+      {{ render_pagination(pagination, 'user.profile', args) }}
     {% endif %}
     {% endif %}
   </div>

@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "macros/verified.html" import badge %}
+{% from "macros/cards.html" import status_badge %}
 
 {% block title %}{{ card.name }} · DNAISLAND{% endblock %}
 
@@ -8,30 +9,34 @@
   <div class="col-12 col-lg-9">
     <a class="btn btn-sm btn-outline-secondary mb-3" href="javascript:history.back()">← 返回</a>
 
-    <div class="card mb-4">
+    {# 信息头 #}
+    <div class="card mb-4 dna-detail-hero">
+      {% if images.landscape %}
+      <img src="{{ images.landscape }}" alt="{{ card.name }} 横幅"
+           style="width:100%;height:220px;object-fit:cover;opacity:.85;">
+      {% endif %}
       <div class="card-body">
-        <div class="d-flex flex-wrap gap-3 align-items-start">
+        <div class="d-flex flex-wrap gap-3 align-items-start {% if images.landscape %}mt-n5{% endif %}">
           {% if images.square %}
-          <img src="{{ images.square }}" alt="{{ card.name }} 头像"
-               class="rounded" style="width:120px;height:120px;object-fit:cover;">
+          <img src="{{ images.square }}" alt="{{ card.name }} 头像" class="dna-avatar"
+               style="width:120px;height:120px;">
+          {% else %}
+          <div class="dna-avatar-ph" style="width:120px;height:120px;font-size:3rem;">{{ card.name[:1] }}</div>
           {% endif %}
           <div class="flex-grow-1">
-            <h2 class="h4 mb-1">{{ card.name }}</h2>
+            <h1 class="h3 mb-1">{{ card.name }}</h1>
             <div class="text-muted small mb-2">
-              {{ card.gender }}{% if author %} · 作者
+              {{ card.gender or '未知' }}{% if author %} · 作者
               <a href="{{ url_for('user.profile', username=author.username) }}">{{ author.nickname }}</a>{{ badge(author) }}{% endif %}
               · 浏览 {{ card.view_count }}
               {% if card.created_at %}· 发布于 {{ card.created_at.strftime('%Y-%m-%d') }}{% endif %}
             </div>
             <div class="mb-2">
-              {% if card.status == 'approved' %}<span class="badge bg-success">已通过</span>
-              {% elif card.status == 'rejected' %}<span class="badge bg-danger">已拒绝</span>
-              {% else %}<span class="badge bg-warning text-dark">审核中</span>{% endif %}
-              {% if card.is_hidden %}<span class="badge bg-secondary">已隐藏</span>{% endif %}
+              {{ status_badge(card.status, card.is_hidden) }}
             </div>
             {% if tags %}
-            <div>
-              {% for t in tags %}<span class="badge bg-light text-dark border me-1 mb-1">{{ t }}</span>{% endfor %}
+            <div class="dna-tile__tags">
+              {% for t in tags %}<span class="dna-chip">#{{ t }}</span>{% endfor %}
             </div>
             {% endif %}
           </div>
@@ -39,7 +44,7 @@
 
         <div class="d-flex flex-wrap gap-2 mt-3">
           <form method="post" action="{{ url_for('user.card_like', card_id=card.id) }}" class="d-inline">
-            <button class="btn btn-sm btn-outline-{{ 'danger' if liked else 'secondary' }}">
+            <button class="btn btn-sm btn-{{ 'primary' if liked else 'outline-secondary' }}">
               ♥ 点赞（{{ like_count }}）
             </button>
           </form>
@@ -50,51 +55,46 @@
           </form>
           {% if not is_owner and author %}
           <form method="post" action="{{ url_for('user.user_follow', username=author.username) }}" class="d-inline">
-            <button class="btn btn-sm btn-outline-{{ 'primary' if following else 'success' }}">
-              {{ '取消关注' if following else '关注作者' }}
+            <button class="btn btn-sm btn-outline-{{ 'secondary' if following else 'primary' }}">
+              {{ '取消关注' if following else '＋ 关注作者' }}
             </button>
           </form>
           {% endif %}
-          <a class="btn btn-sm btn-outline-danger"
+          <a class="btn btn-sm btn-outline-danger ms-auto"
              href="{{ url_for('user.report', type='card', id=card.id) }}">举报</a>
         </div>
-
-        {% if images.landscape %}
-        <img src="{{ images.landscape }}" alt="{{ card.name }} 横幅"
-             class="img-fluid rounded mt-3" style="width:100%;max-height:320px;object-fit:cover;">
-        {% endif %}
       </div>
     </div>
 
     {% if card.persona %}
     <div class="card mb-4">
-      <div class="card-header fw-semibold">人格设定</div>
+      <div class="card-header fw-semibold">✦ 人格设定</div>
       <div class="card-body" style="white-space:pre-wrap;">{{ card.persona }}</div>
     </div>
     {% endif %}
 
     {% if card.intro %}
     <div class="card mb-4">
-      <div class="card-header fw-semibold">简介</div>
+      <div class="card-header fw-semibold">✦ 简介</div>
       <div class="card-body" style="white-space:pre-wrap;">{{ card.intro }}</div>
     </div>
     {% endif %}
 
     {% if card.opening %}
     <div class="card mb-4">
-      <div class="card-header fw-semibold">开场白</div>
+      <div class="card-header fw-semibold">✦ 开场白</div>
       <div class="card-body fst-italic" style="white-space:pre-wrap;">{{ card.opening }}</div>
     </div>
     {% endif %}
 
     {% if dialogue %}
     <div class="card mb-4">
-      <div class="card-header fw-semibold">对话示例</div>
+      <div class="card-header fw-semibold">✦ 对话示例</div>
       <div class="card-body">
         {% for turn in dialogue %}
         <div class="mb-3">
-          {% if turn.user %}<div class="text-primary mb-1"><strong>用户：</strong>{{ turn.user }}</div>{% endif %}
-          {% if turn.assistant %}<div class="text-secondary"><strong>{{ card.name }}：</strong>{{ turn.assistant }}</div>{% endif %}
+          {% if turn.user %}<div class="mb-1"><span class="dna-chip">用户</span> <span class="ms-1">{{ turn.user }}</span></div>{% endif %}
+          {% if turn.assistant %}<div class="text-secondary"><strong class="text-light">{{ card.name }}：</strong>{{ turn.assistant }}</div>{% endif %}
         </div>
         {% endfor %}
       </div>
@@ -103,24 +103,24 @@
 
     {% if card.original_link %}
     <div class="mb-4">
-      <a class="btn btn-outline-primary" href="{{ card.original_link }}" target="_blank" rel="noopener">查看原始链接</a>
+      <a class="btn btn-outline-primary" href="{{ card.original_link }}" target="_blank" rel="noopener">查看原始链接 ↗</a>
     </div>
     {% endif %}
 
     <div class="card mb-4">
-      <div class="card-header fw-semibold">评论（{{ comment_count }}）</div>
+      <div class="card-header fw-semibold">💬 评论（{{ comment_count }}）</div>
       <div class="card-body">
         {% if current_user.is_authenticated %}
         <form method="post" action="{{ url_for('user.card_comment', card_id=card.id) }}">
           <textarea class="form-control mb-2" name="content" rows="3" placeholder="说点什么…" required></textarea>
           <button class="btn btn-primary btn-sm" type="submit">发表评论</button>
         </form>
-        <hr>
+        <hr class="border-secondary opacity-25">
         {% else %}
         <p class="text-muted small mb-3"><a href="{{ url_for('auth.login') }}">登录</a> 后参与评论。</p>
         {% endif %}
         {% for cm in comments %}
-          <div class="mb-3">
+        <div class="mb-3">
           <div class="small text-muted mb-1">
             <a class="text-decoration-none" href="{{ url_for('user.profile', username=cm.author.username) }}">{{ cm.author.nickname }}</a>{{ badge(cm.author) }}
             · {{ cm.created_at.strftime('%Y-%m-%d %H:%M') if cm.created_at else '' }}
@@ -131,7 +131,7 @@
           <div style="white-space:pre-wrap;">{{ cm.content }}</div>
         </div>
         {% else %}
-        <div class="text-muted small">还没有评论。</div>
+        <div class="text-muted small">还没有评论，来抢沙发～</div>
         {% endfor %}
       </div>
     </div>

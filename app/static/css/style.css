@@ -1,27 +1,343 @@
+/* ============================================================
+   DNAISLAND · 深色二次元设计系统
+   通过覆盖 Bootstrap 5 的 CSS 变量，让全站（含表单/后台/弹窗）
+   自动获得统一的暗色霓虹质感，再辅以少量自定义组件类精修。
+   ============================================================ */
+
 :root {
-  --dna-bg: #0f1115;
+  /* 品牌色 —— 霓虹紫 / 品红 / 青 */
+  --dna-accent: #a855f7;
+  --dna-accent-2: #ec4899;
+  --dna-accent-3: #22d3ee;
+  --dna-grad: linear-gradient(135deg, #a855f7 0%, #ec4899 55%, #f472b6 100%);
+  --dna-grad-soft: linear-gradient(135deg, rgba(168, 85, 247, .18), rgba(236, 72, 153, .12));
+
+  /* 背景与表面 */
+  --dna-bg: #0b0a14;
+  --dna-bg-2: #120f22;
+  --dna-surface: rgba(28, 24, 48, .72);
+  --dna-surface-solid: #171327;
+  --dna-border: rgba(255, 255, 255, .08);
+  --dna-border-strong: rgba(255, 255, 255, .16);
+
+  /* 文本 */
+  --dna-text: #ece9f6;
+  --dna-muted: #9c97b8;
+
+  --dna-radius: 16px;
+  --dna-radius-sm: 10px;
+  --dna-shadow: 0 18px 48px -20px rgba(0, 0, 0, .8);
+  --dna-glow: 0 0 0 1px rgba(168, 85, 247, .35), 0 12px 32px -12px rgba(168, 85, 247, .55);
+
+  /* —— 覆盖 Bootstrap 主题变量 —— */
+  --bs-body-bg: var(--dna-bg);
+  --bs-body-color: var(--dna-text);
+  --bs-border-color: var(--dna-border);
+  --bs-primary: #a855f7;
+  --bs-primary-rgb: 168, 85, 247;
+  --bs-link-color: #d8b4fe;
+  --bs-link-hover-color: #f0abfc;
+  --bs-emphasis-color: #fff;
 }
 
+/* Bootstrap 暗色令牌微调，让 card/dropdown/form 统一底色 */
+[data-bs-theme="dark"] {
+  --bs-body-bg: var(--dna-bg);
+  --bs-body-color: var(--dna-text);
+  --bs-secondary-color: var(--dna-muted);
+  --bs-tertiary-bg: var(--dna-surface-solid);
+  --bs-border-color: var(--dna-border);
+  --bs-emphasis-color: #fff;
+}
+
+/* ---------------- 全局背景 ---------------- */
 body {
-  background-color: #f6f7f9;
+  background-color: var(--dna-bg);
+  color: var(--dna-text);
+  background-image:
+    radial-gradient(60vw 60vw at 12% -10%, rgba(168, 85, 247, .22), transparent 60%),
+    radial-gradient(55vw 55vw at 100% 0%, rgba(34, 211, 238, .16), transparent 55%),
+    radial-gradient(50vw 50vw at 80% 110%, rgba(236, 72, 153, .16), transparent 55%);
+  background-attachment: fixed;
+  font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
+::selection { background: rgba(168, 85, 247, .4); color: #fff; }
+
+/* 滚动条 */
+* { scrollbar-width: thin; scrollbar-color: rgba(168,85,247,.5) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb { background: rgba(168,85,247,.45); border-radius: 20px; border: 2px solid transparent; background-clip: content-box; }
+*::-webkit-scrollbar-thumb:hover { background: rgba(168,85,247,.7); background-clip: content-box; }
+
+/* ---------------- 导航栏 ---------------- */
+.navbar.bg-dark {
+  background: rgba(12, 10, 22, .72) !important;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--dna-border);
+}
+.navbar { position: sticky; top: 0; z-index: 1030; }
 .navbar-brand {
-  font-weight: 700;
-  letter-spacing: 0.5px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  background: var(--dna-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
+.navbar .nav-link {
+  color: var(--dna-muted) !important;
+  font-weight: 500;
+  border-radius: 8px;
+  padding-inline: .75rem;
+  transition: color .18s ease, background .18s ease;
+}
+.navbar .nav-link:hover,
+.navbar .nav-link.active { color: #fff !important; background: rgba(255,255,255,.06); }
+.navbar .dropdown-menu { border: 1px solid var(--dna-border); box-shadow: var(--dna-shadow); }
 
+/* ---------------- 卡片 / 表面 ---------------- */
 .card {
+  border: 1px solid var(--dna-border);
+  border-radius: var(--dna-radius);
+  background: var(--dna-surface);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: var(--dna-shadow);
+  color: var(--dna-text);
+}
+.card-header {
+  background: rgba(255, 255, 255, .03);
+  border-bottom: 1px solid var(--dna-border);
+  color: #fff;
+}
+.list-group-item {
+  background: var(--dna-surface);
+  border-color: var(--dna-border);
+  color: var(--dna-text);
+}
+.list-group-item-primary { background: var(--dna-grad-soft); color: #fff; }
+
+/* ---------------- 按钮 ---------------- */
+.btn { border-radius: 10px; font-weight: 600; transition: transform .12s ease, box-shadow .2s ease, filter .2s ease; }
+.btn:active { transform: translateY(1px); }
+.btn-primary {
   border: none;
-  border-radius: 0.75rem;
+  background: var(--dna-grad);
+  color: #fff;
+  box-shadow: 0 10px 26px -12px rgba(236, 72, 153, .8);
+}
+.btn-primary:hover, .btn-primary:focus { filter: brightness(1.08); box-shadow: var(--dna-glow); color: #fff; }
+.btn-outline-primary { border-color: rgba(168,85,247,.55); color: #d8b4fe; }
+.btn-outline-primary:hover { background: rgba(168,85,247,.16); border-color: var(--dna-accent); color: #fff; }
+.btn-outline-secondary { border-color: var(--dna-border-strong); color: var(--dna-muted); }
+.btn-outline-secondary:hover { background: rgba(255,255,255,.08); color: #fff; border-color: var(--dna-border-strong); }
+.btn-outline-light { border-color: var(--dna-border-strong); color: var(--dna-text); }
+.btn-outline-light:hover { background: rgba(255,255,255,.1); color: #fff; }
+
+/* ---------------- 徽章 ---------------- */
+.badge { font-weight: 600; letter-spacing: .2px; }
+.text-bg-primary, .badge.bg-primary { background: var(--dna-grad) !important; color: #fff !important; }
+
+/* ---------------- 表单 ---------------- */
+.form-control, .form-select {
+  background: rgba(10, 9, 18, .6);
+  border: 1px solid var(--dna-border-strong);
+  color: var(--dna-text);
+  border-radius: 10px;
+}
+.form-control::placeholder { color: rgba(156, 151, 184, .7); }
+.form-control:focus, .form-select:focus {
+  background: rgba(10, 9, 18, .85);
+  border-color: var(--dna-accent);
+  color: #fff;
+  box-shadow: 0 0 0 .2rem rgba(168, 85, 247, .25);
+}
+.form-label { color: var(--dna-muted); font-weight: 500; }
+.input-group-text { background: rgba(255,255,255,.05); border-color: var(--dna-border-strong); color: var(--dna-muted); }
+
+/* ---------------- 下拉/建议框 ---------------- */
+.dropdown-menu {
+  background: rgba(20, 16, 34, .96);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--dna-border);
+  border-radius: 12px;
+}
+.dropdown-item { color: var(--dna-text); border-radius: 8px; }
+.dropdown-item:hover, .dropdown-item:focus { background: var(--dna-grad-soft); color: #fff; }
+.dropdown-header { color: var(--dna-muted); }
+.dropdown-divider { border-color: var(--dna-border); }
+
+/* ---------------- 提示 ---------------- */
+main .alert { max-width: 760px; margin-inline: auto; border: 1px solid var(--dna-border); border-radius: 12px; }
+.alert-success { background: rgba(34,197,94,.14); color: #86efac; }
+.alert-danger  { background: rgba(239,68,68,.14); color: #fca5a5; }
+.alert-warning { background: rgba(234,179,8,.14); color: #fde68a; }
+.alert-info    { background: rgba(34,211,238,.14); color: #a5f3fc; }
+
+/* ---------------- 分页 ---------------- */
+.pagination { --bs-pagination-bg: transparent; --bs-pagination-color: var(--dna-muted); --bs-pagination-border-color: var(--dna-border); }
+.page-link { background: var(--dna-surface); border-color: var(--dna-border); color: var(--dna-muted); border-radius: 10px !important; margin: 0 3px; }
+.page-link:hover { background: rgba(168,85,247,.16); color: #fff; }
+.page-item.active .page-link { background: var(--dna-grad); border-color: transparent; color: #fff; }
+.page-item.disabled .page-link { background: transparent; color: rgba(156,151,184,.4); }
+
+/* ---------------- 链接 ---------------- */
+a { color: var(--dna-link, #d8b4fe); }
+.text-muted, .text-secondary { color: var(--dna-muted) !important; }
+
+/* ============================================================
+   自定义组件
+   ============================================================ */
+
+/* Hero 区块 */
+.dna-hero {
+  position: relative;
+  border-radius: 24px;
+  padding: clamp(2.2rem, 5vw, 4.2rem) clamp(1.2rem, 4vw, 3rem);
+  overflow: hidden;
+  border: 1px solid var(--dna-border);
+  background:
+    radial-gradient(120% 140% at 0% 0%, rgba(168,85,247,.35), transparent 55%),
+    radial-gradient(120% 140% at 100% 20%, rgba(34,211,238,.28), transparent 55%),
+    rgba(18, 15, 34, .6);
+  box-shadow: var(--dna-shadow);
+}
+.dna-hero::after {
+  content: "";
+  position: absolute; inset: 0;
+  background-image: radial-gradient(rgba(255,255,255,.06) 1px, transparent 1px);
+  background-size: 22px 22px;
+  mask-image: radial-gradient(80% 80% at 50% 0%, #000, transparent);
+  pointer-events: none;
+}
+.dna-hero__eyebrow {
+  display: inline-flex; align-items: center; gap: .4rem;
+  font-size: .8rem; letter-spacing: 2px; text-transform: uppercase;
+  color: var(--dna-accent-3);
+  border: 1px solid var(--dna-border-strong);
+  padding: .28rem .7rem; border-radius: 999px;
+  background: rgba(255,255,255,.04);
+}
+.dna-hero__title {
+  font-weight: 800;
+  line-height: 1.1;
+  font-size: clamp(1.9rem, 5vw, 3.2rem);
+  margin: 1rem 0 .6rem;
+}
+.dna-gradient-text {
+  background: var(--dna-grad);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
 }
 
-.footer {
-  font-size: 0.85rem;
+/* 区块标题 */
+.dna-section-title {
+  display: flex; align-items: center; gap: .6rem;
+  font-weight: 700; margin-bottom: 1rem;
+}
+.dna-section-title::before {
+  content: ""; width: 4px; height: 1.1em; border-radius: 3px; background: var(--dna-grad);
 }
 
-main .alert {
-  max-width: 720px;
-  margin-left: auto;
-  margin-right: auto;
+/* 角色卡瓦片（列表统一组件） */
+.dna-tile {
+  display: flex; flex-direction: column; height: 100%;
+  border: 1px solid var(--dna-border);
+  border-radius: var(--dna-radius);
+  overflow: hidden;
+  background: var(--dna-surface);
+  color: var(--dna-text);
+  text-decoration: none;
+  transition: transform .2s ease, box-shadow .25s ease, border-color .25s ease;
 }
+.dna-tile:hover {
+  transform: translateY(-4px);
+  border-color: rgba(168,85,247,.5);
+  box-shadow: var(--dna-glow);
+  color: var(--dna-text);
+}
+.dna-tile__media { position: relative; aspect-ratio: 4 / 3; overflow: hidden; background: var(--dna-bg-2); }
+.dna-tile__media img { width: 100%; height: 100%; object-fit: cover; transition: transform .35s ease; }
+.dna-tile:hover .dna-tile__media img { transform: scale(1.06); }
+.dna-tile__ph {
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 3rem; font-weight: 800; color: #fff;
+  background: var(--dna-grad-soft);
+}
+.dna-tile__status { position: absolute; top: .6rem; left: .6rem; display: flex; gap: .35rem; }
+.dna-tile__body { padding: .9rem 1rem 1.1rem; display: flex; flex-direction: column; gap: .35rem; flex: 1; }
+.dna-tile__title { font-size: 1.02rem; font-weight: 700; margin: 0; color: #fff; }
+.dna-tile__meta { font-size: .78rem; color: var(--dna-muted); }
+.dna-tile__desc {
+  font-size: .84rem; color: var(--dna-muted); margin: 0;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+  white-space: pre-wrap;
+}
+.dna-tile__tags { margin-top: auto; display: flex; flex-wrap: wrap; gap: .3rem; }
+
+/* 标签片 */
+.dna-chip {
+  display: inline-flex; align-items: center;
+  font-size: .74rem; color: #d8b4fe;
+  padding: .18rem .55rem; border-radius: 999px;
+  border: 1px solid var(--dna-border-strong);
+  background: rgba(168,85,247,.1);
+}
+
+/* 空状态 */
+.dna-empty {
+  text-align: center; color: var(--dna-muted);
+  padding: 3rem 1rem;
+  border: 1px dashed var(--dna-border-strong);
+  border-radius: var(--dna-radius);
+  background: rgba(255,255,255,.02);
+}
+.dna-empty__icon { font-size: 2.4rem; opacity: .7; margin-bottom: .5rem; }
+
+/* 统计小卡 */
+.dna-stat { text-align: center; padding: 1.1rem .5rem; }
+.dna-stat__num { font-size: 1.8rem; font-weight: 800; line-height: 1; }
+.dna-stat__label { font-size: .8rem; color: var(--dna-muted); margin-top: .3rem; }
+
+/* 头像 */
+.dna-avatar { border-radius: 50%; object-fit: cover; border: 2px solid var(--dna-border-strong); }
+.dna-avatar-ph {
+  border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  color: #fff; font-weight: 700; background: var(--dna-grad);
+}
+
+/* 详情页信息头 */
+.dna-detail-hero { position: relative; overflow: hidden; }
+.dna-detail-hero__banner { width: 100%; max-height: 300px; object-fit: cover; border-radius: var(--dna-radius); }
+
+/* 页脚 */
+.footer.bg-light {
+  background: rgba(12, 10, 22, .7) !important;
+  border-top: 1px solid var(--dna-border);
+  color: var(--dna-muted);
+  backdrop-filter: blur(10px);
+}
+.footer.bg-light .text-muted { color: var(--dna-muted) !important; }
+
+/* mark 高亮 */
+mark, .bg-warning-subtle {
+  background: rgba(236, 72, 153, .3) !important;
+  color: #fff !important; border-radius: 4px; padding: 0 .15em;
+}
+
+/* 后台侧边栏 */
+.sidebar.bg-light {
+  background: rgba(18, 15, 34, .7) !important;
+  border-right: 1px solid var(--dna-border);
+  border-radius: var(--dna-radius);
+}
+.sidebar .nav-link { color: var(--dna-muted); border-radius: 10px; }
+.sidebar .nav-link:hover { background: rgba(255,255,255,.05); color: #fff; }
+.sidebar .nav-pills .nav-link.active { background: var(--dna-grad); color: #fff; }
+
+/* 表格（后台） */
+.table { --bs-table-bg: transparent; --bs-table-color: var(--dna-text); --bs-table-border-color: var(--dna-border); }
+.table > :not(caption) > * > * { background: transparent; }

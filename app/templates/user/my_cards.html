@@ -1,60 +1,52 @@
 {% extends "base.html" %}
 {% from "macros/pagination.html" import render_pagination %}
+{% from "macros/cards.html" import status_badge, empty_state %}
 
 {% block title %}我的发布 · DNAISLAND{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
-  <div class="col-12 col-lg-8">
-    <h2 class="h4 mb-3">我的发布</h2>
-
-    <div class="row g-3 mb-4">
-      <div class="col-4">
-        <div class="card text-center">
-          <div class="card-body">
-            <div class="h3 mb-0">{{ pending }}</div>
-            <div class="small text-muted">审核中</div>
-          </div>
-        </div>
-      </div>
-      <div class="col-4">
-        <div class="card text-center">
-          <div class="card-body">
-            <div class="h3 mb-0 text-success">{{ approved }}</div>
-            <div class="small text-muted">已通过</div>
-          </div>
-        </div>
-      </div>
-      <div class="col-4">
-        <div class="card text-center">
-          <div class="card-body">
-            <div class="h3 mb-0 text-danger">{{ rejected }}</div>
-            <div class="small text-muted">已拒绝</div>
-          </div>
-        </div>
+  <div class="col-12 col-lg-9">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-4">
+      <h1 class="dna-section-title h4 mb-0">我的发布</h1>
+      <div class="d-flex flex-wrap gap-2">
+        <a class="btn btn-primary btn-sm" href="{{ url_for('publish.start') }}">＋ 发布新角色卡</a>
+        <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('user.my_favorites') }}">我的收藏</a>
+        <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('user.my_likes') }}">我点赞的</a>
       </div>
     </div>
 
-    <div class="d-flex flex-wrap gap-2 mb-3">
-      <a class="btn btn-primary btn-sm" href="{{ url_for('publish.start') }}">+ 发布新角色卡</a>
-      <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('user.my_favorites') }}">我的收藏</a>
-      <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('user.my_likes') }}">我点赞的</a>
+    <div class="row g-3 mb-4">
+      <div class="col-4">
+        <div class="card"><div class="dna-stat">
+          <div class="dna-stat__num text-warning">{{ pending }}</div>
+          <div class="dna-stat__label">审核中</div>
+        </div></div>
+      </div>
+      <div class="col-4">
+        <div class="card"><div class="dna-stat">
+          <div class="dna-stat__num text-success">{{ approved }}</div>
+          <div class="dna-stat__label">已通过</div>
+        </div></div>
+      </div>
+      <div class="col-4">
+        <div class="card"><div class="dna-stat">
+          <div class="dna-stat__num text-danger">{{ rejected }}</div>
+          <div class="dna-stat__label">已拒绝</div>
+        </div></div>
+      </div>
     </div>
 
     <div class="list-group">
       {% for card in cards %}
       <div class="list-group-item">
-        <div class="d-flex justify-content-between align-items-start">
+        <div class="d-flex justify-content-between align-items-start gap-2">
           <div>
-            <a class="text-decoration-none" href="{{ url_for('user.card_detail', card_id=card.id) }}">{{ card.name }}</a>
+            <a class="fw-semibold text-decoration-none" href="{{ url_for('user.card_detail', card_id=card.id) }}">{{ card.name }}</a>
             {% if card.is_hidden %}<span class="badge bg-secondary ms-1">已隐藏</span>{% endif %}
-            <span class="text-muted">· {{ card.created_at.strftime('%Y-%m-%d') if card.created_at else '' }}</span>
+            <div class="text-muted small mt-1">{{ card.gender or '未知' }} · {{ card.created_at.strftime('%Y-%m-%d') if card.created_at else '' }}</div>
           </div>
-          <div class="text-nowrap">
-            {% if card.status == 'approved' %}<span class="badge bg-success">已通过</span>
-            {% elif card.status == 'rejected' %}<span class="badge bg-danger">已拒绝</span>
-            {% else %}<span class="badge bg-warning text-dark">审核中</span>{% endif %}
-          </div>
+          <div class="text-nowrap">{{ status_badge(card.status) }}</div>
         </div>
         <div class="mt-2 d-flex flex-wrap gap-2">
           <a class="btn btn-sm btn-outline-primary" href="{{ url_for('user.card_edit', card_id=card.id) }}">编辑</a>
@@ -72,7 +64,7 @@
         </div>
       </div>
       {% else %}
-      <div class="text-center text-muted py-4">还没有发布任何角色卡。</div>
+      <div class="list-group-item bg-transparent border-0 p-0">{{ empty_state('还没有发布任何角色卡。', '🎴') }}</div>
       {% endfor %}
     </div>
 

@@ -37,6 +37,7 @@ from ..models.punishment import (
 )
 from ..services.notification_service import notify
 from ..services.image_service import compress_image, crop_square_and_compress
+from ..services.card_service import attach_covers, load_card_images
 
 user_bp = Blueprint("user", __name__)
 
@@ -84,7 +85,7 @@ def profile(username):
     return render_template(
         "user/profile.html",
         u=u,
-        cards=pagination.items,
+        cards=attach_covers(pagination.items),
         pagination=pagination,
         args={"username": username},
         is_self=is_self,
@@ -226,7 +227,7 @@ def card_detail(card_id):
         for d in CardDialogueStyle.query.filter_by(card_id=card.id)
         .order_by(CardDialogueStyle.turn_index)
     ]
-    images = {i.slot: i.data for i in CardImage.query.filter_by(card_id=card.id).all()}
+    images = load_card_images(card.id)
 
     like_count = CardLike.query.filter_by(card_id=card.id).count()
     favorite_count = CardFavorite.query.filter_by(card_id=card.id).count()
@@ -300,7 +301,7 @@ def my_cards():
     )
     return render_template(
         "user/my_cards.html",
-        cards=pagination.items,
+        cards=attach_covers(pagination.items),
         pagination=pagination,
         args={},
         stats=stats,
@@ -323,7 +324,7 @@ def my_favorites():
     )
     return render_template(
         "user/card_list.html",
-        cards=pagination.items,
+        cards=attach_covers(pagination.items),
         pagination=pagination,
         args={},
         title="我的收藏",
@@ -343,7 +344,7 @@ def my_likes():
     )
     return render_template(
         "user/card_list.html",
-        cards=pagination.items,
+        cards=attach_covers(pagination.items),
         pagination=pagination,
         args={},
         title="我点赞的",
@@ -522,7 +523,7 @@ def card_edit(card_id):
         for d in CardDialogueStyle.query.filter_by(card_id=card.id)
         .order_by(CardDialogueStyle.turn_index)
     ]
-    images = {i.slot: i.data for i in CardImage.query.filter_by(card_id=card.id).all()}
+    images = load_card_images(card.id)
     prefill = {
         "id": card.id,
         "name": card.name,
