@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block title %}注册 · DNAISLAND{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-sm-10 col-md-7 col-lg-5">
+    <div class="card shadow-sm">
+      <div class="card-body p-4">
+        <h2 class="h4 mb-4 text-center">创建账号</h2>
+        <form method="post" novalidate>
+          <div class="mb-3">
+            <label for="username" class="form-label">用户名</label>
+            <input type="text" class="form-control" id="username" name="username"
+                   value="{{ request.form.username or '' }}" required>
+          </div>
+          <div class="mb-3">
+            <label for="nickname" class="form-label">昵称</label>
+            <input type="text" class="form-control" id="nickname" name="nickname"
+                   value="{{ request.form.nickname or '' }}" required>
+          </div>
+          <div class="mb-3">
+            <label for="email" class="form-label">邮箱</label>
+            <div class="input-group">
+              <input type="email" class="form-control" id="email" name="email"
+                     value="{{ request.form.email or '' }}" required>
+              <button type="button" class="btn btn-outline-secondary" id="sendCodeBtn">发送验证码</button>
+            </div>
+            <div class="form-text" id="sendCodeHint">注册前需验证邮箱。</div>
+          </div>
+          <div class="mb-3">
+            <label for="code" class="form-label">邮箱验证码</label>
+            <input type="text" class="form-control" id="code" name="code"
+                   value="{{ request.form.code or '' }}" required>
+          </div>
+          <div class="mb-3">
+            <label for="password" class="form-label">密码</label>
+            <input type="password" class="form-control" id="password" name="password" required>
+          </div>
+          <div class="mb-3">
+            <label for="confirm_password" class="form-label">确认密码</label>
+            <input type="password" class="form-control" id="confirm_password"
+                   name="confirm_password" required>
+          </div>
+          <button type="submit" class="btn btn-primary w-100">注册</button>
+        </form>
+        <p class="text-center mt-3 mb-0">
+          已有账号？<a href="{{ url_for('auth.login') }}">去登录</a>
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const btn = document.getElementById('sendCodeBtn');
+  const hint = document.getElementById('sendCodeHint');
+  const emailInput = document.getElementById('email');
+
+  btn.addEventListener('click', async () => {
+    const email = emailInput.value.trim();
+    if (!email) {
+      hint.textContent = '请先填写邮箱再发送验证码。';
+      hint.className = 'form-text text-danger';
+      return;
+    }
+    btn.disabled = true;
+    btn.textContent = '发送中…';
+    try {
+      const resp = await fetch("{{ url_for('auth.send_code') }}", {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({email: email})
+      });
+      const data = await resp.json();
+      if (data.ok) {
+        hint.textContent = data.message || '验证码已发送，请查收邮箱。';
+        hint.className = 'form-text text-success';
+        let left = 60;
+        btn.textContent = left + ' 秒后重发';
+        const timer = setInterval(() => {
+          left -= 1;
+          if (left <= 0) {
+            clearInterval(timer);
+            btn.disabled = false;
+            btn.textContent = '重新发送';
+          } else {
+            btn.textContent = left + ' 秒后重发';
+          }
+        }, 1000);
+      } else {
+        hint.textContent = data.message || '发送失败，请重试。';
+        hint.className = 'form-text text-danger';
+        btn.disabled = false;
+        btn.textContent = '发送验证码';
+      }
+    } catch (e) {
+      hint.textContent = '网络错误，请重试。';
+      hint.className = 'form-text text-danger';
+      btn.disabled = false;
+      btn.textContent = '发送验证码';
+    }
+  });
+</script>
+{% endblock %}

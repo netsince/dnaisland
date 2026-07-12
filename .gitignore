@@ -8,17 +8,13 @@ __pycache__/
 .venv/
 venv/
 
-# Env files
+# Env / secrets
 .env
 
 # Flask
 instance/
 .webassets-cache
 
-# Local data
-*.sqlite3
-
-# Editor / OS
-.idea/
-.vscode/
+# Misc
 .DS_Store
+*.log
