@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Virtual env
+.venv/
+venv/
+
+# Env files
+.env
+
+# Flask
+instance/
+.webassets-cache
+
+# Local data
+*.sqlite3
+
+# Editor / OS
+.idea/
+.vscode/
+.DS_Store
