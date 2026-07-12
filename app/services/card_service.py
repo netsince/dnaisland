@@ -7,7 +7,9 @@
 - load_card_images(card_id): 返回单卡 {slot: data} 图片字典。
 """
 
-from ..models import CardImage
+from ..extensions import db
+from ..models import Card, CardImage, CardTag
+from sqlalchemy import func
 
 
 def attach_covers(cards, slot="square"):
@@ -37,3 +39,20 @@ def load_card_images(card_id):
         img.slot: img.data
         for img in CardImage.query.filter_by(card_id=card_id).all()
     }
+
+
+def popular_tags(viewer=None, limit=30):
+    """返回可见卡片中的热门标签（含计数），按卡片数降序，用于探索页标签云。
+
+    标签计数只统计对 viewer 可见的卡片，避免使用被屏蔽作者/未通过卡片的噪声标签。
+    """
+    visible_ids = Card.visible_to(viewer).with_entities(Card.id)
+    rows = (
+        db.session.query(CardTag.tag, func.count(CardTag.card_id).label("n"))
+        .filter(CardTag.card_id.in_(visible_ids))
+        .group_by(CardTag.tag)
+        .order_by(func.count(CardTag.card_id).desc())
+        .limit(limit)
+        .all()
+    )
+    return [{"tag": r.tag, "count": r.n} for r in rows]

@@ -1,10 +1,10 @@
 from flask import Blueprint, jsonify, render_template, request, url_for
 from flask_login import current_user
-from sqlalchemy import case, or_
+from sqlalchemy import case, func, or_
 
 from ..extensions import db
-from ..models import Card, CardTag, Punishment, User
-from ..services.card_service import attach_covers
+from ..models import Card, CardLike, CardTag, Punishment, User
+from ..services.card_service import attach_covers, popular_tags
 
 main_bp = Blueprint("main", __name__)
 
@@ -138,6 +138,72 @@ def search():
         cards_pagination=cards_pagination,
         users=users,
         users_pagination=users_pagination,
+        args=args,
+    )
+
+
+@main_bp.route("/explore")
+def explore():
+    page = request.args.get("page", 1, type=int)
+    gender = (request.args.get("gender") or "").strip()
+    tag = (request.args.get("tag") or "").strip() or None
+    sort = request.args.get("sort", "hot")
+    if sort not in ("hot", "new", "likes"):
+        sort = "hot"
+
+    q = Card.visible_to(current_user)
+    if gender:
+        q = q.filter(Card.gender == gender)
+    if tag:
+        q = q.join(CardTag, CardTag.card_id == Card.id).filter(CardTag.tag == tag)
+
+    if sort == "hot":
+        q = q.order_by(Card.view_count.desc(), Card.created_at.desc())
+    elif sort == "new":
+        q = q.order_by(Card.created_at.desc())
+    else:  # likes：相关子查询计数，避免 group by 触发 only_full_group_by 问题
+        like_count = (
+            db.session.query(func.count(CardLike.card_id))
+            .filter(CardLike.card_id == Card.id)
+            .correlate(Card)
+            .scalar_subquery()
+        )
+        q = q.order_by(like_count.desc(), Card.created_at.desc())
+
+    if tag:
+        q = q.distinct()
+
+    pagination = q.paginate(page=page, per_page=24, error_out=False)
+    cards = attach_covers(pagination.items)
+
+    genders = [
+        g[0]
+        for g in (
+            Card.visible_to(current_user)
+            .with_entities(Card.gender)
+            .filter(Card.gender.is_not(None), Card.gender != "")
+            .distinct()
+            .all()
+        )
+    ]
+    tags = popular_tags(current_user, limit=30)
+
+    # 分页链接需保留当前筛选条件
+    args = {"sort": sort}
+    if gender:
+        args["gender"] = gender
+    if tag:
+        args["tag"] = tag
+
+    return render_template(
+        "explore.html",
+        cards=cards,
+        pagination=pagination,
+        genders=genders,
+        tags=tags,
+        gender=gender,
+        tag=tag,
+        sort=sort,
         args=args,
     )
 

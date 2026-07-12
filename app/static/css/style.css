@@ -341,3 +341,69 @@ mark, .bg-warning-subtle {
 /* 表格（后台） */
 .table { --bs-table-bg: transparent; --bs-table-color: var(--dna-text); --bs-table-border-color: var(--dna-border); }
 .table > :not(caption) > * > * { background: transparent; }
+
+/* ============================================================
+   探索页
+   ============================================================ */
+
+/* 筛选条 */
+.dna-filterbar {
+  position: sticky;
+  top: 64px;
+  z-index: 1020;
+  background: rgba(12, 10, 22, .72);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--dna-border);
+  border-radius: var(--dna-radius);
+  padding: .9rem 1.1rem;
+  margin-bottom: 1.5rem;
+  box-shadow: var(--dna-shadow);
+}
+.dna-filterbar__group { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.dna-filterbar__group + .dna-filterbar__group { margin-top: .7rem; padding-top: .7rem; border-top: 1px dashed var(--dna-border); }
+.dna-filterbar__label {
+  font-size: .76rem; letter-spacing: 1px; text-transform: uppercase;
+  color: var(--dna-muted); min-width: 3.2rem; flex-shrink: 0;
+}
+
+/* 可点击筛选 chip（性别 / 排序） */
+.dna-chip-btn {
+  display: inline-flex; align-items: center; gap: .35rem;
+  font-size: .82rem; font-weight: 600; text-decoration: none;
+  color: var(--dna-muted);
+  padding: .34rem .85rem; border-radius: 999px;
+  border: 1px solid var(--dna-border-strong);
+  background: rgba(255, 255, 255, .03);
+  transition: all .18s ease; white-space: nowrap;
+}
+.dna-chip-btn:hover { color: #fff; border-color: var(--dna-accent); background: rgba(168, 85, 247, .16); }
+.dna-chip-btn.is-active {
+  color: #fff; border-color: transparent;
+  background: var(--dna-grad);
+  box-shadow: var(--dna-glow);
+}
+
+/* 标签云 */
+.dna-tagcloud { display: flex; flex-wrap: wrap; gap: .5rem; }
+.dna-tag {
+  --w: .5;
+  display: inline-flex; align-items: center; gap: .3rem;
+  font-size: calc(.74rem + .25rem * var(--w, .5));
+  text-decoration: none; color: #d8b4fe;
+  padding: .32rem .8rem; border-radius: 999px;
+  border: 1px solid var(--dna-border-strong);
+  background: rgba(168, 85, 247, calc(.06 + .1 * var(--w, .5)));
+  transition: all .18s ease;
+}
+.dna-tag:hover { color: #fff; border-color: var(--dna-accent); transform: translateY(-2px); }
+.dna-tag.is-active { color: #fff; border-color: transparent; background: var(--dna-grad); box-shadow: var(--dna-glow); }
+.dna-tag__count { font-size: .68em; opacity: .7; }
+
+/* 当前筛选状态条 */
+.dna-active-filters { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.dna-active-filters .dna-chip-btn { cursor: default; }
+.dna-active-filters .dna-active-filters__clear { margin-left: auto; }
+
+/* 探索页网格更紧凑，容纳更多卡片 */
+.dna-explore-grid .dna-tile__media { aspect-ratio: 3 / 4; }
