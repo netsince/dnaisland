@@ -24,6 +24,18 @@
                href="{{ url_for('admin.reports') }}">举报管理</a>
           </li>
           <li class="nav-item">
+            <a class="nav-link {% if request.endpoint.startswith('admin.comment_moderation') %}active{% endif %}"
+               href="{{ url_for('admin.comment_moderation') }}">评论审核</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% if request.endpoint.startswith('admin.comments') %}active{% endif %}"
+               href="{{ url_for('admin.comments') }}">评论管理</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% if request.endpoint.startswith('admin.notify_send') %}active{% endif %}"
+               href="{{ url_for('admin.notify_send') }}">发送通知</a>
+          </li>
+          <li class="nav-item">
             <a class="nav-link {% if request.endpoint.startswith('admin.punish_appeals') %}active{% endif %}"
                href="{{ url_for('admin.punish_appeals') }}">处罚申诉</a>
           </li>

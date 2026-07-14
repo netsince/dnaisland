@@ -1,0 +1,43 @@
+{% extends "admin/base.html" %}
+
+{% block title %}发送通知 · DNAISLAND{% endblock %}
+
+{% block admin_content %}
+<h2 class="h4 mb-3">发送通知</h2>
+
+<div class="row g-4">
+  <div class="col-12 col-lg-8">
+    <form method="post" action="{{ url_for('admin.notify_send') }}">
+      <div class="mb-3">
+        <label class="form-label">目标用户名</label>
+        <input class="form-control" type="text" name="username" placeholder="输入接收通知的用户名" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">通知内容</label>
+        <textarea class="form-control" name="message" id="notify-message" rows="6" placeholder="输入要发送给用户的内容" required></textarea>
+      </div>
+      <button class="btn btn-primary" type="submit">发送</button>
+    </form>
+  </div>
+
+  <div class="col-12 col-lg-4">
+    <label class="form-label text-muted small">常用模板（点击填入输入框，不直接发送）</label>
+    <div class="d-flex flex-column gap-2">
+      {% for title, text in templates %}
+      <button type="button" class="btn btn-outline-secondary text-start template-btn"
+              data-text="{{ text }}">{{ title }}</button>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<script>
+  document.querySelectorAll('.template-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var ta = document.getElementById('notify-message');
+      ta.value = btn.getAttribute('data-text');
+      ta.focus();
+    });
+  });
+</script>
+{% endblock %}

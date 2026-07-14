@@ -618,3 +618,155 @@ def report_action(report_id):
         "success",
     )
     return redirect(url_for("admin.reports"))
+
+
+# ---------------- 评论审核（先发后审） ----------------
+@admin_bp.route("/comments/moderation")
+@super_admin_required
+def comment_moderation():
+    page = request.args.get("page", 1, type=int)
+    pagination = (
+        Comment.query.filter_by(moderated=False)
+        .order_by(Comment.created_at.desc())
+        .paginate(page=page, per_page=20, error_out=False)
+    )
+    items = []
+    for c in pagination.items:
+        items.append({"comment": c, "card": db.session.get(Card, c.card_id)})
+    return render_template(
+        "admin/comment_moderation.html",
+        items=items,
+        pagination=pagination,
+        args={},
+        pending=Comment.query.filter_by(moderated=False).count(),
+    )
+
+
+@admin_bp.route("/comments/<int:comment_id>/approve", methods=["POST"])
+@super_admin_required
+def comment_approve(comment_id):
+    c = db.session.get(Comment, comment_id)
+    if not c:
+        abort(404)
+    c.moderated = True  # 同意：保持可见
+    db.session.commit()
+    flash("已通过该评论，继续可见", "success")
+    return redirect(url_for("admin.comment_moderation"))
+
+
+@admin_bp.route("/comments/<int:comment_id>/reject", methods=["POST"])
+@super_admin_required
+def comment_reject(comment_id):
+    c = db.session.get(Comment, comment_id)
+    if not c:
+        abort(404)
+    # 拒绝：隐藏评论 + 标记已审核
+    c.is_hidden = True
+    c.moderated = True
+    db.session.commit()
+
+    card = db.session.get(Card, c.card_id)
+    card_name = card.name if card else "未知角色卡"
+    notify(
+        c.user_id,
+        f'你发布在角色卡《{card_name}》下的评论因违反社区规范已被移除。',
+        type_="comment",
+    )
+
+    # 可选：拒绝的同时禁言该用户（复用 mute 处罚）
+    mute = request.form.get("mute") == "1"
+    if mute:
+        u = db.session.get(User, c.user_id)
+        if u and not u.has_punishment("mute"):
+            db.session.add(
+                Punishment(
+                    user_id=u.id,
+                    type="mute",
+                    reason="评论被拒绝时管理员施加禁言",
+                    handled_by=current_user.id,
+                )
+            )
+            db.session.commit()
+            notify(u.id, "你已被平台禁言，暂时无法发表评论。", type_="punish")
+            db.session.commit()
+        db.session.commit()
+
+    flash(
+        "已拒绝该评论（已隐藏并通知用户）" + ("，并禁言该用户" if mute else ""),
+        "success",
+    )
+    return redirect(url_for("admin.comment_moderation"))
+
+
+# ---------------- 评论管理（总列表，独立于审核） ----------------
+@admin_bp.route("/comments")
+@super_admin_required
+def comments():
+    q = request.args.get("q", "").strip()
+    author = request.args.get("author", "").strip()
+    card = request.args.get("card", "").strip()
+    query = Comment.query
+    if q:
+        query = query.filter(Comment.content.like(f"%{q}%"))
+    if author:
+        query = query.join(User).filter(User.username.like(f"%{author}%"))
+    if card:
+        query = query.join(Card).filter(Card.name.like(f"%{card}%"))
+    page = request.args.get("page", 1, type=int)
+    pagination = query.order_by(Comment.created_at.desc()).paginate(
+        page=page, per_page=20, error_out=False
+    )
+    items = [
+        {"comment": c, "card": db.session.get(Card, c.card_id)}
+        for c in pagination.items
+    ]
+    return render_template(
+        "admin/comments.html",
+        items=items,
+        pagination=pagination,
+        args={"q": q, "author": author, "card": card},
+        q=q,
+        author=author,
+        card=card,
+    )
+
+
+@admin_bp.route("/comments/<int:comment_id>/delete", methods=["POST"])
+@super_admin_required
+def comment_delete(comment_id):
+    c = db.session.get(Comment, comment_id)
+    if not c:
+        abort(404)
+    db.session.delete(c)
+    db.session.commit()
+    flash("评论已删除", "success")
+    return redirect(url_for("admin.comments"))
+
+
+# ---------------- 通知发送 ----------------
+NOTIFY_TEMPLATES = [
+    ("感谢", "感谢你对 DNAISLAND 的贡献，期待你创作更多优质角色卡！"),
+    ("欢迎", "欢迎加入 DNAISLAND！如有疑问可随时联系管理员。"),
+    ("违规提醒", "你的部分内容因违反社区规范已被处理，请遵守平台规则。"),
+    ("活动通知", "平台即将举办活动，敬请期待～"),
+]
+
+
+@admin_bp.route("/notify", methods=["GET", "POST"])
+@super_admin_required
+def notify_send():
+    if request.method == "POST":
+        username = (request.form.get("username") or "").strip()
+        message = (request.form.get("message") or "").strip()
+        if not username or not message:
+            flash("请填写目标用户名与通知内容", "warning")
+            return render_template("admin/notify.html", templates=NOTIFY_TEMPLATES)
+        u = User.query.filter_by(username=username).first()
+        if not u:
+            flash("目标用户不存在", "warning")
+            return render_template("admin/notify.html", templates=NOTIFY_TEMPLATES)
+        notify(u.id, message, type_="system")
+        db.session.commit()
+        flash(f"已向用户 {u.nickname}（@{u.username}）发送通知", "success")
+        return redirect(url_for("admin.notify_send"))
+    return render_template("admin/notify.html", templates=NOTIFY_TEMPLATES)

@@ -1,0 +1,53 @@
+{% extends "admin/base.html" %}
+{% from "macros/pagination.html" import render_pagination %}
+
+{% block title %}评论审核 · DNAISLAND{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <h2 class="h4 mb-0">评论审核（先发后审）</h2>
+  <span class="badge bg-warning text-dark">待审核：{{ pending }}</span>
+</div>
+
+<div class="text-muted small mb-3">
+  评论发布后直接进入此队列。点击「同意」保留可见；点击「拒绝」隐藏该评论并通知用户，可同时禁言。
+</div>
+
+{% if items %}
+<div class="list-group">
+  {% for it in items %}
+  {% set c = it.comment %}
+  <div class="list-group-item bg-transparent">
+    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+      <div class="flex-grow-1 min-w-0">
+        <div class="small text-muted mb-1">
+          <a class="text-decoration-none" href="{{ url_for('user.profile', username=c.author.username) if c.author else '#' }}">{{ c.author.nickname if c.author else c.user_id }}</a>
+          {% if it.card %}· 评论于 <a class="text-decoration-none" href="{{ url_for('user.card_detail', card_id=it.card.id) }}">{{ it.card.name }}</a>{% endif %}
+          · {{ c.created_at.strftime('%Y-%m-%d %H:%M') if c.created_at else '' }}
+        </div>
+        <div style="white-space:pre-wrap;">{{ c.content }}</div>
+      </div>
+      <div class="d-flex flex-column gap-2 align-items-end">
+        <form method="post" action="{{ url_for('admin.comment_approve', comment_id=c.id) }}">
+          <button class="btn btn-sm btn-success">同意</button>
+        </form>
+        <form method="post" action="{{ url_for('admin.comment_reject', comment_id=c.id) }}">
+          <div class="form-check mb-1">
+            <input class="form-check-input" type="checkbox" name="mute" id="mute-{{ c.id }}" value="1">
+            <label class="form-check-label small" for="mute-{{ c.id }}">同时禁言</label>
+          </div>
+          <button class="btn btn-sm btn-danger">拒绝</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{{ render_pagination(pagination, 'admin.comment_moderation', args) }}
+{% else %}
+<div class="dna-empty">
+  <div class="dna-empty__icon">✅</div>
+  <div>审核队列已清空，暂无待审核评论。</div>
+</div>
+{% endif %}
+{% endblock %}

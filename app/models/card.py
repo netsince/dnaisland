@@ -105,4 +105,7 @@ class Comment(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     content = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, server_default=db.func.now())
+    # 评论审核（先发后审）：is_hidden=被拒绝隐藏；moderated=是否已进入审核流程处理过
+    is_hidden = db.Column(db.Boolean, server_default="0", nullable=False, index=True)
+    moderated = db.Column(db.Boolean, server_default="0", nullable=False, index=True)
     author = db.relationship("User", backref="comments")

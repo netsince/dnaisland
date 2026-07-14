@@ -1,0 +1,68 @@
+{% extends "admin/base.html" %}
+{% from "macros/pagination.html" import render_pagination %}
+
+{% block title %}评论管理 · DNAISLAND{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2 class="h4 mb-0">评论管理（总列表）</h2>
+</div>
+
+<form class="row g-2 mb-3 align-items-end" method="get">
+  <div class="col-auto">
+    <label class="form-label small text-muted mb-1">内容含</label>
+    <input class="form-control" type="text" name="q" value="{{ q }}" placeholder="评论内容">
+  </div>
+  <div class="col-auto">
+    <label class="form-label small text-muted mb-1">作者</label>
+    <input class="form-control" type="text" name="author" value="{{ author }}" placeholder="用户名">
+  </div>
+  <div class="col-auto">
+    <label class="form-label small text-muted mb-1">角色卡</label>
+    <input class="form-control" type="text" name="card" value="{{ card }}" placeholder="角色卡名">
+  </div>
+  <div class="col-auto">
+    <button class="btn btn-outline-secondary" type="submit">筛选</button>
+  </div>
+</form>
+
+<div class="table-responsive">
+  <table class="table table-hover align-middle">
+    <thead>
+      <tr>
+        <th>ID</th><th>作者</th><th>角色卡</th><th>内容</th><th>状态</th><th>时间</th><th>操作</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for it in items %}
+      {% set c = it.comment %}
+      <tr>
+        <td>{{ c.id }}</td>
+        <td>
+          {% if c.author %}<a class="text-decoration-none" href="{{ url_for('user.profile', username=c.author.username) }}">{{ c.author.nickname }}</a>{% else %}{{ c.user_id }}{% endif %}
+        </td>
+        <td>
+          {% if it.card %}<a class="text-decoration-none" href="{{ url_for('user.card_detail', card_id=it.card.id) }}">{{ it.card.name }}</a>{% else %}{{ c.card_id }}{% endif %}
+        </td>
+        <td style="max-width:360px;white-space:pre-wrap;">{{ c.content }}</td>
+        <td>
+          {% if c.is_hidden %}<span class="badge bg-secondary">已隐藏</span>
+          {% else %}<span class="badge bg-success">可见</span>{% endif %}
+          {% if c.moderated %}<span class="badge bg-info text-dark">已审核</span>{% else %}<span class="badge bg-warning text-dark">待审核</span>{% endif %}
+        </td>
+        <td>{{ c.created_at.strftime('%Y-%m-%d %H:%M') if c.created_at else '' }}</td>
+        <td>
+          <form method="post" action="{{ url_for('admin.comment_delete', comment_id=c.id) }}" onsubmit="return confirm('确认删除该评论？');">
+            <button class="btn btn-sm btn-outline-danger">删除</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="text-center text-muted">暂无评论</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{{ render_pagination(pagination, 'admin.comments', args) }}
+{% endblock %}

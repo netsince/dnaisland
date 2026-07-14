@@ -294,11 +294,12 @@ def card_detail(card_id):
         .order_by(Comment.created_at.asc())
         .all()
     )
-    # 屏蔽全部评论：被处罚用户的评论对他人不可见（本人与管理员可见）
+    # 屏蔽全部评论：被处罚用户的评论对他人不可见（本人与管理员可见）；
+    # 被审核拒绝（is_hidden）的评论同样对他人不可见
     visible_comments = [
         c
         for c in comments
-        if not (
+        if (not c.is_hidden) and not (
             c.author
             and c.author.is_comments_hidden
             and not (current_user.is_authenticated and current_user.id == c.author.id)
