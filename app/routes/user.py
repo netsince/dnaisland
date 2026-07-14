@@ -310,7 +310,21 @@ def card_export(card_id):
     if not (is_public or is_owner or is_admin):
         abort(404)
 
-    package = build_export_package(card)
+    # 收集复制者上下文，用于版权溯源（cp/pd/up/ct/ci）
+    origin = request.host_url.rstrip("/")
+    copier = current_user.username if current_user.is_authenticated else "anonymous"
+    copier_ip = (
+        (request.headers.get("X-Forwarded-For") or request.remote_addr or "unknown")
+        .split(",")[0]
+        .strip()
+    )
+    package = build_export_package(
+        card,
+        origin=origin,
+        copier=copier,
+        copier_ip=copier_ip,
+        platform_domain=origin,
+    )
     body = json.dumps(package, ensure_ascii=False, indent=2)
     resp = make_response(body)
     resp.headers["Content-Type"] = "application/json; charset=utf-8"

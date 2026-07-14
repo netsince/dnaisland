@@ -1,24 +1,7 @@
 import json
-import re
 
 SUPPORTED_VERSION = 1
 IMAGE_SLOTS = ("square", "landscape", "portrait")
-
-
-def _deobfuscate(raw):
-    """还原客户端 _lk / fx 字段的混淆（逆序 hex 拼接）。"""
-    if not raw:
-        return ""
-    s = str(raw)
-    reversed_hex = ""
-    for i in range(0, len(s), 2):
-        reversed_hex = s[i : i + 2] + reversed_hex
-    try:
-        return "".join(
-            chr(int(m, 16)) for m in re.findall(r".{1,2}", reversed_hex)
-        )
-    except Exception:
-        return s
 
 
 def parse_export_package(json_str: str) -> dict:
@@ -42,9 +25,19 @@ def parse_export_package(json_str: str) -> dict:
     if not isinstance(character, dict):
         raise ValueError("缺少 character 字段")
 
-    original_link = data.get("originalLink") or ""
-    if not original_link and data.get("_lk"):
-        original_link = _deobfuscate(data["_lk"])
+    # 版权溯源保护检测：命中任意一层保护即拦截（原封不动对齐 island 平台策略）
+    has_original_link = bool(str(data.get("originalLink") or "").strip())
+    has_hidden_lk = bool(str(data.get("_lk") or "").strip())
+    has_image_fx = False
+    raw_images_check = character.get("images") or data.get("images")
+    if isinstance(raw_images_check, dict):
+        for slot in IMAGE_SLOTS:
+            img = raw_images_check.get(slot)
+            if isinstance(img, dict) and str(img.get("fx") or "").strip():
+                has_image_fx = True
+                break
+    if has_original_link or has_hidden_lk or has_image_fx:
+        raise ValueError("有原作者的角色卡")
 
     images = {}
     raw_images = character.get("images")
@@ -84,5 +77,6 @@ def parse_export_package(json_str: str) -> dict:
         "tags": tags,
         "dialogue_style": dialogue_style,
         "images": images,
-        "original_link": original_link,
+        # 导入成功后强制清空源链接（对齐 island：通过检测的卡视为无原作者标记）
+        "original_link": "",
     }
