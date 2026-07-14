@@ -6,6 +6,7 @@ from flask import (
     Blueprint,
     abort,
     flash,
+    jsonify,
     make_response,
     redirect,
     render_template,
@@ -294,7 +295,14 @@ def card_export(card_id):
     """导出角色卡为 dna-client 可识别的 JSON 下载。
 
     可见性与 card_detail 一致：仅对已通过且未隐藏的公开卡、作者本人或管理员开放。
+    仅登录用户可复制。
     """
+    if not current_user.is_authenticated:
+        return jsonify(
+            error="请先登录后再复制角色卡",
+            login_url=url_for("auth.login"),
+        ), 401
+
     card = db.session.get(Card, card_id)
     if not card:
         abort(404)

@@ -172,6 +172,20 @@
       const original = btn.textContent;
       try {
         const resp = await fetch(btn.dataset.exportUrl, { credentials: 'same-origin' });
+        if (resp.status === 401) {
+          let msg = '请先登录后再复制角色卡';
+          let loginUrl = '/auth/login';
+          try {
+            const data = await resp.json();
+            if (data && data.error) msg = data.error;
+            if (data && data.login_url) loginUrl = data.login_url;
+          } catch (e) {}
+          btn.textContent = '请先登录';
+          if (window.confirm(msg + '，是否前往登录？')) {
+            window.location.href = loginUrl;
+          }
+          return;
+        }
         if (!resp.ok) throw new Error('导出失败：' + resp.status);
         const text = await resp.text();
         if (navigator.clipboard && navigator.clipboard.writeText) {
