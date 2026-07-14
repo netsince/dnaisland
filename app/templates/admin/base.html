@@ -47,6 +47,14 @@
             <a class="nav-link {% if request.endpoint.startswith('admin.punish_appeals') %}active{% endif %}"
                href="{{ url_for('admin.punish_appeals') }}">处罚申诉</a>
           </li>
+          <li class="nav-item">
+            <a class="nav-link {% if request.endpoint.startswith('admin.articles') %}active{% endif %}"
+               href="{{ url_for('admin.articles') }}">文章管理</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% if request.endpoint == 'admin.system_config' %}active{% endif %}"
+               href="{{ url_for('admin.system_config') }}">系统配置</a>
+          </li>
         </ul>
       </div>
     </nav>

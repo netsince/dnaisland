@@ -1,3 +1,5 @@
+import json
+
 from flask import (
     Blueprint,
     abort,
@@ -13,6 +15,7 @@ from sqlalchemy import func
 from ..decorators import super_admin_required
 from ..extensions import db
 from ..models import (
+    Article,
     Card,
     CardDialogueStyle,
     CardImage,
@@ -21,6 +24,7 @@ from ..models import (
     Notification,
     Punishment,
     Report,
+    SiteConfig,
     TeaPost,
     TeaPostLike,
     User,
@@ -32,6 +36,7 @@ from ..models.punishment import (
     PUNISHMENT_TYPES,
 )
 from ..services.notification_service import notify
+from ..services.site_service import get_site_config
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -917,3 +922,151 @@ def tea_post_delete(post_id):
     db.session.commit()
     flash("茶馆帖子已删除", "success")
     return redirect(url_for("admin.tea_posts"))
+
+
+# ---------------- 系统配置 ----------------
+@admin_bp.route("/system", methods=["GET", "POST"])
+@super_admin_required
+def system_config():
+    cfg = get_site_config()
+    if request.method == "POST":
+        cfg.site_name = (request.form.get("site_name") or "").strip() or "DNAISLAND"
+
+        # 关站
+        cfg.shutdown_enabled = request.form.get("shutdown_enabled") == "1"
+        cfg.shutdown_message = (request.form.get("shutdown_message") or "").strip() or None
+
+        # 公告（富文本 / HTML）
+        cfg.announcement_enabled = request.form.get("announcement_enabled") == "1"
+        cfg.announcement_content = (
+            request.form.get("announcement_content") or ""
+        ).strip() or None
+
+        # 首页 Hero
+        cfg.hero_enabled = request.form.get("hero_enabled") == "1"
+        cfg.hero_title = (request.form.get("hero_title") or "").strip() or None
+        cfg.hero_subtitle = (request.form.get("hero_subtitle") or "").strip() or None
+        labels = request.form.getlist("hero_button_label")
+        urls = request.form.getlist("hero_button_url")
+        buttons = []
+        for lab, u in zip(labels, urls):
+            lab = (lab or "").strip()
+            u = (u or "").strip()
+            if lab:
+                buttons.append({"label": lab, "url": u})
+        cfg.hero_buttons = json.dumps(buttons, ensure_ascii=False)
+
+        # 协议链接（外部 URL）
+        cfg.privacy_policy_url = (
+            request.form.get("privacy_policy_url") or ""
+        ).strip() or None
+        cfg.tos_url = (request.form.get("tos_url") or "").strip() or None
+
+        # 注册邮箱白名单
+        cfg.email_whitelist_enabled = request.form.get("email_whitelist_enabled") == "1"
+        cfg.email_whitelist_suffixes = (
+            request.form.get("email_whitelist_suffixes") or ""
+        ).strip() or None
+
+        db.session.commit()
+        flash("系统配置已保存", "success")
+        return redirect(url_for("admin.system_config"))
+
+    return render_template(
+        "admin/system.html", cfg=cfg, hero_buttons=cfg.hero_buttons_list()
+    )
+
+
+# ---------------- 文章管理（仅管理员可发布） ----------------
+@admin_bp.route("/articles")
+@super_admin_required
+def articles():
+    q = request.args.get("q", "").strip()
+    page = request.args.get("page", 1, type=int)
+    try:
+        query = Article.query
+        if q:
+            query = query.filter(Article.title.like(f"%{q}%"))
+        pagination = query.order_by(Article.created_at.desc()).paginate(
+            page=page, per_page=20, error_out=False
+        )
+        items = pagination.items
+    except Exception:
+        # 表尚未建立时优雅降级
+        pagination = None
+        items = []
+    return render_template(
+        "admin/articles.html",
+        articles=items,
+        pagination=pagination,
+        q=q,
+    )
+
+
+@admin_bp.route("/articles/create", methods=["GET", "POST"])
+@super_admin_required
+def article_create():
+    if request.method == "POST":
+        title = (request.form.get("title") or "").strip()
+        content = request.form.get("content") or ""
+        if not title or not content.strip():
+            flash("请填写标题与正文", "danger")
+            return render_template("admin/article_form.html", article=None)
+        a = Article(
+            title=title,
+            summary=(request.form.get("summary") or "").strip() or None,
+            content=content,
+            cover=(request.form.get("cover") or "").strip() or None,
+            author_id=current_user.id,
+            is_published=request.form.get("is_published") == "1",
+            show_author=request.form.get("show_author") != "0",
+        )
+        db.session.add(a)
+        db.session.commit()
+        flash("文章已发布", "success")
+        return redirect(url_for("admin.articles"))
+    return render_template("admin/article_form.html", article=None)
+
+
+@admin_bp.route("/articles/<int:article_id>/edit", methods=["GET", "POST"])
+@super_admin_required
+def article_edit(article_id):
+    a = db.session.get(Article, article_id)
+    if not a:
+        abort(404)
+    if request.method == "POST":
+        a.title = (request.form.get("title") or "").strip() or a.title
+        a.summary = (request.form.get("summary") or "").strip() or None
+        a.content = request.form.get("content") or a.content
+        a.cover = (request.form.get("cover") or "").strip() or None
+        a.is_published = request.form.get("is_published") == "1"
+        a.show_author = request.form.get("show_author") != "0"
+        db.session.commit()
+        flash("文章已更新", "success")
+        return redirect(url_for("admin.articles"))
+    return render_template("admin/article_form.html", article=a)
+
+
+@admin_bp.route("/articles/<int:article_id>/delete", methods=["POST"])
+@super_admin_required
+def article_delete(article_id):
+    a = db.session.get(Article, article_id)
+    if not a:
+        abort(404)
+    db.session.delete(a)
+    db.session.commit()
+    flash("文章已删除", "success")
+    return redirect(url_for("admin.articles"))
+
+
+@admin_bp.route("/articles/<int:article_id>/toggle-author", methods=["POST"])
+@super_admin_required
+def article_toggle_author(article_id):
+    """切换发布者是否公开（隐藏时显示为匿名管理员）。"""
+    a = db.session.get(Article, article_id)
+    if not a:
+        abort(404)
+    a.show_author = not a.show_author
+    db.session.commit()
+    flash("已切换发布者显示状态", "success")
+    return redirect(url_for("admin.articles"))

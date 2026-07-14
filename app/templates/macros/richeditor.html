@@ -1,0 +1,24 @@
+{% macro rich_editor(name, value, placeholder='') %}
+<div class="rich-editor">
+  <div class="btn-toolbar mb-1" role="toolbar" aria-label="格式化工具栏">
+    <div class="btn-group btn-group-sm me-1" role="group">
+      <button type="button" class="btn btn-outline-secondary" data-cmd="bold" title="加粗"><b>B</b></button>
+      <button type="button" class="btn btn-outline-secondary" data-cmd="italic" title="斜体"><i>I</i></button>
+      <button type="button" class="btn btn-outline-secondary" data-cmd="underline" title="下划线"><u>U</u></button>
+    </div>
+    <div class="btn-group btn-group-sm me-1" role="group">
+      <button type="button" class="btn btn-outline-secondary" data-cmd="insertUnorderedList" title="无序列表">• 列表</button>
+      <button type="button" class="btn btn-outline-secondary" data-cmd="insertOrderedList" title="有序列表">1. 列表</button>
+    </div>
+    <div class="btn-group btn-group-sm" role="group">
+      <button type="button" class="btn btn-outline-secondary" data-cmd="createLink" title="插入链接">🔗 链接</button>
+      <button type="button" class="btn btn-outline-secondary" data-cmd="removeFormat" title="清除格式">清除</button>
+    </div>
+  </div>
+  <div class="form-control rich-editor-area" contenteditable="true"
+       data-target="{{ name }}" style="min-height:160px;overflow:auto;background:var(--dna-bg-2);"
+       placeholder="{{ placeholder }}">{{ value | richtext }}</div>
+  <textarea class="d-none" name="{{ name }}" id="{{ name }}">{{ value or '' }}</textarea>
+  <div class="form-text">支持富文本与 HTML，可插入链接。</div>
+</div>
+{% endmacro %}

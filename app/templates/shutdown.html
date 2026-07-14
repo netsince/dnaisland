@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}站点维护中 · DNAISLAND{% endblock %}
+
+{% block content %}
+<div class="container py-5 text-center">
+  <div class="mb-4" style="font-size:3.5rem;">🚧</div>
+  <h1 class="h3 mb-3">站点暂时关闭维护中</h1>
+  {% if message %}
+  <div class="richtext-content mb-4 mx-auto" style="max-width:640px;">{{ message | richtext }}</div>
+  {% else %}
+  <p class="text-secondary mb-4">系统正在进行维护，暂时停止对外服务。</p>
+  {% endif %}
+  <p class="text-muted">当前仅开放登录，其他功能将在恢复后可用。请耐心等待，给您带来不便敬请谅解。</p>
+  <a class="btn btn-outline-light" href="{{ url_for('auth.login') }}">前往登录</a>
+</div>
+{% endblock %}

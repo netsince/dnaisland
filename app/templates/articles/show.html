@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}{{ article.title }} · DNAISLAND{% endblock %}
+
+{% block content %}
+<article class="mx-auto" style="max-width:820px;">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{{ url_for('main.articles') }}">文章</a></li>
+      <li class="breadcrumb-item active" aria-current="page">{{ article.title }}</li>
+    </ol>
+  </nav>
+  <h1 class="mb-2">{{ article.title }}</h1>
+  <div class="text-muted small mb-4">
+    {{ article.author.nickname if (article.show_author and article.author) else '匿名管理员' }}
+    {% if article.created_at %} · {{ article.created_at.strftime('%Y-%m-%d %H:%M') }}{% endif %}
+  </div>
+  {% if article.cover %}<img src="{{ article.cover }}" class="img-fluid rounded mb-4" alt="">{% endif %}
+  <div class="richtext-content article-body">{{ article.content | richtext }}</div>
+</article>
+{% endblock %}

@@ -35,11 +35,16 @@
               <a class="nav-link" href="{{ url_for('teahouse.index') }}">茶馆</a>
             </li>
             <li class="nav-item">
+              <a class="nav-link" href="{{ url_for('main.articles') }}">文章</a>
+            </li>
+            <li class="nav-item">
               <a class="nav-link" href="{{ url_for('publish.start') }}">发布</a>
             </li>
             {% if current_user.is_authenticated and current_user.is_super_admin %}
             <li class="nav-item">
-              <a class="nav-link" href="{{ url_for('admin.review') }}">后台</a>
+              <a class="nav-link" href="{{ url_for('admin.review') }}">后台
+                {% if site_cfg.shutdown.enabled %}<span class="badge bg-warning text-dark ms-1">关站中</span>{% endif %}
+              </a>
             </li>
             {% endif %}
             {% block nav_items %}{% endblock %}
@@ -94,6 +99,23 @@
     </nav>
   </header>
 
+  {% if site_cfg.announcement.enabled and site_cfg.announcement.content %}
+  <div id="siteAnnouncementBanner" class="alert alert-info alert-dismissible fade show mb-0 rounded-0 border-0" role="alert"
+       style="background:var(--dna-grad-soft);">
+    <div class="container-fluid">
+      <div class="richtext-content small">{{ site_cfg.announcement.content | richtext }}</div>
+    </div>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="关闭"
+            onclick="sessionStorage.setItem('dna_ann_dismissed','1')"></button>
+  </div>
+  <script>
+    if (sessionStorage.getItem('dna_ann_dismissed') === '1') {
+      var _b = document.getElementById('siteAnnouncementBanner');
+      if (_b) _b.remove();
+    }
+  </script>
+  {% endif %}
+
   <main class="container-fluid py-4 flex-grow-1">
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
@@ -112,12 +134,70 @@
   <footer class="footer mt-auto py-3 bg-light">
     <div class="container-fluid text-center text-muted">
       {% block footer %}
-        <small>DNAISLAND · 与汝共奏的角色卡社区</small>
+      <div class="mb-1">
+        {% if site_cfg.agreements.privacy_policy_url %}
+        <a href="{{ site_cfg.agreements.privacy_policy_url }}" target="_blank" rel="noopener noreferrer" class="text-decoration-none me-2">隐私政策</a>
+        {% endif %}
+        {% if site_cfg.agreements.tos_url %}
+        <a href="{{ site_cfg.agreements.tos_url }}" target="_blank" rel="noopener noreferrer" class="text-decoration-none me-2">用户协议</a>
+        {% endif %}
+        {% if site_cfg.announcement.enabled and site_cfg.announcement.content %}
+        <a href="#" class="text-decoration-none" data-bs-toggle="modal" data-bs-target="#announcementModal">查看公告</a>
+        {% endif %}
+      </div>
+      <small>DNAISLAND · 与汝共奏的角色卡社区</small>
       {% endblock %}
     </div>
   </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+    // 富文本编辑器：工具栏命令 + 提交前将内容同步到隐藏 textarea
+    (function () {
+      document.addEventListener('click', function (e) {
+        var btn = e.target.closest && e.target.closest('.rich-editor [data-cmd]');
+        if (!btn) return;
+        var editor = btn.closest('.rich-editor').querySelector('.rich-editor-area');
+        if (!editor) return;
+        e.preventDefault();
+        var cmd = btn.getAttribute('data-cmd');
+        editor.focus();
+        if (cmd === 'createLink') {
+          var url = prompt('请输入链接地址（含 http(s)://）：', 'https://');
+          if (url) document.execCommand('createLink', false, url);
+        } else {
+          document.execCommand(cmd, false, null);
+        }
+      });
+      document.addEventListener('submit', function (e) {
+        if (!e.target.querySelectorAll) return;
+        e.target.querySelectorAll('.rich-editor').forEach(function (re) {
+          var area = re.querySelector('.rich-editor-area');
+          var ta = re.querySelector('textarea');
+          if (area && ta) ta.value = area.innerHTML;
+        });
+      });
+    })();
+  </script>
+
+  <!-- 公告弹窗（关站/公告关闭后仍可手动再次查看） -->
+  {% if site_cfg.announcement.enabled and site_cfg.announcement.content %}
+  <div class="modal fade" id="announcementModal" tabindex="-1" aria-labelledby="announcementModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="announcementModalLabel">站点公告</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+        </div>
+        <div class="modal-body richtext-content">{{ site_cfg.announcement.content | richtext }}</div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
   <script>
     (function () {
       var input = document.getElementById("navSearchInput");

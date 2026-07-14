@@ -1,0 +1,76 @@
+{% extends "admin/base.html" %}
+{% from "macros/pagination.html" import render_pagination %}
+
+{% block title %}文章管理 · DNAISLAND{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2 class="h4 mb-0">文章管理</h2>
+  <a class="btn btn-primary btn-sm" href="{{ url_for('admin.article_create') }}">＋ 发布文章</a>
+</div>
+
+<form class="row g-2 mb-3 align-items-end" method="get">
+  <div class="col-auto flex-grow-1">
+    <label class="form-label small text-muted mb-1">关键词</label>
+    <input type="text" class="form-control" name="q" value="{{ q }}" placeholder="标题">
+  </div>
+  <div class="col-auto">
+    <button class="btn btn-outline-secondary" type="submit">搜索</button>
+  </div>
+</form>
+
+<div class="table-responsive">
+  <table class="table table-hover align-middle">
+    <thead>
+      <tr>
+        <th>标题</th>
+        <th>发布者</th>
+        <th>状态</th>
+        <th>更新时间</th>
+        <th class="text-end">操作</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for a in articles %}
+      <tr>
+        <td>
+          <a href="{{ url_for('main.article_detail', article_id=a.id) }}" class="text-decoration-none">{{ a.title }}</a>
+          {% if not a.is_published %}<span class="badge bg-warning text-dark ms-1">草稿</span>{% endif %}
+        </td>
+        <td>
+          {% if a.show_author %}
+            {{ a.author.nickname if a.author else ('UID' + a.author_id|string) }}
+          {% else %}
+            <span class="text-muted">匿名管理员</span>
+          {% endif %}
+        </td>
+        <td>
+          <span class="badge bg-{{ 'success' if a.is_published else 'secondary' }}">
+            {{ '已发布' if a.is_published else '草稿' }}
+          </span>
+        </td>
+        <td class="text-muted small">{{ a.updated_at.strftime('%Y-%m-%d %H:%M') if a.updated_at else '' }}</td>
+        <td class="text-end">
+          <div class="btn-group btn-group-sm">
+            <a class="btn btn-outline-secondary" href="{{ url_for('admin.article_edit', article_id=a.id) }}">编辑</a>
+            <form method="post" action="{{ url_for('admin.article_toggle_author', article_id=a.id) }}" class="d-inline">
+              <button type="submit" class="btn btn-outline-secondary">
+                {{ '隐藏发布者' if a.show_author else '显示发布者' }}
+              </button>
+            </form>
+            <form method="post" action="{{ url_for('admin.article_delete', article_id=a.id) }}"
+                  class="d-inline" onsubmit="return confirm('确认删除该文章？');">
+              <button type="submit" class="btn btn-outline-danger">删除</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="text-center text-muted py-4">暂无文章</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{{ render_pagination(pagination, 'admin.articles', {'q': q}) }}
+{% endblock %}

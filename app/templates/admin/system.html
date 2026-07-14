@@ -1,0 +1,148 @@
+{% extends "admin/base.html" %}
+{% from "macros/richeditor.html" import rich_editor %}
+
+{% block title %}系统配置 · DNAISLAND{% endblock %}
+
+{% block admin_content %}
+<h2 class="h4 mb-3">系统配置</h2>
+
+<form method="post" novalidate>
+  <div class="card mb-4">
+    <div class="card-header">基础</div>
+    <div class="card-body">
+      <div class="mb-3">
+        <label class="form-label" for="site_name">站点名称</label>
+        <input type="text" class="form-control" id="site_name" name="site_name"
+               value="{{ cfg.site_name or '' }}">
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb-4 border-warning">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span>关站设置</span>
+      <div class="form-check form-switch mb-0">
+        <input class="form-check-input" type="checkbox" role="switch" id="shutdown_enabled"
+               name="shutdown_enabled" value="1" {{ 'checked' if cfg.shutdown_enabled else '' }}>
+        <label class="form-check-label" for="shutdown_enabled">启用关站</label>
+      </div>
+    </div>
+    <div class="card-body">
+      <label class="form-label">关站公告（向访客展示，支持富文本 / 链接）</label>
+      {{ rich_editor('shutdown_message', cfg.shutdown_message) }}
+    </div>
+  </div>
+
+  <div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span>公告</span>
+      <div class="form-check form-switch mb-0">
+        <input class="form-check-input" type="checkbox" role="switch" id="announcement_enabled"
+               name="announcement_enabled" value="1" {{ 'checked' if cfg.announcement_enabled else '' }}>
+        <label class="form-check-label" for="announcement_enabled">启用公告</label>
+      </div>
+    </div>
+    <div class="card-body">
+      <label class="form-label">公告内容（富文本 / HTML，可插入链接）</label>
+      {{ rich_editor('announcement_content', cfg.announcement_content) }}
+      <div class="form-text">启用后，将在全站顶部以横幅展示，并在页脚提供「查看公告」入口。</div>
+    </div>
+  </div>
+
+  <div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span>首页 Hero</span>
+      <div class="form-check form-switch mb-0">
+        <input class="form-check-input" type="checkbox" role="switch" id="hero_enabled"
+               name="hero_enabled" value="1" {{ 'checked' if cfg.hero_enabled else '' }}>
+        <label class="form-check-label" for="hero_enabled">启用 Hero</label>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="mb-3">
+        <label class="form-label" for="hero_title">主标题</label>
+        <input type="text" class="form-control" id="hero_title" name="hero_title"
+               value="{{ cfg.hero_title or '' }}" placeholder="在 DNAISLAND 遇见你的下一位 TA">
+      </div>
+      <div class="mb-3">
+        <label class="form-label" for="hero_subtitle">副标题</label>
+        <textarea class="form-control" id="hero_subtitle" name="hero_subtitle" rows="2">{{ cfg.hero_subtitle or '' }}</textarea>
+      </div>
+      <label class="form-label">按钮链接</label>
+      <div id="heroButtons">
+        {% for b in hero_buttons %}
+        <div class="row g-2 mb-2 hero-btn-row">
+          <div class="col-5">
+            <input type="text" class="form-control" name="hero_button_label" placeholder="按钮文字" value="{{ b.label }}">
+          </div>
+          <div class="col-6">
+            <input type="text" class="form-control" name="hero_button_url" placeholder="链接地址 https://..." value="{{ b.url }}">
+          </div>
+          <div class="col-1">
+            <button type="button" class="btn btn-outline-danger w-100" onclick="this.closest('.hero-btn-row').remove()">×</button>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      <button type="button" class="btn btn-sm btn-outline-secondary" id="addHeroBtn">＋ 添加按钮</button>
+    </div>
+  </div>
+
+  <div class="card mb-4">
+    <div class="card-header">协议与隐私（外部链接）</div>
+    <div class="card-body">
+      <div class="mb-3">
+        <label class="form-label" for="privacy_policy_url">隐私政策链接</label>
+        <input type="text" class="form-control" id="privacy_policy_url" name="privacy_policy_url"
+               value="{{ cfg.privacy_policy_url or '' }}" placeholder="https://...">
+      </div>
+      <div class="mb-3">
+        <label class="form-label" for="tos_url">用户协议链接</label>
+        <input type="text" class="form-control" id="tos_url" name="tos_url"
+               value="{{ cfg.tos_url or '' }}" placeholder="https://...">
+      </div>
+      <div class="form-text">页脚将展示这两个链接，可指向站外页面。</div>
+    </div>
+  </div>
+
+  <div class="card mb-4 border-info">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span>注册邮箱白名单</span>
+      <div class="form-check form-switch mb-0">
+        <input class="form-check-input" type="checkbox" role="switch" id="email_whitelist_enabled"
+               name="email_whitelist_enabled" value="1" {{ 'checked' if cfg.email_whitelist_enabled else '' }}>
+        <label class="form-check-label" for="email_whitelist_enabled">启用白名单</label>
+      </div>
+    </div>
+    <div class="card-body">
+      <label class="form-label" for="email_whitelist_suffixes">允许的邮箱后缀（逗号 / 换行分隔）</label>
+      <textarea class="form-control" id="email_whitelist_suffixes" name="email_whitelist_suffixes"
+                rows="3" placeholder="@gmail.com, @qq.com">{{ cfg.email_whitelist_suffixes or '' }}</textarea>
+      <div class="form-text">启用后，仅允许所列后缀的邮箱注册；被拒绝的注册页会展示这些后缀。</div>
+    </div>
+  </div>
+
+  <div class="d-flex gap-2">
+    <button type="submit" class="btn btn-primary">保存配置</button>
+    <a class="btn btn-outline-secondary" href="{{ url_for('admin.system_config') }}">取消</a>
+  </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const addBtn = document.getElementById('addHeroBtn');
+  const wrap = document.getElementById('heroButtons');
+  if (addBtn && wrap) {
+    addBtn.addEventListener('click', function () {
+      const row = document.createElement('div');
+      row.className = 'row g-2 mb-2 hero-btn-row';
+      row.innerHTML =
+        '<div class="col-5"><input type="text" class="form-control" name="hero_button_label" placeholder="按钮文字"></div>' +
+        '<div class="col-6"><input type="text" class="form-control" name="hero_button_url" placeholder="链接地址 https://..."></div>' +
+        '<div class="col-1"><button type="button" class="btn btn-outline-danger w-100" onclick="this.closest(\'.hero-btn-row\').remove()">×</button></div>';
+      wrap.appendChild(row);
+    });
+  }
+</script>
+{% endblock %}

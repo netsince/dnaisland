@@ -1,8 +1,9 @@
 import os
 
 from dotenv import load_dotenv
-from flask import Flask, url_for
+from flask import Flask, jsonify, request, url_for
 from flask_login import current_user
+from markupsafe import Markup
 
 from .config import config
 from .extensions import bcrypt, db, login_manager, mail, migrate
@@ -52,6 +53,7 @@ def create_app(config_object=None):
         auth_bp,
         main_bp,
         publish_bp,
+        system_bp,
         user_bp,
         teahouse_bp,
     )
@@ -62,6 +64,7 @@ def create_app(config_object=None):
     app.register_blueprint(admin_bp)
     app.register_blueprint(user_bp)
     app.register_blueprint(teahouse_bp)
+    app.register_blueprint(system_bp)
 
     from .commands import init_commands
 
@@ -126,5 +129,61 @@ def create_app(config_object=None):
             except Exception:
                 return {"unread_notifications": 0}
         return {"unread_notifications": 0}
+
+    # 把站点公开配置注入所有模板（hero / 公告 / 关站 / 协议 / 白名单）
+    from .services.site_service import public_config
+
+    @app.context_processor
+    def inject_site():
+        # public_config() 内部已对数据库异常做回退，不会抛错
+        return {"site_cfg": public_config()}
+
+    # 富文本渲染（仅管理员后台录入的内容，直接按 HTML 输出）
+    @app.template_filter("richtext")
+    def richtext(value):
+        return Markup(value or "")
+
+    # ---------------- 关站拦截 ----------------
+    # 关站状态下：普通用户仅能登录；所有 API（/api/*）返回 503；
+    # 管理员（super_admin）与登录/退出/静态资源/站点配置 API 不受影响。
+    @app.before_request
+    def enforce_shutdown():
+        from .services.site_service import get_site_config as _get_cfg
+
+        try:
+            cfg = _get_cfg()
+        except Exception:
+            # 配置表尚未初始化（如迁移未执行），放行
+            return
+        if not cfg.shutdown_enabled:
+            return
+
+        path = request.path
+        if path.startswith("/static"):
+            return
+        if path in ("/auth/login", "/auth/logout") or path.startswith("/auth/login/"):
+            return
+        if path == "/api/site-config":
+            return
+        # 管理员拥有完整访问权限（含后台，可用于解除关站）
+        if current_user.is_authenticated and current_user.is_super_admin:
+            return
+
+        # 被拦截：JSON / API 请求返回 503，页面请求渲染关站页
+        wants_json = (
+            path.startswith("/api/")
+            or request.is_json
+            or request.accept_mimetypes.best == "application/json"
+        )
+        if wants_json:
+            return (
+                jsonify(
+                    ok=False,
+                    code="SITE_CLOSED",
+                    message=cfg.shutdown_message or "站点维护中，请稍后恢复。",
+                ),
+                503,
+            )
+        return render_template("shutdown.html", message=cfg.shutdown_message or ""), 503
 
     return app

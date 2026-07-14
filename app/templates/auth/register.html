@@ -27,6 +27,11 @@
               <button type="button" class="btn btn-outline-secondary" id="sendCodeBtn">发送验证码</button>
             </div>
             <div class="form-text" id="sendCodeHint">注册前需验证邮箱。</div>
+            {% if site_cfg.email_whitelist.enabled and site_cfg.email_whitelist.suffixes %}
+            <div class="form-text text-info">
+              当前仅支持以下邮箱后缀注册：{{ site_cfg.email_whitelist.suffixes | join('、') }}
+            </div>
+            {% endif %}
           </div>
           <div class="mb-3">
             <label for="code" class="form-label">邮箱验证码</label>

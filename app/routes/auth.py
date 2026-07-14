@@ -17,6 +17,7 @@ from sqlalchemy import or_
 from ..extensions import db, login_manager
 from ..models import User, VerificationCode
 from ..services.email import send_verification_email
+from ..services.site_service import check_email_allowed
 from ..services.verification_code_service import (
     can_resend,
     create_code,
@@ -43,6 +44,13 @@ def send_code():
 
     if not can_resend(email):
         return jsonify(ok=False, message="验证码发送过于频繁，请稍后再试"), 429
+
+    allowed, suffixes = check_email_allowed(email)
+    if not allowed:
+        return jsonify(
+            ok=False,
+            message="该邮箱不在注册白名单内，支持的后缀：" + "、".join(suffixes),
+        ), 403
 
     code = create_code(email)
     try:
@@ -80,6 +88,14 @@ def register():
             email = valid.normalized
         except EmailNotValidError:
             flash("邮箱格式不正确", "danger")
+            return render_template("auth/register.html")
+
+        allowed, suffixes = check_email_allowed(email)
+        if not allowed:
+            flash(
+                "该邮箱不在注册白名单内，支持的邮箱后缀：" + "、".join(suffixes),
+                "danger",
+            )
             return render_template("auth/register.html")
 
         if User.query.filter_by(username=username).first():

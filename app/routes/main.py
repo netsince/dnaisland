@@ -3,7 +3,7 @@ from flask_login import current_user
 from sqlalchemy import case, func, or_
 
 from ..extensions import db
-from ..models import Card, CardLike, CardTag, Punishment, User
+from ..models import Article, Card, CardLike, CardTag, Punishment, User
 from ..services.card_service import attach_covers, popular_tags
 
 main_bp = Blueprint("main", __name__)
@@ -237,4 +237,38 @@ def search_suggest():
         for u in users
     ]
     return jsonify({"cards": card_hits, "users": user_hits})
+
+
+# ---------------- 文章（前台） ----------------
+@main_bp.route("/articles")
+def articles():
+    page = request.args.get("page", 1, type=int)
+    try:
+        pagination = (
+            Article.query.filter_by(is_published=True)
+            .order_by(Article.created_at.desc())
+            .paginate(page=page, per_page=10, error_out=False)
+        )
+        items = pagination.items
+    except Exception:
+        # 表尚未建立（如迁移未执行）时优雅降级为空列表
+        pagination = None
+        items = []
+    return render_template(
+        "articles/index.html",
+        articles=items,
+        pagination=pagination,
+        args={},
+    )
+
+
+@main_bp.route("/articles/<int:article_id>")
+def article_detail(article_id):
+    try:
+        a = db.session.get(Article, article_id)
+    except Exception:
+        a = None
+    if a is None or not a.is_published:
+        abort(404)
+    return render_template("articles/show.html", article=a)
 
