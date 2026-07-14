@@ -254,22 +254,51 @@ def tos():
 @main_bp.route("/articles")
 def articles():
     page = request.args.get("page", 1, type=int)
+    q = (request.args.get("q") or "").strip()
+    sort = request.args.get("sort", "new")
+
+    # 排序：最新（默认）/ 最早 / 最近更新
+    if sort == "old":
+        order = Article.created_at.asc()
+    elif sort == "updated":
+        order = Article.updated_at.desc()
+    else:
+        sort = "new"
+        order = Article.created_at.desc()
+
     try:
-        pagination = (
-            Article.query.filter_by(is_published=True)
-            .order_by(Article.created_at.desc())
-            .paginate(page=page, per_page=10, error_out=False)
+        query = Article.query.filter_by(is_published=True)
+        if q:
+            like = f"%{q}%"
+            query = query.filter(
+                or_(
+                    Article.title.like(like),
+                    Article.summary.like(like),
+                    Article.content.like(like),
+                )
+            )
+        pagination = query.order_by(order).paginate(
+            page=page, per_page=10, error_out=False
         )
         items = pagination.items
     except Exception:
         # 表尚未建立（如迁移未执行）时优雅降级为空列表
         pagination = None
         items = []
+
+    # 翻页链接需保留当前搜索词与排序
+    args = {}
+    if q:
+        args["q"] = q
+    if sort != "new":
+        args["sort"] = sort
     return render_template(
         "articles/index.html",
         articles=items,
         pagination=pagination,
-        args={},
+        args=args,
+        q=q,
+        sort=sort,
     )
 
 
