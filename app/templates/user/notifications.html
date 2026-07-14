@@ -17,7 +17,7 @@
       {% for n in items %}
       <div class="list-group-item {% if not n.is_read %}list-group-item-primary{% endif %}">
         <div class="d-flex justify-content-between">
-          <span style="white-space:pre-wrap;">{{ n.message }}</span>
+          <span style="white-space:pre-wrap; word-break:break-word;">{{ n.message | linkify }}</span>
           <small class="text-muted">{{ n.created_at.strftime('%Y-%m-%d %H:%M') if n.created_at else '' }}</small>
         </div>
       </div>

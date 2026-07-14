@@ -46,6 +46,24 @@ def create_app(config_object=None):
 
     init_commands(app)
 
+    import re as _re
+
+    from markupsafe import Markup, escape
+
+    _URL_RE = _re.compile(r"(https?://[^\s<]+)")
+
+    @app.template_filter("linkify")
+    def linkify(text):
+        """把纯文本里的 URL 转成可点击链接（先转义防 XSS，再替换 URL）。"""
+        if not text:
+            return ""
+        escaped = str(escape(text))
+        linked = _URL_RE.sub(
+            r'<a href="\1" target="_blank" rel="noopener noreferrer">\1</a>',
+            escaped,
+        )
+        return Markup(linked)
+
     @app.context_processor
     def inject_unread():
         from .services.notification_service import unread_count

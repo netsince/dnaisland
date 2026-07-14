@@ -14,7 +14,8 @@
       </div>
       <div class="mb-3">
         <label class="form-label">通知内容</label>
-        <textarea class="form-control" name="message" id="notify-message" rows="6" placeholder="输入要发送给用户的内容" required></textarea>
+        <textarea class="form-control" name="message" id="notify-message" rows="6" placeholder="输入要发送给用户的内容，可直接粘贴链接（以 http:// 或 https:// 开头），用户端会自动识别为可点击链接" required></textarea>
+        <div class="form-text">支持在内容中放置链接，需以 http:// 或 https:// 开头。</div>
       </div>
       <button class="btn btn-primary" type="submit">发送</button>
     </form>
