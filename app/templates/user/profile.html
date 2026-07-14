@@ -86,12 +86,67 @@
     </div>
     {% endif %}
 
+    {# 内容分类 tab #}
+    <ul class="nav nav-tabs mb-3">
+      <li class="nav-item">
+        <a class="nav-link {% if tab == 'cards' %}active{% endif %}" href="{{ url_for('user.profile', username=u.username, tab='cards') }}">角色卡</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link {% if tab == 'teahouse_posts' %}active{% endif %}" href="{{ url_for('user.profile', username=u.username, tab='teahouse_posts') }}">茶馆帖子</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link {% if tab == 'teahouse_replies' %}active{% endif %}" href="{{ url_for('user.profile', username=u.username, tab='teahouse_replies') }}">茶馆回帖</a>
+      </li>
+    </ul>
+
+    {% if tab == 'cards' %}
     <h2 class="dna-section-title h5">发布的角色卡（{{ pagination.total }}）</h2>
     {% if pagination.total == 0 %}
       {{ empty_state('还没有发布任何角色卡。', '🎴') }}
     {% else %}
       {{ card_grid(cards, show_status=(is_self or is_admin)) }}
       {{ render_pagination(pagination, 'user.profile', args) }}
+    {% endif %}
+    {% elif tab == 'teahouse_posts' %}
+    <h2 class="dna-section-title h5">茶馆帖子（{{ tp_pagination.total }}）</h2>
+    {% if tp_pagination.total == 0 %}
+      <div class="text-center text-muted py-4">还没有发布任何茶馆帖子。</div>
+    {% else %}
+      {% for p in tp_items %}
+      <div class="card mb-2">
+        <div class="card-body py-2">
+          <div class="small text-muted mb-1">
+            {{ p.created_at.strftime('%Y-%m-%d %H:%M') if p.created_at else '' }}
+            {% if p.is_hidden %}· <span class="text-danger">已隐藏</span>{% endif %}
+            {% if not p.moderated %}· <span class="text-warning">待审核</span>{% endif %}
+          </div>
+          <div style="white-space:pre-wrap;word-break:break-word;">{{ p.content | teahouse_linkify }}</div>
+          <a class="small" href="{{ url_for('teahouse.post_detail', post_id=p.id) }}">查看 / 回复 →</a>
+        </div>
+      </div>
+      {% endfor %}
+      {{ render_pagination(tp_pagination, 'user.profile', tp_args) }}
+    {% endif %}
+    {% elif tab == 'teahouse_replies' %}
+    <h2 class="dna-section-title h5">茶馆回帖（{{ tp_pagination.total }}）</h2>
+    {% if tp_pagination.total == 0 %}
+      <div class="text-center text-muted py-4">还没有发布任何茶馆回帖。</div>
+    {% else %}
+      {% for p in tp_items %}
+      <div class="card mb-2">
+        <div class="card-body py-2">
+          <div class="small text-muted mb-1">
+            {{ p.created_at.strftime('%Y-%m-%d %H:%M') if p.created_at else '' }}
+            {% if p.is_hidden %}· <span class="text-danger">已隐藏</span>{% endif %}
+            {% if not p.moderated %}· <span class="text-warning">待审核</span>{% endif %}
+          </div>
+          <div style="white-space:pre-wrap;word-break:break-word;">{{ p.content | teahouse_linkify }}</div>
+          <a class="small" href="{{ url_for('teahouse.post_detail', post_id=p.id) }}">查看原帖 →</a>
+        </div>
+      </div>
+      {% endfor %}
+      {{ render_pagination(tp_pagination, 'user.profile', tp_args) }}
+    {% endif %}
     {% endif %}
     {% endif %}
   </div>

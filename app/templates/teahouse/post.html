@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% from "teahouse/_post_item.html" import render_post, render_reply with context %}
+{% from "macros/pagination.html" import render_pagination %}
+
+{% block title %}茶馆帖子 · DNAISLAND{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-lg-8">
+    <a class="btn btn-sm btn-outline-secondary mb-3" href="{{ url_for('teahouse.index') }}">← 返回茶馆</a>
+
+    {# 帖子链：从最顶上的原帖一直追溯到当前帖，每条都可点击跳转 #}
+    {% if chain %}
+    <nav class="mb-2 small text-muted d-flex flex-wrap align-items-center gap-1" aria-label="帖子链">
+      {% for a in chain %}
+        {% if teapost_visible(a) %}
+          <a class="text-decoration-none" href="{{ url_for('teahouse.post_detail', post_id=a.id) }}">{{ a.author.nickname }}</a>
+        {% else %}
+          <span class="text-secondary">已隐藏</span>
+        {% endif %}
+        <span class="text-secondary">›</span>
+      {% endfor %}
+      <span class="fw-semibold text-dark">{{ post.author.nickname }}</span>
+      <span class="text-secondary">(你在这)</span>
+    </nav>
+    {% endif %}
+
+    {# 当前查看的帖作为主卡置顶：原帖带“原帖”标签；回帖显示“回复 @某人”上下文 #}
+    {% if teapost_visible(post) %}
+      {{ render_post(post, stats, thread=false, top=(post == root), focus=(focus_id is not none), root_id=root.id) }}
+    {% else %}
+      <div class="card mb-3 border-warning">
+        <div class="card-body small text-muted">该帖已被隐藏，仅发布者与管理员可见。</div>
+      </div>
+    {% endif %}
+
+    {# 回复框：紧跟当前帖，不用翻到最底下 #}
+    {% if current_user.is_authenticated and teapost_visible(post) %}
+    <div class="card mb-3" id="reply">
+      <div class="card-body">
+        <form method="post" action="{{ url_for('teahouse.reply', post_id=post.id) }}">
+          <textarea class="form-control" name="content" rows="3" maxlength="{{ max_len }}"
+                    placeholder="回复 @{{ post.author.username }}…"></textarea>
+          <div class="text-end mt-2">
+            <button class="btn btn-primary btn-sm" type="submit">回复</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+
+    {# 回帖列表（扁平）+ 排序切换：只列当前帖自己的回帖 #}
+    <div class="d-flex align-items-center justify-content-between mb-2">
+      <span class="text-muted small">回复（{{ reply_pagination.total }}）</span>
+      <div class="btn-group btn-group-sm" role="group" aria-label="排序">
+        <a class="btn btn-outline-secondary {% if sort != 'hot' %}active{% endif %}"
+           href="{{ url_for('teahouse.post_detail', post_id=post.id, sort='new') }}">最新</a>
+        <a class="btn btn-outline-secondary {% if sort == 'hot' %}active{% endif %}"
+           href="{{ url_for('teahouse.post_detail', post_id=post.id, sort='hot') }}">最热</a>
+      </div>
+    </div>
+
+    {% if replies %}
+      {% for r in replies %}
+        {{ render_reply(r, stats, post.id, focus=(r.id == focus_id)) }}
+      {% endfor %}
+      {{ render_pagination(reply_pagination, 'teahouse.post_detail', reply_args) }}
+    {% else %}
+      <div class="text-center text-muted py-4 small">还没有回复，来抢沙发吧～</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if focus_id %}
+<script>
+  var f = document.getElementById("focus");
+  if (f) { f.scrollIntoView(); }
+</script>
+{% endif %}
+{% endblock %}

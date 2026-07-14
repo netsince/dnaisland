@@ -1,0 +1,44 @@
+{% extends "admin/base.html" %}
+{% from "macros/pagination.html" import render_pagination %}
+
+{% block title %}茶馆审核 · DNAISLAND{% endblock %}
+{% block admin_content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2 class="h4 mb-0">茶馆帖子审核（先发后审）</h2>
+  <span class="badge bg-warning">待审核：{{ pending }}</span>
+</div>
+
+{% if items %}
+  {% for it in items %}
+  <div class="card mb-3">
+    <div class="card-body">
+      <div class="d-flex justify-content-between small text-muted mb-2">
+        <span>@{{ it.post.author.username }}（{{ it.post.author.nickname }}）</span>
+        <span>{{ it.post.created_at.strftime('%Y-%m-%d %H:%M') if it.post.created_at else '' }}</span>
+      </div>
+      {% if it.parent %}
+      <div class="small text-muted mb-1">
+        回复对象：<a href="{{ url_for('teahouse.post_detail', post_id=it.parent.id) }}" target="_blank">@{{ it.parent.author.username }} 的帖子</a>
+      </div>
+      {% endif %}
+      <div class="border rounded p-2 mb-2" style="white-space:pre-wrap;word-break:break-word;">{{ it.post.content | teahouse_linkify }}</div>
+      <div class="d-flex flex-wrap gap-2 align-items-center">
+        <form method="post" action="{{ url_for('admin.tea_post_approve', post_id=it.post.id) }}">
+          <button class="btn btn-sm btn-success">同意</button>
+        </form>
+        <form method="post" action="{{ url_for('admin.tea_post_reject', post_id=it.post.id) }}" class="d-flex align-items-center gap-2">
+          <button class="btn btn-sm btn-danger">拒绝并隐藏</button>
+          <div class="form-check mb-0">
+            <input class="form-check-input" type="checkbox" name="mute" value="1" id="mute{{ it.post.id }}">
+            <label class="form-check-label small" for="mute{{ it.post.id }}">同时禁言</label>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+  {{ render_pagination(pagination, 'admin.tea_moderation', args) }}
+{% else %}
+  <div class="alert alert-success">暂无待审核的茶馆帖子。</div>
+{% endif %}
+{% endblock %}

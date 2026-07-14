@@ -47,7 +47,7 @@ from ..services.card_service import (
 
 user_bp = Blueprint("user", __name__)
 
-REPORT_TARGETS = ("card", "comment", "user")
+REPORT_TARGETS = ("card", "comment", "user", "teapost")
 REPORT_REASONS = [
     ("spam", "垃圾广告 / 刷屏"),
     ("porn", "色情低俗"),
@@ -70,6 +70,8 @@ def profile(username):
     restricted = (not is_self) and (not is_admin) and u.is_profile_banned
 
     page = request.args.get("page", 1, type=int)
+    tab = request.args.get("tab", "cards")
+
     if is_self or is_admin:
         card_query = Card.query.filter_by(author_id=u.id)
     else:
@@ -77,6 +79,20 @@ def profile(username):
         card_query = Card.visible_to(current_user).filter(Card.author_id == u.id)
     pagination = card_query.order_by(Card.created_at.desc()).paginate(
         page=page, per_page=12, error_out=False
+    )
+
+    # 茶馆：我发布的帖子（顶级）/ 回帖（有父级）
+    from ..models import TeaPost
+
+    tp_query = TeaPost.query.filter_by(user_id=u.id)
+    if not (is_self or is_admin):
+        tp_query = tp_query.filter(TeaPost.is_hidden.is_(False))
+    if tab == "teahouse_posts":
+        tp_query = tp_query.filter(TeaPost.parent_id.is_(None))
+    elif tab == "teahouse_replies":
+        tp_query = tp_query.filter(TeaPost.parent_id.isnot(None))
+    tp_pagination = tp_query.order_by(TeaPost.created_at.desc()).paginate(
+        page=page, per_page=20, error_out=False
     )
 
     follower_count = UserFollow.query.filter_by(following_id=u.id).count()
@@ -94,6 +110,10 @@ def profile(username):
         cards=attach_covers(pagination.items),
         pagination=pagination,
         args={"username": username},
+        tab=tab,
+        tp_items=tp_pagination.items,
+        tp_pagination=tp_pagination,
+        tp_args={"username": username, "tab": tab},
         is_self=is_self,
         is_admin=is_admin,
         restricted=restricted,
@@ -728,7 +748,7 @@ def User_query_by_username(username):
 
 def resolve_report_target(target_type, raw_id):
     """根据类型与原始 id 解析被举报对象，返回 (canonical_id, display, target_url) 或 None。"""
-    from ..models import Comment, User
+    from ..models import Comment, TeaPost, User
 
     if target_type == "card":
         card = db.session.get(Card, raw_id)
@@ -761,6 +781,17 @@ def resolve_report_target(target_type, raw_id):
             str(u.id),
             u.nickname,
             url_for("user.profile", username=u.username),
+        )
+    if target_type == "teapost":
+        if not raw_id.isdigit():
+            return None
+        tp = db.session.get(TeaPost, int(raw_id))
+        if not tp:
+            return None
+        return (
+            str(tp.id),
+            tp.content[:30],
+            url_for("teahouse.post_detail", post_id=tp.id),
         )
     return None
 

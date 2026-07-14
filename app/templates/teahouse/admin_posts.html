@@ -1,0 +1,50 @@
+{% extends "admin/base.html" %}
+{% from "macros/pagination.html" import render_pagination %}
+
+{% block title %}茶馆帖子管理 · DNAISLAND{% endblock %}
+{% block admin_content %}
+<h2 class="h4 mb-3">茶馆帖子管理</h2>
+
+<form method="get" class="row g-2 mb-3">
+  <div class="col-auto">
+    <input class="form-control form-control-sm" type="text" name="q" value="{{ q }}" placeholder="内容关键字">
+  </div>
+  <div class="col-auto">
+    <input class="form-control form-control-sm" type="text" name="author" value="{{ author }}" placeholder="作者用户名">
+  </div>
+  <div class="col-auto">
+    <button class="btn btn-sm btn-primary" type="submit">筛选</button>
+  </div>
+</form>
+
+{% if items %}
+  {% for it in items %}
+  <div class="card mb-2">
+    <div class="card-body py-2">
+      <div class="d-flex justify-content-between small text-muted mb-1">
+        <span>
+          @{{ it.post.author.username }}（{{ it.post.author.nickname }}）
+          {% if it.post.is_hidden %}· <span class="text-danger">已隐藏</span>{% endif %}
+          {% if not it.post.moderated %}· <span class="text-warning">待审核</span>{% endif %}
+          {% if it.post.parent_id %}· <span>回帖</span>{% endif %}
+        </span>
+        <span>{{ it.post.created_at.strftime('%Y-%m-%d %H:%M') if it.post.created_at else '' }}</span>
+      </div>
+      <div class="border rounded p-2 mb-2 small" style="white-space:pre-wrap;word-break:break-word;">{{ it.post.content | teahouse_linkify }}</div>
+      <div class="d-flex flex-wrap gap-2">
+        <a class="btn btn-sm btn-outline-info" href="{{ url_for('teahouse.post_detail', post_id=it.post.id) }}" target="_blank">查看</a>
+        <form method="post" action="{{ url_for('admin.tea_post_hide', post_id=it.post.id) }}">
+          <button class="btn btn-sm btn-outline-warning">{% if it.post.is_hidden %}取消隐藏{% else %}隐藏{% endif %}</button>
+        </form>
+        <form method="post" action="{{ url_for('admin.tea_post_delete', post_id=it.post.id) }}" onsubmit="return confirm('确认删除该茶馆帖子？');">
+          <button class="btn btn-sm btn-outline-danger">删除</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+  {{ render_pagination(pagination, 'admin.tea_posts', args) }}
+{% else %}
+  <div class="text-muted">没有匹配的茶馆帖子。</div>
+{% endif %}
+{% endblock %}

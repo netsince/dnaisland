@@ -21,6 +21,8 @@ from ..models import (
     Notification,
     Punishment,
     Report,
+    TeaPost,
+    TeaPostLike,
     User,
 )
 from ..models.punishment import (
@@ -536,6 +538,11 @@ def report_detail(report_id):
         if u:
             target_info["link"] = url_for("user.profile", username=u.username)
             target_info["snippet"] = f"用户名：{u.username}\n昵称：{u.nickname}\n邮箱：{u.email}"
+    elif r.target_type == "teapost":
+        tp = db.session.get(TeaPost, int(r.target_id))
+        if tp:
+            target_info["link"] = url_for("teahouse.post_detail", post_id=tp.id)
+            target_info["snippet"] = f"作者：@{tp.author.username}\n内容：{tp.content}"
 
     # 统计同一被举报对象被多少人举报，便于管理员判断严重程度
     related = Report.query.filter_by(
@@ -599,6 +606,15 @@ def report_action(report_id):
         comment = db.session.get(Comment, int(r.target_id))
         if comment:
             db.session.delete(comment)
+    elif action == "hide_teapost" and r.target_type == "teapost":
+        tp = db.session.get(TeaPost, int(r.target_id))
+        if tp:
+            tp.is_hidden = True
+            tp.moderated = True
+    elif action == "delete_teapost" and r.target_type == "teapost":
+        tp = db.session.get(TeaPost, int(r.target_id))
+        if tp:
+            db.session.delete(tp)
     else:
         flash("无效的处理操作", "warning")
         return redirect(url_for("admin.report_detail", report_id=report_id))
@@ -609,6 +625,8 @@ def report_action(report_id):
         "hide_card": "你举报的角色卡已被平台下架处理，感谢你的反馈。",
         "delete_card": "你举报的角色卡已被平台删除处理，感谢你的反馈。",
         "delete_comment": "你举报的评论已被平台删除处理，感谢你的反馈。",
+        "hide_teapost": "你举报的茶馆帖子已被平台隐藏处理，感谢你的反馈。",
+        "delete_teapost": "你举报的茶馆帖子已被平台删除处理，感谢你的反馈。",
     }
     _resolve_target_reports(
         r.target_type, r.target_id, current_user.id, notice=notice_map.get(action)
@@ -779,3 +797,123 @@ def notify_send():
             flash(f"已向 {len(users)} 名匹配用户发送通知", "success")
         return redirect(url_for("admin.notify_send"))
     return render_template("admin/notify.html", templates=NOTIFY_TEMPLATES)
+
+
+# ---------------- 茶馆帖子审核（先发后审） ----------------
+@admin_bp.route("/teahouse/moderation")
+@super_admin_required
+def tea_moderation():
+    page = request.args.get("page", 1, type=int)
+    pagination = (
+        TeaPost.query.filter_by(moderated=False)
+        .order_by(TeaPost.created_at.desc())
+        .paginate(page=page, per_page=20, error_out=False)
+    )
+    items = []
+    for p in pagination.items:
+        parent = db.session.get(TeaPost, p.parent_id) if p.parent_id else None
+        items.append({"post": p, "parent": parent})
+    return render_template(
+        "teahouse/admin_moderation.html",
+        items=items,
+        pagination=pagination,
+        args={},
+        pending=TeaPost.query.filter_by(moderated=False).count(),
+    )
+
+
+@admin_bp.route("/teahouse/<int:post_id>/approve", methods=["POST"])
+@super_admin_required
+def tea_post_approve(post_id):
+    p = db.session.get(TeaPost, post_id)
+    if not p:
+        abort(404)
+    p.moderated = True  # 同意：保持可见
+    db.session.commit()
+    flash("已通过该茶馆帖子，继续可见", "success")
+    return redirect(url_for("admin.tea_moderation"))
+
+
+@admin_bp.route("/teahouse/<int:post_id>/reject", methods=["POST"])
+@super_admin_required
+def tea_post_reject(post_id):
+    p = db.session.get(TeaPost, post_id)
+    if not p:
+        abort(404)
+    # 拒绝：隐藏帖子 + 标记已审核 + 通知作者
+    p.is_hidden = True
+    p.moderated = True
+    db.session.commit()
+    notify(p.user_id, "你在茶馆发布的帖子因违反社区规范已被移除。", type_="teahouse")
+
+    # 可选：拒绝的同时禁言该用户（复用 mute 处罚）
+    mute = request.form.get("mute") == "1"
+    if mute:
+        u = db.session.get(User, p.user_id)
+        if u and not u.has_punishment("mute"):
+            db.session.add(
+                Punishment(
+                    user_id=u.id,
+                    type="mute",
+                    reason="茶馆帖子被拒绝时管理员施加禁言",
+                    handled_by=current_user.id,
+                )
+            )
+            db.session.commit()
+            notify(u.id, "你已被平台禁言，暂时无法在茶馆发言。", type_="punish")
+            db.session.commit()
+    flash(
+        "已拒绝该茶馆帖子（已隐藏并通知用户）" + ("，并禁言该用户" if mute else ""),
+        "success",
+    )
+    return redirect(url_for("admin.tea_moderation"))
+
+
+# ---------------- 茶馆帖子管理（总列表，独立于审核） ----------------
+@admin_bp.route("/teahouse")
+@super_admin_required
+def tea_posts():
+    q = request.args.get("q", "").strip()
+    author = request.args.get("author", "").strip()
+    query = TeaPost.query
+    if q:
+        query = query.filter(TeaPost.content.like(f"%{q}%"))
+    if author:
+        query = query.join(User).filter(User.username.like(f"%{author}%"))
+    page = request.args.get("page", 1, type=int)
+    pagination = query.order_by(TeaPost.created_at.desc()).paginate(
+        page=page, per_page=20, error_out=False
+    )
+    items = [{"post": p} for p in pagination.items]
+    return render_template(
+        "teahouse/admin_posts.html",
+        items=items,
+        pagination=pagination,
+        args={"q": q, "author": author},
+        q=q,
+        author=author,
+    )
+
+
+@admin_bp.route("/teahouse/<int:post_id>/hide", methods=["POST"])
+@super_admin_required
+def tea_post_hide(post_id):
+    p = db.session.get(TeaPost, post_id)
+    if not p:
+        abort(404)
+    p.is_hidden = not p.is_hidden
+    db.session.commit()
+    flash("已切换帖子隐藏状态", "success")
+    return redirect(url_for("admin.tea_posts"))
+
+
+@admin_bp.route("/teahouse/<int:post_id>/delete", methods=["POST"])
+@super_admin_required
+def tea_post_delete(post_id):
+    p = db.session.get(TeaPost, post_id)
+    if not p:
+        abort(404)
+    db.session.delete(p)
+    db.session.commit()
+    flash("茶馆帖子已删除", "success")
+    return redirect(url_for("admin.tea_posts"))

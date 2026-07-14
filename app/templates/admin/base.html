@@ -32,6 +32,14 @@
                href="{{ url_for('admin.comments') }}">评论管理</a>
           </li>
           <li class="nav-item">
+            <a class="nav-link {% if request.endpoint.startswith('admin.tea_moderation') %}active{% endif %}"
+               href="{{ url_for('admin.tea_moderation') }}">茶馆审核</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% if request.endpoint.startswith('admin.tea_posts') %}active{% endif %}"
+               href="{{ url_for('admin.tea_posts') }}">茶馆管理</a>
+          </li>
+          <li class="nav-item">
             <a class="nav-link {% if request.endpoint.startswith('admin.notify_send') %}active{% endif %}"
                href="{{ url_for('admin.notify_send') }}">发送通知</a>
           </li>

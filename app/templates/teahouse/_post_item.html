@@ -1,0 +1,112 @@
+{% macro render_post(post, stats, thread=false, top=false, focus=false, root_id=None, depth=0) %}
+{% set s = stats.get(post.id, {'like_count': 0, 'liked': false, 'reply_count': 0}) %}
+{% set visible = teapost_visible(post) %}
+<div class="card mb-2 {% if depth > 0 %}ms-4 border-start{% endif %} {% if top or focus %}border-primary{% endif %}{% if focus %} id="focus"{% endif %}"
+     {% if not top and not focus %}style="cursor:pointer;"
+     onclick="if(event.target.closest('a,button,form'))return; window.location.href='{{ url_for('teahouse.post_detail', post_id=post.id) }}'"{% endif %}>
+  <div class="card-body py-3">
+    {% if post.parent_id and root_id is not none and post.parent_id != root_id and visible %}
+    <div class="small text-muted mb-1">回复 @{{ post.parent.author.nickname }}</div>
+    {% endif %}
+    <div class="d-flex align-items-center gap-2 mb-2">
+      {% if post.author.avatar %}
+      <img src="{{ post.author.avatar }}" alt="头像" class="rounded-circle"
+           style="width:40px;height:40px;object-fit:cover;">
+      {% else %}
+      <div class="rounded-circle bg-secondary text-center text-light"
+           style="width:40px;height:40px;line-height:40px;">{{ post.author.nickname[:1] }}</div>
+      {% endif %}
+      <a class="text-decoration-none text-reset fw-semibold" href="{{ url_for('user.profile', username=post.author.username) }}">{{ post.author.nickname }}</a>
+      <span class="text-muted small">@{{ post.author.username }}</span>
+      {% if top %}<span class="badge bg-primary-subtle text-primary small">原帖</span>{% endif %}
+      <span class="text-muted small ms-auto">{{ post.created_at.strftime('%Y-%m-%d %H:%M') if post.created_at else '' }}</span>
+    </div>
+
+    {% if post.is_hidden and not visible %}
+      <div class="alert alert-warning py-1 small mb-2">该帖因违反社区规范已被隐藏</div>
+    {% elif post.is_hidden %}
+      <div class="alert alert-warning py-1 small mb-2">该帖因违反社区规范已被隐藏（仅你可见）</div>
+    {% endif %}
+
+    {% if visible %}
+      <div style="white-space:pre-wrap; word-break:break-word;">{{ post.content | teahouse_linkify }}</div>
+    {% else %}
+      <div class="text-muted small fst-italic">内容已隐藏</div>
+    {% endif %}
+
+    <div class="d-flex flex-wrap gap-3 mt-2 small text-muted align-items-center">
+      <a class="text-decoration-none text-reset" href="{{ url_for('teahouse.post_detail', post_id=post.id) }}">💬 {{ s.reply_count }} 回复</a>
+      {% if current_user.is_authenticated %}
+      <form method="post" action="{{ url_for('teahouse.like', post_id=post.id) }}" class="d-inline m-0 p-0">
+        <button class="btn btn-sm btn-link p-0 text-decoration-none {{ 'text-danger' if s.liked else 'text-muted' }}" type="submit">❤ {{ s.like_count }}</button>
+      </form>
+      {% else %}
+      <span>❤ {{ s.like_count }}</span>
+      {% endif %}
+      <a class="text-decoration-none text-reset" href="{{ url_for('teahouse.post_detail', post_id=post.id) }}#reply">↩ 回复</a>
+      {% if current_user.is_authenticated %}
+      <a class="text-decoration-none text-reset ms-auto" href="{{ url_for('user.report', type='teapost', id=post.id) }}">举报</a>
+      {% endif %}
+    </div>
+
+    {% if thread and depth < 5 and post.replies %}
+    {% for child in post.replies %}
+      {{ render_post(child, stats, thread=true, depth=depth + 1) }}
+    {% endfor %}
+    {% endif %}
+  </div>
+</div>
+{% endmacro %}
+
+
+{% macro render_reply(post, stats, root_id, focus=false) %}
+{% set s = stats.get(post.id, {'like_count': 0, 'liked': false, 'reply_count': 0}) %}
+{% set visible = teapost_visible(post) %}
+<div class="card mb-2 {% if focus %}border-primary{% endif %}{% if focus %} id="focus"{% endif %}" style="cursor:pointer;"
+     onclick="if(event.target.closest('a,button,form'))return; window.location.href='{{ url_for('teahouse.post_detail', post_id=post.id) }}'">
+  <div class="card-body py-3">
+    {% if post.parent_id and post.parent_id != root_id and visible %}
+    <div class="small text-muted mb-1">回复 @{{ post.parent.author.nickname }}</div>
+    {% endif %}
+    <div class="d-flex align-items-center gap-2 mb-2">
+      {% if post.author.avatar %}
+      <img src="{{ post.author.avatar }}" alt="头像" class="rounded-circle"
+           style="width:40px;height:40px;object-fit:cover;">
+      {% else %}
+      <div class="rounded-circle bg-secondary text-center text-light"
+           style="width:40px;height:40px;line-height:40px;">{{ post.author.nickname[:1] }}</div>
+      {% endif %}
+      <a class="text-decoration-none text-reset fw-semibold" href="{{ url_for('user.profile', username=post.author.username) }}">{{ post.author.nickname }}</a>
+      <span class="text-muted small">@{{ post.author.username }}</span>
+      <span class="text-muted small ms-auto">{{ post.created_at.strftime('%Y-%m-%d %H:%M') if post.created_at else '' }}</span>
+    </div>
+
+    {% if post.is_hidden and not visible %}
+      <div class="alert alert-warning py-1 small mb-2">该帖因违反社区规范已被隐藏</div>
+    {% elif post.is_hidden %}
+      <div class="alert alert-warning py-1 small mb-2">该帖因违反社区规范已被隐藏（仅你可见）</div>
+    {% endif %}
+
+    {% if visible %}
+      <div style="white-space:pre-wrap; word-break:break-word;">{{ post.content | teahouse_linkify }}</div>
+    {% else %}
+      <div class="text-muted small fst-italic">内容已隐藏</div>
+    {% endif %}
+
+    <div class="d-flex flex-wrap gap-3 mt-2 small text-muted align-items-center">
+      <a class="text-decoration-none text-reset" href="{{ url_for('teahouse.post_detail', post_id=post.id) }}">💬 {{ s.reply_count }} 回复</a>
+      {% if current_user.is_authenticated %}
+      <form method="post" action="{{ url_for('teahouse.like', post_id=post.id) }}" class="d-inline m-0 p-0">
+        <button class="btn btn-sm btn-link p-0 text-decoration-none {{ 'text-danger' if s.liked else 'text-muted' }}" type="submit">❤ {{ s.like_count }}</button>
+      </form>
+      {% else %}
+      <span>❤ {{ s.like_count }}</span>
+      {% endif %}
+      <a class="text-decoration-none text-reset" href="{{ url_for('teahouse.post_detail', post_id=post.id) }}#reply">↩ 回复</a>
+      {% if current_user.is_authenticated %}
+      <a class="text-decoration-none text-reset ms-auto" href="{{ url_for('user.report', type='teapost', id=post.id) }}">举报</a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endmacro %}
