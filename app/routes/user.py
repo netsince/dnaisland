@@ -104,6 +104,58 @@ def profile(username):
     )
 
 
+@user_bp.route("/user/<username>/followers")
+def followers(username):
+    u = User_query_by_username(username)
+    if not u:
+        abort(404)
+    is_self = current_user.is_authenticated and current_user.id == u.id
+    is_admin = current_user.is_authenticated and current_user.is_super_admin
+    restricted = (not is_self) and (not is_admin) and u.is_profile_banned
+
+    page = request.args.get("page", 1, type=int)
+    pagination = _paginate_follows(u, "followers", page)
+    items = _follow_items(pagination.items, include_banned=is_self or is_admin)
+    return render_template(
+        "user/follow_list.html",
+        u=u,
+        kind="followers",
+        endpoint="user.followers",
+        items=items,
+        pagination=pagination,
+        args={"username": username},
+        is_self=is_self,
+        is_admin=is_admin,
+        restricted=restricted,
+    )
+
+
+@user_bp.route("/user/<username>/following")
+def following(username):
+    u = User_query_by_username(username)
+    if not u:
+        abort(404)
+    is_self = current_user.is_authenticated and current_user.id == u.id
+    is_admin = current_user.is_authenticated and current_user.is_super_admin
+    restricted = (not is_self) and (not is_admin) and u.is_profile_banned
+
+    page = request.args.get("page", 1, type=int)
+    pagination = _paginate_follows(u, "following", page)
+    items = _follow_items(pagination.items, include_banned=is_self or is_admin)
+    return render_template(
+        "user/follow_list.html",
+        u=u,
+        kind="following",
+        endpoint="user.following",
+        items=items,
+        pagination=pagination,
+        args={"username": username},
+        is_self=is_self,
+        is_admin=is_admin,
+        restricted=restricted,
+    )
+
+
 @user_bp.route("/settings/profile", methods=["GET", "POST"])
 @login_required
 def profile_edit():
@@ -628,6 +680,43 @@ def notifications_read_all():
     mark_all_read(current_user.id)
     flash("已全部标记为已读", "success")
     return redirect(url_for("user.notifications"))
+
+
+def _paginate_follows(u, kind, page):
+    """分页返回某用户的粉丝/关注列表（User 对象），按关注时间倒序。"""
+    if kind == "followers":
+        link_col = UserFollow.following_id  # 被关注者 = u
+        join_col = UserFollow.follower_id  # 要展示的是「粉丝」
+    else:
+        link_col = UserFollow.follower_id  # 关注者 = u
+        join_col = UserFollow.following_id  # 要展示的是「已关注的人」
+    query = (
+        db.session.query(User)
+        .join(UserFollow, join_col == User.id)
+        .filter(link_col == u.id)
+        .order_by(UserFollow.created_at.desc())
+    )
+    return query.paginate(page=page, per_page=20, error_out=False)
+
+
+def _follow_items(users, include_banned):
+    """组装列表项：附带「当前用户是否已关注该用户」。
+
+    include_banned 为 False 时（他人访问），过滤掉被「禁止主页被访问」的用户。
+    """
+    if not include_banned:
+        users = [user for user in users if not user.is_profile_banned]
+    ids = [user.id for user in users]
+    following_ids = set()
+    if current_user.is_authenticated and ids:
+        rows = UserFollow.query.filter(
+            UserFollow.follower_id == current_user.id,
+            UserFollow.following_id.in_(ids),
+        ).all()
+        following_ids = {r.following_id for r in rows}
+    return [
+        {"user": user, "is_following": user.id in following_ids} for user in users
+    ]
 
 
 def User_query_by_username(username):

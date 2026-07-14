@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% from "macros/pagination.html" import render_pagination %}
+{% from "macros/verified.html" import badge %}
+
+{% set title_text = '粉丝' if kind == 'followers' else '关注' %}
+
+{% block title %}{{ u.nickname }} 的{{ title_text }} · DNAISLAND{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-lg-9">
+    <div class="d-flex align-items-center mb-3">
+      <a class="btn btn-sm btn-outline-secondary me-3" href="{{ url_for('user.profile', username=u.username) }}">← 返回主页</a>
+      <h1 class="h4 mb-0">{{ u.nickname }} 的{{ title_text }}</h1>
+    </div>
+
+    {% if restricted %}
+    <div class="alert alert-warning">
+      <h4 class="alert-heading">该用户主页已被限制访问</h4>
+      <p class="mb-0">该用户当前受到平台处罚，关注 / 粉丝列表暂不可查看。</p>
+    </div>
+    {% else %}
+    <div class="text-muted small mb-3">
+      {% if kind == 'followers' %}共 {{ pagination.total }} 位粉丝{% else %}关注了 {{ pagination.total }} 位用户{% endif %}
+    </div>
+
+    {% if items %}
+    <ul class="list-group">
+      {% for it in items %}
+      {% set ou = it.user %}
+      <li class="list-group-item bg-transparent d-flex align-items-center gap-3">
+        {% if ou.avatar %}
+        <a href="{{ url_for('user.profile', username=ou.username) }}">
+          <img src="{{ ou.avatar }}" alt="头像" class="dna-avatar" style="width:48px;height:48px;">
+        </a>
+        {% else %}
+        <a href="{{ url_for('user.profile', username=ou.username) }}" class="dna-avatar-ph" style="width:48px;height:48px;font-size:1.2rem;">{{ ou.nickname[:1] }}</a>
+        {% endif %}
+        <div class="flex-grow-1 min-w-0">
+          <a class="fw-bold text-light text-decoration-none" href="{{ url_for('user.profile', username=ou.username) }}">{{ ou.nickname }}{{ badge(ou) }}</a>
+          <div class="text-muted small">@{{ ou.username }}</div>
+          {% if ou.bio %}<div class="small text-muted mt-1 text-truncate">{{ ou.bio }}</div>{% endif %}
+        </div>
+        {% if current_user.is_authenticated and not is_self %}
+        <form method="post" action="{{ url_for('user.user_follow', username=ou.username) }}">
+          <button class="btn btn-sm btn-{{ 'outline-secondary' if it.is_following else 'primary' }}">
+            {{ '取消关注' if it.is_following else '＋ 关注' }}
+          </button>
+        </form>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {{ render_pagination(pagination, endpoint, args) }}
+    {% else %}
+    <div class="dna-empty">
+      <div class="dna-empty__icon">👥</div>
+      <div>{% if kind == 'followers' %}还没有粉丝。{% else %}还没有关注任何人。{% endif %}</div>
+    </div>
+    {% endif %}
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

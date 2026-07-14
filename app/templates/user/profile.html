@@ -40,8 +40,8 @@
             </h1>
             <div class="text-muted">@{{ u.username }}{% if is_self %} · <span class="dna-chip">这是你</span>{% endif %}</div>
             <div class="d-flex align-items-center gap-4 mt-3 flex-wrap">
-              <div><strong class="text-light">{{ following_count }}</strong> <span class="text-muted small">关注</span></div>
-              <div><strong class="text-light">{{ follower_count }}</strong> <span class="text-muted small">粉丝</span></div>
+              <div><a class="text-decoration-none text-reset" href="{{ url_for('user.following', username=u.username) }}"><strong class="text-light">{{ following_count }}</strong> <span class="text-muted small">关注</span></a></div>
+              <div><a class="text-decoration-none text-reset" href="{{ url_for('user.followers', username=u.username) }}"><strong class="text-light">{{ follower_count }}</strong> <span class="text-muted small">粉丝</span></a></div>
               <div><strong class="text-light">{{ pagination.total }}</strong> <span class="text-muted small">角色卡</span></div>
             </div>
           </div>
