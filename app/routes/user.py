@@ -6,6 +6,7 @@ from flask import (
     Blueprint,
     abort,
     flash,
+    make_response,
     redirect,
     render_template,
     request,
@@ -37,7 +38,11 @@ from ..models.punishment import (
 )
 from ..services.notification_service import notify
 from ..services.image_service import compress_image, crop_square_and_compress
-from ..services.card_service import attach_covers, load_card_images
+from ..services.card_service import (
+    attach_covers,
+    build_export_package,
+    load_card_images,
+)
 
 user_bp = Blueprint("user", __name__)
 
@@ -282,6 +287,37 @@ def card_detail(card_id):
         favorited=favorited,
         following=following,
     )
+
+
+@user_bp.route("/card/<card_id>/export")
+def card_export(card_id):
+    """导出角色卡为 dna-client 可识别的 JSON 下载。
+
+    可见性与 card_detail 一致：仅对已通过且未隐藏的公开卡、作者本人或管理员开放。
+    """
+    card = db.session.get(Card, card_id)
+    if not card:
+        abort(404)
+
+    author = card.author
+    is_owner = current_user.is_authenticated and current_user.id == card.author_id
+    is_admin = current_user.is_authenticated and current_user.is_super_admin
+    is_public = (
+        card.status == "approved"
+        and not card.is_hidden
+        and not (author and (author.is_cards_hidden or author.is_profile_banned))
+    )
+    if not (is_public or is_owner or is_admin):
+        abort(404)
+
+    package = build_export_package(card)
+    body = json.dumps(package, ensure_ascii=False, indent=2)
+    resp = make_response(body)
+    resp.headers["Content-Type"] = "application/json; charset=utf-8"
+    resp.headers["Content-Disposition"] = (
+        f'attachment; filename="dna-card-{card.id}.json"'
+    )
+    return resp
 
 
 @user_bp.route("/my/cards")

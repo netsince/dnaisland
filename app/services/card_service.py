@@ -7,8 +7,10 @@
 - load_card_images(card_id): 返回单卡 {slot: data} 图片字典。
 """
 
+from datetime import datetime
+
 from ..extensions import db
-from ..models import Card, CardImage, CardTag
+from ..models import Card, CardDialogueStyle, CardImage, CardTag
 from sqlalchemy import func
 
 
@@ -39,6 +41,55 @@ def load_card_images(card_id):
         img.slot: img.data
         for img in CardImage.query.filter_by(card_id=card_id).all()
     }
+
+
+def build_export_package(card):
+    """把平台 Card 组装成 dna-client 可识别的 ExportPackage JSON 结构。
+
+    字段严格对齐客户端 TaExportImportService 的导入逻辑
+    （含 character.id / name / gender / persona / intro / opening /
+    tags / dialogueStyle / images[slot].data），可被客户端「导入」直接识别。
+    """
+    tags = [t.tag for t in CardTag.query.filter_by(card_id=card.id).all()]
+    dialogue = [
+        {"user": d.user_text, "assistant": d.assistant_text}
+        for d in CardDialogueStyle.query.filter_by(card_id=card.id)
+        .order_by(CardDialogueStyle.turn_index)
+    ]
+    image_rows = {
+        img.slot: img.data
+        for img in CardImage.query.filter_by(card_id=card.id).all()
+        if img.data
+    }
+
+    # 保证三个图片槽位始终存在（缺失时为 null，客户端可正常解析）
+    images = {
+        slot: {"data": image_rows.get(slot)}
+        for slot in ("square", "landscape", "portrait")
+    }
+
+    character = {
+        "id": card.id,
+        "name": card.name,
+        "gender": card.gender or "无性",
+        "persona": card.persona or "",
+        "intro": card.intro or "",
+        "opening": card.opening or "",
+        "tags": tags,
+        "dialogueStyle": dialogue,
+        "images": images,
+    }
+
+    package = {
+        "version": 1,
+        "exportType": "single",
+        "exportedAt": datetime.utcnow().isoformat() + "Z",
+        "compressed": True,
+        "character": character,
+    }
+    if card.original_link:
+        package["originalLink"] = card.original_link
+    return package
 
 
 def popular_tags(viewer=None, limit=30):

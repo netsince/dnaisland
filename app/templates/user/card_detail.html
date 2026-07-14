@@ -60,6 +60,8 @@
             </button>
           </form>
           {% endif %}
+          <button class="btn btn-sm btn-outline-success" id="exportClipboardBtn"
+                  data-export-url="{{ url_for('user.card_export', card_id=card.id) }}">⧉ 复制到剪贴板</button>
           <a class="btn btn-sm btn-outline-danger ms-auto"
              href="{{ url_for('user.report', type='card', id=card.id) }}">举报</a>
         </div>
@@ -159,4 +161,38 @@
     {% endif %}
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    const btn = document.getElementById('exportClipboardBtn');
+    if (!btn) return;
+    btn.addEventListener('click', async function () {
+      const original = btn.textContent;
+      try {
+        const resp = await fetch(btn.dataset.exportUrl, { credentials: 'same-origin' });
+        if (!resp.ok) throw new Error('导出失败：' + resp.status);
+        const text = await resp.text();
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+        } else {
+          // 兼容不支持 Clipboard API 的环境
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+        }
+        btn.textContent = '✓ 已复制';
+      } catch (e) {
+        btn.textContent = '复制失败';
+        console.error(e);
+      } finally {
+        setTimeout(function () { btn.textContent = original; }, 1500);
+      }
+    });
+  })();
+</script>
 {% endblock %}

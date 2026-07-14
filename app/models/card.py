@@ -7,7 +7,7 @@ from ..extensions import db
 class Card(db.Model):
     __tablename__ = "cards"
 
-    # 复用客户端 TA.id (UUID)，保证导入导出身份一致
+    # 平台自动分配的主键（UUID），不读取客户端 JSON 中的 id
     id = db.Column(db.String(36), primary_key=True)
     author_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     name = db.Column(db.String(120), nullable=False)
