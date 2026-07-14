@@ -99,23 +99,6 @@
     </nav>
   </header>
 
-  {% if site_cfg.announcement.enabled and site_cfg.announcement.content %}
-  <div id="siteAnnouncementBanner" class="alert alert-info alert-dismissible fade show mb-0 rounded-0 border-0" role="alert"
-       style="background:var(--dna-grad-soft);">
-    <div class="container-fluid">
-      <div class="richtext-content small">{{ site_cfg.announcement.content | richtext }}</div>
-    </div>
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="关闭"
-            onclick="sessionStorage.setItem('dna_ann_dismissed','1')"></button>
-  </div>
-  <script>
-    if (sessionStorage.getItem('dna_ann_dismissed') === '1') {
-      var _b = document.getElementById('siteAnnouncementBanner');
-      if (_b) _b.remove();
-    }
-  </script>
-  {% endif %}
-
   <main class="container-fluid py-4 flex-grow-1">
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
@@ -181,7 +164,7 @@
     })();
   </script>
 
-  <!-- 公告弹窗（关站/公告关闭后仍可手动再次查看） -->
+  <!-- 公告弹窗：首次进入自动弹出；关闭后本会话内不再自动弹；页脚「查看公告」可手动再开 -->
   {% if site_cfg.announcement.enabled and site_cfg.announcement.content %}
   <div class="modal fade" id="announcementModal" tabindex="-1" aria-labelledby="announcementModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
@@ -192,11 +175,29 @@
         </div>
         <div class="modal-body richtext-content">{{ site_cfg.announcement.content | richtext }}</div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+          <button type="button" class="btn btn-primary" data-bs-dismiss="modal">我已知晓</button>
         </div>
       </div>
     </div>
   </div>
+  <script>
+    (function () {
+      var KEY = 'dna_ann_seen';
+      var modalEl = document.getElementById('announcementModal');
+      if (!modalEl) return;
+      // 关闭（含点击遮罩/按钮）后，本会话内不再自动弹出
+      modalEl.addEventListener('hidden.bs.modal', function () {
+        try { sessionStorage.setItem(KEY, '1'); } catch (e) {}
+      });
+      // 首次进入：未看过则自动弹出
+      var seen = false;
+      try { seen = sessionStorage.getItem(KEY) === '1'; } catch (e) {}
+      if (!seen) {
+        var inst = bootstrap.Modal.getOrCreateInstance(modalEl);
+        inst.show();
+      }
+    })();
+  </script>
   {% endif %}
   <script>
     (function () {
