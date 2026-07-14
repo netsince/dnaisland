@@ -239,6 +239,17 @@ def search_suggest():
     return jsonify({"cards": card_hits, "users": user_hits})
 
 
+# ---------------- 法律协议（前台公开页，供系统配置中的协议链接使用） ----------------
+@main_bp.route("/privacy")
+def privacy():
+    return render_template("legal/privacy.html")
+
+
+@main_bp.route("/tos")
+def tos():
+    return render_template("legal/tos.html")
+
+
 # ---------------- 文章（前台） ----------------
 @main_bp.route("/articles")
 def articles():
