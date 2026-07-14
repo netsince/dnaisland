@@ -64,7 +64,8 @@ def edit():
     intro = request.form.get("intro") or ""
     opening = request.form.get("opening") or ""
     original_link = request.form.get("original_link") or ""
-    card_id = (request.form.get("card_id") or "").strip() or str(uuid.uuid4())
+    # 不读取客户端传入的 id，始终由平台自动分配新 id
+    card_id = str(uuid.uuid4())
 
     tags = [t.strip() for t in (request.form.get("tags") or "").split(",") if t.strip()]
 

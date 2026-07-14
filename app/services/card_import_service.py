@@ -74,8 +74,8 @@ def parse_export_package(json_str: str) -> dict:
     else:
         tags = []
 
+    # 注意：不读取 JSON 中的 id，平台始终自动分配新 id
     return {
-        "id": str(character.get("id") or ""),
         "name": character.get("name") or "",
         "gender": character.get("gender") or "无性",
         "persona": character.get("persona") or "",
