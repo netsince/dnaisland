@@ -111,7 +111,10 @@ _COPYRIGHT_TIPS = "\n".join(
 
 
 def _obfuscate(s):
-    """逆序 hex 拼接混淆（与 card_import_service._deobfuscate 对称，两端可互解）。"""
+    """逆序 hex 拼接混淆，与客户端 _deobfuscate 对称（两端可互解）。
+
+    导入端 card_import_service 改为「命中即拦」策略，不再解码还原，故此处仅作导出混淆用。
+    """
     if not s:
         return ""
     hex_str = "".join(f"{ord(c):02x}" for c in str(s))
