@@ -1,5 +1,7 @@
 import json
 
+from sqlalchemy.dialects.mysql import LONGTEXT
+
 from ..extensions import db
 
 
@@ -87,7 +89,7 @@ class Article(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
     summary = db.Column(db.Text, nullable=True)
-    content = db.Column(db.Text, nullable=False)  # 富文本 / HTML
+    content = db.Column(LONGTEXT, nullable=False)  # 富文本 / HTML（长文用 LONGTEXT）
     cover = db.Column(db.Text, nullable=True)  # 封面图 URL / base64
 
     author_id = db.Column(
