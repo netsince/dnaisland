@@ -761,12 +761,21 @@ def notify_send():
         if not username or not message:
             flash("请填写目标用户名与通知内容", "warning")
             return render_template("admin/notify.html", templates=NOTIFY_TEMPLATES)
-        u = User.query.filter_by(username=username).first()
-        if not u:
-            flash("目标用户不存在", "warning")
+        # 目标用户名支持通配符：* 匹配任意字符，转为 SQL LIKE 的 %
+        if "*" in username:
+            pattern = username.replace("*", "%")
+            users = User.query.filter(User.username.like(pattern)).all()
+        else:
+            users = User.query.filter_by(username=username).all()
+        if not users:
+            flash("没有匹配的用户", "warning")
             return render_template("admin/notify.html", templates=NOTIFY_TEMPLATES)
-        notify(u.id, message, type_="system")
+        for u in users:
+            notify(u.id, message, type_="system")
         db.session.commit()
-        flash(f"已向用户 {u.nickname}（@{u.username}）发送通知", "success")
+        if len(users) == 1:
+            flash(f"已向用户 {users[0].nickname}（@{users[0].username}）发送通知", "success")
+        else:
+            flash(f"已向 {len(users)} 名匹配用户发送通知", "success")
         return redirect(url_for("admin.notify_send"))
     return render_template("admin/notify.html", templates=NOTIFY_TEMPLATES)

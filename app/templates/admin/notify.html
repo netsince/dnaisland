@@ -10,7 +10,7 @@
     <form method="post" action="{{ url_for('admin.notify_send') }}">
       <div class="mb-3">
         <label class="form-label">目标用户名</label>
-        <input class="form-control" type="text" name="username" placeholder="输入接收通知的用户名" required>
+        <input class="form-control" type="text" name="username" placeholder="输入用户名，支持 * 通配符（如 admin*、*test、* 全站）" required>
       </div>
       <div class="mb-3">
         <label class="form-label">通知内容</label>
