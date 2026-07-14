@@ -962,6 +962,9 @@ def system_config():
         ).strip() or None
         cfg.tos_url = (request.form.get("tos_url") or "").strip() or None
 
+        # 联系客服邮箱（mailto）
+        cfg.contact_email = (request.form.get("contact_email") or "").strip() or None
+
         # 注册邮箱白名单
         cfg.email_whitelist_enabled = request.form.get("email_whitelist_enabled") == "1"
         cfg.email_whitelist_suffixes = (

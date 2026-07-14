@@ -127,6 +127,9 @@
         {% if site_cfg.announcement.enabled and site_cfg.announcement.content %}
         <a href="#" class="text-decoration-none" data-bs-toggle="modal" data-bs-target="#announcementModal">查看公告</a>
         {% endif %}
+        {% if site_cfg.contact_email %}
+        <a href="mailto:{{ site_cfg.contact_email }}" class="text-decoration-none ms-2">联系客服</a>
+        {% endif %}
       </div>
       <small>DNAISLAND · 与汝共奏的角色卡社区</small>
       {% endblock %}

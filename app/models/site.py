@@ -35,6 +35,9 @@ class SiteConfig(db.Model):
     privacy_policy_url = db.Column(db.String(500), nullable=True)
     tos_url = db.Column(db.String(500), nullable=True)
 
+    # —— 联系客服邮箱（页脚 mailto）——
+    contact_email = db.Column(db.String(255), nullable=True)
+
     # —— 注册邮箱白名单 ——
     email_whitelist_enabled = db.Column(db.Boolean, server_default="0", nullable=False)
     # 逗号 / 换行 / 空格分隔的后缀，如 @gmail.com、@qq.com

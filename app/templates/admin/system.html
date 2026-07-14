@@ -101,7 +101,12 @@
         <input type="text" class="form-control" id="tos_url" name="tos_url"
                value="{{ cfg.tos_url or '' }}" placeholder="https://...">
       </div>
-      <div class="form-text">页脚将展示这两个链接，可指向站外页面。</div>
+      <div class="mb-3">
+        <label class="form-label" for="contact_email">联系客服邮箱</label>
+        <input type="email" class="form-control" id="contact_email" name="contact_email"
+               value="{{ cfg.contact_email or '' }}" placeholder="support@dnaisland.com">
+      </div>
+      <div class="form-text">页脚「联系客服」按钮将触发 mailto: 该邮箱；留空则不显示该按钮。</div>
     </div>
   </div>
 

@@ -21,6 +21,7 @@ def default_public_config():
         "hero": {"enabled": True, "title": "", "subtitle": "", "buttons": []},
         "agreements": {"privacy_policy_url": "", "tos_url": ""},
         "email_whitelist": {"enabled": False, "suffixes": []},
+        "contact_email": "",
     }
 
 
@@ -57,6 +58,7 @@ def public_config():
             "enabled": bool(cfg.email_whitelist_enabled),
             "suffixes": cfg.email_suffixes_list(),
         },
+        "contact_email": cfg.contact_email or "",
     }
 
 
