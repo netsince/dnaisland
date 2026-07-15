@@ -211,7 +211,7 @@
       const chip = document.createElement('span');
       chip.className = 'badge bg-primary d-inline-flex align-items-center gap-1';
       chip.innerHTML = '<span>' + escapeHtml(t) + '</span>' +
-        '<button type="button" class="btn-close btn-close-white" ' +
+        '<button type="button" class="btn-close" ' +
         'style="font-size:.6rem" data-idx="' + i + '" aria-label="移除"></button>';
       tagChips.appendChild(chip);
     });

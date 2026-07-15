@@ -5,6 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0b0a14">
   <title>{% block title %}DNAISLAND{% endblock %}</title>
+  <!-- 主题初始化：在首屏绘制前应用用户偏好，避免闪烁 (FOUC) -->
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('dna_theme');
+        if (!t) t = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-bs-theme', t);
+      } catch (e) {
+        document.documentElement.setAttribute('data-bs-theme', 'dark');
+      }
+    })();
+  </script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -61,6 +73,26 @@
                  style="position:absolute;top:100%;left:0;right:0;z-index:1050;"></div>
           </form>
           <ul class="navbar-nav mb-2 mb-lg-0 align-items-center">
+            <li class="nav-item d-flex align-items-center">
+              <button type="button" class="btn btn-link nav-link px-2" id="themeToggle"
+                      aria-label="切换深浅色主题" title="切换深浅色">
+                <span class="theme-icon icon-sun" aria-hidden="true">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none"
+                       stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                       stroke-linejoin="round" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="4"></circle>
+                    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path>
+                  </svg>
+                </span>
+                <span class="theme-icon icon-moon" aria-hidden="true">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none"
+                       stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                       stroke-linejoin="round" viewBox="0 0 24 24">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                  </svg>
+                </span>
+              </button>
+            </li>
             {% if current_user.is_authenticated %}
               <li class="nav-item">
                 <a class="nav-link position-relative" href="{{ url_for('user.notifications') }}">
@@ -267,6 +299,31 @@
       input.addEventListener("keydown", function (e) {
         if (e.key === "Escape") closeBox();
       });
+    })();
+  </script>
+  <!-- 主题切换：同步导航栏配色类并持久化用户选择 -->
+  <script>
+    (function () {
+      var KEY = 'dna_theme';
+      var root = document.documentElement;
+      var nav = document.querySelector('.navbar');
+      function apply(t) {
+        root.setAttribute('data-bs-theme', t);
+        if (nav) {
+          nav.classList.toggle('navbar-dark', t === 'dark');
+          nav.classList.toggle('navbar-light', t === 'light');
+        }
+      }
+      // 与 head 中的初始化保持一致，并同步导航栏的 Bootstrap 配色类
+      apply(root.getAttribute('data-bs-theme') || 'dark');
+      var btn = document.getElementById('themeToggle');
+      if (btn) {
+        btn.addEventListener('click', function () {
+          var next = root.getAttribute('data-bs-theme') === 'light' ? 'dark' : 'light';
+          apply(next);
+          try { localStorage.setItem(KEY, next); } catch (e) {}
+        });
+      }
     })();
   </script>
   {% block scripts %}{% endblock %}

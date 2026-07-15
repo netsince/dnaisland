@@ -435,8 +435,164 @@ mark, .bg-warning-subtle {
 
 .article-body { font-size: 1.02rem; }
 
+/* 文章正文：富文本编辑器会为每个元素写死 inline color:rgb(0,0,0)，
+   其优先级高于主题样式，导致深色模式下正文发黑、且切换主题无变化。
+   用 !important 强制覆盖行内黑色，让正文在深色=纯白、浅色=纯黑之间互相切换。 */
+[data-bs-theme="dark"] .article-body,
+[data-bs-theme="dark"] .article-body * { color: #fff !important; }
+[data-bs-theme="light"] .article-body,
+[data-bs-theme="light"] .article-body * { color: #000 !important; }
+[data-bs-theme="dark"] .article-body table,
+[data-bs-theme="dark"] .article-body table td,
+[data-bs-theme="dark"] .article-body table th { border-color: var(--dna-border-strong) !important; }
+
 /* 富文本编辑区占位提示 */
 .rich-editor-area:empty::before {
   content: attr(placeholder); color: var(--dna-muted); pointer-events: none;
 }
 .rich-editor-area:focus { box-shadow: 0 0 0 .2rem rgba(168, 85, 247, .25); outline: 0; }
+
+/* ============================================================
+   主题切换按钮（图标随 data-bs-theme 自动切换）
+   ============================================================ */
+#themeToggle { text-decoration: none; }
+.theme-icon { display: inline-flex; align-items: center; }
+#themeToggle .icon-sun { display: none; }
+#themeToggle .icon-moon { display: inline-flex; }
+[data-bs-theme="light"] #themeToggle .icon-sun { display: inline-flex; }
+[data-bs-theme="light"] #themeToggle .icon-moon { display: none; }
+
+/* 主题切换时的平滑过渡 */
+body, .navbar, .footer, .card, .dna-tile, .dna-hero,
+.dropdown-menu, .form-control, .form-select, .list-group-item, .dna-filterbar, .sidebar {
+  transition: background-color .25s ease, color .25s ease, border-color .25s ease;
+}
+
+/* ============================================================
+   浅色模式
+   通过覆盖 --dna-* 设计变量 + 少量组件级修正，让全站从
+   霓虹深色调平滑切换为清爽浅色调，同时保持品牌渐变与质感。
+   ============================================================ */
+[data-bs-theme="light"] {
+  /* 品牌色保持霓虹质感（略提亮以适配浅底） */
+  --dna-accent: #9333ea;
+  --dna-accent-2: #db2777;
+  --dna-accent-3: #0891b2;
+  --dna-grad: linear-gradient(135deg, #9333ea 0%, #db2777 55%, #ec4899 100%);
+  --dna-grad-soft: linear-gradient(135deg, rgba(147, 51, 234, .14), rgba(219, 39, 119, .1));
+
+  /* 背景与表面 */
+  --dna-bg: #f6f4fb;
+  --dna-bg-2: #ece7f6;
+  --dna-surface: rgba(255, 255, 255, .82);
+  --dna-surface-solid: #ffffff;
+  --dna-border: rgba(28, 22, 54, .1);
+  --dna-border-strong: rgba(28, 22, 54, .16);
+
+  /* 文本 */
+  --dna-text: #211c33;
+  --dna-muted: #6a6385;
+
+  --dna-shadow: 0 18px 48px -24px rgba(40, 20, 80, .28);
+  --dna-glow: 0 0 0 1px rgba(147, 51, 234, .3), 0 12px 30px -12px rgba(147, 51, 234, .4);
+
+  /* —— 覆盖 Bootstrap 主题变量 —— */
+  --bs-body-bg: var(--dna-bg);
+  --bs-body-color: var(--dna-text);
+  --bs-border-color: var(--dna-border);
+  --bs-primary: #9333ea;
+  --bs-primary-rgb: 147, 51, 234;
+  --bs-link-color: #7e22ce;
+  --bs-link-hover-color: #9333ea;
+  --bs-emphasis-color: #1a1526;
+}
+
+[data-bs-theme="light"] body {
+  color: var(--dna-text);
+  background-image:
+    radial-gradient(60vw 60vw at 12% -10%, rgba(147, 51, 234, .12), transparent 60%),
+    radial-gradient(55vw 55vw at 100% 0%, rgba(8, 145, 178, .1), transparent 55%),
+    radial-gradient(50vw 50vw at 80% 110%, rgba(219, 39, 119, .1), transparent 55%);
+}
+[data-bs-theme="light"] ::selection { background: rgba(147, 51, 234, .25); color: #1a1526; }
+
+/* 导航栏 */
+[data-bs-theme="light"] .navbar.bg-dark {
+  background: rgba(255, 255, 255, .8) !important;
+  border-bottom: 1px solid var(--dna-border);
+}
+[data-bs-theme="light"] .navbar .nav-link:hover,
+[data-bs-theme="light"] .navbar .nav-link.active { color: #1a1526 !important; background: rgba(0, 0, 0, .05); }
+
+/* 卡片 / 表面 */
+[data-bs-theme="light"] .card { background: var(--dna-surface); color: var(--dna-text); }
+[data-bs-theme="light"] .card-header { background: rgba(0, 0, 0, .02); color: #1a1526; }
+[data-bs-theme="light"] .list-group-item { background: var(--dna-surface); color: var(--dna-text); }
+
+/* 按钮 */
+[data-bs-theme="light"] .btn-outline-secondary:hover { background: rgba(0, 0, 0, .05); color: #1a1526; }
+[data-bs-theme="light"] .btn-outline-light { border-color: var(--dna-border-strong); color: var(--dna-text); }
+[data-bs-theme="light"] .btn-outline-light:hover { background: rgba(0, 0, 0, .05); color: #1a1526; }
+
+/* 表单 */
+[data-bs-theme="light"] .form-control,
+[data-bs-theme="light"] .form-select { background: rgba(255, 255, 255, .75); color: var(--dna-text); }
+[data-bs-theme="light"] .form-control::placeholder { color: rgba(106, 99, 133, .7); }
+[data-bs-theme="light"] .form-control:focus,
+[data-bs-theme="light"] .form-select:focus { background: #fff; color: #1a1526; }
+[data-bs-theme="light"] .input-group-text { background: rgba(0, 0, 0, .03); color: var(--dna-muted); }
+
+/* 下拉 / 建议框 */
+[data-bs-theme="light"] .dropdown-menu { background: rgba(255, 255, 255, .97); }
+[data-bs-theme="light"] .dropdown-item { color: var(--dna-text); }
+[data-bs-theme="light"] .dropdown-item:hover,
+[data-bs-theme="light"] .dropdown-item:focus { background: var(--dna-grad-soft); color: #1a1526; }
+
+/* 提示 */
+[data-bs-theme="light"] main .alert { border-color: var(--dna-border); }
+[data-bs-theme="light"] .alert-success { background: rgba(34, 197, 94, .12); color: #15803d; }
+[data-bs-theme="light"] .alert-danger  { background: rgba(239, 68, 68, .12); color: #b91c1c; }
+[data-bs-theme="light"] .alert-warning { background: rgba(234, 179, 8, .14); color: #a16207; }
+[data-bs-theme="light"] .alert-info    { background: rgba(34, 211, 238, .12); color: #0e7490; }
+
+/* Hero / 自定义组件 */
+[data-bs-theme="light"] .dna-hero {
+  background:
+    radial-gradient(120% 140% at 0% 0%, rgba(147, 51, 234, .18), transparent 55%),
+    radial-gradient(120% 140% at 100% 20%, rgba(8, 145, 178, .16), transparent 55%),
+    rgba(255, 255, 255, .7);
+}
+[data-bs-theme="light"] .dna-hero::after {
+  background-image: radial-gradient(rgba(0, 0, 0, .05) 1px, transparent 1px);
+}
+[data-bs-theme="light"] .dna-chip { color: #7e22ce; background: rgba(147, 51, 234, .1); }
+[data-bs-theme="light"] .dna-tag { color: #7e22ce; }
+[data-bs-theme="light"] .dna-tile__title { color: #1a1526; }
+[data-bs-theme="light"] .dna-empty { background: rgba(0, 0, 0, .015); }
+
+/* 页脚 / 后台侧边栏 */
+[data-bs-theme="light"] .footer.bg-light {
+  background: rgba(246, 244, 251, .85) !important;
+  color: var(--dna-muted);
+  border-top: 1px solid var(--dna-border);
+}
+[data-bs-theme="light"] .sidebar.bg-light { background: rgba(255, 255, 255, .7) !important; }
+
+/* 探索页筛选条 */
+[data-bs-theme="light"] .dna-filterbar { background: rgba(255, 255, 255, .8); }
+
+/* 富文本 / 文章正文 */
+[data-bs-theme="light"] .richtext-content h1,
+[data-bs-theme="light"] .richtext-content h2,
+[data-bs-theme="light"] .richtext-content h3,
+[data-bs-theme="light"] .richtext-content h4,
+[data-bs-theme="light"] .richtext-content h5 { color: #1a1526; }
+[data-bs-theme="light"] .richtext-content code { background: rgba(0, 0, 0, .06); }
+[data-bs-theme="light"] .richtext-content pre { background: rgba(0, 0, 0, .04); }
+
+/* 高亮 mark */
+[data-bs-theme="light"] mark,
+[data-bs-theme="light"] .bg-warning-subtle { background: rgba(219, 39, 119, .18) !important; color: #831843 !important; }
+
+/* 浅色模式下，原深色专用文本类改为可读深色 */
+[data-bs-theme="light"] .text-light { color: var(--dna-text) !important; }
