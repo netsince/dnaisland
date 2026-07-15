@@ -336,10 +336,14 @@
           var img = box.querySelector('.dna-img-fade__img');
           if (!img) return;
           function done() { box.classList.add('is-loaded'); }
-          // 已缓存（complete）或加载完成时直接标记；否则监听 load/error
-          if (img.complete && img.naturalWidth > 0) { done(); }
+          // 关键优化：等 img.decode() 真正解码完成（含大图解码）再触发渐显，
+          // 避免 load 触发瞬间因解码未完成而产生的硬跳变 / 生硬切换。
+          function reveal() {
+            if (img.decode) { img.decode().then(done).catch(done); } else { done(); }
+          }
+          if (img.complete && img.naturalWidth > 0) { reveal(); }
           else {
-            img.addEventListener('load', done);
+            img.addEventListener('load', reveal);
             img.addEventListener('error', function () { box.classList.add('is-error'); });
           }
         });

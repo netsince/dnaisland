@@ -461,13 +461,13 @@ mark, .bg-warning-subtle {
 }
 .dna-img-fade--top { border-radius: var(--dna-radius) var(--dna-radius) 0 0; }
 
-/* 加载中的轻微脉动提示（仅 JS 下生效，加载完淡出） */
+/* 加载中的轻微脉动提示（仅 JS 下生效，加载完淡出，过渡与图片同步拉长） */
 .js .dna-img-fade::after {
   content: "";
   position: absolute; inset: 0;
   background: radial-gradient(60% 60% at 50% 50%, rgba(255, 255, 255, .07), transparent 70%);
   opacity: 1;
-  transition: opacity .6s ease;
+  transition: opacity 1.4s ease;
   pointer-events: none;
 }
 .js .dna-img-fade.is-loaded::after { opacity: 0; }
@@ -478,12 +478,17 @@ mark, .bg-warning-subtle {
   height: 100%;
   object-fit: cover;
   opacity: 0;
-  filter: blur(16px);
-  transform: scale(1.06);
+  /* 初始更模糊、略放大，让“从无到有”的显影更有层次 */
+  filter: blur(26px);
+  transform: scale(1.08);
+  will-change: opacity, filter, transform;
+  /* 分层缓动：淡入先发生、模糊散去与缩放更慢收尾，
+     三者结束时刻错开，形成“由模糊缓缓凝聚为清晰”的顺滑层次，
+     避免同曲线同时结束带来的硬切换感 */
   transition:
-    opacity 1.1s cubic-bezier(.22, .61, .36, 1),
-    filter 1.1s cubic-bezier(.22, .61, .36, 1),
-    transform 1.1s cubic-bezier(.22, .61, .36, 1);
+    opacity 1s cubic-bezier(.4, 0, .2, 1),
+    filter 1.6s cubic-bezier(.22, .61, .36, 1),
+    transform 1.9s cubic-bezier(.22, .61, .36, 1);
 }
 .js .dna-img-fade.is-loaded .dna-img-fade__img {
   opacity: 1;
