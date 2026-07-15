@@ -16,3 +16,11 @@ dependencies = [
     "pymysql>=1.2.0",
     "python-dotenv>=1.2.2",
 ]
+
+[project.optional-dependencies]
+# 生产 WSGI 服务器：Linux/macOS 用 gunicorn，Windows 用 waitress
+# 安装： uv sync --extra prod   或   pip install ".[prod]"
+prod = [
+    "gunicorn>=23.0.0 ; sys_platform != 'win32'",
+    "waitress>=3.0.0 ; sys_platform == 'win32'",
+]
