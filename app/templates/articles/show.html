@@ -15,7 +15,11 @@
     {{ article.author.nickname if (article.show_author and article.author) else '匿名管理员' }}
     {% if article.created_at %} · {{ article.created_at.strftime('%Y-%m-%d %H:%M') }}{% endif %}
   </div>
-  {% if article.cover %}<img src="{{ article.cover }}" class="img-fluid rounded mb-4" alt="">{% endif %}
+  {% if article.cover %}
+  <div class="dna-img-fade mb-4">
+    <img src="{{ article.cover }}" class="dna-img-fade__img" alt="">
+  </div>
+  {% endif %}
   <div class="richtext-content article-body">{{ article.content | richtext }}</div>
 </article>
 {% endblock %}

@@ -15,6 +15,8 @@
       } catch (e) {
         document.documentElement.setAttribute('data-bs-theme', 'dark');
       }
+      // 标记 JS 可用，启用图片渐显等渐进增强样式
+      document.documentElement.classList.add('js');
     })();
   </script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
@@ -324,6 +326,25 @@
           try { localStorage.setItem(KEY, next); } catch (e) {}
         });
       }
+    })();
+  </script>
+  <!-- 文章封面渐显：图片加载完成后从黑色模糊占位平滑过渡到清晰图 -->
+  <script>
+    (function () {
+      function bindFade(root) {
+        root.querySelectorAll('.dna-img-fade').forEach(function (box) {
+          var img = box.querySelector('.dna-img-fade__img');
+          if (!img) return;
+          function done() { box.classList.add('is-loaded'); }
+          // 已缓存（complete）或加载完成时直接标记；否则监听 load/error
+          if (img.complete && img.naturalWidth > 0) { done(); }
+          else {
+            img.addEventListener('load', done);
+            img.addEventListener('error', function () { box.classList.add('is-error'); });
+          }
+        });
+      }
+      bindFade(document);
     })();
   </script>
   {% block scripts %}{% endblock %}

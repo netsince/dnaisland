@@ -446,6 +446,51 @@ mark, .bg-warning-subtle {
 [data-bs-theme="dark"] .article-body table td,
 [data-bs-theme="dark"] .article-body table th { border-color: var(--dna-border-strong) !important; }
 
+/* ============================================================
+   文章封面：从黑色模糊占位到清晰图片的丝滑渐显
+   未加载时容器统一为黑色；图片加载完成后，从模糊+透明平滑
+   过渡为清晰图（opacity + blur + 轻微缩放），过渡曲线刻意拉长。
+   仅当 <html> 带 .js 类时才启用（渐进增强，无 JS 时图片正常显示）。
+   ============================================================ */
+.dna-img-fade {
+  position: relative;
+  background: #000;                 /* 未加载时统一为黑色 */
+  overflow: hidden;
+  border-radius: var(--dna-radius);
+  aspect-ratio: 16 / 9;             /* 预留空间，避免加载时布局跳动 */
+}
+.dna-img-fade--top { border-radius: var(--dna-radius) var(--dna-radius) 0 0; }
+
+/* 加载中的轻微脉动提示（仅 JS 下生效，加载完淡出） */
+.js .dna-img-fade::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: radial-gradient(60% 60% at 50% 50%, rgba(255, 255, 255, .07), transparent 70%);
+  opacity: 1;
+  transition: opacity .6s ease;
+  pointer-events: none;
+}
+.js .dna-img-fade.is-loaded::after { opacity: 0; }
+
+.js .dna-img-fade__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  filter: blur(16px);
+  transform: scale(1.06);
+  transition:
+    opacity 1.1s cubic-bezier(.22, .61, .36, 1),
+    filter 1.1s cubic-bezier(.22, .61, .36, 1),
+    transform 1.1s cubic-bezier(.22, .61, .36, 1);
+}
+.js .dna-img-fade.is-loaded .dna-img-fade__img {
+  opacity: 1;
+  filter: blur(0);
+  transform: scale(1);
+}
+
 /* 富文本编辑区占位提示 */
 .rich-editor-area:empty::before {
   content: attr(placeholder); color: var(--dna-muted); pointer-events: none;
