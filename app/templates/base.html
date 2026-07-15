@@ -336,10 +336,18 @@
           var img = box.querySelector('.dna-img-fade__img');
           if (!img) return;
           function done() { box.classList.add('is-loaded'); }
-          // 关键优化：等 img.decode() 真正解码完成（含大图解码）再触发渐显，
-          // 避免 load 触发瞬间因解码未完成而产生的硬跳变 / 生硬切换。
+          // 关键修复：图片解码完成后，浏览器默认会在“同一渲染帧”内把清晰图与
+          // is-loaded 一起应用，导致过渡没有起点 → 看起来硬切。
+          // 这里先等一帧，让“已解码的模糊图”真正绘制出来，再于下一帧切换状态，
+          // 过渡才会从模糊平滑散去为清晰（而非直接蹦成清晰图）。
           function reveal() {
-            if (img.decode) { img.decode().then(done).catch(done); } else { done(); }
+            var paint = function () {
+              void img.offsetWidth;                       // 强制提交当前（模糊）帧
+              requestAnimationFrame(function () {
+                requestAnimationFrame(done);             // 下一帧再切换，确保过渡有起点
+              });
+            };
+            if (img.decode) { img.decode().then(paint).catch(done); } else { paint(); }
           }
           if (img.complete && img.naturalWidth > 0) { reveal(); }
           else {
