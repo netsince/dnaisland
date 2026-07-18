@@ -1,0 +1,49 @@
+{% extends "points/base.html" %}
+{% from "macros/pagination.html" import render_pagination %}
+
+{% block points_content %}
+<h2 class="h4 mb-3">我的点数</h2>
+
+<div class="card text-center mb-4 border-0"
+     style="background:linear-gradient(135deg,#1f1f2e,#3a2740);color:#f3e9d2;">
+  <div class="card-body py-5">
+    <div class="text-uppercase small opacity-75 mb-2">当前点数</div>
+    <div class="display-3 fw-bold">{{ balance }}</div>
+  </div>
+</div>
+
+<h4 class="h5 mb-3">变化明细</h4>
+<div class="table-responsive">
+  <table class="table table-striped align-middle">
+    <thead>
+      <tr>
+        <th>时间</th>
+        <th>变化</th>
+        <th>余额</th>
+        <th>来源</th>
+        <th>说明</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in txs %}
+      <tr>
+        <td>{{ t.created_at.strftime('%Y-%m-%d %H:%M') if t.created_at else '' }}</td>
+        <td class="{{ 'text-success' if t.delta >= 0 else 'text-danger' }} fw-semibold">
+          {{ '%+d' % t.delta }}
+        </td>
+        <td>{{ t.balance_after }}</td>
+        <td><span class="badge bg-secondary">{{ t.source }}</span></td>
+        <td>
+          {{ t.reason }}
+          {% if t.related_key %}<code class="ms-1">{{ t.related_key }}</code>{% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="text-center text-muted">暂无记录</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{{ render_pagination(pagination, 'points.detail', {}) }}
+{% endblock %}

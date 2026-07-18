@@ -14,6 +14,7 @@ from .site import Article, SiteConfig
 from .teahouse import TeaPost, TeaPostLike
 from .user import User, UserFollow
 from .verification_code import VerificationCode
+from .points import KeyUsageLog, PointTransaction, RedemptionKey
 
 __all__ = [
     "User",
@@ -33,4 +34,7 @@ __all__ = [
     "TeaPost",
     "TeaPostLike",
     "VerificationCode",
+    "PointTransaction",
+    "RedemptionKey",
+    "KeyUsageLog",
 ]

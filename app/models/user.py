@@ -18,6 +18,9 @@ class User(db.Model, UserMixin):
     role = db.Column(db.String(20), server_default="user", nullable=False, index=True)
 
     avatar = db.Column(db.Text, nullable=True)  # 头像（base64 data URL），可空
+
+    # 点数（积分）余额
+    points = db.Column(db.Integer, nullable=False, server_default="0", default=0)
     bio = db.Column(db.Text, nullable=True)  # 个人简介
     location = db.Column(db.String(80), server_default="", nullable=True)  # 所在地区
     website = db.Column(db.String(200), server_default="", nullable=True)  # 个人网站

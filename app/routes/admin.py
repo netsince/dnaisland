@@ -1,4 +1,8 @@
 import json
+import secrets
+import string
+
+from datetime import date, datetime
 
 from flask import (
     Blueprint,
@@ -8,6 +12,8 @@ from flask import (
     render_template,
     request,
     url_for,
+    Response,
+    session,
 )
 from flask_login import current_user
 from sqlalchemy import func
@@ -23,8 +29,11 @@ from ..models import (
     CardLike,
     CardTag,
     Comment,
+    KeyUsageLog,
     Notification,
+    PointTransaction,
     Punishment,
+    RedemptionKey,
     Report,
     SiteConfig,
     TeaPost,
@@ -138,6 +147,25 @@ def user_edit(user_id):
         if new_status not in ("active", "admin_del", "user_del", "mourning"):
             new_status = u.status
         u.status = new_status
+        points_raw = request.form.get("points")
+        if points_raw not in (None, ""):
+            try:
+                new_points = int(points_raw)
+            except ValueError:
+                flash("点数必须是整数", "warning")
+            else:
+                if new_points != (u.points or 0):
+                    delta = new_points - (u.points or 0)
+                    u.points = new_points
+                    db.session.add(
+                        PointTransaction(
+                            user_id=u.id,
+                            delta=delta,
+                            balance_after=new_points,
+                            reason="管理员调整",
+                            source="admin",
+                        )
+                    )
         u.verified = request.form.get("verified") == "1"
         label = (request.form.get("verified_label") or "").strip()
         u.verified_label = label or None
@@ -166,6 +194,154 @@ def user_delete(user_id):
     db.session.commit()
     flash("用户已删除（账号已封禁，内容保留）", "success")
     return redirect(url_for("admin.users"))
+
+
+@admin_bp.route("/users/<int:user_id>/points")
+@super_admin_required
+def user_points(user_id):
+    u = db.session.get(User, user_id)
+    if not u:
+        abort(404)
+    page = request.args.get("page", 1, type=int)
+    query = PointTransaction.query.filter_by(user_id=u.id).order_by(
+        PointTransaction.created_at.desc()
+    )
+    pagination = query.paginate(page=page, per_page=20, error_out=False)
+    return render_template(
+        "admin/user_points.html",
+        u=u,
+        balance=u.points or 0,
+        pagination=pagination,
+        txs=pagination.items,
+    )
+
+
+# ---------------- 兑换码（Key）管理 ----------------
+_KEY_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # 去歧义字符
+
+
+def _parse_date(value):
+    value = (value or "").strip()
+    if not value:
+        return None
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
+def _generate_key_code(prefix):
+    body = "".join(secrets.choice(_KEY_ALPHABET) for _ in range(12))
+    grouped = "-".join(body[i : i + 4] for i in range(0, 12, 4))
+    return f"{prefix}-{grouped}" if prefix else grouped
+
+
+@admin_bp.route("/keys")
+@super_admin_required
+def keys_list():
+    tab = request.args.get("tab", "all")
+    page = request.args.get("page", 1, type=int)
+    query = RedemptionKey.query
+    if tab == "banned":
+        # 限制列表：已禁用或已达使用上限
+        query = query.filter(
+            db.or_(
+                RedemptionKey.active.is_(False),
+                RedemptionKey.used_count >= RedemptionKey.max_uses,
+            )
+        )
+    query = query.order_by(RedemptionKey.created_at.desc())
+    pagination = query.paginate(page=page, per_page=30, error_out=False)
+
+    usage_page = request.args.get("upage", 1, type=int)
+    usage = KeyUsageLog.query.order_by(KeyUsageLog.created_at.desc()).paginate(
+        page=usage_page, per_page=30, error_out=False
+    )
+    usage_logs = usage.items
+    user_ids = [l.user_id for l in usage_logs if l.user_id]
+    users_map = (
+        {u.id: u.username for u in User.query.filter(User.id.in_(user_ids)).all()}
+        if user_ids
+        else {}
+    )
+    for l in usage_logs:
+        l.username = users_map.get(l.user_id, f"UID{l.user_id}") if l.user_id else "—"
+
+    return render_template(
+        "admin/keys.html",
+        tab=tab,
+        pagination=pagination,
+        keys=pagination.items,
+        usage=usage_logs,
+        usage_pagination=usage,
+    )
+
+
+@admin_bp.route("/keys/generate", methods=["POST"])
+@super_admin_required
+def keys_generate():
+    try:
+        count = int(request.form.get("count", 1))
+    except ValueError:
+        count = 1
+    count = max(1, min(count, 500))
+    try:
+        points = int(request.form.get("points", 0))
+    except ValueError:
+        points = 0
+    try:
+        max_uses = int(request.form.get("max_uses", 1))
+    except ValueError:
+        max_uses = 1
+    try:
+        per_user_limit = int(request.form.get("per_user_limit", 1))
+    except ValueError:
+        per_user_limit = 1
+    prefix = (request.form.get("prefix") or "").strip().upper()
+    batch = (request.form.get("batch") or "").strip() or None
+    valid_from = _parse_date(request.form.get("valid_from"))
+    valid_to = _parse_date(request.form.get("valid_to"))
+
+    generated = []
+    for _ in range(count):
+        while True:
+            code = _generate_key_code(prefix)
+            if not RedemptionKey.query.filter_by(code=code).first():
+                break
+        db.session.add(
+            RedemptionKey(
+                code=code,
+                points=points,
+                max_uses=max_uses,
+                per_user_limit=per_user_limit,
+                valid_from=valid_from,
+                valid_to=valid_to,
+                batch=batch,
+                created_by=current_user.id,
+            )
+        )
+        generated.append(code)
+    db.session.commit()
+    flash(f"已生成 {len(generated)} 个兑换码", "success")
+    # 浏览器直接下载 txt，一行一个
+    content = "\n".join(generated) + "\n"
+    return Response(
+        content,
+        mimetype="text/plain",
+        headers={"Content-Disposition": "attachment; filename=redeem_keys.txt"},
+    )
+
+
+@admin_bp.route("/keys/<int:key_id>/toggle", methods=["POST"])
+@super_admin_required
+def key_toggle(key_id):
+    key = db.session.get(RedemptionKey, key_id)
+    if not key:
+        abort(404)
+    key.active = not key.active
+    db.session.commit()
+    flash("兑换码状态已更新", "success")
+    return redirect(url_for("admin.keys_list", tab=request.args.get("tab", "all")))
 
 
 @admin_bp.route("/users/<int:user_id>/punish", methods=["GET", "POST"])

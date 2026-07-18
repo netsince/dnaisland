@@ -1,0 +1,160 @@
+{% extends "admin/base.html" %}
+{% from "macros/pagination.html" import render_pagination %}
+
+{% block title %}兑换码管理 · DNAISLAND{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2 class="h4 mb-0">兑换码管理</h2>
+</div>
+
+{# ---------------- 生成表单 ---------------- #}
+<div class="card mb-4">
+  <div class="card-header">生成兑换码</div>
+  <div class="card-body">
+    <form method="post" action="{{ url_for('admin.keys_generate') }}" class="row g-3">
+      <div class="col-md-2">
+        <label class="form-label">数量</label>
+        <input type="number" class="form-control" name="count" value="10" min="1" max="500">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">点数</label>
+        <input type="number" class="form-control" name="points" value="100" min="0">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">最多使用次数</label>
+        <input type="number" class="form-control" name="max_uses" value="1" min="1">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">每人限用</label>
+        <input type="number" class="form-control" name="per_user_limit" value="1" min="1">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">有效期起</label>
+        <input type="date" class="form-control" name="valid_from">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">有效期止</label>
+        <input type="date" class="form-control" name="valid_to">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">前缀（可选）</label>
+        <input type="text" class="form-control" name="prefix" placeholder="如 DNA" maxlength="20">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">批次名（可选）</label>
+        <input type="text" class="form-control" name="batch" placeholder="如 活动2026" maxlength="40">
+      </div>
+      <div class="col-12">
+        <button class="btn btn-primary" type="submit">生成并下载 txt</button>
+        <span class="text-muted small ms-2">生成后浏览器将下载 txt（一行一个）</span>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ---------------- Tab 导航 ---------------- #}
+<ul class="nav nav-tabs mb-3">
+  <li class="nav-item">
+    <a class="nav-link {% if tab == 'all' %}active{% endif %}"
+       href="{{ url_for('admin.keys_list', tab='all') }}">全部 Key</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {% if tab == 'banned' %}active{% endif %}"
+       href="{{ url_for('admin.keys_list', tab='banned') }}">限制列表</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {% if tab == 'usage' %}active{% endif %}"
+       href="{{ url_for('admin.keys_list', tab='usage') }}">使用记录</a>
+  </li>
+</ul>
+
+{% if tab != 'usage' %}
+<div class="table-responsive">
+  <table class="table table-striped align-middle">
+    <thead>
+      <tr>
+        <th>兑换码</th>
+        <th>点数</th>
+        <th>使用</th>
+        <th>每人限</th>
+        <th>有效期</th>
+        <th>状态</th>
+        <th>操作</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for k in keys %}
+      <tr>
+        <td><code>{{ k.code }}</code></td>
+        <td>{{ k.points }}</td>
+        <td>{{ k.used_count }} / {{ k.max_uses }}</td>
+        <td>{{ k.per_user_limit }}</td>
+        <td>
+          {% if k.valid_from or k.valid_to %}
+            {{ k.valid_from or '—' }} ~ {{ k.valid_to or '—' }}
+          {% else %}长期{% endif %}
+        </td>
+        <td>
+          {% if k.active %}
+            <span class="badge bg-success">启用</span>
+          {% else %}
+            <span class="badge bg-secondary">禁用</span>
+          {% endif %}
+        </td>
+        <td>
+          <form method="post" action="{{ url_for('admin.key_toggle', key_id=k.id, tab=tab) }}" class="d-inline">
+            <button class="btn btn-sm btn-outline-{{ 'secondary' if k.active else 'success' }}">
+              {{ '禁用' if k.active else '启用' }}
+            </button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="text-center text-muted">暂无兑换码</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{{ render_pagination(pagination, 'admin.keys_list', {'tab': tab}) }}
+
+{% else %}
+<div class="table-responsive">
+  <table class="table table-striped align-middle">
+    <thead>
+      <tr>
+        <th>时间</th>
+        <th>兑换码</th>
+        <th>用户</th>
+        <th>获得点数</th>
+        <th>状态</th>
+        <th>原因</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for l in usage %}
+      <tr>
+        <td>{{ l.created_at.strftime('%Y-%m-%d %H:%M') if l.created_at else '' }}</td>
+        <td><code>{{ l.code }}</code></td>
+        <td><a href="{{ url_for('user.profile', username=l.username) }}">{{ l.username }}</a></td>
+        <td class="{{ 'text-success' if l.status == 'success' else 'text-danger' }}">
+          {{ l.points_gained if l.status == 'success' else '—' }}
+        </td>
+        <td>
+          {% if l.status == 'success' %}
+            <span class="badge bg-success">成功</span>
+          {% else %}
+            <span class="badge bg-danger">失败</span>
+          {% endif %}
+        </td>
+        <td class="text-muted">{{ l.note or '' }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="text-center text-muted">暂无使用记录</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{{ render_pagination(usage_pagination, 'admin.keys_list', {'tab': 'usage'}) }}
+{% endif %}
+{% endblock %}

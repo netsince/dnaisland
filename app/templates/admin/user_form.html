@@ -36,6 +36,12 @@
       <option value="mourning" {% if user and user.status == 'mourning' %}selected{% endif %}>纪念 (mourning)</option>
     </select>
   </div>
+  <div class="mb-3">
+    <label class="form-label">点数</label>
+    <input type="number" class="form-control" name="points"
+           value="{{ user.points if user and user.points is not none else 0 }}">
+    <div class="form-text">留空则不修改。修改将记入积分明细。</div>
+  </div>
   <div class="mb-3 form-check">
     <input type="checkbox" class="form-check-input" name="verified" id="verified"
            value="1" {% if user and user.verified %}checked{% endif %}>

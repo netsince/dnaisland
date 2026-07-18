@@ -1,0 +1,44 @@
+{% extends "points/base.html" %}
+
+{% block points_content %}
+<h2 class="h4 mb-3">兑换点数</h2>
+
+<div class="alert alert-info">
+  一次最多兑换 <strong>50</strong> 个兑换码；每分钟最多兑换 <strong>2</strong> 次；
+  连续多次兑换失败将临时禁用兑换 <strong>1</strong> 小时。
+</div>
+
+{% if status_info and status_info.locked %}
+<div class="alert alert-warning">
+  兑换功能已被临时限制，剩余 {{ status_info.remain_text }}。
+</div>
+{% endif %}
+
+<form method="post" action="{{ url_for('points.redeem') }}">
+  <div class="mb-3">
+    <label class="form-label">兑换码（一行一个）</label>
+    <textarea class="form-control font-monospace" name="keys" rows="10"
+              placeholder="每行输入一个兑换码，例如：&#10;DNA-XXXX-XXXX&#10;DNA-YYYY-YYYY"></textarea>
+  </div>
+  <button class="btn btn-primary" type="submit">兑换</button>
+</form>
+
+{% if results %}
+<h4 class="h5 mt-4">兑换结果</h4>
+<div class="table-responsive">
+  <table class="table align-middle">
+    <thead>
+      <tr><th>兑换码</th><th>结果</th></tr>
+    </thead>
+    <tbody>
+      {% for r in results %}
+      <tr>
+        <td><code>{{ r.code }}</code></td>
+        <td class="{{ 'text-success' if r.ok else 'text-danger' }}">{{ r.msg }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

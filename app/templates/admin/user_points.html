@@ -1,0 +1,54 @@
+{% extends "admin/base.html" %}
+{% from "macros/pagination.html" import render_pagination %}
+
+{% block title %}积分明细 · {{ u.username }}{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2 class="h4 mb-0">积分明细 · @{{ u.username }}</h2>
+  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin.users') }}">返回用户列表</a>
+</div>
+
+<div class="card text-center mb-4 border-0"
+     style="background:linear-gradient(135deg,#1f1f2e,#3a2740);color:#f3e9d2;">
+  <div class="card-body py-4">
+    <div class="text-uppercase small opacity-75 mb-1">当前点数</div>
+    <div class="display-4 fw-bold">{{ balance }}</div>
+  </div>
+</div>
+
+<h4 class="h5 mb-3">变化记录</h4>
+<div class="table-responsive">
+  <table class="table table-striped align-middle">
+    <thead>
+      <tr>
+        <th>时间</th>
+        <th>变化</th>
+        <th>余额</th>
+        <th>来源</th>
+        <th>说明</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in txs %}
+      <tr>
+        <td>{{ t.created_at.strftime('%Y-%m-%d %H:%M') if t.created_at else '' }}</td>
+        <td class="{{ 'text-success' if t.delta >= 0 else 'text-danger' }} fw-semibold">
+          {{ '%+d' % t.delta }}
+        </td>
+        <td>{{ t.balance_after }}</td>
+        <td><span class="badge bg-secondary">{{ t.source }}</span></td>
+        <td>
+          {{ t.reason }}
+          {% if t.related_key %}<code class="ms-1">{{ t.related_key }}</code>{% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="text-center text-muted">暂无记录</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{{ render_pagination(pagination, 'admin.user_points', {'user_id': u.id}) }}
+{% endblock %}
