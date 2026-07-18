@@ -18,7 +18,9 @@ from ..models import (
     Article,
     Card,
     CardDialogueStyle,
+    CardFavorite,
     CardImage,
+    CardLike,
     CardTag,
     Comment,
     Notification,
@@ -364,6 +366,9 @@ def card_delete(card_id):
     CardTag.query.filter_by(card_id=card.id).delete()
     CardDialogueStyle.query.filter_by(card_id=card.id).delete()
     CardImage.query.filter_by(card_id=card.id).delete()
+    Comment.query.filter_by(card_id=card.id).delete()
+    CardLike.query.filter_by(card_id=card.id).delete()
+    CardFavorite.query.filter_by(card_id=card.id).delete()
     db.session.delete(card)
     db.session.commit()
     flash("角色卡已删除", "success")
