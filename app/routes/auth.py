@@ -140,6 +140,15 @@ def login():
             or_(User.username == identifier, User.email == identifier)
         ).first()
 
+        if user is not None and user.is_locked:
+            if user.is_deleted:
+                flash("该账号已被管理员删除，无法登录。", "danger")
+            elif user.is_cancelled:
+                flash("该账号已注销，无法登录。", "danger")
+            else:
+                flash("该账号已被封禁，无法登录。", "danger")
+            return render_template("auth/login.html")
+
         if user is None or not user.check_password(password):
             flash("用户名/邮箱或密码错误", "danger")
             return render_template("auth/login.html")

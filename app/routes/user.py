@@ -107,6 +107,8 @@ def profile(username):
     return render_template(
         "user/profile.html",
         u=u,
+        deleted=u.is_deleted,
+        mourning=u.is_mourning,
         cards=attach_covers(pagination.items),
         pagination=pagination,
         args={"username": username},
@@ -315,11 +317,14 @@ def card_detail(card_id):
         .all()
     )
     # 屏蔽全部评论：被处罚用户的评论对他人不可见（本人与管理员可见）；
-    # 被审核拒绝（is_hidden）的评论同样对他人不可见
+    # 被审核拒绝（is_hidden）的评论同样对他人不可见。
+    # 「已删除」（admin_del）作者的评论对他人/本人均隐藏（管理员仍可见）。
     visible_comments = [
         c
         for c in comments
-        if (not c.is_hidden) and not (
+        if (not c.is_hidden)
+        and not (c.author and c.author.is_deleted and not is_admin)
+        and not (
             c.author
             and c.author.is_comments_hidden
             and not (current_user.is_authenticated and current_user.id == c.author.id)

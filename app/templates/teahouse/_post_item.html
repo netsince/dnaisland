@@ -6,7 +6,7 @@
      onclick="if(event.target.closest('a,button,form'))return; window.location.href='{{ url_for('teahouse.post_detail', post_id=post.id) }}'"{% endif %}>
   <div class="card-body py-3">
     {% if post.parent_id and root_id is not none and post.parent_id != root_id and visible %}
-    <div class="small text-muted mb-1">回复 @{{ post.parent.author.nickname }}</div>
+    <div class="small text-muted mb-1">回复 @{{ post.parent.author.display_name }}</div>
     {% endif %}
     <div class="d-flex align-items-center gap-2 mb-2">
       {% if post.author.avatar %}
@@ -14,9 +14,9 @@
            style="width:40px;height:40px;object-fit:cover;">
       {% else %}
       <div class="rounded-circle bg-secondary text-center text-light"
-           style="width:40px;height:40px;line-height:40px;">{{ post.author.nickname[:1] }}</div>
+           style="width:40px;height:40px;line-height:40px;">{{ post.author.display_name[:1] }}</div>
       {% endif %}
-      <a class="text-decoration-none text-reset fw-semibold" href="{{ url_for('user.profile', username=post.author.username) }}">{{ post.author.nickname }}</a>
+      <a class="text-decoration-none text-reset fw-semibold" href="{{ url_for('user.profile', username=post.author.username) }}">{{ post.author.display_name }}</a>
       <span class="text-muted small">@{{ post.author.username }}</span>
       {% if top %}<span class="badge bg-primary-subtle text-primary small">原帖</span>{% endif %}
       <span class="text-muted small ms-auto">{{ post.created_at.strftime('%Y-%m-%d %H:%M') if post.created_at else '' }}</span>
@@ -66,7 +66,7 @@
      onclick="if(event.target.closest('a,button,form'))return; window.location.href='{{ url_for('teahouse.post_detail', post_id=post.id) }}'">
   <div class="card-body py-3">
     {% if post.parent_id and post.parent_id != root_id and visible %}
-    <div class="small text-muted mb-1">回复 @{{ post.parent.author.nickname }}</div>
+    <div class="small text-muted mb-1">回复 @{{ post.parent.author.display_name }}</div>
     {% endif %}
     <div class="d-flex align-items-center gap-2 mb-2">
       {% if post.author.avatar %}
@@ -74,9 +74,9 @@
            style="width:40px;height:40px;object-fit:cover;">
       {% else %}
       <div class="rounded-circle bg-secondary text-center text-light"
-           style="width:40px;height:40px;line-height:40px;">{{ post.author.nickname[:1] }}</div>
+           style="width:40px;height:40px;line-height:40px;">{{ post.author.display_name[:1] }}</div>
       {% endif %}
-      <a class="text-decoration-none text-reset fw-semibold" href="{{ url_for('user.profile', username=post.author.username) }}">{{ post.author.nickname }}</a>
+      <a class="text-decoration-none text-reset fw-semibold" href="{{ url_for('user.profile', username=post.author.username) }}">{{ post.author.display_name }}</a>
       <span class="text-muted small">@{{ post.author.username }}</span>
       <span class="text-muted small ms-auto">{{ post.created_at.strftime('%Y-%m-%d %H:%M') if post.created_at else '' }}</span>
     </div>

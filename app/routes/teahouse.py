@@ -21,10 +21,17 @@ TEA_POST_MAX_LEN = 280
 
 
 def _visible_query(query, viewer):
-    """对 viewer 可见的帖子：未隐藏，或本人/超级管理员可见自己被隐藏的帖子。"""
+    """对 viewer 可见的帖子：未隐藏，或本人/超级管理员可见自己被隐藏的帖子。
+
+    非超级管理员额外隐藏「已删除」（admin_del）作者的帖子；但保留「已注销」
+    （user_del）与「纪念」（mourning）作者的帖子（其作者名显示对应占位昵称）。
+    """
+    if viewer.is_authenticated and viewer.is_super_admin:
+        return query
+    query = query.join(User, TeaPost.user_id == User.id).filter(
+        User.status != "admin_del"
+    )
     if viewer.is_authenticated:
-        if viewer.is_super_admin:
-            return query
         return query.filter(
             or_(TeaPost.is_hidden.is_(False), TeaPost.user_id == viewer.id)
         )

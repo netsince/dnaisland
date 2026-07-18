@@ -38,7 +38,11 @@ class Card(db.Model):
 
         q = (
             cls.query.join(User, cls.author_id == User.id)
-            .filter(cls.status == "approved", cls.is_hidden.is_(False))
+            .filter(
+                cls.status == "approved",
+                cls.is_hidden.is_(False),
+                User.status != "admin_del",
+            )
         )
         hidden_ids = (
             db.session.query(Punishment.user_id)

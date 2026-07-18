@@ -3,12 +3,33 @@
 {% from "macros/verified.html" import badge %}
 {% from "macros/cards.html" import card_grid, empty_state %}
 
-{% block title %}{{ u.nickname }} · DNAISLAND{% endblock %}
+{% block title %}{{ u.display_name }} · DNAISLAND{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
   <div class="col-12 col-lg-9">
-    {% if restricted %}
+    {% if mourning %}
+    {# 纪念横幅：配置了纪念横幅 URL 时整块可点击跳转，否则仅展示文案 #}
+    {% if site_cfg.memorial_banner_url %}
+    <a href="{{ site_cfg.memorial_banner_url }}" class="text-decoration-none">
+    {% endif %}
+      <div class="text-center mb-4 p-4 rounded-3 border-0"
+           style="background:linear-gradient(135deg,#1f1f2e,#3a2740);color:#f3e9d2;">
+        <div class="fs-5 fw-semibold">斯人虽远去，万古作星辰。</div>
+        <div class="opacity-75 mt-1">Ta已经离开了我们，请允许我们做出最后的道别。</div>
+      </div>
+    {% if site_cfg.memorial_banner_url %}
+    </a>
+    {% endif %}
+    {% endif %}
+
+    {% if deleted %}
+    {# 账号已被管理员删除：仅展示提示，不再暴露任何资料与内容 #}
+    <div class="alert alert-warning">
+      <h4 class="alert-heading">账号已被删除</h4>
+      <p class="mb-0">因相关问题，此账号已被管理员删除。</p>
+    </div>
+    {% elif restricted %}
     {# 他人访问被「禁止主页被访问」的用户：仅展示受限提示与处罚列表 #}
     <div class="alert alert-warning">
       <h4 class="alert-heading">该用户主页已被限制访问</h4>
@@ -31,11 +52,11 @@
           {% if u.avatar %}
           <img src="{{ u.avatar }}" alt="头像" class="dna-avatar" style="width:96px;height:96px;">
           {% else %}
-          <div class="dna-avatar-ph" style="width:96px;height:96px;font-size:2.4rem;">{{ u.nickname[:1] }}</div>
+          <div class="dna-avatar-ph" style="width:96px;height:96px;font-size:2.4rem;">{{ u.display_name[:1] }}</div>
           {% endif %}
           <div class="flex-grow-1">
             <h1 class="h4 mb-1">
-              {{ u.nickname }}{{ badge(u) }}
+              {{ u.display_name }}{{ badge(u) }}
               {% if u.role == 'super_admin' %}<span class="badge bg-danger align-middle ms-1">管理员</span>{% endif %}
             </h1>
             <div class="text-muted">@{{ u.username }}{% if is_self %} · <span class="dna-chip">这是你</span>{% endif %}</div>

@@ -132,7 +132,10 @@ def user_edit(user_id):
         u.role = request.form.get("role") or u.role
         if u.role not in ("user", "super_admin"):
             u.role = "user"
-        u.status = request.form.get("status") or u.status
+        new_status = request.form.get("status") or u.status
+        if new_status not in ("active", "admin_del", "user_del", "mourning"):
+            new_status = u.status
+        u.status = new_status
         u.verified = request.form.get("verified") == "1"
         label = (request.form.get("verified_label") or "").strip()
         u.verified_label = label or None
@@ -154,9 +157,12 @@ def user_delete(user_id):
     if u.id == current_user.id:
         flash("不能删除当前登录的账号", "danger")
         return redirect(url_for("admin.users"))
-    db.session.delete(u)
+    # 软删除：保留账号与其内容，仅将状态置为 admin_del。
+    # 这样作者外键（cards/teahouse/comments 等的 author_id）依旧有效，
+    # 其角色卡不再对外展示，茶馆与评论显示为「已删除用户」。
+    u.status = "admin_del"
     db.session.commit()
-    flash("用户已删除", "success")
+    flash("用户已删除（账号已封禁，内容保留）", "success")
     return redirect(url_for("admin.users"))
 
 
@@ -964,6 +970,11 @@ def system_config():
 
         # 联系客服邮箱（mailto）
         cfg.contact_email = (request.form.get("contact_email") or "").strip() or None
+
+        # 纪念横幅跳转 URL（mourning 状态用户主页横幅可点击跳转）
+        cfg.memorial_banner_url = (
+            request.form.get("memorial_banner_url") or ""
+        ).strip() or None
 
         # 注册邮箱白名单
         cfg.email_whitelist_enabled = request.form.get("email_whitelist_enabled") == "1"

@@ -34,10 +34,10 @@
           <img src="{{ ou.avatar }}" alt="头像" class="dna-avatar" style="width:48px;height:48px;">
         </a>
         {% else %}
-        <a href="{{ url_for('user.profile', username=ou.username) }}" class="dna-avatar-ph" style="width:48px;height:48px;font-size:1.2rem;">{{ ou.nickname[:1] }}</a>
+        <a href="{{ url_for('user.profile', username=ou.username) }}" class="dna-avatar-ph" style="width:48px;height:48px;font-size:1.2rem;">{{ ou.display_name[:1] }}</a>
         {% endif %}
         <div class="flex-grow-1 min-w-0">
-          <a class="fw-bold text-light text-decoration-none" href="{{ url_for('user.profile', username=ou.username) }}">{{ ou.nickname }}{{ badge(ou) }}</a>
+          <a class="fw-bold text-light text-decoration-none" href="{{ url_for('user.profile', username=ou.username) }}">{{ ou.display_name }}{{ badge(ou) }}</a>
           <div class="text-muted small">@{{ ou.username }}</div>
           {% if ou.bio %}<div class="small text-muted mt-1 text-truncate">{{ ou.bio }}</div>{% endif %}
         </div>

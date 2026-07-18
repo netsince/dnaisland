@@ -22,6 +22,7 @@ def default_public_config():
         "agreements": {"privacy_policy_url": "", "tos_url": ""},
         "email_whitelist": {"enabled": False, "suffixes": []},
         "contact_email": "",
+        "memorial_banner_url": "",
     }
 
 
@@ -59,6 +60,7 @@ def public_config():
             "suffixes": cfg.email_suffixes_list(),
         },
         "contact_email": cfg.contact_email or "",
+        "memorial_banner_url": cfg.memorial_banner_url or "",
     }
 
 

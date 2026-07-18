@@ -32,6 +32,35 @@ class User(db.Model, UserMixin):
         return self.role == "super_admin"
 
     @property
+    def is_deleted(self) -> bool:
+        """账号已被管理员删除（软删除，status=admin_del）。"""
+        return self.status == "admin_del"
+
+    @property
+    def is_cancelled(self) -> bool:
+        """账号已注销（status=user_del）。角色卡/茶馆/评论保留，作者名显示「已注销用户」。"""
+        return self.status == "user_del"
+
+    @property
+    def is_mourning(self) -> bool:
+        """纪念状态（status=mourning）。禁止写操作与登录，主页挂纪念横幅。"""
+        return self.status == "mourning"
+
+    @property
+    def is_locked(self) -> bool:
+        """被封禁/注销/进入纪念：禁止登录与一切写操作（登录后自动登出）。"""
+        return self.status in ("admin_del", "user_del", "mourning")
+
+    @property
+    def display_name(self) -> str:
+        """对外展示的昵称：已删除→「已删除用户」，已注销→「已注销用户」。"""
+        if self.is_deleted:
+            return "已删除用户"
+        if self.is_cancelled:
+            return "已注销用户"
+        return self.nickname
+
+    @property
     def is_verified(self) -> bool:
         """平台认证用户：由管理员授予的认证标记。"""
         return bool(self.verified)

@@ -27,7 +27,7 @@
             <h1 class="h3 mb-1">{{ card.name }}</h1>
             <div class="text-muted small mb-2">
               {{ card.gender or '未知' }}{% if author %} · 作者
-              <a href="{{ url_for('user.profile', username=author.username) }}">{{ author.nickname }}</a>{{ badge(author) }}{% endif %}
+              <a href="{{ url_for('user.profile', username=author.username) }}">{{ author.display_name }}</a>{{ badge(author) }}{% endif %}
               · 浏览 {{ card.view_count }}
               {% if card.created_at %}· 发布于 {{ card.created_at.strftime('%Y-%m-%d') }}{% endif %}
             </div>
@@ -124,7 +124,7 @@
         {% for cm in comments %}
         <div class="mb-3">
           <div class="small text-muted mb-1">
-            <a class="text-decoration-none" href="{{ url_for('user.profile', username=cm.author.username) }}">{{ cm.author.nickname }}</a>{{ badge(cm.author) }}
+            <a class="text-decoration-none" href="{{ url_for('user.profile', username=cm.author.username) }}">{{ cm.author.display_name }}</a>{{ badge(cm.author) }}
             · {{ cm.created_at.strftime('%Y-%m-%d %H:%M') if cm.created_at else '' }}
             {% if current_user.is_authenticated and cm.author.id != current_user.id %}
             · <a class="text-decoration-none text-danger" href="{{ url_for('user.report', type='comment', id=cm.id) }}">举报</a>

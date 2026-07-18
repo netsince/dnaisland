@@ -29,8 +29,12 @@
   </div>
   <div class="mb-3">
     <label class="form-label">状态</label>
-    <input type="text" class="form-control" name="status"
-           value="{{ user.status if user else 'active' }}">
+    <select class="form-select" name="status">
+      <option value="active" {% if user and user.status == 'active' %}selected{% endif %}>正常 (active)</option>
+      <option value="admin_del" {% if user and user.status == 'admin_del' %}selected{% endif %}>已删除 (admin_del)</option>
+      <option value="user_del" {% if user and user.status == 'user_del' %}selected{% endif %}>已注销 (user_del)</option>
+      <option value="mourning" {% if user and user.status == 'mourning' %}selected{% endif %}>纪念 (mourning)</option>
+    </select>
   </div>
   <div class="mb-3 form-check">
     <input type="checkbox" class="form-check-input" name="verified" id="verified"

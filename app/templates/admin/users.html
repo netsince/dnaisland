@@ -63,7 +63,17 @@
             <span class="badge bg-secondary">user</span>
           {% endif %}
         </td>
-        <td>{{ u.status }}</td>
+        <td>
+          {% if u.status == 'admin_del' %}
+            <span class="badge bg-dark">已删除</span>
+          {% elif u.status == 'user_del' %}
+            <span class="badge bg-secondary">已注销</span>
+          {% elif u.status == 'mourning' %}
+            <span class="badge bg-info text-dark">纪念</span>
+          {% else %}
+            {{ u.status }}
+          {% endif %}
+        </td>
         <td>
           <a class="btn btn-sm btn-outline-info" href="{{ url_for('admin.cards', author=u.username) }}">查看他发布的角色</a>
           <a class="btn btn-sm btn-outline-primary" href="{{ url_for('admin.user_edit', user_id=u.id) }}">编辑</a>

@@ -1,8 +1,8 @@
 import os
 
 from dotenv import load_dotenv
-from flask import Flask, jsonify, request, url_for
-from flask_login import current_user
+from flask import Flask, jsonify, redirect, request, url_for
+from flask_login import current_user, logout_user
 from markupsafe import Markup
 
 from .config import config
@@ -185,5 +185,18 @@ def create_app(config_object=None):
                 503,
             )
         return render_template("shutdown.html", message=cfg.shutdown_message or ""), 503
+
+    # ---------------- 被封禁 / 注销 / 纪念账号：自动登出 ----------------
+    # 这类账号（status 为 admin_del / user_del / mourning）禁止登录与一切写操作；
+    # 若其处于登录态（如被管理员置为上述状态），在此强制登出并跳回首页。
+    @app.before_request
+    def enforce_user_lock():
+        u = current_user
+        if not u.is_authenticated:
+            return
+        if u.is_locked:
+            logout_user()
+            flash("该账号已被封禁或注销，无法继续使用。", "warning")
+            return redirect(url_for("main.index"))
 
     return app
