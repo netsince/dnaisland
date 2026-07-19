@@ -359,6 +359,7 @@
         });
       }
       bindFade(document);
+      window.bindFade = bindFade;   // 供 AJAX 动态插入的图片复用模糊→清晰动画
     })();
   </script>
   {% block scripts %}{% endblock %}

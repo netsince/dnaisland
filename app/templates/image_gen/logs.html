@@ -4,17 +4,22 @@
 {% block title %}生图记录 · DNAISLAND{% endblock %}
 
 {% block head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/glightbox@3.3.0/dist/css/glightbox.min.css">
 <style>
   .mg-wrap{max-width:1200px;margin:0 auto}
   .masonry{column-count:3;column-gap:16px}
   .mg-item{display:block;break-inside:avoid;margin-bottom:16px;border-radius:14px;overflow:hidden;
            position:relative;background:#1f1f2e;text-decoration:none}
+  .mg-item.dna-img-fade{aspect-ratio:auto;background:#0b0b12}
+  .mg-item.dna-img-fade .dna-img-fade__img{height:auto}
+  .mg-item .glightbox{display:block}
   .mg-item img{width:100%;display:block}
   .mg-meta{position:absolute;left:0;right:0;bottom:0;padding:10px 12px;
            background:linear-gradient(transparent,rgba(0,0,0,.72));color:#fff;font-size:12px;
            display:flex;flex-direction:column;gap:2px}
   .mg-meta .row1{display:flex;justify-content:space-between;align-items:center;gap:8px}
   .dl-btn{cursor:pointer;background:rgba(255,255,255,.16);padding:3px 9px;border-radius:8px;white-space:nowrap}
+  .mg-detail{color:#fff;text-decoration:underline;text-underline-offset:2px}
   @media (max-width: 992px){ .masonry{column-count:2} }
   @media (max-width: 576px){ .masonry{column-count:1} }
 </style>
@@ -32,16 +37,19 @@
     {% for l in logs %}
       {% set imgs = l.image_list() %}
       {% if imgs %}
-      <a class="mg-item" href="{{ url_for('image_gen.log_detail', log_id=l.id) }}">
-        <img src="{{ imgs[0] }}" alt="生成图" loading="lazy">
+      <div class="mg-item dna-img-fade">
+        <a class="glightbox" href="{{ imgs[0] }}" data-type="image" data-gallery="genlogs">
+          <img src="{{ imgs[0] }}" alt="生成图" class="dna-img-fade__img" loading="lazy">
+        </a>
         <div class="mg-meta">
           <div class="row1">
             <span>{{ l.model_name }} · {{ l.size or 'auto' }}</span>
             <span class="dl-btn js-dlpng" data-src="{{ imgs[0] }}" data-name="gen_{{ l.id }}.png" onclick="event.stopPropagation()">↓ PNG</span>
           </div>
-          <div>{{ l.count }} 张请求 · 消耗 {{ l.points_spent }} 点 · {{ l.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
+          <div>{{ l.count }} 张请求 · 消耗 {{ l.points_spent }} 点 · {{ l.created_at.strftime('%Y-%m-%d %H:%M') }}
+            · <a class="mg-detail" href="{{ url_for('image_gen.log_detail', log_id=l.id) }}">详情</a></div>
         </div>
-      </a>
+      </div>
       {% endif %}
     {% endfor %}
   </div>
@@ -50,4 +58,15 @@
   <p class="text-muted">还没有生图记录。</p>
   {% endif %}
 </div>
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/glightbox@3.3.0/dist/js/glightbox.min.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    if (window.GLightbox) {
+      GLightbox({ selector: '.glightbox', touchNavigation: true, loop: false });
+    }
+  });
+</script>
+{% endblock %}
 {% endblock %}

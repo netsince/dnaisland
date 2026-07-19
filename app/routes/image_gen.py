@@ -55,9 +55,12 @@ def workbench():
         .limit(8)
         .all()
     )
+    # 默认选中每图积分最低的可用模型
+    default_model = min(models, key=lambda m: m.points_per_image or 0) if models else None
     return render_template(
         "image_gen/workbench.html",
         models=models,
+        default_model=default_model,
         recent=recent,
         aspects=VALID_ASPECTS,
         max_refs=MAX_REFERENCES,

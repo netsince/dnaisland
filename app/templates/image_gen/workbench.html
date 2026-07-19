@@ -31,6 +31,7 @@
   .ig-chip.on{color:#fff;border-color:transparent;background:linear-gradient(90deg,#a855f7,#ec4899)}
   .ig-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
   .ig-card{aspect-ratio:1;border-radius:14px;overflow:hidden;position:relative;background:linear-gradient(135deg,#26263a,#3a2740);display:block}
+  .ig-card.dna-img-fade{aspect-ratio:1;background:#000}
   .ig-card img{width:100%;height:100%;object-fit:cover}
   .ig-card .tag{position:absolute;left:8px;bottom:8px;font-size:11px;background:rgba(0,0,0,.45);padding:3px 8px;border-radius:8px;color:#fff}
   .ig-card .dl{position:absolute;right:8px;top:8px;background:rgba(0,0,0,.45);width:28px;height:28px;border-radius:8px;
@@ -93,7 +94,7 @@
           <select name="model" required>
             <option value="">请选择模型</option>
             {% for m in models %}
-            <option value="{{ m.id }}">{{ m.display_name }}（{{ m.points_per_image }} 点/张）</option>
+            <option value="{{ m.id }}" {{ 'selected' if default_model and m.id == default_model.id else '' }}>{{ m.display_name }}（{{ m.points_per_image }} 点/张）</option>
             {% else %}
             <option value="" disabled>暂无可用模型（联系管理员配置）</option>
             {% endfor %}
@@ -148,8 +149,8 @@
       {% for l in recent %}
         {% set img = l.image_list()[0] if l.image_list() else None %}
         {% if img %}
-        <a class="ig-card" href="{{ url_for('image_gen.log_detail', log_id=l.id) }}">
-          <img src="{{ img }}" alt="生成图">
+        <a class="ig-card dna-img-fade" href="{{ url_for('image_gen.log_detail', log_id=l.id) }}">
+          <img src="{{ img }}" alt="生成图" class="dna-img-fade__img">
           <span class="tag">{{ l.size or 'auto' }} · {{ l.model_name }}</span>
           <span class="dl js-dlpng" data-src="{{ img }}" data-name="gen_{{ l.id }}.png" title="下载 PNG">↓</span>
         </a>
@@ -228,12 +229,13 @@
             if (pointsEl) pointsEl.innerHTML = '点数 <b>' + data.balance + '</b>';
             (data.images || []).forEach(function (img) {
               var a = document.createElement('a');
-              a.className = 'ig-card';
+              a.className = 'ig-card dna-img-fade';
               a.href = '/image-gen/logs/' + data.log_id;
-              a.innerHTML = '<img src="' + img + '" alt="生成图">' +
+              a.innerHTML = '<img src="' + img + '" alt="生成图" class="dna-img-fade__img">' +
                 '<span class="tag">' + (data.size || 'auto') + ' · ' + data.model_name + '</span>' +
                 '<span class="dl js-dlpng" data-src="' + img + '" data-name="gen_' + data.log_id + '.png" title="下载 PNG">↓</span>';
               grid.insertBefore(a, grid.firstChild);
+              if (window.bindFade) window.bindFade(a);   // 新插入图片触发模糊→清晰动画
             });
             promptEl.value = '';
             var empty = grid.querySelector('.ig-empty');
