@@ -5,60 +5,101 @@
 {% block head %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/glightbox@3.3.0/dist/css/glightbox.min.css">
 <style>
+  .gd-wrap{max-width:960px;margin:0 auto}
+  .gd-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:22px;flex-wrap:wrap}
+  .gd-head h2{font-size:22px;font-weight:700;margin:0;
+              background:linear-gradient(90deg,#a855f7,#ec4899);
+              -webkit-background-clip:text;background-clip:text;color:transparent}
+
+  .gd-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:18px}
+  .gd-stat{background:#171722;border:1px solid #26263a;border-radius:14px;padding:13px 14px}
+  .gd-stat .k{font-size:12px;color:#9a9ab0;margin-bottom:5px}
+  .gd-stat .v{font-size:15px;color:#ECECF3;font-weight:600;word-break:break-word}
+  .gd-stat .v small{font-weight:400;color:#9a9ab0;font-size:11px}
+
+  .badge-ok{background:rgba(63,185,80,.16);color:#7ee787;border:1px solid rgba(63,185,80,.4)}
+  .badge-part{background:rgba(210,153,34,.16);color:#f0c040;border:1px solid rgba(210,153,34,.4)}
+  .badge-fail{background:rgba(248,81,73,.16);color:#ff7b72;border:1px solid rgba(248,81,73,.4)}
+  .badge-def{background:#26263a;color:#cfcfe0;border:1px solid #33334a}
+
+  .gd-prompt{background:#0e0e16;border:1px solid #26263a;border-radius:14px;padding:14px 16px;
+             white-space:pre-wrap;font-size:.9rem;color:#d7d7e6;line-height:1.6;margin:0}
+  .gd-sec{font-size:14px;color:#cfcfe0;margin:26px 0 14px;font-weight:600;
+          display:flex;align-items:center;gap:8px}
+  .gd-sec::before{content:"";width:4px;height:16px;border-radius:3px;
+                  background:linear-gradient(180deg,#a855f7,#ec4899)}
+
+  .gd-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
+  .gen-card{background:#171722;border:1px solid #26263a;border-radius:16px;overflow:hidden;
+            transition:transform .3s,box-shadow .3s,border-color .3s}
+  .gen-card:hover{transform:translateY(-4px);border-color:#a855f7;box-shadow:0 14px 34px rgba(0,0,0,.45)}
+  .gen-card__media{position:relative;background:#111;cursor:zoom-in}
   .gen-detail-fade{aspect-ratio:auto;background:#111;border-radius:0}
-  .gen-detail-fade .dna-img-fade__img{height:auto}
+  .gen-detail-fade .dna-img-fade__img{height:auto;transition:transform .5s cubic-bezier(.2,.7,.3,1)}
+  .gen-card:hover .dna-img-fade__img{transform:scale(1.04)}
+  .gen-card__bar{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px}
+  .gen-idx{font-size:12px;color:#9a9ab0}
+  .gen-dl{cursor:pointer;background:linear-gradient(90deg,#a855f7,#ec4899);border:none;color:#fff;
+          font-size:13px;font-weight:600;padding:7px 14px;border-radius:10px;transition:filter .2s}
+  .gen-dl:hover{filter:brightness(1.1)}
+
+  .gd-empty{text-align:center;color:#9a9ab0;padding:60px 0}
+  .gd-empty .big{font-size:40px;display:block;margin-bottom:10px;opacity:.6}
+  @media (max-width:576px){ .gd-head h2{font-size:19px} }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container py-4" style="max-width: 960px;">
-  <div class="d-flex align-items-center justify-content-between mb-3">
-    <h2 class="h4 mb-0">生图详情</h2>
-    <a class="btn btn-sm btn-outline-light" href="{{ url_for('image_gen.logs') }}">返回记录</a>
+<div class="container py-4 gd-wrap">
+  <div class="gd-head">
+    <h2>生图详情</h2>
+    <a class="btn btn-sm btn-outline-light" href="{{ url_for('image_gen.logs') }}">← 返回记录</a>
   </div>
 
-  <div class="card mb-4">
-    <div class="card-body">
-      <div class="row g-2 small text-muted">
-        <div class="col-6">模型：<span class="text-light">{{ log.model_name }}</span></div>
-        <div class="col-6">状态：<span class="text-light">{{ '成功' if log.status == 'success' else ('部分成功' if log.status == 'partial' else '失败') }}</span></div>
-        <div class="col-6">宽高比/尺寸：<span class="text-light">{{ log.size or 'auto' }}</span></div>
-        <div class="col-6">请求张数：<span class="text-light">{{ log.count }}</span></div>
-        <div class="col-6">参考图：<span class="text-light">{{ log.references_count }} 张</span></div>
-        <div class="col-6">消耗点数：<span class="text-light">{{ log.points_spent }}</span></div>
-        <div class="col-12">时间：<span class="text-light">{{ log.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</span></div>
-      </div>
-      <hr>
-      <div class="mb-2 fw-semibold">提示词</div>
-      <pre class="bg-dark text-light p-3 rounded" style="white-space: pre-wrap; font-size: .9rem;">{{ log.prompt }}</pre>
-      {% if log.status == 'failed' and log.error %}
-      <div class="alert alert-danger mt-3 mb-0">{{ log.error }}</div>
-      {% endif %}
-    </div>
+  {% set st = log.status %}
+  <div class="gd-stats">
+    <div class="gd-stat"><div class="k">模型</div><div class="v">{{ log.model_name }}</div></div>
+    <div class="gd-stat"><div class="k">状态</div><div class="v">
+      {% if st == 'success' %}<span class="badge badge-ok">成功</span>
+      {% elif st == 'partial' %}<span class="badge badge-part">部分成功</span>
+      {% elif st == 'failed' %}<span class="badge badge-fail">失败</span>
+      {% else %}<span class="badge badge-def">{{ st or '未知' }}</span>{% endif %}
+    </div></div>
+    <div class="gd-stat"><div class="k">宽高比 / 尺寸</div><div class="v">{{ log.size or 'auto' }}</div></div>
+    <div class="gd-stat"><div class="k">请求张数</div><div class="v">{{ log.count }}</div></div>
+    <div class="gd-stat"><div class="k">参考图</div><div class="v">{{ log.references_count }} 张</div></div>
+    <div class="gd-stat"><div class="k">消耗点数</div><div class="v">{{ log.points_spent }} <small>点</small></div></div>
+    <div class="gd-stat" style="grid-column:1/-1"><div class="k">生成时间</div>
+      <div class="v">{{ log.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</div></div>
   </div>
 
-  <h3 class="h6 text-muted mb-2">生成结果（{{ log.image_list()|length }} 张）</h3>
+  <div class="gd-sec">提示词</div>
+  <pre class="gd-prompt">{{ log.prompt }}</pre>
+  {% if st == 'failed' and log.error %}
+  <div class="alert alert-danger mt-3 mb-0">{{ log.error }}</div>
+  {% endif %}
+
+  <div class="gd-sec">生成结果（{{ log.image_list()|length }} 张）</div>
   {% set imgs = log.image_list() %}
   {% if imgs %}
-  <div class="row g-3">
+  <div class="gd-grid">
     {% for img in imgs %}
-    <div class="col-6 col-md-4">
-      <div class="card bg-transparent">
-        <div class="dna-img-fade gen-detail-fade">
-          <a class="glightbox" href="{{ img }}" data-type="image" data-gallery="gendetail">
-            <img src="{{ img }}" class="dna-img-fade__img" alt="生成图 {{ loop.index }}" style="object-fit: contain; background:#111;">
-          </a>
-        </div>
-        <div class="card-body p-2">
-          <button type="button" class="btn btn-sm btn-outline-light w-100 js-dlpng"
-                  data-src="{{ img }}" data-name="gen_{{ log.id }}_{{ loop.index }}.png">下载 PNG</button>
-        </div>
+    <div class="gen-card">
+      <div class="gen-card__media dna-img-fade gen-detail-fade">
+        <a class="glightbox" href="{{ img }}" data-type="image" data-gallery="gendetail">
+          <img src="{{ img }}" class="dna-img-fade__img" alt="生成图 {{ loop.index }}" style="object-fit:contain;background:#111;">
+        </a>
+      </div>
+      <div class="gen-card__bar">
+        <span class="gen-idx">#{{ loop.index }}</span>
+        <button type="button" class="gen-dl js-dlpng"
+                data-src="{{ img }}" data-name="gen_{{ log.id }}_{{ loop.index }}.png">↓ 下载 PNG</button>
       </div>
     </div>
     {% endfor %}
   </div>
-  {% elif log.status != 'failed' %}
-  <p class="text-muted">本次未产出图像。</p>
+  {% elif st != 'failed' %}
+  <div class="gd-empty"><span class="big">🖼️</span>本次未产出图像。</div>
   {% endif %}
 </div>
 

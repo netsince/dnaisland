@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "macros/pagination.html" import render_pagination %}
 
 {% block title %}生图工作台 · DNAISLAND{% endblock %}
 
@@ -37,6 +38,10 @@
   .ig-card .dl{position:absolute;right:8px;top:8px;background:rgba(0,0,0,.45);width:28px;height:28px;border-radius:8px;
                display:grid;place-items:center;font-size:13px;color:#fff;text-decoration:none}
   .ig-empty{color:#9a9ab0;text-align:center;padding:60px 0}
+  .ig-page{margin-top:24px}
+  .ig-page .pagination{--bs-pagination-bg:transparent;--bs-pagination-border-color:#2a2a3a;
+    --bs-pagination-color:#cfcfe0;--bs-pagination-active-bg:#a855f7;--bs-pagination-active-border-color:#a855f7;
+    --bs-pagination-active-color:#fff;--bs-pagination-hover-bg:#26263a;--bs-pagination-hover-color:#fff}
   .ig-status{font-size:13px;color:#9a9ab0}
   .ig-spin{display:inline-block;width:12px;height:12px;border:2px solid #9a9ab0;
            border-top-color:transparent;border-radius:50%;animation:igspin .7s linear infinite;
@@ -158,6 +163,9 @@
       {% else %}
         <div class="ig-empty">还没有生成记录，左侧填写提示词开始创作吧。</div>
       {% endfor %}
+    </div>
+    <div class="ig-page">
+      {{ render_pagination(pagination, 'image_gen.workbench', {}) }}
     </div>
   </main>
 </div>

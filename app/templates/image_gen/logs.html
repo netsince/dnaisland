@@ -7,29 +7,63 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/glightbox@3.3.0/dist/css/glightbox.min.css">
 <style>
   .mg-wrap{max-width:1200px;margin:0 auto}
-  .masonry{column-count:3;column-gap:16px}
-  .mg-item{display:block;break-inside:avoid;margin-bottom:16px;border-radius:14px;overflow:hidden;
-           position:relative;background:#1f1f2e;text-decoration:none}
+  .mg-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;
+           margin-bottom:22px;flex-wrap:wrap}
+  .mg-head h2{font-size:22px;font-weight:700;margin:0;
+              background:linear-gradient(90deg,#a855f7,#ec4899);
+              -webkit-background-clip:text;background-clip:text;color:transparent}
+  .mg-head .sub{font-size:13px;color:#9a9ab0;margin-top:4px}
+  .mg-head .pill{font-size:12px;color:#cfcfe0;background:#1f1f2e;border:1px solid #2a2a3a;
+                 padding:6px 12px;border-radius:20px;white-space:nowrap}
+
+  .masonry{column-count:3;column-gap:18px}
+  .mg-item{position:relative;break-inside:avoid;margin-bottom:18px;border-radius:16px;overflow:hidden;
+           background:#1f1f2e;border:1px solid #26263a;
+           transition:transform .3s cubic-bezier(.2,.7,.3,1),box-shadow .3s,border-color .3s;
+           cursor:zoom-in}
+  .mg-item:hover{transform:translateY(-4px);border-color:#a855f7;
+                 box-shadow:0 14px 34px rgba(0,0,0,.45)}
   .mg-item.dna-img-fade{aspect-ratio:auto;background:#0b0b12}
-  .mg-item.dna-img-fade .dna-img-fade__img{height:auto}
+  .mg-item.dna-img-fade .dna-img-fade__img{height:auto;transition:transform .5s cubic-bezier(.2,.7,.3,1)}
+  .mg-item:hover .dna-img-fade__img{transform:scale(1.04)}
   .mg-item .glightbox{display:block}
   .mg-item img{width:100%;display:block}
-  .mg-meta{position:absolute;left:0;right:0;bottom:0;padding:10px 12px;
-           background:linear-gradient(transparent,rgba(0,0,0,.72));color:#fff;font-size:12px;
-           display:flex;flex-direction:column;gap:2px}
+  .mg-meta{position:absolute;left:0;right:0;bottom:0;padding:28px 13px 12px;
+           background:linear-gradient(transparent,rgba(0,0,0,.82));color:#fff;font-size:12px;
+           display:flex;flex-direction:column;gap:3px;pointer-events:none;
+           opacity:.92;transition:opacity .3s}
+  .mg-item:hover .mg-meta{opacity:1}
   .mg-meta .row1{display:flex;justify-content:space-between;align-items:center;gap:8px}
-  .dl-btn{cursor:pointer;background:rgba(255,255,255,.16);padding:3px 9px;border-radius:8px;white-space:nowrap}
-  .mg-detail{color:#fff;text-decoration:underline;text-underline-offset:2px}
+  .mg-meta .title{font-weight:600;font-size:13px;display:flex;align-items:center;gap:6px}
+  .mg-status{font-size:10px;padding:2px 7px;border-radius:8px;font-weight:600;white-space:nowrap}
+  .mg-status.ok{background:rgba(63,185,80,.18);color:#7ee787}
+  .mg-status.part{background:rgba(210,153,34,.18);color:#f0c040}
+  .mg-status.fail{background:rgba(248,81,73,.18);color:#ff7b72}
+  .mg-meta .info{color:#d7d7e6}
+  .mg-meta a,.mg-meta .dl-btn{pointer-events:auto}
+  .dl-btn{cursor:pointer;background:rgba(255,255,255,.16);padding:3px 10px;border-radius:9px;
+          white-space:nowrap;transition:background .2s}
+  .dl-btn:hover{background:rgba(255,255,255,.3)}
+  .mg-detail{color:#fff;text-decoration:underline;text-underline-offset:2px;margin-left:6px}
+  .mg-empty{text-align:center;color:#9a9ab0;padding:80px 0;font-size:15px}
+  .mg-empty .big{font-size:40px;display:block;margin-bottom:10px;opacity:.6}
+
   @media (max-width: 992px){ .masonry{column-count:2} }
-  @media (max-width: 576px){ .masonry{column-count:1} }
+  @media (max-width: 576px){ .masonry{column-count:1} .mg-head h2{font-size:19px} }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container py-4 mg-wrap">
-  <div class="d-flex align-items-center justify-content-between mb-3">
-    <h2 class="h4 mb-0">我的生图记录</h2>
-    <a class="btn btn-sm btn-primary" href="{{ url_for('image_gen.workbench') }}">去生图</a>
+  <div class="mg-head">
+    <div>
+      <h2>我的生图记录</h2>
+      <div class="sub">点击任意图片可放大查看，悬停可下载 PNG 或查看详情</div>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      {% if pagination %}<span class="pill">共 {{ pagination.total }} 条</span>{% endif %}
+      <a class="btn btn-sm btn-primary" href="{{ url_for('image_gen.workbench') }}">去生图</a>
+    </div>
   </div>
 
   {% if logs %}
@@ -43,11 +77,16 @@
         </a>
         <div class="mg-meta">
           <div class="row1">
-            <span>{{ l.model_name }} · {{ l.size or 'auto' }}</span>
-            <span class="dl-btn js-dlpng" data-src="{{ imgs[0] }}" data-name="gen_{{ l.id }}.png" onclick="event.stopPropagation()">↓ PNG</span>
+            <span class="title">{{ l.model_name }}
+              {% if l.status == 'success' %}<span class="mg-status ok">成功</span>
+              {% elif l.status == 'partial' %}<span class="mg-status part">部分</span>
+              {% elif l.status == 'failed' %}<span class="mg-status fail">失败</span>{% endif %}
+            </span>
+            <span class="dl-btn js-dlpng" data-src="{{ imgs[0] }}" data-name="gen_{{ l.id }}.png" onclick="event.stopPropagation();event.preventDefault()">↓ PNG</span>
           </div>
-          <div>{{ l.count }} 张请求 · 消耗 {{ l.points_spent }} 点 · {{ l.created_at.strftime('%Y-%m-%d %H:%M') }}
-            · <a class="mg-detail" href="{{ url_for('image_gen.log_detail', log_id=l.id) }}">详情</a></div>
+          <div class="info">{{ l.size or 'auto' }} · {{ l.count }} 张请求 · 消耗 {{ l.points_spent }} 点</div>
+          <div class="info">{{ l.created_at.strftime('%Y-%m-%d %H:%M') }}
+            <a class="mg-detail" href="{{ url_for('image_gen.log_detail', log_id=l.id) }}">详情 →</a></div>
         </div>
       </div>
       {% endif %}
@@ -55,7 +94,7 @@
   </div>
   {{ render_pagination(pagination, 'image_gen.logs', {}) }}
   {% else %}
-  <p class="text-muted">还没有生图记录。</p>
+  <div class="mg-empty"><span class="big">🖼️</span>还没有生图记录，去工作台创作第一张吧。</div>
   {% endif %}
 </div>
 

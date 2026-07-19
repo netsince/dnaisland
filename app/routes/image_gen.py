@@ -49,11 +49,11 @@ def workbench():
         .order_by(GenerationModel.display_name)
         .all()
     )
-    recent = (
+    page = request.args.get("page", 1, type=int)
+    pagination = (
         GenerationLog.query.filter_by(user_id=current_user.id)
         .order_by(GenerationLog.created_at.desc())
-        .limit(8)
-        .all()
+        .paginate(page=page, per_page=12, error_out=False)
     )
     # 默认选中每图积分最低的可用模型
     default_model = min(models, key=lambda m: m.points_per_image or 0) if models else None
@@ -61,7 +61,8 @@ def workbench():
         "image_gen/workbench.html",
         models=models,
         default_model=default_model,
-        recent=recent,
+        recent=pagination.items,
+        pagination=pagination,
         aspects=VALID_ASPECTS,
         max_refs=MAX_REFERENCES,
     )
