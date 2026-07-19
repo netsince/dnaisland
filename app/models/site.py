@@ -50,6 +50,9 @@ class SiteConfig(db.Model):
     image_api_key = db.Column(db.Text, nullable=True)  # 密钥，不在模板中回显
     image_base_url = db.Column(db.Text, nullable=True)  # 如 https://api.openai.com/v1
 
+    # 获取兑换码的跳转地址（可选）；配置后在 /points/ 侧边栏显示「获取积分」
+    redeem_code_url = db.Column(db.String(500), nullable=True)
+
     updated_at = db.Column(
         db.DateTime, server_default=db.func.now(), onupdate=db.func.now()
     )

@@ -170,6 +170,23 @@
   </main>
 </div>
 
+<!-- 点数不足弹窗：引导去点数页获取积分 -->
+<div class="modal fade" id="noPointsModal" tabindex="-1" aria-labelledby="noPointsModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="background:#1f1f2e;color:#ECECF3;border:1px solid #33334a;">
+      <div class="modal-header border-secondary">
+        <h5 class="modal-title" id="noPointsModalLabel">点数不足</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="关闭"></button>
+      </div>
+      <div class="modal-body" id="noPointsMsg">你的点数不足以完成本次生图，请先获取积分。</div>
+      <div class="modal-footer border-secondary">
+        <a class="btn btn-primary" href="{{ url_for('points.detail') }}">去获取积分</a>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
   (function () {
     var form = document.querySelector('form[action="{{ url_for('image_gen.generate') }}"]');
@@ -251,6 +268,15 @@
           } else {
             statusEl.textContent = data.error || '生成失败';
             statusEl.style.color = '#ec4899';
+            // 点数不足：弹窗提示并引导去点数页
+            if (data.code === 'insufficient_points') {
+              var msgEl = document.getElementById('noPointsMsg');
+              if (msgEl) msgEl.textContent = data.error || '点数不足，请先获取积分。';
+              var modalEl = document.getElementById('noPointsModal');
+              if (modalEl && window.bootstrap && bootstrap.Modal) {
+                bootstrap.Modal.getOrCreateInstance(modalEl).show();
+              }
+            }
           }
         })
         .catch(function () {

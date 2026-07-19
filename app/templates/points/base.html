@@ -9,6 +9,10 @@
            href="{{ url_for('points.detail') }}">详情</a>
         <a class="list-group-item list-group-item-action {% if request.endpoint == 'points.redeem' %}active{% endif %}"
            href="{{ url_for('points.redeem') }}">兑换</a>
+        {% if site_cfg.redeem_code_url %}
+        <a class="list-group-item list-group-item-action" target="_blank" rel="noopener noreferrer"
+           href="{{ site_cfg.redeem_code_url }}">获取积分</a>
+        {% endif %}
       </div>
     </div>
     <div class="col-md-9 col-lg-10">

@@ -154,6 +154,12 @@
                placeholder="{{ '已配置（留空则不修改）' if cfg.image_api_key else 'sk-...' }}" autocomplete="new-password">
         <div class="form-text">密钥仅在有填写时更新，留空保留原值，不在页面回显。</div>
       </div>
+      <div class="mb-3">
+        <label class="form-label" for="redeem_code_url">获取兑换码 URL（可选）</label>
+        <input type="text" class="form-control" id="redeem_code_url" name="redeem_code_url"
+               value="{{ cfg.redeem_code_url or '' }}" placeholder="https://example.com/store/points">
+        <div class="form-text">填写后，用户「点数」页侧边栏会显示「获取积分」选项卡并跳转此地址。</div>
+      </div>
       <div class="form-text">模型需在「生图模型管理」中另行添加（调用名 + 每图积分）。</div>
     </div>
   </div>

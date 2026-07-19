@@ -23,6 +23,7 @@ def default_public_config():
         "email_whitelist": {"enabled": False, "suffixes": []},
         "contact_email": "",
         "memorial_banner_url": "",
+        "redeem_code_url": "",
     }
 
 
@@ -61,6 +62,7 @@ def public_config():
         },
         "contact_email": cfg.contact_email or "",
         "memorial_banner_url": cfg.memorial_banner_url or "",
+        "redeem_code_url": cfg.redeem_code_url or "",
     }
 
 

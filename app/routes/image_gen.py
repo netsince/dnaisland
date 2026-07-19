@@ -122,7 +122,11 @@ def generate():
     estimated = count * (model.points_per_image or 0)
     balance = current_user.points or 0
     if balance < estimated:
-        return early(f"点数不足：本次预计消耗 {estimated} 点，当前余额 {balance} 点")
+        msg = f"点数不足：本次预计消耗 {estimated} 点，当前余额 {balance} 点"
+        if want_json:
+            return jsonify(ok=False, code="insufficient_points", error=msg), 400
+        flash(msg, "warning")
+        return redirect(url_for("image_gen.workbench"))
 
     # 调用生图
     try:

@@ -1250,6 +1250,11 @@ def system_config():
         if api_key:
             cfg.image_api_key = api_key
 
+        # 获取兑换码跳转地址（可选）
+        cfg.redeem_code_url = (
+            request.form.get("redeem_code_url") or ""
+        ).strip() or None
+
         db.session.commit()
         flash("系统配置已保存", "success")
         return redirect(url_for("admin.system_config"))

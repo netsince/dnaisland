@@ -49,6 +49,9 @@
               <a class="nav-link" href="{{ url_for('teahouse.index') }}">茶馆</a>
             </li>
             <li class="nav-item">
+              <a class="nav-link" href="{{ url_for('image_gen.workbench') }}">生图</a>
+            </li>
+            <li class="nav-item">
               <a class="nav-link" href="{{ url_for('main.articles') }}">文章</a>
             </li>
             <li class="nav-item">
@@ -116,7 +119,6 @@
                   <li><a class="dropdown-item" href="{{ url_for('user.my_cards') }}">我的发布</a></li>
                   <li><a class="dropdown-item" href="{{ url_for('user.my_punishments') }}">我的处罚</a></li>
                   <li><a class="dropdown-item" href="{{ url_for('points.detail') }}">点数</a></li>
-                  <li><a class="dropdown-item" href="{{ url_for('image_gen.workbench') }}">生图</a></li>
                   <li><hr class="dropdown-divider"></li>
                   <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}">退出</a></li>
                 </ul>
