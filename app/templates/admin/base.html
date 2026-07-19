@@ -56,6 +56,14 @@
                href="{{ url_for('admin.keys_list') }}">兑换码管理</a>
           </li>
           <li class="nav-item">
+            <a class="nav-link {% if request.endpoint.startswith('admin.image_models') %}active{% endif %}"
+               href="{{ url_for('admin.image_models') }}">生图模型</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% if request.endpoint == 'admin.image_logs' %}active{% endif %}"
+               href="{{ url_for('admin.image_logs') }}">生图记录</a>
+          </li>
+          <li class="nav-item">
             <a class="nav-link {% if request.endpoint == 'admin.system_config' %}active{% endif %}"
                href="{{ url_for('admin.system_config') }}">系统配置</a>
           </li>

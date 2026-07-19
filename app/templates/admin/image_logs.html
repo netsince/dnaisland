@@ -1,0 +1,45 @@
+{% extends "admin/base.html" %}
+{% from "macros/pagination.html" import render_pagination %}
+
+{% block title %}生图记录审阅 · DNAISLAND{% endblock %}
+
+{% block admin_content %}
+<h2 class="h4 mb-3">生图记录审阅</h2>
+
+{% if logs %}
+<div class="table-responsive">
+  <table class="table table-hover align-middle">
+    <thead>
+      <tr>
+        <th>用户</th><th>模型</th><th>提示词</th><th>尺寸</th><th>张数</th>
+        <th>消耗</th><th>状态</th><th>时间</th><th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for l in logs %}
+      <tr>
+        <td>{{ l.nickname }}</td>
+        <td>{{ l.model_name }}</td>
+        <td class="text-truncate" style="max-width: 220px;">{{ l.prompt[:40] }}{% if l.prompt|length > 40 %}…{% endif %}</td>
+        <td>{{ l.size or 'auto' }}</td>
+        <td>{{ l.count }}</td>
+        <td>{{ l.points_spent }}</td>
+        <td>
+          <span class="badge bg-{{ 'success' if l.status == 'success' else ('warning' if l.status == 'partial' else 'danger') }}">
+            {{ '成功' if l.status == 'success' else ('部分' if l.status == 'partial' else '失败') }}
+          </span>
+        </td>
+        <td class="small text-muted">{{ l.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+        <td>
+          <a class="btn btn-sm btn-outline-info" href="{{ url_for('image_gen.log_detail', log_id=l.id) }}">查看</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{{ render_pagination(pagination, 'admin.image_logs', {}) }}
+{% else %}
+<p class="text-muted">暂无生图记录。</p>
+{% endif %}
+{% endblock %}

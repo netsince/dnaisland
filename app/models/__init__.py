@@ -15,6 +15,7 @@ from .teahouse import TeaPost, TeaPostLike
 from .user import User, UserFollow
 from .verification_code import VerificationCode
 from .points import KeyUsageLog, PointTransaction, RedemptionKey
+from .image_gen import GenerationLog, GenerationModel
 
 __all__ = [
     "User",
@@ -37,4 +38,6 @@ __all__ = [
     "PointTransaction",
     "RedemptionKey",
     "KeyUsageLog",
+    "GenerationModel",
+    "GenerationLog",
 ]

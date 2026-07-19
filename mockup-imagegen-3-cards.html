@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>生图工作台 · 方案3 卡片 + 可视化比例</title>
+<style>
+  :root{
+    --bg:#0e0e16; --panel:#171722; --panel2:#1f1f2e; --line:#2a2a3a;
+    --txt:#ECECF3; --mut:#9a9ab0; --acc1:#a855f7; --acc2:#ec4899;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--txt);min-height:100vh;padding:30px}
+  .wrap{max-width:1080px;margin:0 auto}
+  .head{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px}
+  .head h1{font-size:20px;font-weight:700;background:linear-gradient(90deg,var(--acc1),var(--acc2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .pts{font-size:13px;color:var(--mut);background:var(--panel2);padding:7px 14px;border-radius:20px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:22px;margin-bottom:22px}
+  textarea{width:100%;min-height:90px;resize:vertical;background:var(--panel2);border:1px solid var(--line);border-radius:12px;color:var(--txt);padding:13px;font-size:14px;font-family:inherit}
+  textarea:focus{outline:none;border-color:var(--acc1)}
+  .field{margin-top:18px}
+  .field>label{font-size:13px;color:var(--mut);display:block;margin-bottom:10px}
+  .models{display:flex;gap:10px;flex-wrap:wrap}
+  .m{flex:1;min-width:150px;border:1px solid var(--line);border-radius:12px;padding:13px;cursor:pointer;background:var(--panel2);transition:.15s}
+  .m.on{border-color:transparent;background:linear-gradient(90deg,rgba(168,85,247,.25),rgba(236,72,153,.25));box-shadow:0 0 0 1.5px var(--acc1)}
+  .m b{font-size:14px;display:block}
+  .m span{font-size:12px;color:var(--mut)}
+  .ratios{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  .r{border:1px solid var(--line);border-radius:12px;padding:12px 8px;text-align:center;cursor:pointer;background:var(--panel2)}
+  .r.on{border-color:transparent;background:linear-gradient(90deg,rgba(168,85,247,.25),rgba(236,72,153,.25));box-shadow:0 0 0 1.5px var(--acc1)}
+  .r .box2{width:34px;height:34px;margin:0 auto 8px;background:var(--line);display:grid;place-items:center}
+  .r.on .box2{background:linear-gradient(135deg,var(--acc1),var(--acc2))}
+  .r small{font-size:12px;color:var(--mut)}
+  .foot{display:flex;align-items:center;gap:14px;margin-top:20px}
+  .cnt{display:flex;gap:0;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .cnt button{background:var(--panel2);border:none;color:var(--txt);width:38px;height:38px;font-size:16px;cursor:pointer}
+  .cnt span{padding:0 14px;display:grid;place-items:center;font-size:14px}
+  .gen{margin-left:auto;background:linear-gradient(90deg,var(--acc1),var(--acc2));border:none;color:#fff;font-weight:600;font-size:15px;padding:13px 30px;border-radius:12px;cursor:pointer}
+  .gallery{columns:3;column-gap:16px}
+  .gallery .ph{break-inside:avoid;margin-bottom:16px;border-radius:14px;background:linear-gradient(135deg,#26263a,#3a2740)}
+  .gallery .ph.h{aspect-ratio:16/9}.gallery .ph.v{aspect-ratio:9/16}.gallery .ph.s{aspect-ratio:1}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head"><h1>◆ 生图工作台</h1><span class="pts">点数 <b style="color:var(--txt)">320</b></span></div>
+
+  <div class="card">
+    <textarea placeholder="描述你想生成的画面…"></textarea>
+
+    <div class="field">
+      <label>选择模型</label>
+      <div class="models">
+        <div class="m on"><b>GPT 生图</b><span>10 点 / 张</span></div>
+        <div class="m"><b>SDXL</b><span>5 点 / 张</span></div>
+        <div class="m"><b>Flux</b><span>8 点 / 张</span></div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>宽高比</label>
+      <div class="ratios">
+        <div class="r on"><div class="box2"></div><small>1:1</small></div>
+        <div class="r"><div class="box2" style="width:34px;height:23px"></div><small>3:2</small></div>
+        <div class="r"><div class="box2" style="width:23px;height:34px"></div><small>2:3</small></div>
+        <div class="r"><div class="box2" style="width:34px;height:26px"></div><small>4:3</small></div>
+        <div class="r"><div class="box2" style="width:26px;height:34px"></div><small>3:4</small></div>
+        <div class="r"><div class="box2" style="width:34px;height:20px"></div><small>16:9</small></div>
+        <div class="r"><div class="box2" style="width:20px;height:34px"></div><small>9:16</small></div>
+        <div class="r"><div class="box2" style="border-radius:50%"></div><small>auto</small></div>
+      </div>
+    </div>
+
+    <div class="foot">
+      <div class="cnt"><button>−</button><span>1</span><button>＋</button></div>
+      <span style="font-size:13px;color:var(--mut)">张数</span>
+      <button class="gen">✦ 生成</button>
+    </div>
+  </div>
+
+  <div class="gallery">
+    <div class="ph s"></div><div class="ph h"></div><div class="ph v"></div>
+    <div class="ph s"></div><div class="ph v"></div><div class="ph h"></div>
+  </div>
+</div>
+</body>
+</html>

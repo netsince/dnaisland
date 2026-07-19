@@ -139,6 +139,25 @@
     </div>
   </div>
 
+  <div class="card mb-4 border-warning">
+    <div class="card-header">生图服务（OpenAI 格式通道）</div>
+    <div class="card-body">
+      <div class="mb-3">
+        <label class="form-label" for="image_base_url">API Base URL</label>
+        <input type="text" class="form-control" id="image_base_url" name="image_base_url"
+               value="{{ cfg.image_base_url or '' }}" placeholder="https://api.openai.com/v1">
+        <div class="form-text">兼容 OpenAI 生图接口的地址（不含末尾 /images/...）。</div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label" for="image_api_key">API Key</label>
+        <input type="password" class="form-control" id="image_api_key" name="image_api_key"
+               placeholder="{{ '已配置（留空则不修改）' if cfg.image_api_key else 'sk-...' }}" autocomplete="new-password">
+        <div class="form-text">密钥仅在有填写时更新，留空保留原值，不在页面回显。</div>
+      </div>
+      <div class="form-text">模型需在「生图模型管理」中另行添加（调用名 + 每图积分）。</div>
+    </div>
+  </div>
+
   <div class="d-flex gap-2">
     <button type="submit" class="btn btn-primary">保存配置</button>
     <a class="btn btn-outline-secondary" href="{{ url_for('admin.system_config') }}">取消</a>

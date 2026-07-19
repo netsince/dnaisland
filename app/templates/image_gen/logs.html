@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% from "macros/pagination.html" import render_pagination %}
+
+{% block title %}生图记录 · DNAISLAND{% endblock %}
+
+{% block head %}
+<style>
+  .mg-wrap{max-width:1200px;margin:0 auto}
+  .masonry{column-count:3;column-gap:16px}
+  .mg-item{display:block;break-inside:avoid;margin-bottom:16px;border-radius:14px;overflow:hidden;
+           position:relative;background:#1f1f2e;text-decoration:none}
+  .mg-item img{width:100%;display:block}
+  .mg-meta{position:absolute;left:0;right:0;bottom:0;padding:10px 12px;
+           background:linear-gradient(transparent,rgba(0,0,0,.72));color:#fff;font-size:12px;
+           display:flex;flex-direction:column;gap:2px}
+  .mg-meta .row1{display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .dl-btn{cursor:pointer;background:rgba(255,255,255,.16);padding:3px 9px;border-radius:8px;white-space:nowrap}
+  @media (max-width: 992px){ .masonry{column-count:2} }
+  @media (max-width: 576px){ .masonry{column-count:1} }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4 mg-wrap">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h2 class="h4 mb-0">我的生图记录</h2>
+    <a class="btn btn-sm btn-primary" href="{{ url_for('image_gen.workbench') }}">去生图</a>
+  </div>
+
+  {% if logs %}
+  <div class="masonry">
+    {% for l in logs %}
+      {% set imgs = l.image_list() %}
+      {% if imgs %}
+      <a class="mg-item" href="{{ url_for('image_gen.log_detail', log_id=l.id) }}">
+        <img src="{{ imgs[0] }}" alt="生成图" loading="lazy">
+        <div class="mg-meta">
+          <div class="row1">
+            <span>{{ l.model_name }} · {{ l.size or 'auto' }}</span>
+            <span class="dl-btn js-dlpng" data-src="{{ imgs[0] }}" data-name="gen_{{ l.id }}.png" onclick="event.stopPropagation()">↓ PNG</span>
+          </div>
+          <div>{{ l.count }} 张请求 · 消耗 {{ l.points_spent }} 点 · {{ l.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
+        </div>
+      </a>
+      {% endif %}
+    {% endfor %}
+  </div>
+  {{ render_pagination(pagination, 'image_gen.logs', {}) }}
+  {% else %}
+  <p class="text-muted">还没有生图记录。</p>
+  {% endif %}
+</div>
+{% endblock %}

@@ -46,6 +46,10 @@ class SiteConfig(db.Model):
     # 逗号 / 换行 / 空格分隔的后缀，如 @gmail.com、@qq.com
     email_whitelist_suffixes = db.Column(db.Text, nullable=True)
 
+    # —— 生图服务（OpenAI 格式通道）——
+    image_api_key = db.Column(db.Text, nullable=True)  # 密钥，不在模板中回显
+    image_base_url = db.Column(db.Text, nullable=True)  # 如 https://api.openai.com/v1
+
     updated_at = db.Column(
         db.DateTime, server_default=db.func.now(), onupdate=db.func.now()
     )

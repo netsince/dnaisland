@@ -116,6 +116,7 @@
                   <li><a class="dropdown-item" href="{{ url_for('user.my_cards') }}">我的发布</a></li>
                   <li><a class="dropdown-item" href="{{ url_for('user.my_punishments') }}">我的处罚</a></li>
                   <li><a class="dropdown-item" href="{{ url_for('points.detail') }}">点数</a></li>
+                  <li><a class="dropdown-item" href="{{ url_for('image_gen.workbench') }}">生图</a></li>
                   <li><hr class="dropdown-divider"></li>
                   <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}">退出</a></li>
                 </ul>
@@ -361,5 +362,33 @@
     })();
   </script>
   {% block scripts %}{% endblock %}
+  <script>
+    // 生图结果下载：数据库存 WebP，点击时前端转成 PNG 再下载
+    document.addEventListener('click', function (e) {
+      var el = e.target.closest('.js-dlpng');
+      if (!el) return;
+      e.preventDefault();
+      var src = el.getAttribute('data-src');
+      var name = el.getAttribute('data-name') || 'image.png';
+      var im = new Image();
+      im.onload = function () {
+        var cv = document.createElement('canvas');
+        cv.width = im.naturalWidth;
+        cv.height = im.naturalHeight;
+        cv.getContext('2d').drawImage(im, 0, 0);
+        cv.toBlob(function (blob) {
+          if (!blob) return;
+          var a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = name;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(a.href);
+        }, 'image/png');
+      };
+      im.src = src;
+    });
+  </script>
 </body>
 </html>

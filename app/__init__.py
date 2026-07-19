@@ -51,6 +51,7 @@ def create_app(config_object=None):
     from .routes import (
         admin_bp,
         auth_bp,
+        image_gen_bp,
         main_bp,
         points_bp,
         publish_bp,
@@ -67,6 +68,7 @@ def create_app(config_object=None):
     app.register_blueprint(teahouse_bp)
     app.register_blueprint(system_bp)
     app.register_blueprint(points_bp)
+    app.register_blueprint(image_gen_bp)
 
     from .commands import init_commands
 

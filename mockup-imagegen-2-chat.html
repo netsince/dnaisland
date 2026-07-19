@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>生图工作台 · 方案2 对话式 Composer</title>
+<style>
+  :root{
+    --bg:#0e0e16; --panel:#16161f; --panel2:#1f1f2e; --line:#2a2a3a;
+    --txt:#ECECF3; --mut:#9a9ab0; --acc1:#a855f7; --acc2:#ec4899;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--txt);height:100vh;display:flex;flex-direction:column}
+  .top{display:flex;align-items:center;justify-content:space-between;padding:16px 26px;border-bottom:1px solid var(--line)}
+  .top h1{font-size:17px;font-weight:700;background:linear-gradient(90deg,var(--acc1),var(--acc2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .top .meta{display:flex;gap:10px;align-items:center;font-size:13px;color:var(--mut)}
+  .feed{flex:1;overflow:auto;padding:26px;max-width:900px;margin:0 auto;width:100%;display:flex;flex-direction:column;gap:18px}
+  .msg{display:flex;gap:12px}
+  .msg.me{justify-content:flex-end}
+  .bubble{max-width:78%;padding:12px 15px;border-radius:16px;font-size:14px;line-height:1.5}
+  .me .bubble{background:linear-gradient(90deg,var(--acc1),var(--acc2));color:#fff;border-bottom-right-radius:4px}
+  .bot .bubble{background:var(--panel);border:1px solid var(--line);border-bottom-left-radius:4px}
+  .imgs{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+  .imgs .ph{aspect-ratio:1;border-radius:10px;background:linear-gradient(135deg,#26263a,#3a2740)}
+  .composer{position:sticky;bottom:0;padding:16px 26px;background:rgba(14,14,22,.85);backdrop-filter:blur(8px);border-top:1px solid var(--line)}
+  .box{max-width:900px;margin:0 auto;background:var(--panel2);border:1px solid var(--line);border-radius:18px;padding:12px 14px}
+  .box textarea{width:100%;background:transparent;border:none;color:var(--txt);font-size:14px;resize:none;font-family:inherit;height:46px}
+  .box textarea:focus{outline:none}
+  .tools{display:flex;align-items:center;gap:10px;margin-top:8px}
+  .pill{font-size:12px;color:var(--mut);background:var(--panel);border:1px solid var(--line);padding:6px 12px;border-radius:20px;cursor:pointer}
+  .pill.on{color:#fff;border-color:transparent;background:linear-gradient(90deg,var(--acc1),var(--acc2))}
+  .send{margin-left:auto;background:linear-gradient(90deg,var(--acc1),var(--acc2));border:none;color:#fff;font-weight:600;padding:9px 20px;border-radius:12px;cursor:pointer}
+</style>
+</head>
+<body>
+  <div class="top">
+    <h1>◆ 生图工作台</h1>
+    <div class="meta"><span>点数 <b style="color:var(--txt)">320</b></span><span>·</span><span>GPT 生图</span></div>
+  </div>
+
+  <div class="feed">
+    <div class="msg me"><div class="bubble">画一个在霓虹城市屋顶拉小提琴的少女，赛博朋克风</div></div>
+    <div class="msg bot">
+      <div class="bubble">已生成 2 张 · 消耗 20 点
+        <div class="imgs"><div class="ph"></div><div class="ph"></div></div>
+      </div>
+    </div>
+    <div class="msg me"><div class="bubble">换成黄昏色调，加上飞鸟</div></div>
+  </div>
+
+  <div class="composer">
+    <div class="box">
+      <textarea placeholder="输入提示词，回车生成…"></textarea>
+      <div class="tools">
+        <span class="pill">＋ 参考图</span>
+        <span class="pill on">1:1</span><span class="pill">16:9</span><span class="pill">auto</span>
+        <span class="pill">1 张</span><span class="pill">2 张</span>
+        <button class="send">生成 ✦</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

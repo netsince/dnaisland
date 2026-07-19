@@ -1,0 +1,75 @@
+{% extends "admin/base.html" %}
+
+{% block title %}生图模型管理 · DNAISLAND{% endblock %}
+
+{% block admin_content %}
+<h2 class="h4 mb-3">生图模型管理</h2>
+
+<div class="card mb-4">
+  <div class="card-header">新增模型</div>
+  <div class="card-body">
+    <form method="post" action="{{ url_for('admin.image_models') }}" class="row g-3">
+      <div class="col-md-4">
+        <label class="form-label">调用名</label>
+        <input type="text" class="form-control" name="name" placeholder="如 gpt-image-1" required>
+        <div class="form-text">传给生图接口 model 字段的值。</div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">展示名</label>
+        <input type="text" class="form-control" name="display_name" placeholder="如 GPT 生图" required>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">每图积分</label>
+        <input type="number" class="form-control" name="points_per_image" value="0" min="0">
+      </div>
+      <div class="col-md-2 d-flex align-items-end">
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" role="switch" id="enabled" name="enabled" value="1" checked>
+          <label class="form-check-label" for="enabled">启用</label>
+        </div>
+      </div>
+      <div class="col-12">
+        <button type="submit" class="btn btn-primary">添加</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">已有模型</div>
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr>
+          <th>调用名</th><th>展示名</th><th>每图积分</th><th>状态</th><th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in models %}
+        <tr>
+          <td><code>{{ m.name }}</code></td>
+          <td>{{ m.display_name }}</td>
+          <td>{{ m.points_per_image }}</td>
+          <td>
+            <span class="badge bg-{{ 'success' if m.enabled else 'secondary' }}">
+              {{ '启用' if m.enabled else '禁用' }}
+            </span>
+          </td>
+          <td>
+            <form method="post" action="{{ url_for('admin.image_model_toggle', model_id=m.id) }}" class="d-inline">
+              <button class="btn btn-sm btn-outline-secondary">{{ '禁用' if m.enabled else '启用' }}</button>
+            </form>
+            <form method="post" action="{{ url_for('admin.image_model_delete', model_id=m.id) }}" class="d-inline"
+                  onsubmit="return confirm('确认删除该模型？');">
+              <button class="btn btn-sm btn-outline-danger">删除</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="text-muted text-center">暂无模型</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

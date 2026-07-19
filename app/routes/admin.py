@@ -29,6 +29,8 @@ from ..models import (
     CardLike,
     CardTag,
     Comment,
+    GenerationLog,
+    GenerationModel,
     KeyUsageLog,
     Notification,
     PointTransaction,
@@ -342,6 +344,83 @@ def key_toggle(key_id):
     db.session.commit()
     flash("兑换码状态已更新", "success")
     return redirect(url_for("admin.keys_list", tab=request.args.get("tab", "all")))
+
+
+# ---------------- 生图模型管理 ----------------
+@admin_bp.route("/image-models", methods=["GET", "POST"])
+@super_admin_required
+def image_models():
+    if request.method == "POST":
+        name = (request.form.get("name") or "").strip()
+        display_name = (request.form.get("display_name") or "").strip()
+        try:
+            points_per_image = int(request.form.get("points_per_image", 0))
+        except ValueError:
+            points_per_image = 0
+        if not name or not display_name:
+            flash("调用名与展示名均必填", "warning")
+        elif GenerationModel.query.filter_by(name=name).first():
+            flash("该调用名已存在", "warning")
+        else:
+            db.session.add(
+                GenerationModel(
+                    name=name,
+                    display_name=display_name,
+                    points_per_image=points_per_image,
+                    enabled=request.form.get("enabled") == "1",
+                )
+            )
+            db.session.commit()
+            flash("生图模型已添加", "success")
+        return redirect(url_for("admin.image_models"))
+
+    models = GenerationModel.query.order_by(GenerationModel.created_at.desc()).all()
+    return render_template("admin/image_models.html", models=models)
+
+
+@admin_bp.route("/image-models/<int:model_id>/toggle", methods=["POST"])
+@super_admin_required
+def image_model_toggle(model_id):
+    m = db.session.get(GenerationModel, model_id)
+    if not m:
+        abort(404)
+    m.enabled = not m.enabled
+    db.session.commit()
+    flash("模型状态已更新", "success")
+    return redirect(url_for("admin.image_models"))
+
+
+@admin_bp.route("/image-models/<int:model_id>/delete", methods=["POST"])
+@super_admin_required
+def image_model_delete(model_id):
+    m = db.session.get(GenerationModel, model_id)
+    if not m:
+        abort(404)
+    db.session.delete(m)
+    db.session.commit()
+    flash("模型已删除", "success")
+    return redirect(url_for("admin.image_models"))
+
+
+@admin_bp.route("/image-logs")
+@super_admin_required
+def image_logs():
+    page = request.args.get("page", 1, type=int)
+    pagination = GenerationLog.query.order_by(
+        GenerationLog.created_at.desc()
+    ).paginate(page=page, per_page=20, error_out=False)
+    logs = pagination.items
+    user_ids = [l.user_id for l in logs]
+    users_map = (
+        {u.id: u.nickname for u in User.query.filter(User.id.in_(user_ids)).all()}
+        if user_ids
+        else {}
+    )
+    for l in logs:
+        l.nickname = users_map.get(l.user_id, f"UID{l.user_id}")
+    return render_template(
+        "admin/image_logs.html", pagination=pagination, logs=logs
+    )
 
 
 @admin_bp.route("/users/<int:user_id>/punish", methods=["GET", "POST"])
@@ -1162,6 +1241,14 @@ def system_config():
         cfg.email_whitelist_suffixes = (
             request.form.get("email_whitelist_suffixes") or ""
         ).strip() or None
+
+        # 生图服务（OpenAI 格式通道）：仅在有值时更新，避免误清空密钥
+        base_url = (request.form.get("image_base_url") or "").strip()
+        if base_url:
+            cfg.image_base_url = base_url
+        api_key = (request.form.get("image_api_key") or "").strip()
+        if api_key:
+            cfg.image_api_key = api_key
 
         db.session.commit()
         flash("系统配置已保存", "success")

@@ -1,0 +1,222 @@
+"""用户侧生图工作台：生图、我的记录与详情。
+
+权限：仅登录用户；生成前校验点数，不足直接禁止。
+扣费：完成后按实产张数 × 模型每图积分扣减（写入 PointTransaction）。
+"""
+
+import json
+
+from flask import (
+    Blueprint,
+    abort,
+    flash,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
+from flask_login import current_user, login_required
+
+from ..extensions import db
+from ..models import GenerationLog, GenerationModel, PointTransaction
+from ..services.image_gen_service import generate_images
+from ..services.site_service import get_site_config
+
+image_gen_bp = Blueprint("image_gen", __name__, url_prefix="/image-gen")
+
+# 宽高比 -> OpenAI size（照搬 infinite-canvas 默认 1k 分辨率）；auto 不传 size
+ASPECT_TO_SIZE = {
+    "1:1": "1024x1024",
+    "3:2": "1536x1024",
+    "2:3": "1024x1536",
+    "4:3": "1360x1024",
+    "3:4": "1024x1360",
+    "16:9": "1824x1024",
+    "9:16": "1024x1824",
+    "auto": None,
+}
+VALID_ASPECTS = list(ASPECT_TO_SIZE.keys())
+MAX_REFERENCES = 5
+MAX_COUNT = 2
+
+
+@image_gen_bp.route("/")
+@login_required
+def workbench():
+    models = (
+        GenerationModel.query.filter_by(enabled=True)
+        .order_by(GenerationModel.display_name)
+        .all()
+    )
+    recent = (
+        GenerationLog.query.filter_by(user_id=current_user.id)
+        .order_by(GenerationLog.created_at.desc())
+        .limit(8)
+        .all()
+    )
+    return render_template(
+        "image_gen/workbench.html",
+        models=models,
+        recent=recent,
+        aspects=VALID_ASPECTS,
+        max_refs=MAX_REFERENCES,
+    )
+
+
+@image_gen_bp.route("/generate", methods=["POST"])
+@login_required
+def generate():
+    want_json = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+
+    def early(msg):
+        if want_json:
+            return jsonify(ok=False, error=msg), 400
+        flash(msg, "warning")
+        return redirect(url_for("image_gen.workbench"))
+
+    cfg = get_site_config()
+    if not cfg.image_base_url or not cfg.image_api_key:
+        return early("生图服务尚未配置，请联系管理员")
+
+    model_id = request.form.get("model", type=int)
+    model = db.session.get(GenerationModel, model_id) if model_id else None
+    if not model or not model.enabled:
+        return early("请选择有效的生图模型")
+
+    prompt = (request.form.get("prompt") or "").strip()
+    if not prompt:
+        return early("请输入提示词")
+
+    aspect = request.form.get("size", "auto")
+    if aspect not in ASPECT_TO_SIZE:
+        aspect = "auto"
+    size = ASPECT_TO_SIZE[aspect]
+
+    try:
+        count = int(request.form.get("count", 1))
+    except ValueError:
+        count = 1
+    count = max(1, min(count, MAX_COUNT))
+
+    # 参考图（最多 5 张）
+    references = []
+    for f in request.files.getlist("references")[:MAX_REFERENCES]:
+        if f and f.filename:
+            data = f.read()
+            if data:
+                references.append((f.filename, data, f.mimetype or "image/png"))
+    ref_count = len(references)
+    if ref_count:
+        labels = "、".join(f"图片{i + 1}" for i in range(ref_count))
+        prompt = (
+            f"参考图片编号：{labels}。"
+            f"请按这些编号理解提示词中的图片引用。\n\n{prompt}"
+        )
+
+    # 预估算积分，点数不足禁止生成
+    estimated = count * (model.points_per_image or 0)
+    balance = current_user.points or 0
+    if balance < estimated:
+        return early(f"点数不足：本次预计消耗 {estimated} 点，当前余额 {balance} 点")
+
+    # 调用生图
+    try:
+        images = generate_images(
+            base_url=cfg.image_base_url,
+            api_key=cfg.image_api_key,
+            model=model.name,
+            prompt=prompt,
+            size=size,
+            n=count,
+            references=references,
+        )
+    except Exception as e:
+        log = GenerationLog(
+            user_id=current_user.id,
+            model_id=model.id,
+            model_name=model.display_name,
+            prompt=prompt,
+            size=size,
+            count=count,
+            references_count=ref_count,
+            status="failed",
+            images="[]",
+            points_spent=0,
+            error=str(e)[:500],
+        )
+        db.session.add(log)
+        db.session.commit()
+        if want_json:
+            return jsonify(ok=False, error=str(e)[:200], log_id=log.id), 200
+        flash(f"生图失败：{str(e)[:200]}", "danger")
+        return redirect(url_for("image_gen.workbench"))
+
+    actual = len(images)
+    spent = actual * (model.points_per_image or 0)
+    status = "success" if actual == count else ("partial" if actual > 0 else "failed")
+
+    log = GenerationLog(
+        user_id=current_user.id,
+        model_id=model.id,
+        model_name=model.display_name,
+        prompt=prompt,
+        size=size,
+        count=count,
+        references_count=ref_count,
+        status=status,
+        images=json.dumps(images, ensure_ascii=False),
+        points_spent=spent,
+    )
+    db.session.add(log)
+    if spent:
+        current_user.points = balance - spent
+        db.session.add(
+            PointTransaction(
+                user_id=current_user.id,
+                delta=-spent,
+                balance_after=current_user.points,
+                reason=f"生图消耗（{model.display_name} ×{actual}）",
+                source="consume",
+            )
+        )
+    db.session.commit()
+
+    if want_json:
+        return jsonify(
+            ok=True,
+            log_id=log.id,
+            model_name=model.display_name,
+            size=size,
+            images=images,
+            points_spent=spent,
+            balance=current_user.points,
+            status=status,
+        )
+    flash(f"生图完成，成功 {actual} 张，消耗 {spent} 点", "success")
+    return redirect(url_for("image_gen.log_detail", log_id=log.id))
+
+
+@image_gen_bp.route("/logs")
+@login_required
+def logs():
+    page = request.args.get("page", 1, type=int)
+    pagination = (
+        GenerationLog.query.filter_by(user_id=current_user.id)
+        .order_by(GenerationLog.created_at.desc())
+        .paginate(page=page, per_page=12, error_out=False)
+    )
+    return render_template(
+        "image_gen/logs.html", pagination=pagination, logs=pagination.items
+    )
+
+
+@image_gen_bp.route("/logs/<int:log_id>")
+@login_required
+def log_detail(log_id):
+    log = db.session.get(GenerationLog, log_id)
+    if not log:
+        abort(404)
+    if log.user_id != current_user.id and not current_user.is_super_admin:
+        abort(403)
+    return render_template("image_gen/log_detail.html", log=log)

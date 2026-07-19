@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}生图详情 · DNAISLAND{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 960px;">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h2 class="h4 mb-0">生图详情</h2>
+    <a class="btn btn-sm btn-outline-light" href="{{ url_for('image_gen.logs') }}">返回记录</a>
+  </div>
+
+  <div class="card mb-4">
+    <div class="card-body">
+      <div class="row g-2 small text-muted">
+        <div class="col-6">模型：<span class="text-light">{{ log.model_name }}</span></div>
+        <div class="col-6">状态：<span class="text-light">{{ '成功' if log.status == 'success' else ('部分成功' if log.status == 'partial' else '失败') }}</span></div>
+        <div class="col-6">宽高比/尺寸：<span class="text-light">{{ log.size or 'auto' }}</span></div>
+        <div class="col-6">请求张数：<span class="text-light">{{ log.count }}</span></div>
+        <div class="col-6">参考图：<span class="text-light">{{ log.references_count }} 张</span></div>
+        <div class="col-6">消耗点数：<span class="text-light">{{ log.points_spent }}</span></div>
+        <div class="col-12">时间：<span class="text-light">{{ log.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</span></div>
+      </div>
+      <hr>
+      <div class="mb-2 fw-semibold">提示词</div>
+      <pre class="bg-dark text-light p-3 rounded" style="white-space: pre-wrap; font-size: .9rem;">{{ log.prompt }}</pre>
+      {% if log.status == 'failed' and log.error %}
+      <div class="alert alert-danger mt-3 mb-0">{{ log.error }}</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <h3 class="h6 text-muted mb-2">生成结果（{{ log.image_list()|length }} 张）</h3>
+  {% set imgs = log.image_list() %}
+  {% if imgs %}
+  <div class="row g-3">
+    {% for img in imgs %}
+    <div class="col-6 col-md-4">
+      <div class="card bg-transparent">
+        <img src="{{ img }}" class="card-img-top" alt="生成图 {{ loop.index }}" style="object-fit: contain; background:#111;">
+        <div class="card-body p-2">
+          <button type="button" class="btn btn-sm btn-outline-light w-100 js-dlpng"
+                  data-src="{{ img }}" data-name="gen_{{ log.id }}_{{ loop.index }}.png">下载 PNG</button>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% elif log.status != 'failed' %}
+  <p class="text-muted">本次未产出图像。</p>
+  {% endif %}
+</div>
+{% endblock %}
