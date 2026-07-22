@@ -91,9 +91,9 @@
  <div class="small text-muted mb-2">上传的参考图（{{ log.reference_image_list()|length }} 张，点击可放大查看，↓ 可下载 PNG）：</div>
  <div class="gd-refs">
  {% for ref_img in log.reference_image_list() %}
- <div class="gd-ref">
+ <div class="gd-ref dna-img-fade">
  <a class="glightbox" href="{{ ref_img }}" data-type="image">
- <img src="{{ ref_img }}" alt="参考图">
+ <img src="{{ ref_img }}" alt="参考图" class="dna-img-fade__img" loading="lazy">
  </a>
  <a class="gd-ref__dl js-dlpng" href="{{ ref_img }}" data-src="{{ ref_img }}"
  data-name="reference_{{ log.id }}_{{ loop.index }}.png" title="下载 PNG">↓</a>
@@ -114,7 +114,7 @@
  <div class="gen-card">
  <div class="gen-card__media dna-img-fade gen-detail-fade">
  <a class="glightbox" href="{{ img }}" data-type="image" data-gallery="gendetail">
- <img src="{{ img }}" class="dna-img-fade__img" alt="生成图 {{ loop.index }}" style="object-fit:contain;background:#111;">
+ <img src="{{ img }}" class="dna-img-fade__img" alt="生成图 {{ loop.index }}" loading="lazy" style="object-fit:contain;background:#111;">
  </a>
  </div>
  <div class="gen-card__bar">

@@ -1355,3 +1355,34 @@ main.dna-page-loading {
   }
 }
 
+/* ===== 全站/生图流光骨架屏 (Shimmer Skeleton Screen) ===== */
+.dna-img-fade:not(.is-loaded),
+.dna-skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.03) 25%,
+    rgba(255, 255, 255, 0.09) 37%,
+    rgba(255, 255, 255, 0.03) 63%
+  ) !important;
+  background-size: 400% 100% !important;
+  animation: dnaSkeletonShimmer 1.4s ease infinite !important;
+  border-radius: var(--dna-radius-sm, 12px);
+}
+
+@keyframes dnaSkeletonShimmer {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
+}
+
+.dna-img-fade img {
+  opacity: 0;
+  transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1), transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.dna-img-fade.is-loaded img {
+  opacity: 1;
+}
+
