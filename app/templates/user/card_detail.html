@@ -11,7 +11,7 @@
 {% block content %}
 {# 横幅：贴顶全宽出血封面 #}
 {% if images.landscape %}
-<div class="dna-card-banner">
+<div class="dna-card-banner {{ 'is-cover' if card.cover_focus else '' }}">
   {% set _f = (card.cover_focus or '50,50').split(',') %}
   <a class="glightbox" href="{{ url_for('user.card_image', card_id=card.id, slot='landscape') }}" data-type="image" aria-label="查看原图">
     <img src="{{ url_for('user.card_image', card_id=card.id, slot='landscape') }}" alt="{{ card.name }}"

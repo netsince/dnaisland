@@ -67,7 +67,7 @@ def avatar(user_id):
         webp = data_url_to_webp_bytes(u.avatar, max_edge=256, quality=82)
     except Exception:
         abort(404)
-    return send_file(BytesIO(webp), mimetype="image/webp", cache_timeout=86400)
+    return send_file(BytesIO(webp), mimetype="image/webp", max_age=86400)
 
 
 @user_bp.route("/card-image/<card_id>/<slot>")
@@ -82,7 +82,7 @@ def card_image(card_id, slot):
         webp = data_url_to_webp_bytes(img.data, max_edge=1024, quality=82)
     except Exception:
         abort(404)
-    return send_file(BytesIO(webp), mimetype="image/webp", cache_timeout=86400)
+    return send_file(BytesIO(webp), mimetype="image/webp", max_age=86400)
 
 REPORT_TARGETS = ("card", "comment", "user", "teapost")
 REPORT_REASONS = [

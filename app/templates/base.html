@@ -267,7 +267,37 @@ function showToast(message, type) {
  if (area && ta) ta.value = area.innerHTML;
  });
  });
- })();
+})();
+
+// 富文本编辑器：全屏切换
+(function () {
+ function exitAll() {
+ document.querySelectorAll('.rich-editor.is-fullscreen').forEach(function (re) {
+ re.classList.remove('is-fullscreen');
+ var b = re.querySelector('[data-action="fullscreen"]');
+ if (b) b.innerHTML = '⤢ 全屏';
+ });
+ document.body.style.overflow = '';
+ }
+ document.addEventListener('click', function (e) {
+ var btn = e.target.closest && e.target.closest('.rich-editor [data-action="fullscreen"]');
+ if (!btn) return;
+ e.preventDefault();
+ var re = btn.closest('.rich-editor');
+ if (!re) return;
+ var on = re.classList.toggle('is-fullscreen');
+ if (on) {
+ btn.innerHTML = '⤡ 退出';
+ document.body.style.overflow = 'hidden';
+ } else {
+ btn.innerHTML = '⤢ 全屏';
+ document.body.style.overflow = '';
+ }
+ });
+ document.addEventListener('keydown', function (e) {
+ if (e.key === 'Escape') exitAll();
+ });
+})();
  </script>
 
  <!-- 公告弹窗：首次进入自动弹出；关闭后本会话内不再自动弹；页脚「查看公告」可手动再开 -->

@@ -27,7 +27,7 @@ def article_cover(article_id):
                 return send_file(
                     BytesIO(base64.b64decode(b64)),
                     mimetype="image/webp",
-                    cache_timeout=86400,
+                    max_age=86400,
                 )
             except Exception:
                 pass
@@ -35,7 +35,7 @@ def article_cover(article_id):
             webp = data_url_to_webp_bytes(a.cover, max_edge=1024, quality=82)
         except Exception:
             abort(404)
-        return send_file(BytesIO(webp), mimetype="image/webp", cache_timeout=86400)
+        return send_file(BytesIO(webp), mimetype="image/webp", max_age=86400)
     abort(404)
 
 
