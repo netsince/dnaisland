@@ -1175,6 +1175,13 @@ body.is-mobile-plus-open header {
 .dna-comment-item:last-child {
   border-bottom: none;
 }
+.dna-comment-item--focus {
+  background: rgba(var(--dna-accent-rgb, 99, 102, 241), 0.16);
+  border-radius: 8px;
+  padding-left: 8px;
+  padding-right: 8px;
+  box-shadow: 0 0 0 1px rgba(var(--dna-accent-rgb, 99, 102, 241), 0.5) inset;
+}
 .dna-comment-item__avatar {
   width: 34px; height: 34px;
   border-radius: 50%;

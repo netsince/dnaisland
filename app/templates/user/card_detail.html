@@ -203,15 +203,21 @@
   var page = 1;
   var loading = false;
   var hasNext = true;
+  // 外部带 ?comment=<id> 进入时，自动展开评论区并定位到该评论
+  var focusComment = {{ focus_comment or 'null' }};
 
   function open() {
     drawer.classList.add('show');
     overlay.classList.add('show');
     document.body.style.overflow = 'hidden';
-    // 立即渲染输入框，不等 API
-    if (page === 1) {
+    if (!footer.dataset.built) {
       buildFooter();
-      loadComments();
+      footer.dataset.built = '1';
+    }
+    if (focusComment) {
+      fetchFocusPage(focusComment);
+    } else if (page === 1) {
+      loadPage(page, {});
     }
   }
   function close() {
@@ -224,6 +230,11 @@
   overlay.addEventListener('click', close);
   closeBtn.addEventListener('click', close);
 
+  // 携带 ?comment= 参数进入时，自动展开评论区并定位到对应评论
+  if (focusComment) {
+    open();
+  }
+
   function avatarEl(author) {
     if (author.avatar) {
       return '<img src="' + author.avatar + '" class="dna-comment-item__avatar" alt="">';
@@ -235,7 +246,7 @@
     var reportHtml = cm.can_report
       ? '<a href="' + cm.report_url + '" class="ms-2 text-muted small opacity-75 text-decoration-none">举报</a>'
       : '';
-    return '<div class="dna-comment-item">'
+    return '<div class="dna-comment-item" data-comment-id="' + cm.id + '">'
       + avatarEl(cm.author)
       + '<div class="dna-comment-item__body">'
       + '<div class="dna-comment-item__meta">'
@@ -252,18 +263,26 @@
   }
 
   function loadComments() {
-    if (loading || !hasNext) return;
+    loadPage(page, {});
+  }
+
+  // 加载指定分页；opts.silent=true 时不追加「加载更多」按钮；opts.onDone 在渲染后回调
+  function loadPage(p, opts) {
+    opts = opts || {};
+    if (loading) return;
     loading = true;
-    fetch(apiUrl + '?page=' + page)
+    fetch(apiUrl + '?page=' + p)
       .then(function(r) { return r.json(); })
       .then(function(data) {
         loading = false;
-        if (page === 1) {
+        if (p === 1) {
           body.innerHTML = '';
           title.textContent = '评论（' + data.total + '）';
         }
-        if (data.items.length === 0 && page === 1) {
+        if (data.items.length === 0 && p === 1) {
           body.innerHTML = '<div class="text-muted text-center py-4">还没有评论，来抢沙发～</div>';
+          hasNext = false;
+          if (opts.onDone) opts.onDone();
           return;
         }
         var frag = document.createDocumentFragment();
@@ -274,22 +293,63 @@
 
         hasNext = data.has_next;
         if (hasNext) {
-          page++;
-          var loadMore = document.createElement('button');
-          loadMore.className = 'btn btn-link text-muted w-100 py-2';
-          loadMore.textContent = '加载更多';
-          loadMore.id = 'cmLoadMore';
-          loadMore.addEventListener('click', function() {
-            loadMore.remove();
-            loadComments();
-          });
-          body.appendChild(loadMore);
+          page = p + 1;
+          if (!opts.silent) {
+            var loadMore = document.createElement('button');
+            loadMore.className = 'btn btn-link text-muted w-100 py-2';
+            loadMore.textContent = '加载更多';
+            loadMore.id = 'cmLoadMore';
+            loadMore.addEventListener('click', function() {
+              loadMore.remove();
+              loadPage(page, {});
+            });
+            body.appendChild(loadMore);
+          }
         }
+        if (opts.onDone) opts.onDone();
       })
       .catch(function() {
         loading = false;
         body.innerHTML = '<div class="text-danger text-center py-4">加载失败，请刷新重试。</div>';
+        if (opts.onDone) opts.onDone();
       });
+  }
+
+  // 根据评论 id 查询其所在分页，并 Sequential 加载到该页后定位高亮
+  function fetchFocusPage(id) {
+    body.innerHTML = '<div class="text-center text-muted py-4">定位评论中…</div>';
+    fetch(apiUrl + '?comment_id=' + id)
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.focus_page) {
+          loadUpTo(data.focus_page, id, 1);
+        } else {
+          loadPage(1, {});
+        }
+      })
+      .catch(function() { loadPage(1, {}); });
+  }
+
+  function loadUpTo(targetPage, focusId, current) {
+    var isLast = current >= targetPage;
+    loadPage(current, {
+      silent: !isLast,
+      onDone: function() {
+        if (current < targetPage && hasNext) {
+          loadUpTo(targetPage, focusId, current + 1);
+        } else {
+          scrollToComment(focusId);
+        }
+      }
+    });
+  }
+
+  function scrollToComment(focusId) {
+    var el = body.querySelector('[data-comment-id="' + focusId + '"]');
+    if (el) {
+      el.scrollIntoView({ block: 'center' });
+      el.classList.add('dna-comment-item--focus');
+    }
   }
 
   function buildFooter(total) {

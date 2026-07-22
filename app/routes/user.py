@@ -315,6 +315,9 @@ def card_detail(card_id):
     if not (is_public or is_owner or is_admin):
         abort(404)
 
+    # 外部带 comment 参数进入时，自动展开评论区并定位到对应评论
+    focus_comment = request.args.get("comment", type=int)
+
     if not is_owner:
         card.view_count = (card.view_count or 0) + 1
         db.session.commit()
@@ -383,6 +386,7 @@ def card_detail(card_id):
         liked=liked,
         favorited=favorited,
         following=following,
+        focus_comment=focus_comment,
     )
 
 
@@ -595,12 +599,30 @@ def card_comments_api(card_id):
             ),
             "report_url": url_for("user.report", type="comment", id=cm.id),
         })
+    # 定位指定评论所在分页：供「从外部带 comment 参数进入」时自动翻到对应评论
+    focus_page = None
+    focus_id = request.args.get("comment_id", type=int)
+    if focus_id is not None:
+        target = db.session.get(Comment, focus_id)
+        if target and target.card_id == card_id:
+            newer = (
+                Comment.query.filter_by(card_id=card_id, is_hidden=False)
+                .filter(Comment.created_at > target.created_at)
+                .count()
+            )
+            same_newer = (
+                Comment.query.filter_by(card_id=card_id, is_hidden=False)
+                .filter(Comment.created_at == target.created_at, Comment.id > target.id)
+                .count()
+            )
+            focus_page = (newer + same_newer) // per_page + 1
     return jsonify({
         "items": items,
         "page": pagination.page,
         "pages": pagination.pages,
         "total": pagination.total,
         "has_next": pagination.has_next,
+        "focus_page": focus_page,
     })
 
 
