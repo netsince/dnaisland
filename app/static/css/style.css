@@ -797,8 +797,8 @@ body, .navbar, .footer, .card, .dna-tile, .dna-hero,
   color: var(--dna-accent);
 }
 
-/* 发布按钮展开/关闭微交互 */
-.dna-mobile-plus-text {
+/* 移动端底栏统一文字微交互：默认只保留大图标，当前激活(active)或展开时在下方优雅浮现文字 */
+.dna-mobile-nav__item span {
   font-size: 10px;
   max-height: 0;
   opacity: 0;
@@ -807,7 +807,8 @@ body, .navbar, .footer, .card, .dna-tile, .dna-hero,
   margin-top: 0;
   display: block;
 }
-body.is-mobile-plus-open .dna-mobile-plus-text {
+.dna-mobile-nav__item.active span,
+body.is-mobile-plus-open #mobilePlusBtn span {
   max-height: 16px;
   opacity: 1;
   margin-top: 2px;
