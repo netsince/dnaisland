@@ -105,17 +105,20 @@
           </div>
           {% endif %}
 
-          {# is_self 下的个人工具箱按钮组 #}
+          {# is_self 下的个人工具箱按钮组（双列紧凑网格） #}
           {% if is_self %}
-          <div class="d-flex flex-column gap-2 pt-3 border-top border-secondary border-opacity-25">
-            <a class="btn btn-sm btn-outline-primary w-100" href="{{ url_for('image_gen.workbench') }}">🎨 AI 生图工作台</a>
-            <a class="btn btn-sm btn-outline-warning w-100" href="{{ url_for('points.detail') }}">🪙 我的点数</a>
-            <a class="btn btn-sm btn-outline-info w-100" href="{{ url_for('user.my_cards') }}">🎴 我的发布</a>
-            <a class="btn btn-sm btn-outline-secondary w-100" href="{{ url_for('user.my_favorites') }}">⭐ 我的收藏</a>
-            <a class="btn btn-sm btn-outline-secondary w-100" href="{{ url_for('user.my_likes') }}">❤️ 我点赞的</a>
-            <a class="btn btn-sm btn-outline-danger w-100" href="{{ url_for('user.my_punishments') }}">⚖️ 我的处罚</a>
-            <a class="btn btn-sm btn-outline-secondary w-100" href="{{ url_for('main.articles') }}">📰 官方公告与文章</a>
-            <a class="btn btn-sm btn-outline-secondary w-100" href="{{ url_for('auth.logout') }}">🚪 退出登录</a>
+          <div class="border-top border-secondary border-opacity-25 pt-3">
+            <div class="small text-muted mb-2">快捷工具</div>
+            <div class="row g-2">
+              <div class="col-6"><a class="btn btn-sm btn-outline-primary w-100 text-truncate px-1" href="{{ url_for('image_gen.workbench') }}">🎨 生图工作台</a></div>
+              <div class="col-6"><a class="btn btn-sm btn-outline-warning w-100 text-truncate px-1" href="{{ url_for('points.detail') }}">🪙 我的点数</a></div>
+              <div class="col-6"><a class="btn btn-sm btn-outline-info w-100 text-truncate px-1" href="{{ url_for('user.my_cards') }}">🎴 我的发布</a></div>
+              <div class="col-6"><a class="btn btn-sm btn-outline-secondary w-100 text-truncate px-1" href="{{ url_for('user.my_favorites') }}">⭐ 我的收藏</a></div>
+              <div class="col-6"><a class="btn btn-sm btn-outline-secondary w-100 text-truncate px-1" href="{{ url_for('user.my_likes') }}">❤️ 我点赞的</a></div>
+              <div class="col-6"><a class="btn btn-sm btn-outline-danger w-100 text-truncate px-1" href="{{ url_for('user.my_punishments') }}">⚖️ 我的处罚</a></div>
+              <div class="col-6"><a class="btn btn-sm btn-outline-secondary w-100 text-truncate px-1" href="{{ url_for('main.articles') }}">📰 官方公告</a></div>
+              <div class="col-6"><a class="btn btn-sm btn-outline-secondary w-100 text-truncate px-1" href="{{ url_for('auth.logout') }}">🚪 退出登录</a></div>
+            </div>
           </div>
           {% endif %}
         </div>
