@@ -10,7 +10,6 @@
     <div class="d-grid gap-3">
       <button type="button" class="btn btn-primary btn-lg" id="btnJson">从 JSON 识别</button>
       <a href="{{ url_for('publish.edit') }}" class="btn btn-outline-primary btn-lg text-center">直接开始编辑</a>
-      <a href="{{ url_for('image_gen.workbench') }}" class="btn btn-outline-secondary text-center">🎨 去 AI 生图工作台绘图</a>
     </div>
 
     <form method="post" action="{{ url_for('publish.parse') }}" class="mt-4" id="jsonForm" style="display:none">

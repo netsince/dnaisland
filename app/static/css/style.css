@@ -933,3 +933,43 @@ body, .navbar, .footer, .card, .dna-tile, .dna-hero,
   color: #fff;
 }
 
+/* 移动端底栏 + 号弹出大按钮、全屏高斯模糊与 + 变 × 旋转 */
+.dna-mobile-plus-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 8, 20, 0.75);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  z-index: 1045;
+  opacity: 0;
+  transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.dna-mobile-plus-overlay.show {
+  display: block;
+  opacity: 1;
+}
+
+.dna-mobile-plus-popup {
+  position: absolute;
+  bottom: 72px;
+  left: 16px; right: 16px;
+  max-width: 360px;
+  margin-inline: auto;
+  transform: translateY(24px);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.dna-mobile-plus-overlay.show .dna-mobile-plus-popup {
+  transform: translateY(0);
+}
+
+body.is-mobile-plus-open main,
+body.is-mobile-plus-open header {
+  filter: blur(8px);
+  transition: filter 0.25s ease;
+}
+
+.dna-mobile-plus-rotated {
+  transform: rotate(135deg) !important;
+}
+
