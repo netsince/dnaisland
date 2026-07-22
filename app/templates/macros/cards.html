@@ -36,7 +36,7 @@
 {% endmacro %}
 
 {# 网格容器：传入一组卡片直接渲染成响应式网格 #}
-{% macro card_grid(cards, q=None, show_status=False, cols='col-6 col-md-4 col-xl-3') %}
+{% macro card_grid(cards, q=None, show_status=False, cols='col-6 col-sm-4 col-md-3 col-lg-2') %}
 <div class="row g-3">
   {% for card in cards %}
   <div class="{{ cols }}">{{ card_tile(card, q=q, show_status=show_status) }}</div>
