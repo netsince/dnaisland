@@ -2,27 +2,39 @@
 {% from "macros/pagination.html" import render_pagination %}
 
 {% block title %}通知 · DNAISLAND{% endblock %}
+{% block header %}{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
   <div class="col-12 col-lg-8">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-      <h2 class="h4 mb-0">通知{% if unread %}<span class="badge bg-danger ms-1">{{ unread }} 未读</span>{% endif %}</h2>
+    <div class="d-flex align-items-center justify-content-between mb-3">
+      <div class="d-flex align-items-center gap-2">
+        <a class="btn btn-sm btn-outline-secondary rounded-pill me-1" href="javascript:history.back()">← 返回</a>
+        <h1 class="h4 mb-0 fw-bold d-flex align-items-center gap-2">
+          <span>🔔 消息通知</span>
+          {% if unread %}<span class="badge bg-danger rounded-pill px-2" style="font-size:0.75rem;">{{ unread }} 未读</span>{% endif %}
+        </h1>
+      </div>
+      {% if unread %}
       <form method="post" action="{{ url_for('user.notifications_read_all') }}">
-        <button class="btn btn-sm btn-outline-secondary" type="submit">全部标为已读</button>
+        <button class="btn btn-sm btn-outline-secondary rounded-pill" type="submit">✓ 全部已读</button>
       </form>
+      {% endif %}
     </div>
 
-    <div class="list-group">
+    <div class="list-group gap-2">
       {% for n in items %}
-      <div class="list-group-item {% if not n.is_read %}list-group-item-primary{% endif %}">
-        <div class="d-flex justify-content-between">
-          <span style="white-space:pre-wrap; word-break:break-word;">{{ n.message | linkify }}</span>
-          <small class="text-muted">{{ n.created_at.strftime('%Y-%m-%d %H:%M') if n.created_at else '' }}</small>
+      <div class="list-group-item dna-notification-item {% if not n.is_read %}is-unread{% endif %}">
+        <div class="d-flex justify-content-between align-items-start gap-2">
+          <div class="d-flex align-items-start gap-2">
+            {% if not n.is_read %}<span class="dna-unread-dot mt-1 flex-shrink-0" title="未读消息"></span>{% endif %}
+            <div style="white-space:pre-wrap; word-break:break-word;" class="dna-notification-msg">{{ n.message | linkify }}</div>
+          </div>
+          <small class="text-muted text-nowrap flex-shrink-0 ms-2" style="font-size:0.78rem;">{{ n.created_at.strftime('%Y-%m-%d %H:%M') if n.created_at else '' }}</small>
         </div>
       </div>
       {% else %}
-      <div class="text-center text-muted py-4">暂时没有通知。</div>
+      <div class="text-center text-muted py-5">暂时没有通知。</div>
       {% endfor %}
     </div>
 

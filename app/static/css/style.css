@@ -1025,3 +1025,22 @@ body.is-mobile-plus-open header {
   padding: 10px 14px !important;
 }
 
+/* 通知列表卡片收紧与 8px 微型精细圆角 */
+.dna-notification-item {
+  border-radius: 8px !important;
+  background: var(--dna-surface, #1e1b30);
+  border: 1px solid var(--dna-border, rgba(255,255,255,0.08)) !important;
+  padding: 10px 14px !important;
+  transition: background-color 0.15s ease;
+}
+.dna-notification-item.is-unread {
+  border-left: 3px solid var(--dna-accent, #a855f7) !important;
+  background: rgba(168, 85, 247, 0.06) !important;
+}
+.dna-unread-dot {
+  display: inline-block;
+  width: 7px; height: 7px;
+  background-color: #ef4444;
+  border-radius: 50%;
+}
+
