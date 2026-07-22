@@ -763,11 +763,11 @@ body, .navbar, .footer, .card, .dna-tile, .dna-hero,
   position: fixed;
   bottom: 0; left: 0; right: 0;
   height: 52px;
-  background: rgba(18, 15, 34, 0.96);
+  background: rgba(18, 15, 34, 0.98);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   border-top: 1px solid var(--dna-border);
-  z-index: 1030;
+  z-index: 1050 !important;
   justify-content: space-around;
   align-items: center;
 }
