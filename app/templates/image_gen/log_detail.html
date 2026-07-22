@@ -7,29 +7,29 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/glightbox@3.3.0/dist/css/glightbox.min.css">
 <style>
   .gd-container {
-    max-width: 820px;
+    max-width: 800px;
     margin: 0 auto;
   }
   
-  /* 模块化区块卡片：提供清晰色块分割与视觉层次 */
+  /* 极致紧凑、无重阴影的干练分隔卡片 */
   .gd-card-section {
     background: var(--dna-surface, #141320);
     border: 1px solid var(--dna-border, #242236);
-    border-radius: 16px;
-    padding: 1.25rem;
-    margin-bottom: 1.5rem;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    border-radius: 12px;
+    padding: 0.85rem 1rem;
+    margin-bottom: 0.85rem;
+    box-shadow: none !important;
   }
   
-  /* 彻底覆盖全局 16/9 与 cover 裁切，主图 100% 忠于真实比例 */
+  /* 原图无损展示：100% 保持自然比例，无任何裁剪 */
   .gd-detail-img-wrap {
     aspect-ratio: auto !important;
     height: auto !important;
     width: 100% !important;
-    border-radius: 12px;
+    border-radius: 10px;
     overflow: hidden;
     background: #090810;
-    margin-bottom: 1rem;
+    margin-bottom: 0.65rem;
   }
   .gd-detail-img-wrap img.dna-img-fade__img {
     width: 100% !important;
@@ -40,33 +40,33 @@
     margin: 0 auto;
   }
 
-  /* 参考图容器：彻底废除正方形裁剪，100% 保持自然比例展现 */
+  /* 参考图：无任何裁剪，紧凑小巧 */
   .gd-ref-card {
     display: inline-block;
-    border-radius: 10px;
+    border-radius: 8px;
     overflow: hidden;
     border: 1px solid var(--dna-border, #28253d);
     background: #0a0914;
-    padding: 3px;
+    padding: 2px;
     flex: none;
   }
   .gd-ref-card img.dna-img-fade__img {
-    max-height: 110px !important;
+    max-height: 90px !important;
     width: auto !important;
-    max-width: 180px !important;
+    max-width: 150px !important;
     object-fit: contain !important;
-    border-radius: 8px;
+    border-radius: 6px;
     display: block;
   }
 
-  /* 提示词区块内背景 */
+  /* 提示词紧凑区块 */
   .gd-prompt-inner {
-    background: rgba(0, 0, 0, 0.25);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 12px;
-    padding: 1rem;
-    font-size: 0.93rem;
-    line-height: 1.6;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+    padding: 0.75rem 0.85rem;
+    font-size: 0.9rem;
+    line-height: 1.5;
     color: #e2e2f0;
     white-space: pre-wrap;
     word-break: break-word;
@@ -75,10 +75,10 @@
 {% endblock %}
 
 {% block content %}
-<div class="container py-3 gd-container">
-  <!-- 头部返回与时间 -->
-  <div class="d-flex align-items-center justify-content-between mb-3">
-    <a class="btn btn-sm btn-outline-secondary rounded-pill px-3" href="{{ url_for('image_gen.logs') }}">
+<div class="container py-2 gd-container">
+  <!-- 头部返回与时间（紧凑无过多留白） -->
+  <div class="d-flex align-items-center justify-content-between mb-2 fs-7">
+    <a class="btn btn-sm btn-link text-muted text-decoration-none px-0 py-0" href="{{ url_for('image_gen.logs') }}">
       <i class="bi bi-arrow-left me-1"></i> 返回生图记录
     </a>
     <div class="small text-muted">
@@ -89,16 +89,16 @@
   {% set imgs = log.image_list() %}
   {% set st = log.status %}
 
-  <!-- 区块一：生成作品展现区（有卡片色块包裹） -->
+  <!-- 区块一：生成作品区（紧凑分割，零发乌大阴影） -->
   <div class="gd-card-section">
-    <div class="d-flex align-items-center justify-content-between mb-3">
-      <div class="fw-bold text-light fs-6 d-flex align-items-center gap-2">
+    <div class="d-flex align-items-center justify-content-between mb-2">
+      <div class="fw-bold text-light small d-flex align-items-center gap-2">
         <i class="bi bi-image text-primary"></i> 生成作品
-        <span class="badge bg-secondary bg-opacity-30 rounded-pill px-2.5 py-1 font-monospace fs-7 fw-normal">{{ imgs|length }} 张</span>
+        <span class="badge bg-secondary bg-opacity-30 rounded-pill px-2 py-0.5 font-monospace fs-7 fw-normal">{{ imgs|length }} 张</span>
       </div>
-      {% if st == 'success' %}<span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-3 py-1">生成成功</span>
-      {% elif st == 'partial' %}<span class="badge bg-warning bg-opacity-20 text-warning border border-warning border-opacity-30 rounded-pill px-3 py-1">部分成功</span>
-      {% elif st == 'failed' %}<span class="badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-30 rounded-pill px-3 py-1">生成失败</span>{% endif %}
+      {% if st == 'success' %}<span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-2.5 py-0.5 fs-7">生成成功</span>
+      {% elif st == 'partial' %}<span class="badge bg-warning bg-opacity-20 text-warning border border-warning border-opacity-30 rounded-pill px-2.5 py-0.5 fs-7">部分成功</span>
+      {% elif st == 'failed' %}<span class="badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-30 rounded-pill px-2.5 py-0.5 fs-7">生成失败</span>{% endif %}
     </div>
 
     {% if imgs %}
@@ -109,47 +109,47 @@
       </a>
     </div>
 
-    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 pt-1">
-      <div class="small text-muted">
-        分辨率 / 尺寸：<strong class="text-light">{{ log.size or 'auto' }}</strong>
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+      <div class="small text-muted fs-7">
+        分辨率：<strong class="text-light">{{ log.size or 'auto' }}</strong>
       </div>
       <div class="d-flex align-items-center gap-2">
-        <a class="btn btn-sm btn-outline-light rounded-pill px-3 js-dlpng" href="{{ img }}" data-src="{{ img }}" data-name="artwork_{{ log.id }}_{{ loop.index }}.png">
+        <a class="btn btn-sm btn-outline-light rounded-pill px-3 py-1 fs-7 js-dlpng" href="{{ img }}" data-src="{{ img }}" data-name="artwork_{{ log.id }}_{{ loop.index }}.png">
           <i class="bi bi-download me-1"></i> 下载原图
         </a>
-        <a class="btn btn-sm btn-primary rounded-pill px-3" href="{{ url_for('image_gen.workbench') }}?prompt={{ log.prompt|urlencode }}">
+        <a class="btn btn-sm btn-primary rounded-pill px-3 py-1 fs-7" href="{{ url_for('image_gen.workbench') }}?prompt={{ log.prompt|urlencode }}">
           <i class="bi bi-magic me-1"></i> 同款生成
         </a>
       </div>
     </div>
     {% endfor %}
     {% else %}
-    <div class="text-center text-muted py-5">本次未产出图像。</div>
+    <div class="text-center text-muted py-4 small">本次未产出图像。</div>
     {% endif %}
 
     {% if st == 'failed' and log.error %}
-    <div class="alert alert-danger rounded-3 mt-3 mb-0">{{ log.error }}</div>
+    <div class="alert alert-danger rounded-3 mt-2 mb-0 py-2 fs-7">{{ log.error }}</div>
     {% endif %}
   </div>
 
-  <!-- 区块二：创作灵感与垫图参考区（有卡片色块包裹） -->
+  <!-- 区块二：创作灵感与垫图参考区（紧凑间距） -->
   <div class="gd-card-section">
     <!-- 提示词 Prompt -->
-    <div class="mb-4">
-      <div class="d-flex align-items-center justify-content-between mb-2">
-        <div class="fw-bold text-light fs-6"><i class="bi bi-chat-quote me-1 text-primary"></i> 提示词 Prompt</div>
-        <button type="button" class="btn btn-link btn-sm text-decoration-none p-0 text-muted" id="copyPromptBtn">
-          <i class="bi bi-clipboard me-1"></i> <span id="copyPromptText">复制提示词</span>
+    <div class="mb-3">
+      <div class="d-flex align-items-center justify-content-between mb-1.5">
+        <div class="fw-bold text-light small"><i class="bi bi-chat-quote me-1 text-primary"></i> 提示词 Prompt</div>
+        <button type="button" class="btn btn-link btn-sm text-decoration-none p-0 text-muted fs-7" id="copyPromptBtn">
+          <i class="bi bi-clipboard me-1"></i> <span id="copyPromptText">复制</span>
         </button>
       </div>
       <div class="gd-prompt-inner" id="promptTextContent">{{ log.prompt }}</div>
     </div>
 
-    <!-- 所用参考图垫图（100% 忠于真实比例，无任何正方形切割） -->
+    <!-- 所用参考图垫图 -->
     {% if log.reference_image_list() %}
     <div>
-      <div class="fw-bold text-light fs-6 mb-2.5"><i class="bi bi-images me-1 text-primary"></i> 所用参考图（{{ log.reference_image_list()|length }} 张）</div>
-      <div class="d-flex gap-3 overflow-x-auto pb-2">
+      <div class="fw-bold text-light small mb-2"><i class="bi bi-images me-1 text-primary"></i> 所用参考图（{{ log.reference_image_list()|length }} 张）</div>
+      <div class="d-flex gap-2 overflow-x-auto pb-1">
         {% for ref_img in log.reference_image_list() %}
         <div class="gd-ref-card dna-img-fade">
           <a class="glightbox" href="{{ ref_img }}" data-type="image" title="查看参考大图">
@@ -162,24 +162,24 @@
     {% endif %}
   </div>
 
-  <!-- 区块三：生成参数与统计归纳区（清晰色块区块） -->
+  <!-- 区块三：生成参数与消耗归纳区 -->
   <div class="gd-card-section mb-0">
-    <div class="fw-bold text-light fs-6 mb-3"><i class="bi bi-sliders me-1 text-primary"></i> 生成参数与消耗</div>
-    <div class="row g-3 text-muted small">
+    <div class="fw-bold text-light small mb-2"><i class="bi bi-sliders me-1 text-primary"></i> 生成参数与消耗</div>
+    <div class="row g-2 text-muted fs-7">
       <div class="col-6 col-md-3">
-        <div class="mb-1 text-muted fs-7">使用模型</div>
+        <div class="text-muted" style="font-size: 11px;">使用模型</div>
         <div class="text-light fw-bold">{{ log.model_name }}</div>
       </div>
       <div class="col-6 col-md-3">
-        <div class="mb-1 text-muted fs-7">请求张数</div>
+        <div class="text-muted" style="font-size: 11px;">请求张数</div>
         <div class="text-light fw-bold">{{ log.count }} 张</div>
       </div>
       <div class="col-6 col-md-3">
-        <div class="mb-1 text-muted fs-7">使用参考图</div>
+        <div class="text-muted" style="font-size: 11px;">使用参考图</div>
         <div class="text-light fw-bold">{{ log.references_count }} 张</div>
       </div>
       <div class="col-6 col-md-3">
-        <div class="mb-1 text-muted fs-7">消耗点数</div>
+        <div class="text-muted" style="font-size: 11px;">消耗点数</div>
         <div class="text-light fw-bold">{{ log.points_spent }} 点</div>
       </div>
     </div>
@@ -222,7 +222,7 @@
       navigator.clipboard.writeText(text).then(function () {
         if (copyText) {
           copyText.textContent = '已复制';
-          setTimeout(function () { copyText.textContent = '复制提示词'; }, 2000);
+          setTimeout(function () { copyText.textContent = '复制'; }, 2000);
         }
       });
     });
