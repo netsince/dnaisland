@@ -485,10 +485,15 @@
  document.body.style.overflow = 'hidden';
  }
 
- // AJAX 提交：按钮旁显示「正在生成中」，插入虚化骨架，结果就地插入画廊
- form.addEventListener('submit', function (e) {
- e.preventDefault();
- var promptEl = form.querySelector('[name=prompt]');
+  // AJAX 提交：按钮旁显示「正在生成中」，插入虚化骨架，结果就地插入画廊
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (genBtn.disabled || localStorage.getItem('dna_ig_active_task')) {
+      statusEl.textContent = '当前已有正在进行的生图任务，请等待完成';
+      statusEl.style.color = '#ec4899';
+      return;
+    }
+    var promptEl = form.querySelector('[name=prompt]');
  var modelEl = form.querySelector('[name=model]');
  if (!modelEl.value) {
  statusEl.textContent = '请选择模型'; statusEl.style.color = '#ec4899'; return;

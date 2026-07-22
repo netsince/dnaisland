@@ -134,18 +134,46 @@ def generate():
         flash(msg, "warning")
         return redirect(url_for("image_gen.workbench"))
 
-    # 调用生图
+    # 加锁定，进入生成任务
+    ACTIVE_GENERATION_TASKS.add(current_user.id)
     try:
-        images = generate_images(
-            base_url=cfg.image_base_url,
-            api_key=cfg.image_api_key,
-            model=model.name,
-            prompt=prompt,
-            size=size,
-            n=count,
-            references=references,
-        )
-    except Exception as e:
+        # 调用生图
+        try:
+            images = generate_images(
+                base_url=cfg.image_base_url,
+                api_key=cfg.image_api_key,
+                model=model.name,
+                prompt=prompt,
+                size=size,
+                n=count,
+                references=references,
+            )
+        except Exception as e:
+            log = GenerationLog(
+                user_id=current_user.id,
+                model_id=model.id,
+                model_name=model.display_name,
+                prompt=prompt,
+                size=size,
+                count=count,
+                references_count=ref_count,
+                status="failed",
+                images="[]",
+                reference_images=json.dumps(ref_b64_list),
+                points_spent=0,
+                error=str(e)[:500],
+            )
+            db.session.add(log)
+            db.session.commit()
+            if want_json:
+                return jsonify(ok=False, error=str(e)[:200], log_id=log.id), 200
+            flash(f"生图失败：{str(e)[:200]}", "danger")
+            return redirect(url_for("image_gen.workbench"))
+
+        actual = len(images)
+        spent = actual * (model.points_per_image or 0)
+        status = "success" if actual == count else ("partial" if actual > 0 else "failed")
+
         log = GenerationLog(
             user_id=current_user.id,
             model_id=model.id,
@@ -154,24 +182,24 @@ def generate():
             size=size,
             count=count,
             references_count=ref_count,
-            status="failed",
-            images="[]",
+            status=status,
+            images=json.dumps(images, ensure_ascii=False),
             reference_images=json.dumps(ref_b64_list),
-            points_spent=0,
-            error=str(e)[:500],
+            points_spent=spent,
         )
         db.session.add(log)
+        if spent:
+            current_user.points = balance - spent
+            db.session.add(
+                PointTransaction(
+                    user_id=current_user.id,
+                    delta=-spent,
+                    balance_after=current_user.points,
+                    reason=f"生图消耗（{model.display_name} ×{actual}）",
+                    source="consume",
+                )
+            )
         db.session.commit()
-        if want_json:
-            return jsonify(ok=False, error=str(e)[:200], log_id=log.id), 200
-        flash(f"生图失败：{str(e)[:200]}", "danger")
-        return redirect(url_for("image_gen.workbench"))
-
-    actual = len(images)
-    spent = actual * (model.points_per_image or 0)
-    status = "success" if actual == count else ("partial" if actual > 0 else "failed")
-
-    log = GenerationLog(
         user_id=current_user.id,
         model_id=model.id,
         model_name=model.display_name,
