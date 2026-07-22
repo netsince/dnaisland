@@ -4,7 +4,7 @@
 <div class="container-fluid py-4">
   <div class="row">
     <div class="col-md-3 col-lg-2">
-      <div class="list-group">
+      <div class="list-group dna-points-nav">
         <a class="list-group-item list-group-item-action {% if request.endpoint == 'points.detail' %}active{% endif %}"
            href="{{ url_for('points.detail') }}">详情</a>
         <a class="list-group-item list-group-item-action {% if request.endpoint == 'points.redeem' %}active{% endif %}"

@@ -680,3 +680,23 @@ body, .navbar, .footer, .card, .dna-tile, .dna-hero,
   from { transform: translateY(-100%); }
   to { transform: translateY(0); }
 }
+
+@media (max-width: 768px) {
+  /* 积分中心导航扁平化 */
+  .dna-points-nav {
+    flex-direction: row !important;
+    overflow-x: auto;
+    white-space: nowrap;
+    margin-bottom: 1rem !important;
+    border: 1px solid var(--dna-border);
+    border-radius: 10px;
+  }
+  .dna-points-nav .list-group-item {
+    flex: 1;
+    text-align: center;
+    border: none !important;
+    border-radius: 8px !important;
+    padding: 10px 6px !important;
+  }
+}
+
