@@ -424,6 +424,21 @@
         });
       }
     })();
+
+    // 全局智能返回拦截器
+    document.addEventListener('click', function (e) {
+      var backBtn = e.target.closest('a[href="javascript:history.back()"], .btn[href="javascript:history.back()"]');
+      if (!backBtn) return;
+      e.preventDefault();
+      
+      // 如果有上一页 referrer 且包含本站域名，正常执行 history.back()
+      if (document.referrer && document.referrer.indexOf(window.location.host) !== -1) {
+        history.back();
+      } else {
+        // 否则安全降级退回首页，防止微信/分享跳转进来的新客点击返回时无响应
+        window.location.href = '/';
+      }
+    });
   </script>
 </body>
 </html>
