@@ -72,7 +72,7 @@ def _build_stats(posts):
 @teahouse_bp.route("/")
 def index():
     page = request.args.get("page", 1, type=int)
-    default_sort = "follow" if current_user.is_authenticated else "new"
+    default_sort = "follow" if current_user.is_authenticated else "hot"
     sort = request.args.get("sort", default_sort)
     q = TeaPost.query.filter(TeaPost.parent_id.is_(None))
     q = _visible_query(q, current_user)
