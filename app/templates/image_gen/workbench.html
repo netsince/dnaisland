@@ -567,9 +567,31 @@
  localStorage.removeItem('dna_ig_active_task');
  setSkeletonState(false);
  statusEl.textContent = '网络错误，请重试';
- statusEl.style.color = '#ec4899';
  });
  });
+
+ initWorkbenchImgFade();
+ document.addEventListener('dna:page-loaded', function () {
+ initWorkbenchImgFade();
+ });
+
+ function initWorkbenchImgFade(scope) {
+ var cards = (scope || document).querySelectorAll('.ig-mcard.dna-img-fade');
+ cards.forEach(function (card) {
+ var img = card.querySelector('img');
+ if (!img) return;
+ if (img.complete) {
+ card.classList.add('is-loaded');
+ } else {
+ img.addEventListener('load', function () {
+ card.classList.add('is-loaded');
+ });
+ img.addEventListener('error', function () {
+ card.classList.add('is-loaded');
+ });
+ }
+ });
+ }
 })();
 </script>
 {% endblock %}
