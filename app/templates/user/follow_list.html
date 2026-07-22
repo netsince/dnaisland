@@ -42,11 +42,13 @@
  {% if ou.bio %}<div class="small text-muted mt-1 text-truncate">{{ ou.bio }}</div>{% endif %}
  </div>
  {% if current_user.is_authenticated and not is_self %}
- <form method="post" action="{{ url_for('user.user_follow', username=ou.username) }}">
- <button class="btn btn-sm btn-{{ 'outline-secondary' if it.is_following else 'primary' }}">
- {{ '取消关注' if it.is_following else '＋ 关注' }}
- </button>
- </form>
+<form method="post" action="{{ url_for('user.user_follow', username=ou.username) }}" class="js-toggle">
+<button class="btn btn-sm btn-{{ 'outline-secondary' if it.is_following else 'primary' }}"
+        data-on-class="btn-outline-secondary" data-off-class="btn-primary"
+        data-label-on="取消关注" data-label-off="＋ 关注">
+<span class="js-toggle-label">{{ '取消关注' if it.is_following else '＋ 关注' }}</span>
+</button>
+</form>
  {% endif %}
  </li>
  {% endfor %}

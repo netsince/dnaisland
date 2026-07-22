@@ -50,23 +50,30 @@
 
   {# 操作按钮栏：图标胶囊 #}
   <div class="d-flex flex-wrap gap-2 align-items-center mb-4">
-    <form method="post" action="{{ url_for('user.card_like', card_id=card.id) }}" class="d-inline m-0">
-      <button class="btn btn-sm d-flex align-items-center gap-1 rounded-pill {{ 'btn-danger' if liked else 'btn-outline-secondary' }}" style="padding:5px 12px;">
-        <i class="bi bi-heart{% if liked %}-fill{% endif %}"></i>
-        <span>{{ like_count }}</span>
+    <form method="post" action="{{ url_for('user.card_like', card_id=card.id) }}" class="d-inline m-0 js-toggle">
+      <button class="btn btn-sm d-flex align-items-center gap-1 rounded-pill {{ 'btn-danger' if liked else 'btn-outline-secondary' }}" style="padding:5px 12px;"
+              data-on-class="btn-danger" data-off-class="btn-outline-secondary"
+              data-on-icon="bi-heart-fill" data-off-icon="bi-heart">
+        <i class="bi bi-heart{% if liked %}-fill{% endif %} js-toggle-icon"></i>
+        <span class="js-toggle-count">{{ like_count }}</span>
       </button>
     </form>
-    <form method="post" action="{{ url_for('user.card_favorite', card_id=card.id) }}" class="d-inline m-0">
-      <button class="btn btn-sm d-flex align-items-center gap-1 rounded-pill {{ 'btn-warning' if favorited else 'btn-outline-secondary' }}" style="padding:5px 12px;">
-        <i class="bi bi-bookmark{% if favorited %}-fill{% endif %}"></i>
-        <span>{{ favorite_count }}</span>
+    <form method="post" action="{{ url_for('user.card_favorite', card_id=card.id) }}" class="d-inline m-0 js-toggle">
+      <button class="btn btn-sm d-flex align-items-center gap-1 rounded-pill {{ 'btn-warning' if favorited else 'btn-outline-secondary' }}" style="padding:5px 12px;"
+              data-on-class="btn-warning" data-off-class="btn-outline-secondary"
+              data-on-icon="bi-bookmark-fill" data-off-icon="bi-bookmark">
+        <i class="bi bi-bookmark{% if favorited %}-fill{% endif %} js-toggle-icon"></i>
+        <span class="js-toggle-count">{{ favorite_count }}</span>
       </button>
     </form>
     {% if not is_owner and author %}
-    <form method="post" action="{{ url_for('user.user_follow', username=author.username) }}" class="d-inline m-0">
-      <button class="btn btn-sm d-flex align-items-center gap-1 rounded-pill {{ 'btn-outline-secondary' if following else 'btn-outline-primary' }}" style="padding:5px 12px;">
-        <i class="bi bi-person-{% if following %}dash{% else %}plus{% endif %}"></i>
-        <span>{{ '取消关注' if following else '关注作者' }}</span>
+    <form method="post" action="{{ url_for('user.user_follow', username=author.username) }}" class="d-inline m-0 js-toggle">
+      <button class="btn btn-sm d-flex align-items-center gap-1 rounded-pill {{ 'btn-outline-secondary' if following else 'btn-outline-primary' }}" style="padding:5px 12px;"
+              data-on-class="btn-outline-secondary" data-off-class="btn-outline-primary"
+              data-on-icon="bi-person-dash" data-off-icon="bi-person-plus"
+              data-label-on="取消关注" data-label-off="关注作者">
+        <i class="bi bi-person-{% if following %}dash{% else %}plus{% endif %} js-toggle-icon"></i>
+        <span class="js-toggle-label">{{ '取消关注' if following else '关注作者' }}</span>
       </button>
     </form>
     {% endif %}

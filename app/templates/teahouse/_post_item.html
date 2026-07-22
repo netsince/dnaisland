@@ -40,12 +40,14 @@
  <span>{{ s.reply_count }} 回复</span>
  </a>
  {% if current_user.is_authenticated %}
- <form method="post" action="{{ url_for('teahouse.like', post_id=post.id) }}" class="d-inline m-0 p-0">
- <button class="btn btn-sm btn-link p-0 text-decoration-none d-flex align-items-center gap-1 {{ 'text-danger fw-bold' if s.liked else 'text-muted' }} dna-like-btn" type="submit">
- <i class="bi bi-heart{% if s.liked %}-fill{% endif %} dna-heart-icon"></i>
- <span>{{ s.like_count }}</span>
- </button>
- </form>
+<form method="post" action="{{ url_for('teahouse.like', post_id=post.id) }}" class="d-inline m-0 p-0 js-toggle">
+<button class="btn btn-sm btn-link p-0 text-decoration-none d-flex align-items-center gap-1 {{ 'text-danger fw-bold' if s.liked else 'text-muted' }} dna-like-btn" type="submit"
+        data-on-class="text-danger fw-bold" data-off-class="text-muted"
+        data-on-icon="bi-heart-fill" data-off-icon="bi-heart">
+<i class="bi bi-heart{% if s.liked %}-fill{% endif %} dna-heart-icon js-toggle-icon"></i>
+<span class="js-toggle-count">{{ s.like_count }}</span>
+</button>
+</form>
  {% else %}
  <span class="d-flex align-items-center gap-1">
  <i class="bi bi-heart"></i>
@@ -108,9 +110,12 @@
  <div class="d-flex flex-wrap gap-3 mt-2 small text-muted align-items-center">
  <a class="text-decoration-none text-reset" href="{{ url_for('teahouse.post_detail', post_id=post.id) }}"> {{ s.reply_count }} 回复</a>
  {% if current_user.is_authenticated %}
- <form method="post" action="{{ url_for('teahouse.like', post_id=post.id) }}" class="d-inline m-0 p-0">
- <button class="btn btn-sm btn-link p-0 text-decoration-none {{ 'text-danger' if s.liked else 'text-muted' }}" type="submit"> {{ s.like_count }}</button>
- </form>
+<form method="post" action="{{ url_for('teahouse.like', post_id=post.id) }}" class="d-inline m-0 p-0 js-toggle">
+<button class="btn btn-sm btn-link p-0 text-decoration-none {{ 'text-danger' if s.liked else 'text-muted' }}" type="submit"
+        data-on-class="text-danger" data-off-class="text-muted">
+<span class="js-toggle-count">{{ s.like_count }}</span>
+</button>
+</form>
  {% else %}
  <span> {{ s.like_count }}</span>
  {% endif %}

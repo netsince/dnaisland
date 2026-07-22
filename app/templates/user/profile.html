@@ -89,11 +89,13 @@
  <a class="btn btn-sm btn-outline-secondary w-100" href="{{ url_for('user.profile_edit') }}">编辑资料</a>
  {% endif %}
  {% else %}
- <form method="post" action="{{ url_for('user.user_follow', username=u.username) }}">
- <button class="btn btn-sm btn-{{ 'outline-secondary' if is_following else 'primary' }} w-100">
- {{ '取消关注' if is_following else '＋ 关注' }}
- </button>
- </form>
+<form method="post" action="{{ url_for('user.user_follow', username=u.username) }}" class="js-toggle">
+<button class="btn btn-sm btn-{{ 'outline-secondary' if is_following else 'primary' }} w-100"
+        data-on-class="btn-outline-secondary" data-off-class="btn-primary"
+        data-label-on="取消关注" data-label-off="＋ 关注">
+<span class="js-toggle-label">{{ '取消关注' if is_following else '＋ 关注' }}</span>
+</button>
+</form>
  <a class="btn btn-sm btn-outline-danger w-100" href="{{ url_for('user.report', type='user', id=u.username) }}">举报</a>
  {% endif %}
  </div>

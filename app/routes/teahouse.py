@@ -255,10 +255,20 @@ def like(post_id):
     ).first()
     if existing:
         db.session.delete(existing)
+        now_liked = False
     else:
         db.session.add(TeaPostLike(user_id=current_user.id, post_id=post_id))
         # 点赞不再额外通知，避免刷屏
+        now_liked = True
     db.session.commit()
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        # 局部提交：返回新状态供前端切换按钮，不整页刷新
+        return jsonify({
+            "ok": True,
+            "action": "like",
+            "state": now_liked,
+            "count": TeaPostLike.query.filter_by(post_id=post_id).count(),
+        })
     return redirect(request.referrer or url_for("teahouse.post_detail", post_id=post_id))
 
 

@@ -77,9 +77,13 @@
  </div>
  <div class="ms-auto flex-shrink-0 d-flex gap-2">
  {% if current_user.is_authenticated and current_user.id != spotlight_user.id %}
- <form method="post" action="{{ url_for('user.user_follow', username=spotlight_user.username) }}" class="d-inline">
- <button class="btn btn-sm btn-primary rounded-pill px-3">＋ 关注</button>
- </form>
+<form method="post" action="{{ url_for('user.user_follow', username=spotlight_user.username) }}" class="d-inline js-toggle">
+<button class="btn btn-sm btn-primary rounded-pill px-3"
+        data-on-class="btn-outline-primary" data-off-class="btn-primary"
+        data-label-on="取消关注" data-label-off="＋ 关注">
+<span class="js-toggle-label">＋ 关注</span>
+</button>
+</form>
  {% endif %}
  <a href="{{ url_for('user.profile', username=spotlight_user.username) }}" class="btn btn-sm btn-outline-primary rounded-pill px-3">访问主页</a>
  </div>

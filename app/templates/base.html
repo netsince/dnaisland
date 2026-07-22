@@ -390,7 +390,64 @@
  window.bindFade = bindFade; // 供 AJAX 动态插入的图片复用模糊→清晰动画
  })();
  </script>
- {% block scripts %}{% endblock %}
+ <!-- 通用 toggle 表单（关注/点赞/收藏）AJAX 局部提交，免整页刷新 -->
+<script>
+(function () {
+  // 根据后端返回的 JSON 切换按钮文案 / 图标 / 计数 / 配色
+  function applyToggle(btn, data) {
+    var onC = btn.dataset.onClass ? btn.dataset.onClass.split(/\s+/) : [];
+    var offC = btn.dataset.offClass ? btn.dataset.offClass.split(/\s+/) : [];
+    var add = data.state ? onC : offC;
+    var rem = data.state ? offC : onC;
+    add.forEach(function (c) { if (c) btn.classList.add(c); });
+    rem.forEach(function (c) { if (c) btn.classList.remove(c); });
+
+    var icon = btn.querySelector('.js-toggle-icon');
+    if (icon && btn.dataset.onIcon) {
+      if (data.state) {
+        icon.classList.remove(btn.dataset.offIcon);
+        icon.classList.add(btn.dataset.onIcon);
+      } else {
+        icon.classList.remove(btn.dataset.onIcon);
+        icon.classList.add(btn.dataset.offIcon);
+      }
+    }
+
+    var label = btn.querySelector('.js-toggle-label');
+    if (label) {
+      label.textContent = data.state ? (btn.dataset.labelOn || '') : (btn.dataset.labelOff || '');
+    }
+
+    if (data.count != null) {
+      var c = btn.querySelector('.js-toggle-count');
+      if (c) c.textContent = data.count;
+    }
+  }
+
+  document.addEventListener('submit', function (e) {
+    var form = e.target.closest('form.js-toggle');
+    if (!form) return;
+    e.preventDefault();
+    var btn = form.querySelector('button[type="submit"]');
+    if (!btn || btn.disabled) return;
+    btn.disabled = true;
+    fetch(form.action, {
+      method: 'POST',
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      credentials: 'same-origin'
+    })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (data) {
+        if (data && data.ok) { applyToggle(btn, data); }
+        else if (data && data.error) { alert(data.error); }
+        else { window.location.reload(); }
+      })
+      .catch(function () { window.location.reload(); })
+      .finally(function () { btn.disabled = false; });
+  });
+})();
+</script>
+{% block scripts %}{% endblock %}
  <script>
  // 生图结果下载：数据库存 WebP，点击时前端转成 PNG 再下载
  document.addEventListener('click', function (e) {

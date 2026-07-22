@@ -523,6 +523,14 @@ def card_like(card_id):
         db.session.add(CardLike(user_id=current_user.id, card_id=card_id))
         flash("已点赞", "success")
     db.session.commit()
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        # 局部提交：返回新状态供前端切换按钮，不整页刷新
+        return jsonify({
+            "ok": True,
+            "action": "like",
+            "state": existing is None,
+            "count": CardLike.query.filter_by(card_id=card_id).count(),
+        })
     return redirect(url_for("user.card_detail", card_id=card_id))
 
 
@@ -540,6 +548,14 @@ def card_favorite(card_id):
         db.session.add(CardFavorite(user_id=current_user.id, card_id=card_id))
         flash("已收藏", "success")
     db.session.commit()
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        # 局部提交：返回新状态供前端切换按钮，不整页刷新
+        return jsonify({
+            "ok": True,
+            "action": "favorite",
+            "state": existing is None,
+            "count": CardFavorite.query.filter_by(card_id=card_id).count(),
+        })
     return redirect(url_for("user.card_detail", card_id=card_id))
 
 
@@ -549,6 +565,7 @@ def user_follow(username):
     target = User_query_by_username(username)
     if not target or target.is_profile_banned:
         abort(404)
+    now_following = None
     if str(target.id) == str(current_user.get_id()):
         flash("不能关注自己", "warning")
     else:
@@ -557,14 +574,25 @@ def user_follow(username):
         ).first()
         if existing:
             db.session.delete(existing)
+            now_following = False
             flash("已取消关注", "info")
         else:
             db.session.add(
                 UserFollow(follower_id=current_user.id, following_id=target.id)
             )
             notify(target.id, f"{current_user.nickname} 关注了你", type_="follow")
+            now_following = True
             flash("已关注", "success")
         db.session.commit()
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        # 局部提交：返回新状态供前端切换按钮，不整页刷新
+        if now_following is None:
+            return jsonify({"ok": False, "error": "不能关注自己"})
+        return jsonify({
+            "ok": True,
+            "action": "follow",
+            "state": now_following,
+        })
     return redirect(url_for("user.profile", username=username))
 
 
