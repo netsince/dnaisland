@@ -105,20 +105,13 @@
           </div>
           {% endif %}
 
-          {# is_self 下的个人工具箱按钮组（双列紧凑网格） #}
+          {# is_self 下的快捷菜单触发按键（无高光描边，极简收纳） #}
           {% if is_self %}
           <div class="border-top border-secondary border-opacity-25 pt-3">
-            <div class="small text-muted mb-2">快捷工具</div>
-            <div class="row g-2">
-              <div class="col-6"><a class="btn btn-sm btn-outline-primary w-100 text-truncate px-1" href="{{ url_for('image_gen.workbench') }}">🎨 生图工作台</a></div>
-              <div class="col-6"><a class="btn btn-sm btn-outline-warning w-100 text-truncate px-1" href="{{ url_for('points.detail') }}">🪙 我的点数</a></div>
-              <div class="col-6"><a class="btn btn-sm btn-outline-info w-100 text-truncate px-1" href="{{ url_for('user.my_cards') }}">🎴 我的发布</a></div>
-              <div class="col-6"><a class="btn btn-sm btn-outline-secondary w-100 text-truncate px-1" href="{{ url_for('user.my_favorites') }}">⭐ 我的收藏</a></div>
-              <div class="col-6"><a class="btn btn-sm btn-outline-secondary w-100 text-truncate px-1" href="{{ url_for('user.my_likes') }}">❤️ 我点赞的</a></div>
-              <div class="col-6"><a class="btn btn-sm btn-outline-danger w-100 text-truncate px-1" href="{{ url_for('user.my_punishments') }}">⚖️ 我的处罚</a></div>
-              <div class="col-6"><a class="btn btn-sm btn-outline-secondary w-100 text-truncate px-1" href="{{ url_for('main.articles') }}">📰 官方公告</a></div>
-              <div class="col-6"><a class="btn btn-sm btn-outline-secondary w-100 text-truncate px-1" href="{{ url_for('auth.logout') }}">🚪 退出登录</a></div>
-            </div>
+            <button class="btn btn-secondary btn-sm w-100 d-flex align-items-center justify-content-between py-2 px-3 border-0" type="button" data-bs-toggle="offcanvas" data-bs-target="#userToolsOffcanvas">
+              <span class="d-flex align-items-center gap-2 fw-medium">⚙️ 功能菜单</span>
+              <span class="small opacity-75">展开 ➔</span>
+            </button>
           </div>
           {% endif %}
         </div>
@@ -201,6 +194,65 @@
       {{ render_pagination(tp_pagination, 'user.profile', tp_args) }}
     {% endif %}
     {% endif %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if is_self %}
+<!-- 个人功能菜单 侧滑抽屉 -->
+<div class="offcanvas offcanvas-start dna-tools-offcanvas" tabindex="-1" id="userToolsOffcanvas" aria-labelledby="userToolsOffcanvasLabel">
+  <div class="offcanvas-header border-bottom border-secondary border-opacity-25 py-3">
+    <h5 class="offcanvas-title h6 mb-0 d-flex align-items-center gap-2" id="userToolsOffcanvasLabel">
+      <span>⚙️</span> <span>功能菜单</span>
+    </h5>
+    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="关闭"></button>
+  </div>
+  <div class="offcanvas-body p-3">
+    {# 1. 资产类目 #}
+    <div class="text-muted small mb-2 px-2 fw-semibold">资产</div>
+    <div class="list-group list-group-flush mb-2">
+      <a href="{{ url_for('points.detail') }}" class="list-group-item list-group-item-action d-flex align-items-center gap-2 py-2 border-0 rounded-2">
+        <span>🪙</span> <span>我的点数</span>
+      </a>
+    </div>
+
+    <hr class="border-secondary border-opacity-25 my-3">
+
+    {# 2. 互动与内容类目（收藏、点赞、发布归为同类目） #}
+    <div class="text-muted small mb-2 px-2 fw-semibold">互动与内容</div>
+    <div class="list-group list-group-flush mb-2">
+      <a href="{{ url_for('user.my_favorites') }}" class="list-group-item list-group-item-action d-flex align-items-center gap-2 py-2 border-0 rounded-2 mb-1">
+        <span>⭐</span> <span>我的收藏</span>
+      </a>
+      <a href="{{ url_for('user.my_likes') }}" class="list-group-item list-group-item-action d-flex align-items-center gap-2 py-2 border-0 rounded-2 mb-1">
+        <span>❤️</span> <span>我点赞的</span>
+      </a>
+      <a href="{{ url_for('user.my_cards') }}" class="list-group-item list-group-item-action d-flex align-items-center gap-2 py-2 border-0 rounded-2">
+        <span>🎴</span> <span>我的发布</span>
+      </a>
+    </div>
+
+    <hr class="border-secondary border-opacity-25 my-3">
+
+    {# 3. 平台与记录类目 #}
+    <div class="text-muted small mb-2 px-2 fw-semibold">平台与记录</div>
+    <div class="list-group list-group-flush mb-2">
+      <a href="{{ url_for('main.articles') }}" class="list-group-item list-group-item-action d-flex align-items-center gap-2 py-2 border-0 rounded-2 mb-1">
+        <span>📰</span> <span>官方公告</span>
+      </a>
+      <a href="{{ url_for('user.my_punishments') }}" class="list-group-item list-group-item-action d-flex align-items-center gap-2 py-2 border-0 rounded-2">
+        <span>⚖️</span> <span>我的处罚</span>
+      </a>
+    </div>
+
+    <hr class="border-secondary border-opacity-25 my-3">
+
+    {# 4. 账号操作类目 #}
+    <div class="list-group list-group-flush">
+      <a href="{{ url_for('auth.logout') }}" class="list-group-item list-group-item-action text-danger d-flex align-items-center gap-2 py-2 border-0 rounded-2">
+        <span>🚪</span> <span>退出登录</span>
+      </a>
     </div>
   </div>
 </div>

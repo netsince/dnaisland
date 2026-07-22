@@ -915,3 +915,21 @@ body, .navbar, .footer, .card, .dna-tile, .dna-hero,
   letter-spacing: 0.5px;
 }
 
+/* 个人功能菜单侧滑抽屉 */
+.dna-tools-offcanvas {
+  background-color: var(--dna-surface-solid, #171527) !important;
+  color: var(--dna-text, #e2e8f0);
+  border-right: 1px solid var(--dna-border, rgba(255,255,255,0.1));
+  max-width: 280px;
+}
+.dna-tools-offcanvas .list-group-item {
+  background-color: transparent;
+  color: var(--dna-text, #e2e8f0);
+  border: none !important;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.dna-tools-offcanvas .list-group-item:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
