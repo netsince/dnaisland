@@ -104,11 +104,11 @@
   <!-- 原始列表模版片段（隐藏），供 JS 动态依时间从左到右分发进列 -->
   <div id="mgRawItems" style="display:none;">
     {% for l in logs %}
-    {% set imgs = l.image_list() %}
-    {% if imgs %}
+    {% set first_image = url_for('image_gen.output_image', log_id=l.id, idx=0) if l.image_list() else None %}
+    {% if first_image %}
     <div class="mg-item dna-img-fade">
       <a href="{{ url_for('image_gen.log_detail', log_id=l.id) }}" style="display:block">
-        <img src="{{ imgs[0] }}" alt="生成图" class="dna-img-fade__img" loading="lazy">
+        <img src="{{ first_image }}" alt="生成图" class="dna-img-fade__img" loading="lazy" decoding="async">
       </a>
       <div class="mg-meta">
         <div class="row1">
@@ -187,17 +187,17 @@
     fetch('/image-gen/api/logs', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
       .then(function (r) { return r.json(); })
       .then(function (res) {
-        if (!res.ok || !res.logs || !res.logs.length) return;
+        if (!res.ok || !res.items || !res.items.length) return;
         rawContainer.innerHTML = '';
-        res.logs.forEach(function (l) {
-          var imgs = l.images || [];
-          if (!imgs.length) return;
+        res.items.forEach(function (l) {
+          var firstImage = l.first_image;
+          if (!firstImage) return;
           var item = document.createElement('div');
           item.className = 'mg-item dna-img-fade';
           var stClass = l.status === 'success' ? 'ok' : (l.status === 'partial' ? 'part' : 'fail');
           var stText = l.status === 'success' ? '成功' : (l.status === 'partial' ? '部分' : '失败');
           item.innerHTML = '<a href="/image-gen/logs/' + l.id + '" style="display:block">' +
-            '<img src="' + imgs[0] + '" alt="生成图" class="dna-img-fade__img" loading="lazy"></a>' +
+            '<img src="' + firstImage + '" alt="生成图" class="dna-img-fade__img" loading="lazy" decoding="async"></a>' +
             '<div class="mg-meta">' +
               '<div class="row1"><span class="title">' + l.model_name + ' <span class="mg-status ' + stClass + '">' + stText + '</span></span></div>' +
               '<div class="info">' + (l.size || 'auto') + ' · ' + l.count + ' 张请求 · 消耗 ' + l.points_spent + ' 点</div>' +

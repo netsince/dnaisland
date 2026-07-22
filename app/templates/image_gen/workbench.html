@@ -31,8 +31,10 @@
  .ig-chips{display:flex;gap:8px;flex-wrap:wrap}
  .ig-chip{font-size:12px;color:#9a9ab0;background:#171722;border:1px solid #2a2a3a;padding:7px 13px;border-radius:20px;cursor:pointer}
  .ig-chip.on{color:#fff;border-color:transparent;background:linear-gradient(90deg,#a855f7,#ec4899)}
- .ig-masonry{column-count:3;column-gap:14px}
- .ig-masonry > *{break-inside:avoid;margin-bottom:14px}
+ .ig-masonry-row{display:flex;gap:14px;align-items:flex-start}
+ .ig-col{flex:1;display:flex;flex-direction:column;gap:14px;min-width:0}
+ @media (max-width:992px){ .ig-col:nth-child(3){display:none} }
+ @media (max-width:576px){ .ig-col:nth-child(2),.ig-col:nth-child(3){display:none} }
  .ig-mitem{display:block}
  .ig-mcard{display:block;border-radius:14px;overflow:hidden;position:relative;
  background:linear-gradient(135deg,#26263a,#3a2740);text-decoration:none}
@@ -193,28 +195,34 @@ object-fit:contain;border-radius:10px;border:1px solid #2a2a3a}
  <button class="ig-sheet__close" id="igSheetClose" type="button" aria-label="关闭">✕</button>
  </div>
  <div class="ig-sheet__body">
-<div class="ig-masonry" id="igGrid">
- {% for log in recent %}
- {% set img = log.image_list()[0] if log.image_list() else None %}
- {% if img %}
- <div class="ig-mitem">
- <a class="ig-mcard dna-img-fade" href="{{ url_for('image_gen.log_detail', log_id=log.id) }}">
- <img src="{{ img }}" alt="生成图" class="dna-img-fade__img">
+<div class="ig-masonry-row" id="igGrid">
+ <div class="ig-col"></div>
+ <div class="ig-col"></div>
+ <div class="ig-col"></div>
+</div>
+<div id="igRawItems" style="display:none;">
+{% for log in recent %}
+{% set img = url_for('image_gen.output_image', log_id=log.id, idx=0) if log.image_list() else None %}
+{% if img %}
+<div class="ig-mitem">
+<a class="ig-mcard dna-img-fade" href="{{ url_for('image_gen.log_detail', log_id=log.id) }}">
+<img src="{{ img }}" alt="生成图" class="dna-img-fade__img" loading="lazy" decoding="async">
  <span class="tag">{{ log.size or 'auto' }} · {{ log.model_name }}</span>
  </a>
  {% if log.reference_image_list() %}
  <div class="ig-refs">
- {% for ref_img in log.reference_image_list() %}
- <img src="{{ ref_img }}" alt="参考图">
+{% for ref_img in log.reference_image_list() %}
+<img src="{{ url_for('image_gen.reference_image', log_id=log.id, idx=loop.index0) }}" alt="参考图" loading="lazy" decoding="async">
  {% endfor %}
  </div>
  {% endif %}
- </div>
- {% endif %}
- {% else %}
- <div class="ig-empty">还没有生成记录，左侧填写提示词开始创作吧。</div>
- {% endfor %}
 </div>
+{% endif %}
+{% endfor %}
+</div>
+{% if not recent %}
+<div class="ig-empty">还没有生成记录，左侧填写提示词开始创作吧。</div>
+{% endif %}
  <div class="ig-page">
 {{ render_pagination(pagination, 'image_gen.workbench', {}) }}
 </div>
@@ -343,14 +351,13 @@ object-fit:contain;border-radius:10px;border:1px solid #2a2a3a}
  function setSkeletonState(show) {
  var skeleton = document.getElementById('igSkeletonCard');
  if (show) {
- if (!skeleton && grid) {
+ var firstCol = grid ? grid.querySelector('.ig-col') : null;
+ if (!skeleton && grid && firstCol) {
  skeleton = document.createElement('div');
  skeleton.id = 'igSkeletonCard';
  skeleton.className = 'ig-card-skeleton';
  skeleton.innerHTML = '<div class="spin-icon"></div><div class="loading-text">正在生成中...</div>';
- grid.insertBefore(skeleton, grid.firstChild);
- var empty = grid.querySelector('.ig-empty');
- if (empty) empty.style.display = 'none';
+ firstCol.insertBefore(skeleton, firstCol.firstChild);
  }
  } else {
  if (skeleton) skeleton.remove();
@@ -402,17 +409,30 @@ object-fit:contain;border-radius:10px;border:1px solid #2a2a3a}
  if (sheetClose) sheetClose.addEventListener('click', closeSheet);
  if (sheetBackdrop) sheetBackdrop.addEventListener('click', closeSheet);
 
- // 瀑布流列数随容器宽度自适应：最小 1 列，最大 7 列
- function layoutMasonry() {
+ // 瀑布流：与 logs 页一致的横向行序分列（idx % 可见列数 依次落入各列）
+ function renderWorkbenchMasonry() {
  if (!grid) return;
- var w = grid.clientWidth || (grid.parentElement ? grid.parentElement.clientWidth : 0);
- if (!w) return;
- var target = 200; // 每列目标宽度(px)
- var cols = Math.max(1, Math.min(7, Math.floor(w / target)));
- grid.style.columnCount = cols;
+ var cols = grid.querySelectorAll('.ig-col');
+ if (!cols.length) return;
+ cols.forEach(function (c) { c.innerHTML = ''; });
+ var visibleCols = 3;
+ if (window.innerWidth <= 576) visibleCols = 1;
+ else if (window.innerWidth <= 992) visibleCols = 2;
+ var raw = document.getElementById('igRawItems');
+ if (!raw) return;
+ var items = Array.prototype.slice.call(raw.children);
+ items.forEach(function (item, idx) {
+ var colIdx = idx % visibleCols;
+ cols[colIdx].appendChild(item.cloneNode(true));
+ });
+ initWorkbenchImgFade(grid);
  }
- layoutMasonry();
-window.addEventListener('resize', layoutMasonry);
+ renderWorkbenchMasonry();
+ var resizeTimer;
+ window.addEventListener('resize', function () {
+ clearTimeout(resizeTimer);
+ resizeTimer = setTimeout(renderWorkbenchMasonry, 100);
+ });
 
  // AJAX 提交：按钮旁显示「正在生成中」，插入虚化骨架，结果就地插入画廊
   form.addEventListener('submit', function (e) {
@@ -459,27 +479,24 @@ window.addEventListener('resize', layoutMasonry);
  statusEl.textContent = '完成，消耗 ' + data.points_spent + ' 点';
  statusEl.style.color = '#7ee787';
  if (pointsEl) pointsEl.innerHTML = '点数 <b>' + data.balance + '</b>';
+ var rawContainer = document.getElementById('igRawItems');
  (data.images || []).forEach(function (img) {
   var container = document.createElement('div');
   container.className = 'ig-mitem';
   var a = document.createElement('a');
   a.className = 'ig-mcard dna-img-fade';
   a.href = '/image-gen/logs/' + data.log_id;
-  a.innerHTML = '<img src="' + img + '" alt="生成图" class="dna-img-fade__img">' +
- '<span class="tag">' + (data.size || 'auto') + ' · ' + data.model_name + '</span>';
+  a.innerHTML = '<img src="' + img + '" alt="生成图" class="dna-img-fade__img" loading="lazy" decoding="async">' +
+  '<span class="tag">' + (data.size || 'auto') + ' · ' + data.model_name + '</span>';
   container.appendChild(a);
-  grid.insertBefore(container, grid.firstChild);
-
- // 关键修复：延迟 60ms 添加 is-loaded，确保浏览器渲染出模糊初始帧后再平滑散去模糊淡入清晰图
- setTimeout(function () {
- a.classList.add('is-loaded');
- }, 60);
+  if (rawContainer) rawContainer.insertBefore(container, rawContainer.firstChild);
  });
+ if (rawContainer) renderWorkbenchMasonry();
  promptEl.value = '';
  if (refInput) refInput.value = '';
  selectedRefs = [];
  if (refPreviewContainer) refPreviewContainer.innerHTML = '';
- var empty = grid.querySelector('.ig-empty');
+ var empty = document.querySelector('.ig-empty');
  if (empty) empty.remove();
  if (window.innerWidth <= 768) {
  sessionStorage.removeItem('ig_just_generated');

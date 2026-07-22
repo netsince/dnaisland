@@ -109,8 +109,8 @@
   <!-- 2. 图片绝对独立：纯粹展现 -->
   {% if imgs %}
   {% for img in imgs %}
-  <a class="glightbox gd-pure-img-anchor mb-2.5" href="{{ img }}" data-type="image" data-gallery="gendetail">
-    <img src="{{ img }}" class="gd-standalone-art" alt="生成作品 {{ loop.index }}" loading="lazy">
+  <a class="glightbox gd-pure-img-anchor mb-2.5" href="{{ url_for('image_gen.output_image', log_id=log.id, idx=loop.index0) }}" data-type="image" data-gallery="gendetail">
+    <img src="{{ url_for('image_gen.output_image', log_id=log.id, idx=loop.index0) }}" class="gd-standalone-art" alt="生成作品 {{ loop.index }}" loading="lazy" decoding="async">
   </a>
 
   <!-- 操作栏：舒适内边距 -->
@@ -119,7 +119,7 @@
       尺寸 <strong class="text-light me-2">{{ log.size or 'auto' }}</strong>
     </div>
     <div class="d-flex align-items-center gap-2">
-      <a class="btn btn-sm btn-outline-secondary rounded-pill px-3 py-1.5 fs-7 js-dlpng" href="{{ img }}" data-src="{{ img }}" data-name="artwork_{{ log.id }}_{{ loop.index }}.png">
+      <a class="btn btn-sm btn-outline-secondary rounded-pill px-3 py-1.5 fs-7 js-dlpng" href="{{ url_for('image_gen.output_image', log_id=log.id, idx=loop.index0) }}" data-src="{{ url_for('image_gen.output_image', log_id=log.id, idx=loop.index0) }}" data-name="artwork_{{ log.id }}_{{ loop.index }}.png">
         <i class="bi bi-download me-1"></i> 下载原图
       </a>
       <a class="btn btn-sm btn-primary rounded-pill px-3 py-1.5 fs-7" href="{{ url_for('image_gen.workbench') }}?prompt={{ log.prompt|urlencode }}" style="background: linear-gradient(90deg, #a855f7, #ec4899); border:none;">
@@ -156,8 +156,8 @@
       <div class="d-flex gap-2.5 overflow-x-auto pb-1">
         {% for ref_img in log.reference_image_list() %}
         <div class="gd-ref-chip">
-          <a class="glightbox" href="{{ ref_img }}" data-type="image">
-            <img src="{{ ref_img }}" alt="参考图" loading="lazy">
+          <a class="glightbox" href="{{ url_for('image_gen.reference_image', log_id=log.id, idx=loop.index0) }}" data-type="image">
+            <img src="{{ url_for('image_gen.reference_image', log_id=log.id, idx=loop.index0) }}" alt="参考图" loading="lazy" decoding="async">
           </a>
         </div>
         {% endfor %}

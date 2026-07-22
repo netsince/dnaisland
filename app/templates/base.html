@@ -24,7 +24,15 @@
 function showToast(message, type) {
   type = type || 'info';
   var container = document.getElementById('toast-container');
-  if (!container) return;
+  if (!container) {
+    // 容器缺失时（如整页加载时脚本早于容器解析）自动创建，保证 toast 一定能弹出
+    container = document.createElement('div');
+    container.id = 'toast-container';
+    container.className = 'dna-toast-container';
+    container.setAttribute('aria-live', 'polite');
+    container.setAttribute('aria-atomic', 'false');
+    document.body.appendChild(container);
+  }
   var el = document.createElement('div');
   el.className = 'dna-toast dna-toast--' + type;
   el.setAttribute('role', 'status');
@@ -184,19 +192,30 @@ function showToast(message, type) {
  {% endblock %}
 
  <main class="container-fluid py-4 flex-grow-1">
- {% with messages = get_flashed_messages(with_categories=true) %}
- {% if messages %}
- {% for category, message in messages %}
- <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
- {{ message }}
- <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="关闭"></button>
- </div>
- {% endfor %}
- {% endif %}
- {% endwith %}
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+{# 服务端 flash 消息改为右上角轻提示 toast，不再以 alert 块侵占正文阅读区；
+   整页加载与 Ajax/SPA 切页后均会通过 executeScripts 重跑此脚本 #}
+<script>
+  (function () {
+    var msgs = {{ messages | tojson }};
+    if (window.showToast && Array.isArray(msgs)) {
+      var known = ['danger', 'success', 'info', 'warning'];
+      msgs.forEach(function (m) {
+        if (!m) return;
+        var cat = m[0] || 'info';
+        if (known.indexOf(cat) < 0) cat = 'info';
+        showToast(m[1] == null ? '' : m[1], cat);
+      });
+    }
+  })();
+</script>
+{% endif %}
+{% endwith %}
 
- {% block content %}{% endblock %}
- </main>
+{% block content %}{% endblock %}
+{% block scripts %}{% endblock %}
+</main>
 
  <footer class="footer mt-auto py-3 bg-light">
  <div class="container-fluid text-center text-muted">
@@ -507,7 +526,6 @@ function showToast(message, type) {
   });
 })();
 </script>
-{% block scripts %}{% endblock %}
  <script>
  // 生图结果下载：数据库存 WebP，点击时前端转成 PNG 再下载
  document.addEventListener('click', function (e) {
@@ -592,6 +610,8 @@ function showToast(message, type) {
       if (!href || href.startsWith('#') || href.startsWith('javascript:') || href.startsWith('mailto:') || href.startsWith('tel:')) return true;
       if (a.hasAttribute('download') || a.getAttribute('target') === '_blank') return true;
       if (a.hasAttribute('data-no-pjax')) return true;
+      // 图片预览器（GLightbox）的触发链接：交给 GLightbox 自身弹窗，勿当切页拦截
+      if (a.classList && a.classList.contains('glightbox')) return true;
       if (a.origin !== location.origin) return true;
       return false;
     }
@@ -721,6 +741,7 @@ function showToast(message, type) {
 
         document.title = doc.title || document.title;
         document.body.className = doc.body.className;
+        document.body.style.overflow = '';
         syncHeadStyles(doc);
 
         main.innerHTML = newMain.innerHTML;
@@ -748,6 +769,8 @@ function showToast(message, type) {
     }
 
     document.addEventListener('click', function (e) {
+      // 若其它处理器（如下载、GLightbox 预览器）已接管该点击，不再触发切页
+      if (e.defaultPrevented) return;
       var a = e.target.closest ? e.target.closest('a') : null;
       if (isIgnoredLink(a)) return;
       if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
@@ -853,8 +876,6 @@ function showToast(message, type) {
  });
  })();
  </script>
-<!-- 轻提示容器：全局 toast 统一挂载于此 -->
-<div id="toast-container" class="dna-toast-container" aria-live="polite" aria-atomic="false"></div>
 
 <!-- 全局 AJAX Pjax 切换 Loading 遮罩与脉冲动画 -->
 <div class="dna-pjax-loader" id="pjaxLoader">

@@ -14,14 +14,19 @@ from flask import (
     redirect,
     render_template,
     request,
+    send_file,
     url_for,
 )
 from flask_login import current_user, login_required
+from io import BytesIO
 
 from ..extensions import db
 from ..models import GenerationLog, GenerationModel, PointTransaction
 from ..services.image_gen_service import generate_images
-from ..services.image_service import raw_bytes_to_webp_data_url
+from ..services.image_service import (
+    data_url_to_webp_bytes,
+    raw_bytes_to_webp_data_url,
+)
 from ..services.site_service import get_site_config
 
 image_gen_bp = Blueprint("image_gen", __name__, url_prefix="/image-gen")
@@ -67,6 +72,47 @@ def workbench():
         aspects=VALID_ASPECTS,
         max_refs=MAX_REFERENCES,
     )
+
+
+def _serve_webp_from_data_url(data_url):
+    """把某条生图记录的 base64 Data URL 转 WEBP 后以图片形式发送。"""
+    if not data_url:
+        abort(404)
+    try:
+        webp = data_url_to_webp_bytes(data_url)
+    except Exception:
+        abort(404)
+    return send_file(BytesIO(webp), mimetype="image/webp")
+
+
+@image_gen_bp.route("/output/<int:log_id>/<int:idx>")
+@login_required
+def output_image(log_id, idx):
+    """产出图（原图）接口：按 log_id + 序号返回 WEBP 二进制。"""
+    log = db.session.get(GenerationLog, log_id)
+    if not log:
+        abort(404)
+    if log.user_id != current_user.id and not current_user.is_super_admin:
+        abort(403)
+    imgs = log.image_list()
+    if idx < 0 or idx >= len(imgs):
+        abort(404)
+    return _serve_webp_from_data_url(imgs[idx])
+
+
+@image_gen_bp.route("/reference/<int:log_id>/<int:idx>")
+@login_required
+def reference_image(log_id, idx):
+    """参考图（垫图）接口：按 log_id + 序号返回 WEBP 二进制。"""
+    log = db.session.get(GenerationLog, log_id)
+    if not log:
+        abort(404)
+    if log.user_id != current_user.id and not current_user.is_super_admin:
+        abort(403)
+    refs = log.reference_image_list()
+    if idx < 0 or idx >= len(refs):
+        abort(404)
+    return _serve_webp_from_data_url(refs[idx])
 
 
 @image_gen_bp.route("/generate", methods=["POST"])
@@ -207,7 +253,10 @@ def generate():
                 log_id=log.id,
                 model_name=model.display_name,
                 size=size,
-                images=images,
+                images=[
+                    url_for("image_gen.output_image", log_id=log.id, idx=i)
+                    for i in range(len(images))
+                ],
                 points_spent=spent,
                 balance=current_user.points,
                 status=status,
@@ -233,7 +282,9 @@ def api_logs():
         if imgs:
             items.append({
                 "id": l.id,
-                "first_image": imgs[0],
+                "first_image": url_for(
+                    "image_gen.output_image", log_id=l.id, idx=0
+                ),
                 "model_name": l.model_name,
                 "size": l.size or "auto",
                 "count": l.count,

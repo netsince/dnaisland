@@ -72,3 +72,22 @@ def raw_bytes_to_webp_data_url(raw_bytes: bytes, max_edge: int = 1024, quality: 
     img.save(out, format="WEBP", quality=quality)
     return _encode(out.getvalue(), mime="image/webp")
 
+
+def data_url_to_webp_bytes(data_url: str, max_edge: int = 1024, quality: int = 82) -> bytes:
+    """存储的 base64 Data URL -> WEBP 原始字节（供图片 API 直接以二进制发送）。
+
+    - 解码 Data URL 拿到原始字节
+    - 统一转 RGBA，长边超过 max_edge 时等比缩放，再以 WEBP 编码
+    """
+    raw = _decode(data_url)
+    img = Image.open(BytesIO(raw)).convert("RGBA")
+    w, h = img.size
+    if max(w, h) > max_edge:
+        scale = max_edge / max(w, h)
+        img = img.resize(
+            (max(1, int(w * scale)), max(1, int(h * scale))), Image.LANCZOS
+        )
+    out = BytesIO()
+    img.save(out, format="WEBP", quality=quality)
+    return out.getvalue()
+
