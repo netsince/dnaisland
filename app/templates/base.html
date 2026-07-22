@@ -717,10 +717,10 @@ function showToast(message, type) {
  <i class="bi bi-compass"></i>
  <span>探索</span>
  </a>
- <button type="button" class="dna-mobile-nav__item border-0 bg-transparent {% if request.endpoint and request.endpoint.startswith('publish.') %}active{% endif %}" id="mobilePlusBtn" aria-label="发布或生图">
- <i id="mobilePlusSvg" class="bi bi-plus-lg" style="transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1); display:inline-block;"></i>
- <span>＋发布</span>
- </button>
+  <button type="button" class="dna-mobile-nav__item border-0 bg-transparent {% if request.endpoint and request.endpoint.startswith('publish.') %}active{% endif %}" id="mobilePlusBtn" aria-label="发布或生图">
+  <i id="mobilePlusSvg" class="bi bi-plus-lg" style="transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1); display:inline-block;"></i>
+  <span id="mobilePlusText" class="dna-mobile-plus-text">关闭</span>
+  </button>
  <a href="{{ url_for('teahouse.index') }}" class="dna-mobile-nav__item {% if request.endpoint and request.endpoint.startswith('teahouse.') %}active{% endif %}">
  <i class="bi bi-chat-dots"></i>
  <span>茶馆</span>
