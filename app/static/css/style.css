@@ -828,4 +828,34 @@ body, .navbar, .footer, .card, .dna-tile, .dna-hero,
   }
 }
 
+/* 个人主页 PC 双栏侧边栏 */
+@media (min-width: 992px) {
+  .dna-profile-card {
+    position: sticky;
+    top: 70px;
+    z-index: 10;
+  }
+}
 
+/* 个人主页 移动端紧凑 Header 与 Tab 吸顶 */
+@media (max-width: 768px) {
+  .dna-profile-card .dna-avatar,
+  .dna-profile-card .dna-avatar-ph {
+    width: 64px !important;
+    height: 64px !important;
+    font-size: 1.6rem !important;
+  }
+  .dna-profile-card .card-body {
+    padding: 1rem !important;
+  }
+  .dna-profile-tabs {
+    position: sticky;
+    top: 52px;
+    z-index: 1020;
+    background: var(--dna-bg-2);
+    padding-top: 6px;
+    margin-inline: -10px;
+    padding-inline: 10px;
+    border-bottom: 1px solid var(--dna-border);
+  }
+}

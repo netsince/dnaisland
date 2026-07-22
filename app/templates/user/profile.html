@@ -6,72 +6,79 @@
 {% block title %}{{ u.display_name }} · DNAISLAND{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-  <div class="col-12 col-lg-9">
-    {% if mourning %}
-    {# 纪念横幅：配置了纪念横幅 URL 时整块可点击跳转，否则仅展示文案 #}
-    {% if site_cfg.memorial_banner_url %}
-    <a href="{{ site_cfg.memorial_banner_url }}" class="text-decoration-none">
-    {% endif %}
-      <div class="text-center mb-4 p-4 rounded-3 border-0"
-           style="background:linear-gradient(135deg,#1f1f2e,#3a2740);color:#f3e9d2;">
-        <div class="fs-5 fw-semibold">斯人虽远去，万古作星辰。</div>
-        <div class="opacity-75 mt-1">Ta已经离开了我们，请允许我们做出最后的道别。</div>
-      </div>
-    {% if site_cfg.memorial_banner_url %}
-    </a>
-    {% endif %}
-    {% endif %}
+{% if mourning %}
+{# 纪念横幅：配置了纪念横幅 URL 时整块可点击跳转，否则仅展示文案 #}
+{% if site_cfg.memorial_banner_url %}
+<a href="{{ site_cfg.memorial_banner_url }}" class="text-decoration-none">
+{% endif %}
+  <div class="text-center mb-4 p-4 rounded-3 border-0"
+       style="background:linear-gradient(135deg,#1f1f2e,#3a2740);color:#f3e9d2;">
+    <div class="fs-5 fw-semibold">斯人虽远去，万古作星辰。</div>
+    <div class="opacity-75 mt-1">Ta已经离开了我们，请允许我们做出最后的道别。</div>
+  </div>
+{% if site_cfg.memorial_banner_url %}
+</a>
+{% endif %}
+{% endif %}
 
-    {% if deleted %}
-    {# 账号已被管理员删除：仅展示提示，不再暴露任何资料与内容 #}
-    <div class="alert alert-warning">
-      <h4 class="alert-heading">账号已被删除</h4>
-      <p class="mb-0">因相关问题，此账号已被管理员删除。</p>
-    </div>
-    {% elif restricted %}
-    {# 他人访问被「禁止主页被访问」的用户：仅展示受限提示与处罚列表 #}
-    <div class="alert alert-warning">
-      <h4 class="alert-heading">该用户主页已被限制访问</h4>
-      <p class="mb-0">该用户当前受到以下平台处罚：</p>
-    </div>
-    <ul class="list-group mb-3">
-      {% for p in punishments %}
-      <li class="list-group-item d-flex justify-content-between align-items-center">
-        <span>{{ p.type_label }}</span>
-        <span class="text-muted small">{{ p.created_at.strftime('%Y-%m-%d') if p.created_at else '' }}</span>
-      </li>
-      {% endfor %}
-    </ul>
-    {% else %}
+{% if deleted %}
+{# 账号已被管理员删除：仅展示提示，不再暴露任何资料与内容 #}
+<div class="alert alert-warning">
+  <h4 class="alert-heading">账号已被删除</h4>
+  <p class="mb-0">因相关问题，此账号已被管理员删除。</p>
+</div>
+{% elif restricted %}
+{# 他人访问被「禁止主页被访问」的用户：仅展示受限提示与处罚列表 #}
+<div class="alert alert-warning">
+  <h4 class="alert-heading">该用户主页已被限制访问</h4>
+  <p class="mb-0">该用户当前受到以下平台处罚：</p>
+</div>
+<ul class="list-group mb-3">
+  {% for p in punishments %}
+  <li class="list-group-item d-flex justify-content-between align-items-center">
+    <span>{{ p.type_label }}</span>
+    <span class="text-muted small">{{ p.created_at.strftime('%Y-%m-%d') if p.created_at else '' }}</span>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
 
-    {# 资料头 #}
-    <div class="card mb-4">
+<div class="row g-3 g-lg-4">
+  <!-- 左侧资料列 -->
+  <div class="col-12 col-lg-4 col-xl-3">
+    <div class="card dna-profile-card">
       <div class="card-body p-4">
-        <div class="d-flex flex-wrap align-items-center gap-3">
-          {% if u.avatar %}
-          <img src="{{ u.avatar }}" alt="头像" class="dna-avatar" style="width:96px;height:96px;">
-          {% else %}
-          <div class="dna-avatar-ph" style="width:96px;height:96px;font-size:2.4rem;">{{ u.display_name[:1] }}</div>
-          {% endif %}
-          <div class="flex-grow-1">
-            <h1 class="h4 mb-1">
-              {{ u.display_name }}{{ badge(u) }}
-              {% if u.role == 'super_admin' %}<span class="badge bg-danger align-middle ms-1">管理员</span>{% endif %}
-            </h1>
-            <div class="text-muted">@{{ u.username }}{% if is_self %} · <span class="dna-chip">这是你</span>{% endif %}</div>
-            <div class="d-flex align-items-center gap-4 mt-3 flex-wrap">
-              <div><a class="text-decoration-none text-reset" href="{{ url_for('user.following', username=u.username) }}"><strong class="text-light">{{ following_count }}</strong> <span class="text-muted small">关注</span></a></div>
-              <div><a class="text-decoration-none text-reset" href="{{ url_for('user.followers', username=u.username) }}"><strong class="text-light">{{ follower_count }}</strong> <span class="text-muted small">粉丝</span></a></div>
-              <div><strong class="text-light">{{ pagination.total }}</strong> <span class="text-muted small">角色卡</span></div>
+        <div class="d-flex flex-column gap-3">
+          {# 头像与基本信息 #}
+          <div class="d-flex align-items-center gap-3">
+            {% if u.avatar %}
+            <img src="{{ u.avatar }}" alt="头像" class="dna-avatar flex-shrink-0" style="width:96px;height:96px;">
+            {% else %}
+            <div class="dna-avatar-ph flex-shrink-0" style="width:96px;height:96px;font-size:2.4rem;">{{ u.display_name[:1] }}</div>
+            {% endif %}
+            <div class="flex-grow-1 min-w-0">
+              <h1 class="h5 mb-1 text-truncate">
+                {{ u.display_name }}{{ badge(u) }}
+                {% if u.role == 'super_admin' %}<span class="badge bg-danger align-middle ms-1">管理员</span>{% endif %}
+              </h1>
+              <div class="text-muted small text-truncate">@{{ u.username }}{% if is_self %} · <span class="dna-chip">这是你</span>{% endif %}</div>
             </div>
           </div>
-          <div class="ms-auto d-flex flex-column gap-2">
+
+          {# 粉丝/关注/角色卡数据 #}
+          <div class="d-flex align-items-center justify-content-around text-center border-top border-bottom border-secondary border-opacity-25 py-2">
+            <div><a class="text-decoration-none text-reset" href="{{ url_for('user.following', username=u.username) }}"><strong class="text-light d-block">{{ following_count }}</strong><span class="text-muted small">关注</span></a></div>
+            <div><a class="text-decoration-none text-reset" href="{{ url_for('user.followers', username=u.username) }}"><strong class="text-light d-block">{{ follower_count }}</strong><span class="text-muted small">粉丝</span></a></div>
+            <div><strong class="text-light d-block">{{ pagination.total }}</strong><span class="text-muted small">角色卡</span></div>
+          </div>
+
+          {# 编辑/关注行动按钮 #}
+          <div class="d-flex flex-column gap-2">
             {% if is_self %}
               {% if u.is_edit_profile_banned %}
-              <span class="text-muted small">你被禁止更改资料</span>
+              <span class="text-muted small text-center">你被禁止更改资料</span>
               {% else %}
-              <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('user.profile_edit') }}">编辑资料</a>
+              <a class="btn btn-sm btn-outline-secondary w-100" href="{{ url_for('user.profile_edit') }}">编辑资料</a>
               {% endif %}
             {% else %}
             <form method="post" action="{{ url_for('user.user_follow', username=u.username) }}">
@@ -79,29 +86,37 @@
                 {{ '取消关注' if is_following else '＋ 关注' }}
               </button>
             </form>
-            <a class="btn btn-sm btn-outline-danger" href="{{ url_for('user.report', type='user', id=u.username) }}">举报</a>
+            <a class="btn btn-sm btn-outline-danger w-100" href="{{ url_for('user.report', type='user', id=u.username) }}">举报</a>
             {% endif %}
           </div>
-        </div>
 
-        {% if u.bio or u.location or u.website or u.birthday %}
-        <hr class="border-secondary opacity-25">
-        {% if u.bio %}<p class="mb-2" style="white-space:pre-wrap;">{{ u.bio }}</p>{% endif %}
-        <ul class="list-inline mb-0 small text-muted">
-          {% if u.location %}<li class="list-inline-item me-3">📍 {{ u.location }}</li>{% endif %}
-          {% if u.website %}<li class="list-inline-item me-3">🔗 <a href="{{ u.website }}" target="_blank" rel="noopener">{{ u.website }}</a></li>{% endif %}
-          {% if u.birthday %}<li class="list-inline-item me-3">🎂 {{ u.birthday.strftime('%Y-%m-%d') }}</li>{% endif %}
-          <li class="list-inline-item">📅 加入于 {{ u.created_at.strftime('%Y-%m-%d') if u.created_at else '—' }}</li>
-        {% endif %}
-        {% if is_self %}
-        <div class="d-flex flex-wrap gap-2 mt-3 pt-3 border-top border-secondary border-opacity-25">
-          <a class="btn btn-sm btn-outline-primary" href="{{ url_for('image_gen.workbench') }}">🎨 AI 生图工作台</a>
-          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('main.articles') }}">📰 官方公告与文章</a>
+          {# bio / location / website / birthday / created_at #}
+          {% if u.bio or u.location or u.website or u.birthday %}
+          <div class="border-top border-secondary border-opacity-25 pt-3">
+            {% if u.bio %}<p class="mb-2 small" style="white-space:pre-wrap;">{{ u.bio }}</p>{% endif %}
+            <ul class="list-unstyled mb-0 small text-muted d-flex flex-column gap-1">
+              {% if u.location %}<li>📍 {{ u.location }}</li>{% endif %}
+              {% if u.website %}<li>🔗 <a href="{{ u.website }}" target="_blank" rel="noopener">{{ u.website }}</a></li>{% endif %}
+              {% if u.birthday %}<li>🎂 {{ u.birthday.strftime('%Y-%m-%d') }}</li>{% endif %}
+              <li>📅 加入于 {{ u.created_at.strftime('%Y-%m-%d') if u.created_at else '—' }}</li>
+            </ul>
+          </div>
+          {% endif %}
+
+          {# is_self 下的工具箱按钮 #}
+          {% if is_self %}
+          <div class="d-flex flex-column gap-2 pt-3 border-top border-secondary border-opacity-25">
+            <a class="btn btn-sm btn-outline-primary w-100" href="{{ url_for('image_gen.workbench') }}">🎨 AI 生图工作台</a>
+            <a class="btn btn-sm btn-outline-secondary w-100" href="{{ url_for('main.articles') }}">📰 官方公告与文章</a>
+          </div>
+          {% endif %}
         </div>
-        {% endif %}
       </div>
     </div>
+  </div>
 
+  <!-- 右侧内容列 -->
+  <div class="col-12 col-lg-8 col-xl-9">
     {% if punishments %}
     <div class="alert alert-danger">
       <strong>{{ '你' if is_self else '该用户' }}当前受到的处罚：</strong>
@@ -113,7 +128,7 @@
     {% endif %}
 
     {# 内容分类 tab #}
-    <ul class="nav nav-tabs mb-3">
+    <ul class="nav nav-tabs dna-profile-tabs mb-3">
       <li class="nav-item">
         <a class="nav-link {% if tab == 'cards' %}active{% endif %}" href="{{ url_for('user.profile', username=u.username, tab='cards') }}">角色卡</a>
       </li>
@@ -176,9 +191,9 @@
     {% endif %}
     {% endif %}
     </div>
-    {% endif %}
   </div>
 </div>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
