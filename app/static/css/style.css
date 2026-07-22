@@ -1044,7 +1044,7 @@ body.is-mobile-plus-open header {
   border-radius: 50%;
 }
 
-/* ===== 角色卡详情页全宽横幅封面 ===== */
+/* ===== 角色卡详情页全宽横幅封面（保持原图比例，不裁剪） ===== */
 .dna-card-banner {
   width: 100vw;
   position: relative;
@@ -1052,15 +1052,18 @@ body.is-mobile-plus-open header {
   right: 50%;
   margin-left: -50vw;
   margin-right: -50vw;
-  height: 220px;
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
+  overflow: hidden;
+  background: #0b0a14;
 }
-.dna-card-banner::after {
-  content: '';
+.dna-card-banner img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.dna-card-banner__fade {
   position: absolute;
   inset: 0;
+  pointer-events: none;
   background: linear-gradient(to bottom, transparent 40%, var(--bs-body-bg, #12111c) 100%);
 }
 
