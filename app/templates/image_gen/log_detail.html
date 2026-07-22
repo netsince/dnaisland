@@ -12,7 +12,17 @@
     padding-inline: 4px;
   }
 
-  /* 图片直接作为独立最外层节点，彻底无任何父级容器卡片与背景框 */
+  /* 彻底移除任何黑色/写死背景，主图节点绝对纯粹 */
+  .gd-pure-img-anchor {
+    display: block;
+    background: transparent !important;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .gd-pure-img-anchor::after {
+    display: none !important; /* 彻底移除扫光伪元素黑底 */
+  }
+
   img.gd-standalone-art {
     width: 100% !important;
     height: auto !important;
@@ -21,6 +31,7 @@
     display: block;
     margin: 0 auto 0.75rem auto;
     border-radius: 10px;
+    background: transparent !important;
   }
 
   /* 下载与操作单独在下方的独立小容器中 */
@@ -61,7 +72,7 @@
     padding: 2px;
     flex: none;
   }
-  .gd-ref-chip img.dna-img-fade__img {
+  .gd-ref-chip img {
     max-height: 85px !important;
     width: auto !important;
     max-width: 140px !important;
@@ -87,11 +98,11 @@
   {% set imgs = log.image_list() %}
   {% set st = log.status %}
 
-  <!-- 2. 图片绝对独立：无任何父级容器卡片包裹 -->
+  <!-- 2. 图片绝对独立：彻底移除 dna-img-fade 的黑底背景 -->
   {% if imgs %}
   {% for img in imgs %}
-  <a class="glightbox d-block dna-img-fade mb-2" href="{{ img }}" data-type="image" data-gallery="gendetail" title="点击放大查看原图" style="aspect-ratio: auto !important;">
-    <img src="{{ img }}" class="gd-standalone-art dna-img-fade__img" alt="生成作品 {{ loop.index }}" loading="lazy">
+  <a class="glightbox gd-pure-img-anchor mb-2" href="{{ img }}" data-type="image" data-gallery="gendetail" title="点击放大查看原图">
+    <img src="{{ img }}" class="gd-standalone-art" alt="生成作品 {{ loop.index }}" loading="lazy">
   </a>
 
   <!-- 下载与操作单独在下方独立小容器中 -->
@@ -136,9 +147,9 @@
       <div class="fw-bold small mb-1.5"><i class="bi bi-images me-1 text-primary"></i> 所用参考图（{{ log.reference_image_list()|length }} 张）</div>
       <div class="d-flex gap-2 overflow-x-auto pb-1">
         {% for ref_img in log.reference_image_list() %}
-        <div class="gd-ref-chip dna-img-fade">
+        <div class="gd-ref-chip">
           <a class="glightbox" href="{{ ref_img }}" data-type="image" title="查看参考大图">
-            <img src="{{ ref_img }}" alt="参考图" class="dna-img-fade__img" loading="lazy">
+            <img src="{{ ref_img }}" alt="参考图" loading="lazy">
           </a>
         </div>
         {% endfor %}
