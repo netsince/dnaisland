@@ -68,7 +68,11 @@
  /* 移动端底部弹窗：生图日志（桌面端为内联画廊，头部与按钮均隐藏） */
  .ig-sheet{display:block}
  .ig-sheet__bar,.ig-sheet__backdrop,.ig-log-btn{display:none}
- @media (max-width:768px){
+ @media (max-width:991.98px){
+ .dna-wb-container{flex-direction:column !important}
+ .ig-side{width:100%;height:auto;border-right:none;border-bottom:1px solid #2a2a3a}
+ .ig-main{height:auto;padding:18px}
+ .ig-brand h1{font-size:16px}
  .ig-sheet{position:fixed;left:0;right:0;bottom:0;z-index:1060;max-height:82vh;
  display:flex;flex-direction:column;background:#12121c;
  border-top:1px solid #2a2a3a;border-radius:16px 16px 0 0;
@@ -84,7 +88,7 @@
  .ig-sheet__backdrop{display:block;position:fixed;inset:0;background:rgba(0,0,0,.5);
  z-index:1055;opacity:0;pointer-events:none;transition:opacity .28s}
  .ig-sheet__backdrop.show{opacity:1;pointer-events:auto}
- .ig-log-btn{display:inline-flex}
+ .ig-log-btn{display:inline-flex !important}
  .ig-log-link{display:none}
  }
  .ig-page{margin-top:24px}
@@ -118,17 +122,12 @@
  .ig-box[data-shape="9:16"]{width:18px;height:32px}
  .ig-box[data-shape="auto"]{width:18px;height:18px;border-radius:50%}
  .caret{margin-left:auto;color:#9a9ab0}
- @media (max-width: 768px){
- .ig-side{width:100%;height:auto;border-right:none;border-bottom:1px solid #2a2a3a}
- .ig-main{height:auto;padding:18px}
- .ig-brand h1{font-size:16px}
- }
 
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="d-flex">
+<div class="d-flex dna-wb-container">
  <aside class="ig-side">
  <div class="ig-brand">
  <h1>◆ 生图工作台</h1>
