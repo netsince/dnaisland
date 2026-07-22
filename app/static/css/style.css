@@ -1267,13 +1267,13 @@ body.is-mobile-plus-open header {
   white-space: pre-wrap;
 }
 
-/* 专属控制：手机端（<992px）隐藏顶栏 Header，并替换为 25px 顶边距 padding */
+/* 专属控制：手机端（<992px）隐藏顶栏 Header，统一 main 顶边距 padding 为 15px */
 @media (max-width: 991.98px) {
   body.dna-hide-header-on-mobile header {
     display: none !important;
   }
-  body.dna-hide-header-on-mobile main {
-    padding-top: 25px !important;
+  main {
+    padding-top: 15px !important;
   }
 }
 
