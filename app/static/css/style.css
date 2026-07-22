@@ -796,6 +796,11 @@ body, .navbar, .footer, .card, .dna-tile, .dna-hero,
 }
 
 @media (max-width: 768px) {
+  /* 彻底屏蔽移动端顶部重复的汉堡菜单与折叠链接 */
+  .navbar-toggler,
+  .navbar-collapse {
+    display: none !important;
+  }
   body {
     padding-bottom: 64px !important;
   }
