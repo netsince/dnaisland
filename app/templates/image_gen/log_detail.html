@@ -20,7 +20,7 @@
     overflow: hidden;
   }
   .gd-pure-img-anchor::after {
-    display: none !important; /* 彻底移除扫光伪元素黑底 */
+    display: none !important;
   }
 
   img.gd-standalone-art {
@@ -32,6 +32,13 @@
     margin: 0 auto 0.75rem auto;
     border-radius: 10px;
     background: transparent !important;
+  }
+
+  /* 彻底屏蔽 GLightbox 放大弹窗底部的白条与冗余描述文字 */
+  .gslide-description, .gslide-title, .gdesc-inner, .gslide-desc {
+    display: none !important;
+    background: transparent !important;
+    border: none !important;
   }
 
   /* 下载与操作单独在下方的独立小容器中 */
@@ -98,10 +105,10 @@
   {% set imgs = log.image_list() %}
   {% set st = log.status %}
 
-  <!-- 2. 图片绝对独立：彻底移除 dna-img-fade 的黑底背景 -->
+  <!-- 2. 图片绝对独立：无 title 冗余描述，全屏无白条 -->
   {% if imgs %}
   {% for img in imgs %}
-  <a class="glightbox gd-pure-img-anchor mb-2" href="{{ img }}" data-type="image" data-gallery="gendetail" title="点击放大查看原图">
+  <a class="glightbox gd-pure-img-anchor mb-2" href="{{ img }}" data-type="image" data-gallery="gendetail">
     <img src="{{ img }}" class="gd-standalone-art" alt="生成作品 {{ loop.index }}" loading="lazy">
   </a>
 
@@ -148,7 +155,7 @@
       <div class="d-flex gap-2 overflow-x-auto pb-1">
         {% for ref_img in log.reference_image_list() %}
         <div class="gd-ref-chip">
-          <a class="glightbox" href="{{ ref_img }}" data-type="image" title="查看参考大图">
+          <a class="glightbox" href="{{ ref_img }}" data-type="image">
             <img src="{{ ref_img }}" alt="参考图" loading="lazy">
           </a>
         </div>
