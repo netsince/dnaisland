@@ -6,129 +6,120 @@
 {% block head %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/glightbox@3.3.0/dist/css/glightbox.min.css">
 <style>
- .gd-wrap{max-width:960px;margin:0 auto}
- .gd-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:22px;flex-wrap:wrap}
- .gd-head h2{font-size:22px;font-weight:700;margin:0;
- background:linear-gradient(90deg,#a855f7,#ec4899);
- -webkit-background-clip:text;background-clip:text;color:transparent}
+  .gd-container {
+    max-width: 780px;
+    margin: 0 auto;
+  }
+  
+  /* 纯粹原图展示，无任何强加边框或油腻背景 */
+  .gd-main-image {
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 12px;
+    margin: 0 auto;
+  }
 
- .gd-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:18px}
- .gd-stat{background:#171722;border:1px solid #26263a;border-radius:14px;padding:13px 14px}
- .gd-stat .k{font-size:12px;color:#9a9ab0;margin-bottom:5px}
- .gd-stat .v{font-size:15px;color:#ECECF3;font-weight:600;word-break:break-word}
- .gd-stat .v small{font-weight:400;color:#9a9ab0;font-size:11px}
+  .gd-prompt-block {
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+  }
 
- .badge-ok{background:rgba(63,185,80,.16);color:#7ee787;border:1px solid rgba(63,185,80,.4)}
- .badge-part{background:rgba(210,153,34,.16);color:#f0c040;border:1px solid rgba(210,153,34,.4)}
- .badge-fail{background:rgba(248,81,73,.16);color:#ff7b72;border:1px solid rgba(248,81,73,.4)}
- .badge-def{background:#26263a;color:#cfcfe0;border:1px solid #33334a}
-
- .gd-prompt{background:#0e0e16;border:1px solid #26263a;border-radius:14px;padding:14px 16px;
- white-space:pre-wrap;font-size:.9rem;color:#d7d7e6;line-height:1.6;margin:0}
- .gd-sec{font-size:14px;color:#cfcfe0;margin:26px 0 14px;font-weight:600;
- display:flex;align-items:center;gap:8px}
- .gd-sec::before{content:"";width:4px;height:16px;border-radius:3px;
- background:linear-gradient(180deg,#a855f7,#ec4899)}
-
- .gd-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
- .gen-card{background:#171722;border:1px solid #26263a;border-radius:16px;overflow:hidden;
- transition:transform .3s,box-shadow .3s,border-color .3s}
- .gen-card:hover{transform:translateY(-4px);border-color:#a855f7;box-shadow:0 14px 34px rgba(0,0,0,.45)}
- .gen-card__media{position:relative;background:#111;cursor:zoom-in}
- .gen-detail-fade{aspect-ratio:auto;background:#111;border-radius:0}
- .gen-detail-fade .dna-img-fade__img{height:auto;transition:transform .5s cubic-bezier(.2,.7,.3,1)}
- .gen-card:hover .dna-img-fade__img{transform:scale(1.04)}
- .gen-card__bar{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px}
- .gen-idx{font-size:12px;color:#9a9ab0}
- .gen-dl{cursor:pointer;background:linear-gradient(90deg,#a855f7,#ec4899);border:none;color:#fff;
- font-size:13px;font-weight:600;padding:7px 14px;border-radius:10px;transition:filter .2s}
- .gen-dl:hover{filter:brightness(1.1)}
-
- .gd-refs{display:flex;gap:14px;flex-wrap:wrap}
- .gd-ref{position:relative;width:128px;height:128px;border-radius:12px;overflow:hidden;
- background:#111;border:1px solid #26263a;cursor:zoom-in;transition:transform .3s,border-color .3s}
- .gd-ref:hover{transform:translateY(-3px);border-color:#a855f7}
- .gd-ref img{width:100%;height:100%;object-fit:cover;display:block}
- .gd-ref__dl{position:absolute;right:6px;bottom:6px;width:28px;height:28px;border-radius:50%;
- background:linear-gradient(90deg,#a855f7,#ec4899);color:#fff;font-size:14px;line-height:28px;
- text-align:center;text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,.5);z-index:2}
- .gd-ref__dl:hover{filter:brightness(1.1)}
-
- .gd-empty{text-align:center;color:#9a9ab0;padding:60px 0}
- .gd-empty .big{font-size:40px;display:block;margin-bottom:10px;opacity:.6}
- @media (max-width:576px){ .gd-head h2{font-size:19px} }
+  .gd-ref-item {
+    width: 80px;
+    height: 80px;
+    border-radius: 8px;
+    overflow: hidden;
+    flex: none;
+  }
+  .gd-ref-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container py-4 gd-wrap">
- <div class="gd-head">
- <h2>生图详情</h2>
- <a class="btn btn-sm btn-outline-light" href="{{ url_for('image_gen.logs') }}">← 返回记录</a>
- </div>
+<div class="container py-3 gd-container">
+  <!-- 返回与顶栏 -->
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <a class="btn btn-sm btn-link text-muted text-decoration-none px-0" href="{{ url_for('image_gen.logs') }}">
+      <i class="bi bi-chevron-left me-1"></i> 返回生图记录
+    </a>
+    <div class="small text-muted">
+      {{ log.created_at.strftime('%Y-%m-%d %H:%M') }}
+    </div>
+  </div>
 
- {% set st = log.status %}
- <div class="gd-stats">
- <div class="gd-stat"><div class="k">模型</div><div class="v">{{ log.model_name }}</div></div>
- <div class="gd-stat"><div class="k">状态</div><div class="v">
- {% if st == 'success' %}<span class="badge badge-ok">成功</span>
- {% elif st == 'partial' %}<span class="badge badge-part">部分成功</span>
- {% elif st == 'failed' %}<span class="badge badge-fail">失败</span>
- {% else %}<span class="badge badge-def">{{ st or '未知' }}</span>{% endif %}
- </div></div>
- <div class="gd-stat"><div class="k">宽高比 / 尺寸</div><div class="v">{{ log.size or 'auto' }}</div></div>
- <div class="gd-stat"><div class="k">请求张数</div><div class="v">{{ log.count }}</div></div>
- <div class="gd-stat"><div class="k">参考图</div><div class="v">{{ log.references_count }} 张</div></div>
- <div class="gd-stat"><div class="k">消耗点数</div><div class="v">{{ log.points_spent }} <small>点</small></div></div>
- <div class="gd-stat" style="grid-column:1/-1"><div class="k">生成时间</div>
- <div class="v">{{ log.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</div></div>
- </div>
+  {% set imgs = log.image_list() %}
+  {% set st = log.status %}
 
- <div class="gd-sec">提示词</div>
- <pre class="gd-prompt">{{ log.prompt }}</pre>
- {% if log.reference_image_list() %}
- <div class="mb-3 mt-3">
- <div class="small text-muted mb-2">上传的参考图（{{ log.reference_image_list()|length }} 张，点击可放大查看，↓ 可下载 PNG）：</div>
- <div class="gd-refs">
- {% for ref_img in log.reference_image_list() %}
- <div class="gd-ref dna-img-fade">
- <a class="glightbox" href="{{ ref_img }}" data-type="image">
- <img src="{{ ref_img }}" alt="参考图" class="dna-img-fade__img" loading="lazy">
- </a>
- <a class="gd-ref__dl js-dlpng" href="{{ ref_img }}" data-src="{{ ref_img }}"
- data-name="reference_{{ log.id }}_{{ loop.index }}.png" title="下载 PNG">↓</a>
- </div>
- {% endfor %}
- </div>
- </div>
- {% endif %}
- {% if st == 'failed' and log.error %}
- <div class="alert alert-danger mt-3 mb-0">{{ log.error }}</div>
- {% endif %}
+  <!-- 1. 核心第一视觉区：自然原图展现 (零裁剪，纯粹展图) -->
+  {% if imgs %}
+  <div class="mb-4">
+    {% for img in imgs %}
+    <div class="mb-3 dna-img-fade text-center" style="border-radius: 12px; overflow: hidden;">
+      <a class="glightbox" href="{{ img }}" data-type="image" data-gallery="gendetail" title="点击放大查看原图">
+        <img src="{{ img }}" class="gd-main-image dna-img-fade__img" alt="生成图 {{ loop.index }}" loading="lazy">
+      </a>
+    </div>
+    <div class="d-flex align-items-center justify-content-end mb-4">
+      <a class="btn btn-sm btn-outline-secondary rounded-pill px-3 js-dlpng me-2" href="{{ img }}" data-src="{{ img }}" data-name="artwork_{{ log.id }}_{{ loop.index }}.png">
+        <i class="bi bi-download me-1"></i> 下载原图
+      </a>
+      <a class="btn btn-sm btn-primary rounded-pill px-3" href="{{ url_for('image_gen.workbench') }}?prompt={{ log.prompt|urlencode }}">
+        <i class="bi bi-magic me-1"></i> 同款生成
+      </a>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="text-center text-muted py-5">本次未产出图像。</div>
+  {% endif %}
 
- <div class="gd-sec">生成结果（{{ log.image_list()|length }} 张）</div>
- {% set imgs = log.image_list() %}
- {% if imgs %}
- <div class="gd-grid">
- {% for img in imgs %}
- <div class="gen-card">
- <div class="gen-card__media dna-img-fade gen-detail-fade">
- <a class="glightbox" href="{{ img }}" data-type="image" data-gallery="gendetail">
- <img src="{{ img }}" class="dna-img-fade__img" alt="生成图 {{ loop.index }}" loading="lazy" style="object-fit:contain;background:#111;">
- </a>
- </div>
- <div class="gen-card__bar">
- <span class="gen-idx">#{{ loop.index }}</span>
- <button type="button" class="gen-dl js-dlpng"
- data-src="{{ img }}" data-name="gen_{{ log.id }}_{{ loop.index }}.png">↓ 下载 PNG</button>
- </div>
- </div>
- {% endfor %}
- </div>
- {% elif st != 'failed' %}
- <div class="gd-empty"><span class="big">️</span>本次未产出图像。</div>
- {% endif %}
+  {% if st == 'failed' and log.error %}
+  <div class="alert alert-danger rounded-3 mb-4">{{ log.error }}</div>
+  {% endif %}
+
+  <!-- 2. 参考垫图（如果有） -->
+  {% if log.reference_image_list() %}
+  <div class="mb-4">
+    <div class="small text-muted mb-2"><i class="bi bi-images me-1"></i> 所用参考图（{{ log.reference_image_list()|length }} 张）：</div>
+    <div class="d-flex gap-2 overflow-x-auto pb-1">
+      {% for ref_img in log.reference_image_list() %}
+      <div class="gd-ref-item dna-img-fade">
+        <a class="glightbox" href="{{ ref_img }}" data-type="image">
+          <img src="{{ ref_img }}" alt="参考图" class="dna-img-fade__img" loading="lazy">
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- 3. 提示词 (Prompt) 简约文本区 -->
+  <div class="gd-prompt-block mb-4">
+    <div class="d-flex align-items-center justify-content-between mb-2">
+      <span class="small text-muted"><i class="bi bi-chat-quote me-1"></i> 提示词 Prompt</span>
+      <button type="button" class="btn btn-link btn-sm text-decoration-none p-0 text-muted" id="copyPromptBtn">
+        <i class="bi bi-clipboard me-1"></i> <span id="copyPromptText">复制</span>
+      </button>
+    </div>
+    <div class="text-light" style="font-size: 0.92rem; line-height: 1.6; white-space: pre-wrap;" id="promptTextContent">{{ log.prompt }}</div>
+  </div>
+
+  <!-- 4. 底部极简次要参数 -->
+  <div class="d-flex align-items-center gap-3 text-muted small pt-2 border-top border-secondary border-opacity-10 flex-wrap">
+    <span>模型：{{ log.model_name }}</span>
+    <span>尺寸：{{ log.size or 'auto' }}</span>
+    <span>消耗：{{ log.points_spent }} 点</span>
+    {% if st == 'success' %}<span class="text-success">· 成功</span>
+    {% elif st == 'failed' %}<span class="text-danger">· 失败</span>{% endif %}
+  </div>
 </div>
+{% endblock %}
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/glightbox@3.3.0/dist/js/glightbox.min.js"></script>
@@ -153,7 +144,23 @@
   document.addEventListener('dna:page-loaded', function () {
     setTimeout(initLightbox, 50);
   });
+
+  // 复制 Prompt
+  var copyBtn = document.getElementById('copyPromptBtn');
+  var copyText = document.getElementById('copyPromptText');
+  var promptContent = document.getElementById('promptTextContent');
+
+  if (copyBtn && promptContent) {
+    copyBtn.addEventListener('click', function () {
+      var text = promptContent.textContent || '';
+      navigator.clipboard.writeText(text).then(function () {
+        if (copyText) {
+          copyText.textContent = '已复制';
+          setTimeout(function () { copyText.textContent = '复制'; }, 2000);
+        }
+      });
+    });
+  }
 })();
 </script>
-{% endblock %}
 {% endblock %}
