@@ -875,3 +875,43 @@ body, .navbar, .footer, .card, .dna-tile, .dna-hero,
   }
 }
 
+/* 生图进行中的虚化骨架卡片 */
+.ig-card-skeleton {
+  aspect-ratio: 1;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #1a1829, #2d2640);
+  border: 1.5px dashed var(--dna-accent);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  position: relative;
+  overflow: hidden;
+  animation: igSkeletonPulse 1.6s ease-in-out infinite;
+}
+.ig-card-skeleton::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(100deg, rgba(255,255,255,0) 20%, rgba(168,85,247,0.15) 50%, rgba(255,255,255,0) 80%);
+  background-size: 200% 100%;
+  animation: dna-shimmer 1.2s ease-in-out infinite;
+}
+@keyframes igSkeletonPulse {
+  0%, 100% { transform: scale(1); opacity: 0.85; }
+  50% { transform: scale(0.98); opacity: 1; }
+}
+.ig-card-skeleton .spin-icon {
+  width: 28px; height: 28px;
+  border: 3px solid rgba(168,85,247,0.3);
+  border-top-color: var(--dna-accent);
+  border-radius: 50%;
+  animation: igspin .8s linear infinite;
+}
+.ig-card-skeleton .loading-text {
+  font-size: 0.78rem;
+  color: var(--dna-accent);
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+

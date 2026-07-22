@@ -258,20 +258,49 @@
       });
     }
 
-    // 3. 页面 DOMContentLoaded 加载时，移动端检测到 ig_just_generated 标记则自动聚焦结果区
+    // 辅助函数：控制生成中虚化骨架卡片的显示与移除
+    function setSkeletonState(show) {
+      var skeleton = document.getElementById('igSkeletonCard');
+      if (show) {
+        if (!skeleton && grid) {
+          skeleton = document.createElement('div');
+          skeleton.id = 'igSkeletonCard';
+          skeleton.className = 'ig-card-skeleton';
+          skeleton.innerHTML = '<div class="spin-icon"></div><div class="loading-text">正在生成中...</div>';
+          grid.insertBefore(skeleton, grid.firstChild);
+          var empty = grid.querySelector('.ig-empty');
+          if (empty) empty.style.display = 'none';
+        }
+      } else {
+        if (skeleton) skeleton.remove();
+      }
+    }
+
+    // 页面 DOMContentLoaded 加载时：检测 localStorage 是否有进行中的任务（刷新不掉状态）
     document.addEventListener('DOMContentLoaded', function () {
+      var activeTask = localStorage.getItem('dna_ig_active_task');
+      if (activeTask) {
+        try {
+          var task = JSON.parse(activeTask);
+          if (Date.now() - task.time < 180000) {
+            setSkeletonState(true);
+          } else {
+            localStorage.removeItem('dna_ig_active_task');
+          }
+        } catch (e) {
+          localStorage.removeItem('dna_ig_active_task');
+        }
+      }
+
       if (sessionStorage.getItem('ig_just_generated') === '1' && window.innerWidth <= 768) {
         sessionStorage.removeItem('ig_just_generated');
         document.getElementById('igGrid')?.scrollIntoView({ behavior: 'smooth' });
       }
     });
 
-    // AJAX 提交：按钮旁显示「正在生成中」，结果就地插入画廊
+    // AJAX 提交：按钮旁显示「正在生成中」，插入虚化骨架，结果就地插入画廊
     form.addEventListener('submit', function (e) {
       e.preventDefault();
-      // 2. 提交生图表单时标记 SESSION_STORAGE
-      sessionStorage.setItem('ig_just_generated', '1');
-
       var promptEl = form.querySelector('[name=prompt]');
       var modelEl = form.querySelector('[name=model]');
       if (!modelEl.value) {
@@ -280,6 +309,10 @@
       if (!promptEl.value.trim()) {
         statusEl.textContent = '请输入提示词'; statusEl.style.color = '#ec4899'; return;
       }
+
+      sessionStorage.setItem('ig_just_generated', '1');
+      localStorage.setItem('dna_ig_active_task', JSON.stringify({ time: Date.now() }));
+      setSkeletonState(true);
 
       genBtn.disabled = true;
       genBtn.textContent = '生成中…';
@@ -296,19 +329,29 @@
         .then(function (data) {
           genBtn.disabled = false;
           genBtn.textContent = '✦ 生成';
+          localStorage.removeItem('dna_ig_active_task');
+          setSkeletonState(false);
+
           if (data.ok) {
             statusEl.textContent = '完成，消耗 ' + data.points_spent + ' 点';
             statusEl.style.color = '#7ee787';
             if (pointsEl) pointsEl.innerHTML = '点数 <b>' + data.balance + '</b>';
             (data.images || []).forEach(function (img) {
+              var container = document.createElement('div');
+              container.className = 'd-flex flex-column gap-2';
               var a = document.createElement('a');
               a.className = 'ig-card dna-img-fade';
               a.href = '/image-gen/logs/' + data.log_id;
               a.innerHTML = '<img src="' + img + '" alt="生成图" class="dna-img-fade__img">' +
                 '<span class="tag">' + (data.size || 'auto') + ' · ' + data.model_name + '</span>' +
                 '<span class="dl js-dlpng" data-src="' + img + '" data-name="gen_' + data.log_id + '.png" title="下载 PNG">↓</span>';
-              grid.insertBefore(a, grid.firstChild);
-              if (window.bindFade) window.bindFade(a);   // 新插入图片触发模糊→清晰动画
+              container.appendChild(a);
+              grid.insertBefore(container, grid.firstChild);
+
+              // 关键修复：延迟 60ms 添加 is-loaded，确保浏览器渲染出模糊初始帧后再平滑散去模糊淡入清晰图
+              setTimeout(function () {
+                a.classList.add('is-loaded');
+              }, 60);
             });
             promptEl.value = '';
             if (refInput) refInput.value = '';
@@ -322,7 +365,6 @@
           } else {
             statusEl.textContent = data.error || '生成失败';
             statusEl.style.color = '#ec4899';
-            // 点数不足：弹窗提示并引导去点数页
             if (data.code === 'insufficient_points') {
               var msgEl = document.getElementById('noPointsMsg');
               if (msgEl) msgEl.textContent = data.error || '点数不足，请先获取积分。';
@@ -333,6 +375,15 @@
             }
           }
         })
+        .catch(function (err) {
+          genBtn.disabled = false;
+          genBtn.textContent = '✦ 生成';
+          localStorage.removeItem('dna_ig_active_task');
+          setSkeletonState(false);
+          statusEl.textContent = '网络错误，请重试';
+          statusEl.style.color = '#ec4899';
+        });
+    });
         .catch(function () {
           genBtn.disabled = false;
           genBtn.textContent = '✦ 生成';
