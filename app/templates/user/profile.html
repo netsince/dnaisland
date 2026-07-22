@@ -92,7 +92,7 @@
           {% if u.website %}<li class="list-inline-item me-3">🔗 <a href="{{ u.website }}" target="_blank" rel="noopener">{{ u.website }}</a></li>{% endif %}
           {% if u.birthday %}<li class="list-inline-item me-3">🎂 {{ u.birthday.strftime('%Y-%m-%d') }}</li>{% endif %}
           <li class="list-inline-item">📅 加入于 {{ u.created_at.strftime('%Y-%m-%d') if u.created_at else '—' }}</li>
-        </ul>
+        {% endif %}
         {% if is_self %}
         <div class="d-flex flex-wrap gap-2 mt-3 pt-3 border-top border-secondary border-opacity-25">
           <a class="btn btn-sm btn-outline-primary" href="{{ url_for('image_gen.workbench') }}">🎨 AI 生图工作台</a>
@@ -176,7 +176,6 @@
     {% endif %}
     {% endif %}
     </div>
-    {% endif %}
   </div>
 </div>
 {% endblock %}
