@@ -32,6 +32,10 @@
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
       <div class="container-fluid">
         <a class="navbar-brand" href="{{ url_for('main.index') }}">DNAISLAND</a>
+        <!-- 手机端搜索触发按钮 -->
+        <button class="btn btn-link nav-link d-lg-none ms-auto me-2 px-2" id="mobileSearchTrigger" type="button" aria-label="展开搜索">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-search"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        </button>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
                 data-bs-target="#mainNav" aria-controls="mainNav"
                 aria-expanded="false" aria-label="切换导航">
@@ -135,6 +139,16 @@
         </div>
       </div>
     </nav>
+    <!-- 手机端全屏搜索抽屉 -->
+    <div class="dna-mobile-search-drawer" id="mobileSearchDrawer">
+      <div class="container py-3">
+        <form class="d-flex position-relative" action="{{ url_for('main.search') }}" method="get">
+          <input class="form-control me-2" type="search" name="q" id="mobileSearchInput" placeholder="搜索角色卡 / 作者" autocomplete="off">
+          <button class="btn btn-primary" type="submit">搜索</button>
+          <button class="btn btn-link text-muted ms-2 px-1 text-decoration-none" id="mobileSearchClose" type="button">取消</button>
+        </form>
+      </div>
+    </div>
   </header>
 
   <main class="container-fluid py-4 flex-grow-1">
@@ -392,6 +406,24 @@
       };
       im.src = src;
     });
+  </script>
+
+  <script>
+    (function () {
+      var trigger = document.getElementById('mobileSearchTrigger');
+      var drawer = document.getElementById('mobileSearchDrawer');
+      var close = document.getElementById('mobileSearchClose');
+      var input = document.getElementById('mobileSearchInput');
+      if (trigger && drawer && close) {
+        trigger.addEventListener('click', function () {
+          drawer.classList.add('show');
+          if (input) input.focus();
+        });
+        close.addEventListener('click', function () {
+          drawer.classList.remove('show');
+        });
+      }
+    })();
   </script>
 </body>
 </html>

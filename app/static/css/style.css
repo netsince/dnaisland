@@ -660,3 +660,23 @@ body, .navbar, .footer, .card, .dna-tile, .dna-hero,
 
 /* 浅色模式下，原深色专用文本类改为可读深色 */
 [data-bs-theme="light"] .text-light { color: var(--dna-text) !important; }
+
+/* 手机端搜索抽屉 */
+.dna-mobile-search-drawer {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  background: rgba(12, 10, 22, 0.98);
+  border-bottom: 1px solid var(--dna-border);
+  z-index: 1045;
+  padding-top: max(10px, safe-area-inset-top);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+}
+.dna-mobile-search-drawer.show {
+  display: block;
+  animation: slideDownSearch 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@keyframes slideDownSearch {
+  from { transform: translateY(-100%); }
+  to { transform: translateY(0); }
+}
