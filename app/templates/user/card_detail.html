@@ -110,61 +110,213 @@
  </div>
  {% endif %}
 
- <div class="card mb-4">
- <div class="card-header fw-semibold"> 评论（{{ comment_count }}）</div>
- <div class="card-body">
- {% if current_user.is_authenticated %}
- <form method="post" action="{{ url_for('user.card_comment', card_id=card.id) }}">
- <textarea class="form-control mb-2" name="content" rows="3" placeholder="说点什么…" required></textarea>
- <button class="btn btn-primary btn-sm" type="submit">发表评论</button>
- </form>
- <hr class="border-secondary opacity-25">
- {% else %}
- <p class="text-muted small mb-3"><a href="{{ url_for('auth.login') }}">登录</a> 后参与评论。</p>
- {% endif %}
- {% for cm in comments %}
- <div class="mb-3">
- <div class="small text-muted mb-1">
- <a class="text-decoration-none" href="{{ url_for('user.profile', username=cm.author.username) }}">{{ cm.author.display_name }}</a>{{ badge(cm.author) }}
- · {{ cm.created_at.strftime('%Y-%m-%d %H:%M') if cm.created_at else '' }}
- {% if current_user.is_authenticated and cm.author.id != current_user.id %}
- · <a class="text-decoration-none text-danger" href="{{ url_for('user.report', type='comment', id=cm.id) }}">举报</a>
- {% endif %}
- </div>
- <div style="white-space:pre-wrap;">{{ cm.content }}</div>
- </div>
- {% else %}
- <div class="text-muted small">还没有评论，来抢沙发～</div>
- {% endfor %}
- </div>
- </div>
+  <!-- 评论触发按钮 -->
+  <button type="button" class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-2 mb-4"
+          id="commentDrawerTrigger"
+          data-api-url="{{ url_for('user.card_comments_api', card_id=card.id) }}"
+          data-post-url="{{ url_for('user.card_comment', card_id=card.id) }}"
+          data-logged-in="{{ 'true' if current_user.is_authenticated else 'false' }}"
+          data-login-url="{{ url_for('auth.login') }}">
+    <i class="bi bi-chat-square"></i>
+    <span>评论（{{ comment_count }}）</span>
+  </button>
 
- {% if is_owner or is_admin %}
- <div class="d-flex flex-wrap gap-2">
- {% if is_owner %}
- <a class="btn btn-sm btn-outline-primary" href="{{ url_for('user.card_edit', card_id=card.id) }}">编辑</a>
- <form method="post" action="{{ url_for('user.card_toggle_hidden', card_id=card.id) }}" class="d-inline"
- onsubmit="return confirm('确认{{ '取消隐藏' if card.is_hidden else '隐藏' }}该角色卡？');">
- <button class="btn btn-sm btn-outline-{{ 'secondary' if card.is_hidden else 'warning' }}">
- {{ '取消隐藏' if card.is_hidden else '隐藏' }}
- </button>
- </form>
- {% if card.status == 'rejected' %}
- <form method="post" action="{{ url_for('user.card_resubmit', card_id=card.id) }}" class="d-inline">
- <button class="btn btn-sm btn-outline-success">重新提审</button>
- </form>
- {% endif %}
- {% endif %}
- {% if is_admin %}
- <a class="btn btn-sm btn-outline-dark" href="{{ url_for('admin.cards') }}">前往后台审核</a>
- {% endif %}
- </div>
- {% endif %}
- </div>
+  {% if is_owner or is_admin %}
+  <div class="d-flex flex-wrap gap-2">
+    {% if is_owner %}
+    <a class="btn btn-sm btn-outline-primary" href="{{ url_for('user.card_edit', card_id=card.id) }}">编辑</a>
+    <form method="post" action="{{ url_for('user.card_toggle_hidden', card_id=card.id) }}" class="d-inline"
+          onsubmit="return confirm('确认{{ '取消隐藏' if card.is_hidden else '隐藏' }}该角色卡？');">
+      <button class="btn btn-sm btn-outline-{{ 'secondary' if card.is_hidden else 'warning' }}">
+        {{ '取消隐藏' if card.is_hidden else '隐藏' }}
+      </button>
+    </form>
+    {% if card.status == 'rejected' %}
+    <form method="post" action="{{ url_for('user.card_resubmit', card_id=card.id) }}" class="d-inline">
+      <button class="btn btn-sm btn-outline-success">重新提审</button>
+    </form>
+    {% endif %}
+    {% endif %}
+    {% if is_admin %}
+    <a class="btn btn-sm btn-outline-dark" href="{{ url_for('admin.cards') }}">前往后台审核</a>
+    {% endif %}
+  </div>
+  {% endif %}
+  </div>
 </div>
+
+<!-- 评论遮罩 -->
+<div class="dna-comment-overlay" id="commentOverlay"></div>
+
+<!-- 评论抽屉 -->
+<aside class="dna-comment-drawer" id="commentDrawer" aria-label="评论区">
+  <div class="dna-comment-drawer__handle"></div>
+  <div class="dna-comment-drawer__header">
+    <h2 class="h6 mb-0 fw-semibold" id="commentDrawerTitle">评论</h2>
+    <button type="button" class="btn btn-link text-muted p-0" id="commentDrawerClose" aria-label="关闭">
+      <i class="bi bi-x-lg"></i>
+    </button>
+  </div>
+  <div class="dna-comment-drawer__body" id="commentDrawerBody">
+    <div class="text-center text-muted py-4" id="commentLoading">加载中…</div>
+  </div>
+  <div class="dna-comment-drawer__footer" id="commentDrawerFooter"></div>
+</aside>
+
 {% endblock %}
 
 {% block scripts %}
+<script>
+(function () {
+  var trigger = document.getElementById('commentDrawerTrigger');
+  var drawer  = document.getElementById('commentDrawer');
+  var overlay = document.getElementById('commentOverlay');
+  var closeBtn = document.getElementById('commentDrawerClose');
+  var body    = document.getElementById('commentDrawerBody');
+  var footer  = document.getElementById('commentDrawerFooter');
+  var title   = document.getElementById('commentDrawerTitle');
+  if (!trigger || !drawer) return;
+
+  var apiUrl    = trigger.dataset.apiUrl;
+  var postUrl   = trigger.dataset.postUrl;
+  var loggedIn  = trigger.dataset.loggedIn === 'true';
+  var loginUrl  = trigger.dataset.loginUrl;
+  var page = 1;
+  var loading = false;
+  var hasNext = true;
+
+  function open() {
+    drawer.classList.add('show');
+    overlay.classList.add('show');
+    document.body.style.overflow = 'hidden';
+    if (page === 1) loadComments();
+  }
+  function close() {
+    drawer.classList.remove('show');
+    overlay.classList.remove('show');
+    document.body.style.overflow = '';
+  }
+
+  trigger.addEventListener('click', open);
+  overlay.addEventListener('click', close);
+  closeBtn.addEventListener('click', close);
+
+  function avatarEl(author) {
+    if (author.avatar) {
+      return '<img src="' + author.avatar + '" class="dna-comment-item__avatar" alt="">';
+    }
+    return '<div class="dna-comment-item__avatar">' + (author.display_name[0] || '?') + '</div>';
+  }
+
+  function renderItem(cm) {
+    var reportHtml = cm.can_report
+      ? '<a href="' + cm.report_url + '" class="ms-2 text-muted small opacity-75 text-decoration-none">举报</a>'
+      : '';
+    return '<div class="dna-comment-item">'
+      + avatarEl(cm.author)
+      + '<div class="dna-comment-item__body">'
+      + '<div class="dna-comment-item__meta">'
+      + '<a href="/user/' + cm.author.username + '" class="text-decoration-none text-reset fw-medium">' + cm.author.display_name + '</a>'
+      + '<span class="ms-2 opacity-60">' + cm.created_at + '</span>'
+      + reportHtml
+      + '</div>'
+      + '<div class="dna-comment-item__text">' + escHtml(cm.content) + '</div>'
+      + '</div></div>';
+  }
+
+  function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function loadComments() {
+    if (loading || !hasNext) return;
+    loading = true;
+    fetch(apiUrl + '?page=' + page)
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        loading = false;
+        if (page === 1) {
+          body.innerHTML = '';
+          title.textContent = '评论（' + data.total + '）';
+          buildFooter(data.total);
+        }
+        if (data.items.length === 0 && page === 1) {
+          body.innerHTML = '<div class="text-muted text-center py-4">还没有评论，来抢沙发～</div>';
+          return;
+        }
+        var frag = document.createDocumentFragment();
+        var wrap = document.createElement('div');
+        wrap.innerHTML = data.items.map(renderItem).join('');
+        while (wrap.firstChild) frag.appendChild(wrap.firstChild);
+        body.appendChild(frag);
+
+        hasNext = data.has_next;
+        if (hasNext) {
+          page++;
+          var loadMore = document.createElement('button');
+          loadMore.className = 'btn btn-link text-muted w-100 py-2';
+          loadMore.textContent = '加载更多';
+          loadMore.id = 'cmLoadMore';
+          loadMore.addEventListener('click', function() {
+            loadMore.remove();
+            loadComments();
+          });
+          body.appendChild(loadMore);
+        }
+      })
+      .catch(function() {
+        loading = false;
+        body.innerHTML = '<div class="text-danger text-center py-4">加载失败，请刷新重试。</div>';
+      });
+  }
+
+  function buildFooter(total) {
+    if (!loggedIn) {
+      footer.innerHTML = '<div class="text-muted small text-center py-1"><a href="' + loginUrl + '">登录</a> 后参与评论</div>';
+      return;
+    }
+    footer.innerHTML = '<form id="cmForm" class="d-flex gap-2 align-items-end">'
+      + '<textarea class="form-control" id="cmInput" rows="1" placeholder="说点什么…" style="resize:none;"></textarea>'
+      + '<button class="btn btn-primary btn-sm px-3 flex-shrink-0" type="submit">发布</button>'
+      + '</form>';
+
+    var form = document.getElementById('cmForm');
+    var input = document.getElementById('cmInput');
+
+    // 自动展开
+    input.addEventListener('focus', function() { input.rows = 3; });
+    input.addEventListener('blur', function() { if (!input.value) input.rows = 1; });
+
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      var content = input.value.trim();
+      if (!content) return;
+      var fd = new FormData();
+      fd.append('content', content);
+      fetch(postUrl, {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        body: fd,
+        credentials: 'same-origin'
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.ok) {
+          input.value = '';
+          input.rows = 1;
+          // 重置并重新加载评论列表
+          page = 1; hasNext = true;
+          body.innerHTML = '<div class="text-center text-muted py-3">加载中…</div>';
+          loadComments();
+        } else {
+          alert(data.error || '发布失败');
+        }
+      })
+      .catch(function() { alert('网络错误，请重试'); });
+    });
+  }
+})();
+</script>
 <script>
  (function () {
  const btn = document.getElementById('exportClipboardBtn');

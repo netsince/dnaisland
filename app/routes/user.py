@@ -546,6 +546,46 @@ def user_follow(username):
     return redirect(url_for("user.profile", username=username))
 
 
+@user_bp.route("/api/card/<card_id>/comments", methods=["GET"])
+def card_comments_api(card_id):
+    """返回角色卡评论 JSON，供前端抽屉 AJAX 分页加载。"""
+    card = db.session.get(Card, card_id)
+    if not card:
+        return jsonify({"error": "not found"}), 404
+    page = request.args.get("page", 1, type=int)
+    per_page = 20
+    q = (
+        Comment.query
+        .filter_by(card_id=card_id, is_hidden=False)
+        .order_by(Comment.created_at.desc())
+    )
+    pagination = q.paginate(page=page, per_page=per_page, error_out=False)
+    items = []
+    for cm in pagination.items:
+        items.append({
+            "id": cm.id,
+            "content": cm.content,
+            "created_at": cm.created_at.strftime("%Y-%m-%d %H:%M") if cm.created_at else "",
+            "author": {
+                "username": cm.author.username,
+                "display_name": cm.author.display_name,
+                "avatar": cm.author.avatar or "",
+            },
+            "can_report": (
+                current_user.is_authenticated
+                and cm.author.id != current_user.id
+            ),
+            "report_url": url_for("user.report", type="comment", id=cm.id),
+        })
+    return jsonify({
+        "items": items,
+        "page": pagination.page,
+        "pages": pagination.pages,
+        "total": pagination.total,
+        "has_next": pagination.has_next,
+    })
+
+
 @user_bp.route("/card/<card_id>/comment", methods=["POST"])
 @login_required
 def card_comment(card_id):
@@ -553,16 +593,22 @@ def card_comment(card_id):
     if not card:
         abort(404)
     if current_user.is_muted:
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({"error": "你已被禁言，暂时无法评论"}), 403
         flash("你已被禁言，暂时无法评论", "warning")
         return redirect(url_for("user.card_detail", card_id=card_id))
     content = (request.form.get("content") or "").strip()
     if not content:
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({"error": "评论内容不能为空"}), 400
         flash("评论内容不能为空", "warning")
     else:
         db.session.add(
             Comment(card_id=card_id, user_id=current_user.id, content=content)
         )
         db.session.commit()
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({"ok": True})
         flash("评论成功", "success")
     return redirect(url_for("user.card_detail", card_id=card_id))
 

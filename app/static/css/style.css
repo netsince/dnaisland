@@ -1044,3 +1044,139 @@ body.is-mobile-plus-open header {
   border-radius: 50%;
 }
 
+/* ===== 评论抽屉 ===== */
+/* 遮罩 */
+.dna-comment-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1040;
+  transition: opacity 0.25s ease;
+  opacity: 0;
+}
+.dna-comment-overlay.show {
+  display: block;
+  opacity: 1;
+}
+
+/* 抽屉通用基础 */
+.dna-comment-drawer {
+  position: fixed;
+  z-index: 1050;
+  background: var(--bs-body-bg, #12111c);
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* 桌面端：右侧抽屉 */
+@media (min-width: 768px) {
+  .dna-comment-drawer {
+    top: 0; right: 0; bottom: 0;
+    width: 420px;
+    border-left: 1px solid var(--dna-border, rgba(255,255,255,0.08));
+    transform: translateX(100%);
+  }
+  .dna-comment-drawer.show {
+    transform: translateX(0);
+  }
+}
+
+/* 手机端：底部抽屉 */
+@media (max-width: 767.98px) {
+  .dna-comment-drawer {
+    left: 0; right: 0; bottom: 0;
+    height: 80vh;
+    border-radius: 16px 16px 0 0;
+    border-top: 1px solid var(--dna-border, rgba(255,255,255,0.08));
+    transform: translateY(100%);
+  }
+  .dna-comment-drawer.show {
+    transform: translateY(0);
+  }
+}
+
+/* 抽屉顶部拖拽把手（仅移动端显示） */
+.dna-comment-drawer__handle {
+  display: none;
+  width: 40px; height: 4px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 2px;
+  margin: 10px auto 0;
+  flex-shrink: 0;
+}
+@media (max-width: 767.98px) {
+  .dna-comment-drawer__handle { display: block; }
+}
+
+/* 抽屉头部 */
+.dna-comment-drawer__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--dna-border, rgba(255,255,255,0.08));
+  flex-shrink: 0;
+}
+
+/* 抽屉可滚动内容区 */
+.dna-comment-drawer__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px;
+  overscroll-behavior: contain;
+}
+.dna-comment-drawer__body::-webkit-scrollbar {
+  width: 4px;
+}
+.dna-comment-drawer__body::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.1);
+  border-radius: 2px;
+}
+
+/* 抽屉底部输入区 */
+.dna-comment-drawer__footer {
+  padding: 10px 16px;
+  border-top: 1px solid var(--dna-border, rgba(255,255,255,0.08));
+  flex-shrink: 0;
+}
+
+/* 单条评论样式 */
+.dna-comment-item {
+  display: flex;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--dna-border, rgba(255,255,255,0.06));
+}
+.dna-comment-item:last-child {
+  border-bottom: none;
+}
+.dna-comment-item__avatar {
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--dna-surface, #1e1b30);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.dna-comment-item__body {
+  flex: 1;
+  min-width: 0;
+}
+.dna-comment-item__meta {
+  font-size: 0.78rem;
+  color: var(--dna-muted, #94a3b8);
+  margin-bottom: 2px;
+}
+.dna-comment-item__text {
+  font-size: 0.9rem;
+  line-height: 1.55;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
