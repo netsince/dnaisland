@@ -95,6 +95,20 @@ def profile(username):
         page=page, per_page=20, error_out=False
     )
 
+    # 角色卡评论：用户在各角色卡下的回复
+    cm_pagination = (
+        Comment.query.filter_by(user_id=u.id)
+        .order_by(Comment.created_at.desc())
+        .paginate(page=page, per_page=12, error_out=False)
+    )
+    # 批量附加评论所属角色卡（含封面），避免模板 N 次查询
+    comment_cards = {}
+    cm_card_ids = [c.card_id for c in cm_pagination.items if c.card_id]
+    if cm_card_ids:
+        cm_cards = Card.query.filter(Card.id.in_(cm_card_ids)).all()
+        attach_covers(cm_cards, slot="square")
+        comment_cards = {c.id: c for c in cm_cards}
+
     follower_count = UserFollow.query.filter_by(following_id=u.id).count()
     following_count = UserFollow.query.filter_by(follower_id=u.id).count()
     is_following = (
@@ -116,6 +130,10 @@ def profile(username):
         tp_items=tp_pagination.items,
         tp_pagination=tp_pagination,
         tp_args={"username": username, "tab": tab},
+        comments=cm_pagination.items,
+        cm_pagination=cm_pagination,
+        comment_cards=comment_cards,
+        cm_args={"username": username, "tab": "comments"},
         is_self=is_self,
         is_admin=is_admin,
         restricted=restricted,

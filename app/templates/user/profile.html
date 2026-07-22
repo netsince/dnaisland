@@ -145,10 +145,13 @@
  <li class="nav-item">
  <a class="nav-link {% if tab == 'teahouse_posts' %}active{% endif %}" href="{{ url_for('user.profile', username=u.username, tab='teahouse_posts') }}">茶馆帖子</a>
  </li>
- <li class="nav-item">
- <a class="nav-link {% if tab == 'teahouse_replies' %}active{% endif %}" href="{{ url_for('user.profile', username=u.username, tab='teahouse_replies') }}">茶馆回帖</a>
- </li>
- </ul>
+<li class="nav-item">
+  <a class="nav-link {% if tab == 'teahouse_replies' %}active{% endif %}" href="{{ url_for('user.profile', username=u.username, tab='teahouse_replies') }}">茶馆回帖</a>
+</li>
+<li class="nav-item">
+  <a class="nav-link {% if tab == 'comments' %}active{% endif %}" href="{{ url_for('user.profile', username=u.username, tab='comments') }}">角色卡评论</a>
+</li>
+</ul>
 
  <div id="profileTabContent">
  {% if tab == 'cards' %}
@@ -184,22 +187,48 @@
  {% if tp_pagination.total == 0 %}
  <div class="text-center text-muted py-4">还没有发布任何茶馆回帖。</div>
  {% else %}
- {% for p in tp_items %}
- <div class="card mb-2">
- <div class="card-body py-2">
- <div class="small text-muted mb-1">
- {{ p.created_at.strftime('%Y-%m-%d %H:%M') if p.created_at else '' }}
- {% if p.is_hidden %}· <span class="text-danger">已隐藏</span>{% endif %}
- {% if not p.moderated %}· <span class="text-warning">待审核</span>{% endif %}
- </div>
- <div style="white-space:pre-wrap;word-break:break-word;">{{ p.content | teahouse_linkify }}</div>
- <a class="small" href="{{ url_for('teahouse.post_detail', post_id=p.id) }}">查看原帖 →</a>
- </div>
- </div>
- {% endfor %}
- {{ render_pagination(tp_pagination, 'user.profile', tp_args) }}
- {% endif %}
- {% endif %}
+{% for p in tp_items %}
+<div class="card mb-2">
+<div class="card-body py-2">
+<div class="small text-muted mb-1">
+  {{ p.created_at.strftime('%Y-%m-%d %H:%M') if p.created_at else '' }}
+  {% if p.is_hidden %}· <span class="text-danger">已隐藏</span>{% endif %}
+  {% if not p.moderated %}· <span class="text-warning">待审核</span>{% endif %}
+</div>
+<div style="white-space:pre-wrap;word-break:break-word;">{{ p.content | teahouse_linkify }}</div>
+<a class="small" href="{{ url_for('teahouse.post_detail', post_id=p.id) }}">查看原帖 →</a>
+</div>
+</div>
+{% endfor %}
+{{ render_pagination(tp_pagination, 'user.profile', tp_args) }}
+{% endif %}
+{% elif tab == 'comments' %}
+<h2 class="dna-section-title h5">角色卡评论（{{ cm_pagination.total }}）</h2>
+{% if cm_pagination.total == 0 %}
+<div class="text-center text-muted py-4">还没有在任何角色卡下发表评论。</div>
+{% else %}
+<div class="d-flex flex-column gap-2">
+{% for c in comments %}
+<div class="card">
+  <div class="card-body py-2">
+    <div class="small text-muted mb-1">{{ c.created_at.strftime('%Y-%m-%d %H:%M') if c.created_at else '' }}</div>
+    {% set card = comment_cards.get(c.card_id) %}
+    {% if card %}
+    <a class="d-flex align-items-center gap-2 mb-2 text-decoration-none text-reset" href="{{ url_for('user.card_detail', card_id=card.id) }}?comment={{ c.id }}">
+      {% if card.cover %}<img src="{{ card.cover }}" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:6px;">{% endif %}
+      <span class="fw-medium">{{ card.name }}</span>
+    </a>
+    {% else %}
+    <div class="small text-muted mb-2">角色卡已不可用</div>
+    {% endif %}
+    <div style="white-space:pre-wrap;word-break:break-word;">{{ c.content }}</div>
+  </div>
+</div>
+{% endfor %}
+</div>
+{{ render_pagination(cm_pagination, 'user.profile', cm_args) }}
+{% endif %}
+{% endif %}
  </div>
  </div>
 </div>
