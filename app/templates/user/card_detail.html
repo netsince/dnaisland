@@ -205,11 +205,27 @@
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/glightbox@3.3.0/dist/js/glightbox.min.js"></script>
 <script>
-  document.addEventListener('DOMContentLoaded', function () {
-    if (window.GLightbox) {
-      GLightbox({ selector: '.glightbox', touchNavigation: true, loop: false });
+(function () {
+  var lightboxInstance = null;
+  function initLightbox() {
+    if (window.GLightbox && document.querySelector('.glightbox')) {
+      if (lightboxInstance) {
+        try { lightboxInstance.destroy(); } catch (e) {}
+      }
+      lightboxInstance = GLightbox({ selector: '.glightbox', touchNavigation: true, loop: false });
     }
+  }
+
+  if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    setTimeout(initLightbox, 50);
+  } else {
+    document.addEventListener('DOMContentLoaded', initLightbox);
+  }
+
+  document.addEventListener('dna:page-loaded', function () {
+    setTimeout(initLightbox, 50);
   });
+})();
 </script>
 <script>
 (function () {

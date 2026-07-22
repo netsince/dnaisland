@@ -651,16 +651,36 @@ function showToast(message, type) {
       }
     }
 
-    function executeScripts(container) {
-      var scripts = container.querySelectorAll('script');
-      scripts.forEach(function (oldScript) {
+    function executeScripts(container, callback) {
+      var scripts = Array.from(container.querySelectorAll('script'));
+      if (scripts.length === 0) {
+        if (callback) callback();
+        return;
+      }
+
+      var index = 0;
+      function runNext() {
+        if (index >= scripts.length) {
+          if (callback) callback();
+          return;
+        }
+        var oldScript = scripts[index++];
         var newScript = document.createElement('script');
         Array.from(oldScript.attributes).forEach(function (attr) {
           newScript.setAttribute(attr.name, attr.value);
         });
-        newScript.textContent = oldScript.textContent;
-        oldScript.parentNode.replaceChild(newScript, oldScript);
-      });
+
+        if (oldScript.src) {
+          newScript.onload = newScript.onerror = runNext;
+          oldScript.parentNode.replaceChild(newScript, oldScript);
+        } else {
+          newScript.textContent = oldScript.textContent;
+          oldScript.parentNode.replaceChild(newScript, oldScript);
+          runNext();
+        }
+      }
+
+      runNext();
     }
 
     function loadPage(url, pushHistory) {
@@ -704,17 +724,18 @@ function showToast(message, type) {
         syncHeadStyles(doc);
 
         main.innerHTML = newMain.innerHTML;
-        executeScripts(main);
 
-        if (pushHistory) {
-          history.pushState({ pjax: true, url: url }, '', url);
-        }
+        executeScripts(main, function () {
+          if (pushHistory) {
+            history.pushState({ pjax: true, url: url }, '', url);
+          }
 
-        updateActiveNavLinks(url);
-        window.scrollTo({ top: 0, behavior: 'instant' });
+          updateActiveNavLinks(url);
+          window.scrollTo({ top: 0, behavior: 'instant' });
 
-        if (window.bindFade) window.bindFade(main);
-        document.dispatchEvent(new CustomEvent('dna:page-loaded', { detail: { url: url } }));
+          if (window.bindFade) window.bindFade(main);
+          document.dispatchEvent(new CustomEvent('dna:page-loaded', { detail: { url: url } }));
+        });
       })
       .catch(function (err) {
         console.warn('Pjax load failed, falling back to full reload:', err);
