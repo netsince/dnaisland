@@ -14,10 +14,25 @@
 </div>
 {% endif %}
 
-<form method="post" action="{{ url_for('points.redeem') }}">
+<form method="post" action="{{ url_for('points.redeem') }}" id="redeemForm">
+  <!-- 移动端默认的单码输入 -->
+  <div class="mb-3" id="singleCodeGroup">
+    <label class="form-label">输入兑换码</label>
+    <div class="input-group">
+      <input type="text" class="form-control font-monospace" name="single_key" id="singleKeyInput" placeholder="请输入单个兑换码，例如：DNA-XXXX-XXXX">
+      <button class="btn btn-outline-secondary" type="button" id="pasteCodeBtn">粘贴</button>
+    </div>
+  </div>
+  
+  <!-- 切换模式的按钮 -->
   <div class="mb-3">
-    <label class="form-label">兑换码（一行一个）</label>
-    <textarea class="form-control font-monospace" name="keys" rows="10"
+    <a href="javascript:void(0)" class="small text-decoration-none" id="toggleRedeemModeBtn">多行批量兑换 (批量粘贴) ▾</a>
+  </div>
+
+  <!-- 批量兑换区域，默认隐藏 -->
+  <div class="mb-3 d-none" id="multiCodeGroup">
+    <label class="form-label">批量兑换码（一行一个）</label>
+    <textarea class="form-control font-monospace" name="keys" id="multiKeysTextarea" rows="6"
               placeholder="每行输入一个兑换码，例如：&#10;DNA-XXXX-XXXX&#10;DNA-YYYY-YYYY"></textarea>
   </div>
   <button class="btn btn-primary" type="submit">兑换</button>
@@ -41,4 +56,61 @@
   </table>
 </div>
 {% endif %}
+{% block scripts %}
+<script>
+  (function () {
+    const form = document.getElementById('redeemForm');
+    const singleGroup = document.getElementById('singleCodeGroup');
+    const multiGroup = document.getElementById('multiCodeGroup');
+    const toggleBtn = document.getElementById('toggleRedeemModeBtn');
+    const singleInput = document.getElementById('singleKeyInput');
+    const multiText = document.getElementById('multiKeysTextarea');
+    const pasteBtn = document.getElementById('pasteCodeBtn');
+    let isMulti = false;
+
+    // 切换单/多行模式
+    toggleBtn.addEventListener('click', () => {
+      isMulti = !isMulti;
+      if (isMulti) {
+        multiGroup.classList.remove('d-none');
+        singleGroup.classList.add('d-none');
+        toggleBtn.textContent = '单码快捷兑换 ▴';
+      } else {
+        multiGroup.classList.add('d-none');
+        singleGroup.classList.remove('d-none');
+        toggleBtn.textContent = '多行批量兑换 (批量粘贴) ▾';
+      }
+    });
+
+    // 提交时，若为单码模式，将单码字段内容同步拼入批量 textarea 以适配 Flask 后端解析 keys 字段
+    form.addEventListener('submit', () => {
+      if (!isMulti && singleInput.value.trim()) {
+        multiText.value = singleInput.value.trim();
+      }
+    });
+
+    // 粘贴按钮逻辑
+    if (pasteBtn && navigator.clipboard && navigator.clipboard.readText) {
+      pasteBtn.addEventListener('click', async () => {
+        try {
+          const text = await navigator.clipboard.readText();
+          if (text) singleInput.value = text.trim();
+        } catch (e) {
+          console.error('Clipboard paste failed:', e);
+        }
+      });
+    } else if (pasteBtn) {
+      pasteBtn.style.display = 'none'; // 浏览器安全限制阻止剪切板时隐藏该按钮
+    }
+
+    // 读取 URL query 中带的 code 自动填充
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    if (code) {
+      singleInput.value = code.trim();
+    }
+  })();
+</script>
+{% endblock %}
+
 {% endblock %}
