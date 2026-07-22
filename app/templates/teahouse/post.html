@@ -39,7 +39,7 @@
     {% if current_user.is_authenticated and teapost_visible(post) %}
     <div class="card mb-3" id="reply">
       <div class="card-body">
-        <form method="post" action="{{ url_for('teahouse.reply', post_id=post.id) }}">
+        <form method="post" action="{{ url_for('teahouse.reply', post_id=post.id) }}" class="js-reply">
           <textarea class="form-control" name="content" id="replyContent" rows="3" maxlength="{{ max_len }}"
                     placeholder="回复 @{{ post.author.username }}…"></textarea>
           <div class="d-flex justify-content-between align-items-center mt-2">
@@ -53,7 +53,7 @@
 
     {# 回帖列表（扁平）+ 排序切换：只列当前帖自己的回帖 #}
     <div class="d-flex align-items-center justify-content-between mb-2">
-      <span class="text-muted small">回复（{{ reply_pagination.total }}）</span>
+      <span class="text-muted small" id="js-reply-count">回复（{{ reply_pagination.total }}）</span>
       <div class="btn-group btn-group-sm" role="group" aria-label="排序">
         <a class="btn btn-outline-secondary {% if sort != 'hot' %}active{% endif %}"
            href="{{ url_for('teahouse.post_detail', post_id=post.id, sort='new') }}">最新</a>
@@ -62,14 +62,16 @@
       </div>
     </div>
 
+    <div id="js-replies">
     {% if replies %}
       {% for r in replies %}
         {{ render_reply(r, stats, post.id, focus=(r.id == focus_id)) }}
       {% endfor %}
       {{ render_pagination(reply_pagination, 'teahouse.post_detail', reply_args) }}
     {% else %}
-      <div class="text-center text-muted py-4 small">还没有回复，来抢沙发吧～</div>
+      <div class="text-center text-muted py-4 small" id="js-replies-empty">还没有回复，来抢沙发吧～</div>
     {% endif %}
+    </div>
   </div>
 </div>
 {% endblock %}
@@ -101,6 +103,49 @@
       }
     });
   }
+})();
+
+// 回帖 AJAX 局部提交：成功后把新回复插到列表顶部并刷新计数，不整页刷新
+(function () {
+  var form = document.querySelector('form.js-reply');
+  if (!form) return;
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var ta = document.getElementById('replyContent');
+    var btn = form.querySelector('button[type="submit"]');
+    if (!ta || !ta.value.trim() || btn.disabled) return;
+    btn.disabled = true;
+    fetch(form.action, {
+      method: 'POST',
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      credentials: 'same-origin',
+      body: new URLSearchParams({ content: ta.value })
+    })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (data) {
+        if (!data || !data.ok) {
+          if (data && data.error) alert(data.error);
+          else window.location.reload();
+          return;
+        }
+        var wrap = document.getElementById('js-replies');
+        var empty = document.getElementById('js-replies-empty');
+        if (empty) empty.remove();
+        if (wrap && data.reply_html) {
+          var tmp = document.createElement('div');
+          tmp.innerHTML = data.reply_html.trim();
+          var node = tmp.firstChild;
+          if (node) wrap.insertBefore(node, wrap.firstChild);
+        }
+        var count = document.getElementById('js-reply-count');
+        if (count && data.reply_count != null) {
+          count.textContent = '回复（' + data.reply_count + '）';
+        }
+        if (ta) { ta.value = ''; ta.dispatchEvent(new Event('input')); }
+      })
+      .catch(function () { window.location.reload(); })
+      .finally(function () { btn.disabled = false; });
+  });
 })();
 </script>
 {% endblock %}

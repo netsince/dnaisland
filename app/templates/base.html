@@ -390,7 +390,7 @@
  window.bindFade = bindFade; // 供 AJAX 动态插入的图片复用模糊→清晰动画
  })();
  </script>
- <!-- 通用 toggle 表单（关注/点赞/收藏）AJAX 局部提交，免整页刷新 -->
+ <!-- 通用 toggle 表单（关注/点赞/收藏/隐藏/已读/重提审等）AJAX 局部提交，免整页刷新 -->
 <script>
 (function () {
   // 根据后端返回的 JSON 切换按钮文案 / 图标 / 计数 / 配色
@@ -424,9 +424,37 @@
     }
   }
 
+  // 隐藏/显示角色卡：切换按钮 + 同步「已隐藏」徽章
+  function applyHidden(btn, data) {
+    applyToggle(btn, data);
+    var box = btn.closest('.card');
+    var badge = box && box.querySelector('.js-hidden-badge');
+    if (badge) badge.classList.toggle('d-none', !data.state);
+  }
+
+  // 全部已读：移除按钮与未读红点
+  function applyReadAll(btn) {
+    var form = btn.closest('form');
+    if (form) form.remove();
+    var badge = document.querySelector('.js-unread-badge');
+    if (badge) badge.remove();
+  }
+
+  // 重新提审：移除按钮 + 更新状态徽章
+  function applyResubmit(btn, data) {
+    var form = btn.closest('form');
+    if (form) form.remove();
+    if (data.status_html) {
+      var box = btn.closest('.card');
+      var sb = box && box.querySelector('.js-status-badge');
+      if (sb) sb.innerHTML = data.status_html;
+    }
+  }
+
   document.addEventListener('submit', function (e) {
     var form = e.target.closest('form.js-toggle');
     if (!form) return;
+    if (form.dataset.confirm && !window.confirm(form.dataset.confirm)) return;
     e.preventDefault();
     var btn = form.querySelector('button[type="submit"]');
     if (!btn || btn.disabled) return;
@@ -438,9 +466,15 @@
     })
       .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
       .then(function (data) {
-        if (data && data.ok) { applyToggle(btn, data); }
-        else if (data && data.error) { alert(data.error); }
-        else { window.location.reload(); }
+        if (!data || !data.ok) {
+          if (data && data.error) alert(data.error);
+          else window.location.reload();
+          return;
+        }
+        if (data.action === 'hidden') applyHidden(btn, data);
+        else if (data.action === 'read_all') applyReadAll(btn, data);
+        else if (data.action === 'resubmit') applyResubmit(btn, data);
+        else applyToggle(btn, data);
       })
       .catch(function () { window.location.reload(); })
       .finally(function () { btn.disabled = false; });

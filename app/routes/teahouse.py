@@ -2,6 +2,8 @@ from flask import (
     Blueprint,
     abort,
     flash,
+    get_template_attribute,
+    jsonify,
     redirect,
     render_template,
     request,
@@ -218,19 +220,27 @@ def reply(post_id):
     p = db.session.get(TeaPost, post_id)
     if not p:
         abort(404)
+    is_xhr = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+
     if current_user.is_muted:
+        if is_xhr:
+            return jsonify({"ok": False, "error": "你已被禁言，暂时无法回复"})
         flash("你已被禁言，暂时无法回复", "warning")
         return redirect(url_for("teahouse.post_detail", post_id=post_id))
     content = (request.form.get("content") or "").strip()
     if not content:
+        if is_xhr:
+            return jsonify({"ok": False, "error": "回复内容不能为空"})
         flash("回复内容不能为空", "warning")
         return redirect(url_for("teahouse.post_detail", post_id=post_id))
     if len(content) > TEA_POST_MAX_LEN:
+        if is_xhr:
+            return jsonify({"ok": False, "error": f"回复内容不能超过 {TEA_POST_MAX_LEN} 字"})
         flash(f"回复内容不能超过 {TEA_POST_MAX_LEN} 字", "warning")
         return redirect(url_for("teahouse.post_detail", post_id=post_id))
-    db.session.add(
-        TeaPost(user_id=current_user.id, parent_id=post_id, content=content)
-    )
+
+    reply_post = TeaPost(user_id=current_user.id, parent_id=post_id, content=content)
+    db.session.add(reply_post)
     db.session.commit()
     # 通知被回复帖子的作者（非本人）
     if p.user_id != current_user.id:
@@ -239,6 +249,18 @@ def reply(post_id):
             f"{current_user.nickname} 回复了你在茶馆的帖子：{content[:30]}",
             type_="teahouse",
         )
+
+    if is_xhr:
+        # 局部提交：渲染新回复 HTML 并刷新回复数，不整页刷新
+        stats = {reply_post.id: {"like_count": 0, "liked": False, "reply_count": 0}}
+        reply_macro = get_template_attribute("teahouse/_post_item.html", "render_reply")
+        reply_html = reply_macro(reply_post, stats, root_id=post_id)
+        return jsonify({
+            "ok": True,
+            "action": "reply",
+            "reply_html": reply_html,
+            "reply_count": TeaPost.query.filter_by(parent_id=post_id).count(),
+        })
     flash("回复成功", "success")
     return redirect(url_for("teahouse.post_detail", post_id=post_id))
 

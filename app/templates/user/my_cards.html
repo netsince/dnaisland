@@ -41,24 +41,26 @@
  <div class="d-flex justify-content-between align-items-start gap-2">
  <div>
  <a class="fw-semibold text-decoration-none" href="{{ url_for('user.card_detail', card_id=card.id) }}">{{ card.name }}</a>
- {% if card.is_hidden %}<span class="badge bg-secondary ms-1">已隐藏</span>{% endif %}
+ <span class="badge bg-secondary ms-1 js-hidden-badge {% if not card.is_hidden %}d-none{% endif %}">已隐藏</span>
  <div class="text-muted small mt-1">{{ card.gender or '未知' }} · {{ card.created_at.strftime('%Y-%m-%d') if card.created_at else '' }}</div>
  </div>
- <div class="text-nowrap">{{ status_badge(card.status) }}</div>
+ <div class="text-nowrap js-status-badge">{{ status_badge(card.status) }}</div>
  </div>
  <div class="mt-2 d-flex flex-wrap gap-2">
  <a class="btn btn-sm btn-outline-primary" href="{{ url_for('user.card_edit', card_id=card.id) }}">编辑</a>
  {% if card.status == 'rejected' %}
- <form method="post" action="{{ url_for('user.card_resubmit', card_id=card.id) }}" class="d-inline">
- <button class="btn btn-sm btn-outline-success">重新提审</button>
- </form>
- {% endif %}
- <form method="post" action="{{ url_for('user.card_toggle_hidden', card_id=card.id) }}" class="d-inline"
- onsubmit="return confirm('确认{{ '取消隐藏' if card.is_hidden else '隐藏' }}该角色卡？');">
- <button class="btn btn-sm btn-outline-{{ 'secondary' if card.is_hidden else 'warning' }}">
- {{ '取消隐藏' if card.is_hidden else '隐藏' }}
- </button>
- </form>
+<form method="post" action="{{ url_for('user.card_resubmit', card_id=card.id) }}" class="d-inline js-toggle">
+<button class="btn btn-sm btn-outline-success">重新提审</button>
+</form>
+{% endif %}
+<form method="post" action="{{ url_for('user.card_toggle_hidden', card_id=card.id) }}" class="d-inline js-toggle"
+data-confirm="确认{{ '取消隐藏' if card.is_hidden else '隐藏' }}该角色卡？"
+data-on-class="btn-outline-secondary" data-off-class="btn-outline-warning"
+data-label-on="取消隐藏" data-label-off="隐藏">
+<button class="btn btn-sm btn-outline-{{ 'secondary' if card.is_hidden else 'warning' }}">
+<span class="js-toggle-label">{{ '取消隐藏' if card.is_hidden else '隐藏' }}</span>
+</button>
+</form>
  </div>
  </div>
  {% else %}

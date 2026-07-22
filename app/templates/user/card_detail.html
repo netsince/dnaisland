@@ -151,14 +151,16 @@
   <div class="d-flex flex-wrap gap-2">
     {% if is_owner %}
     <a class="btn btn-sm btn-outline-primary" href="{{ url_for('user.card_edit', card_id=card.id) }}">编辑</a>
-    <form method="post" action="{{ url_for('user.card_toggle_hidden', card_id=card.id) }}" class="d-inline"
-          onsubmit="return confirm('确认{{ '取消隐藏' if card.is_hidden else '隐藏' }}该角色卡？');">
+    <form method="post" action="{{ url_for('user.card_toggle_hidden', card_id=card.id) }}" class="d-inline js-toggle"
+          data-confirm="确认{{ '取消隐藏' if card.is_hidden else '隐藏' }}该角色卡？"
+          data-on-class="btn-outline-secondary" data-off-class="btn-outline-warning"
+          data-label-on="取消隐藏" data-label-off="隐藏">
       <button class="btn btn-sm btn-outline-{{ 'secondary' if card.is_hidden else 'warning' }}">
-        {{ '取消隐藏' if card.is_hidden else '隐藏' }}
+        <span class="js-toggle-label">{{ '取消隐藏' if card.is_hidden else '隐藏' }}</span>
       </button>
     </form>
     {% if card.status == 'rejected' %}
-    <form method="post" action="{{ url_for('user.card_resubmit', card_id=card.id) }}" class="d-inline">
+    <form method="post" action="{{ url_for('user.card_resubmit', card_id=card.id) }}" class="d-inline js-toggle">
       <button class="btn btn-sm btn-outline-success">重新提审</button>
     </form>
     {% endif %}

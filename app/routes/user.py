@@ -38,6 +38,13 @@ from ..models.punishment import (
     PUNISHMENT_TYPES,
 )
 from ..services.notification_service import notify
+
+# 审核状态徽章 HTML（与 macros/cards.html::status_badge 保持一致，供 AJAX 局部更新）
+STATUS_BADGE_HTML = {
+    "approved": '<span class="badge bg-success">已通过</span>',
+    "rejected": '<span class="badge bg-danger">已拒绝</span>',
+    "pending": '<span class="badge bg-warning text-dark">审核中</span>',
+}
 from ..services.image_service import compress_image, crop_square_and_compress
 from ..services.card_service import (
     attach_covers,
@@ -693,6 +700,14 @@ def card_resubmit(card_id):
         card.status = "pending"
         db.session.commit()
         flash("已重新提交审核", "success")
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        # 局部提交：返回新状态供前端更新按钮与状态徽章，不整页刷新
+        return jsonify({
+            "ok": True,
+            "action": "resubmit",
+            "status": card.status,
+            "status_html": STATUS_BADGE_HTML.get(card.status, ""),
+        })
     return redirect(url_for("user.my_cards"))
 
 
@@ -705,6 +720,13 @@ def card_toggle_hidden(card_id):
     card.is_hidden = not card.is_hidden
     db.session.commit()
     flash("已隐藏" if card.is_hidden else "已取消隐藏", "success")
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        # 局部提交：返回新状态供前端切换按钮与「已隐藏」徽章，不整页刷新
+        return jsonify({
+            "ok": True,
+            "action": "hidden",
+            "state": card.is_hidden,
+        })
     return redirect(url_for("user.my_cards"))
 
 
@@ -819,6 +841,9 @@ def notifications_read_all():
 
     mark_all_read(current_user.id)
     flash("已全部标记为已读", "success")
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        # 局部提交：返回成功供前端移除按钮与未读红点，不整页刷新
+        return jsonify({"ok": True, "action": "read_all"})
     return redirect(url_for("user.notifications"))
 
 
