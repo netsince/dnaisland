@@ -213,9 +213,46 @@ def generate():
     return redirect(url_for("image_gen.log_detail", log_id=log.id))
 
 
+@image_gen_bp.route("/api/logs")
+@login_required
+def api_logs():
+    page = request.args.get("page", 1, type=int)
+    pagination = (
+        GenerationLog.query.filter_by(user_id=current_user.id)
+        .order_by(GenerationLog.created_at.desc())
+        .paginate(page=page, per_page=12, error_out=False)
+    )
+    items = []
+    for l in pagination.items:
+        imgs = l.image_list()
+        if imgs:
+            items.append({
+                "id": l.id,
+                "first_image": imgs[0],
+                "model_name": l.model_name,
+                "size": l.size or "auto",
+                "count": l.count,
+                "points_spent": l.points_spent,
+                "status": l.status,
+                "created_at": l.created_at.strftime("%Y-%m-%d %H:%M"),
+                "detail_url": url_for("image_gen.log_detail", log_id=l.id),
+            })
+    return jsonify({
+        "ok": True,
+        "total": pagination.total,
+        "page": pagination.page,
+        "pages": pagination.pages,
+        "has_next": pagination.has_next,
+        "has_prev": pagination.has_prev,
+        "items": items,
+    })
+
+
 @image_gen_bp.route("/logs")
 @login_required
 def logs():
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest" and request.args.get("json"):
+        return api_logs()
     page = request.args.get("page", 1, type=int)
     pagination = (
         GenerationLog.query.filter_by(user_id=current_user.id)
