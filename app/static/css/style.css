@@ -1277,10 +1277,10 @@ body.is-mobile-plus-open header {
   }
 }
 
-/* 电脑端（>=992px）：主内容区与顶栏之间保持 1.5rem (24px) 的舒服留白 */
+/* 电脑端（>=992px）：主内容区与顶栏之间保持紧凑干练的 12px 留白 */
 @media (min-width: 992px) {
   main {
-    padding-top: 1.5rem !important;
+    padding-top: 12px !important;
   }
 }
 
