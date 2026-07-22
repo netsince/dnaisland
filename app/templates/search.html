@@ -7,8 +7,8 @@
 {% block title %}搜索：{{ q }} · DNAISLAND{% endblock %}
 
 {% set counts = {
-  'card': cards_pagination.total if cards_pagination else 0,
-  'user': users_pagination.total if users_pagination else 0,
+  'card': cards_count,
+  'user': users_count,
 } %}
 
 {% block content %}
@@ -23,7 +23,7 @@
 {# 类型切换 + 排序 #}
 <div class="d-flex flex-wrap align-items-center gap-2 mb-4">
   <div class="btn-group btn-group-sm" role="group" aria-label="搜索类型">
-    <a class="btn {{ 'btn-primary' if search_type=='all' else 'btn-outline-primary' }}" href="{{ url_for('main.search', q=q, type='all', sort=sort, tag=tag) }}">全部{% if cards_pagination or users_pagination %} <span class="badge text-bg-dark">{{ counts.card + counts.user }}</span>{% endif %}</a>
+    <a class="btn {{ 'btn-primary' if search_type=='all' else 'btn-outline-primary' }}" href="{{ url_for('main.search', q=q, type='all', sort=sort, tag=tag) }}">全部{% if q %} <span class="badge text-bg-dark">{{ counts.card + counts.user }}</span>{% endif %}</a>
     <a class="btn {{ 'btn-primary' if search_type=='card' else 'btn-outline-primary' }}" href="{{ url_for('main.search', q=q, type='card', sort=sort, tag=tag) }}">角色卡 <span class="badge text-bg-dark">{{ counts.card }}</span></a>
     <a class="btn {{ 'btn-primary' if search_type=='user' else 'btn-outline-primary' }}" href="{{ url_for('main.search', q=q, type='user', sort=sort, tag=tag) }}">作者 <span class="badge text-bg-dark">{{ counts.user }}</span></a>
   </div>
@@ -47,6 +47,11 @@
   {% if search_type == 'all' %}<h2 class="dna-section-title h5">角色卡 <span class="text-muted small">（{{ counts.card }}）</span></h2>{% endif %}
   {% if cards %}
     {{ card_grid(cards, q=q) }}
+    {% if search_type == 'all' and counts.card > 4 %}
+      <div class="text-center mt-3">
+        <a class="btn btn-outline-primary btn-sm" href="{{ url_for('main.search', q=q, type='card', sort=sort, tag=tag) }}">查看全部卡片</a>
+      </div>
+    {% endif %}
     {% if cards_pagination %}{{ render_pagination(cards_pagination, 'main.search', args) }}{% endif %}
   {% elif q %}
     {{ empty_state('没有找到相关角色卡。', '🎴') }}
@@ -79,6 +84,11 @@
     </div>
     {% endfor %}
   </div>
+  {% if search_type == 'all' and counts.user > 3 %}
+    <div class="text-center mt-3">
+      <a class="btn btn-outline-primary btn-sm" href="{{ url_for('main.search', q=q, type='user', sort=sort, tag=tag) }}">查看全部作者</a>
+    </div>
+  {% endif %}
   {% if users_pagination %}{{ render_pagination(users_pagination, 'main.search', args) }}{% endif %}
   {% elif q %}
     {{ empty_state('没有找到相关作者。', '👤') }}

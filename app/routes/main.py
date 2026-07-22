@@ -114,18 +114,26 @@ def search():
     cards_pagination = None
     users = []
     users_pagination = None
+    cards_count = 0
+    users_count = 0
 
-    if q and search_type in ("all", "card"):
-        cards_pagination = _card_search_query(q, sort, tag).paginate(
-            page=page, per_page=12, error_out=False
-        )
-        cards = attach_covers(cards_pagination.items)
+    if q:
+        cards_count = _card_search_query(q, sort, tag).count()
+        users_count = _user_search_query(q, sort).count()
 
-    if q and search_type in ("all", "user"):
-        users_pagination = _user_search_query(q, sort).paginate(
-            page=page, per_page=20, error_out=False
-        )
-        users = users_pagination.items
+        if search_type == "all":
+            cards = attach_covers(_card_search_query(q, sort, tag).limit(4).all())
+            users = _user_search_query(q, sort).limit(3).all()
+        elif search_type == "card":
+            cards_pagination = _card_search_query(q, sort, tag).paginate(
+                page=page, per_page=12, error_out=False
+            )
+            cards = attach_covers(cards_pagination.items)
+        elif search_type == "user":
+            users_pagination = _user_search_query(q, sort).paginate(
+                page=page, per_page=20, error_out=False
+            )
+            users = users_pagination.items
 
     return render_template(
         "search.html",
@@ -136,8 +144,10 @@ def search():
         tag=tag,
         cards=cards,
         cards_pagination=cards_pagination,
+        cards_count=cards_count,
         users=users,
         users_pagination=users_pagination,
+        users_count=users_count,
         args=args,
     )
 
