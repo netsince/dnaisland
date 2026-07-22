@@ -1,3 +1,4 @@
+import html
 import json
 import re
 from io import BytesIO
@@ -5,6 +6,7 @@ from io import BytesIO
 from datetime import datetime
 from flask import (
     Blueprint,
+    Response,
     abort,
     flash,
     jsonify,
@@ -57,17 +59,35 @@ from ..services.card_service import (
 user_bp = Blueprint("user", __name__)
 
 
+def _default_avatar_svg(ch):
+    """生成一个首字母占位头像（SVG），避免无头像时返回 404 导致破图。"""
+    ch = html.escape(ch or "?", quote=True)
+    return (
+        '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">'
+        '<rect width="256" height="256" fill="#2a2738"/>'
+        '<text x="128" y="140" fill="#b9b6d6" font-size="120" '
+        'font-family="system-ui, sans-serif" text-anchor="middle" '
+        'dominant-baseline="middle">' + ch + "</text>"
+        "</svg>"
+    )
+
+
 @user_bp.route("/avatar/<int:user_id>")
 def avatar(user_id):
-    """用户头像：base64 data URL -> WEBP 二进制，避免内联膨胀 HTML。"""
+    """用户头像：base64 data URL -> WEBP 二进制，避免内联膨胀 HTML。无头像时返回首字母占位图。"""
     u = db.session.get(User, user_id)
-    if not u or not u.avatar:
-        abort(404)
-    try:
-        webp = data_url_to_webp_bytes(u.avatar, max_edge=256, quality=82)
-    except Exception:
-        abort(404)
-    return send_file(BytesIO(webp), mimetype="image/webp", max_age=86400)
+    if u and u.avatar:
+        try:
+            webp = data_url_to_webp_bytes(u.avatar, max_edge=256, quality=82)
+            return send_file(BytesIO(webp), mimetype="image/webp", max_age=86400)
+        except Exception:
+            pass
+    ch = (u.display_name or u.username or "?")[0] if u else "?"
+    return Response(
+        _default_avatar_svg(ch),
+        mimetype="image/svg+xml",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
 
 
 @user_bp.route("/card-image/<card_id>/<slot>")
