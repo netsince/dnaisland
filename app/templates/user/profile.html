@@ -12,11 +12,11 @@
 {% if site_cfg.memorial_banner_url %}
 <a href="{{ site_cfg.memorial_banner_url }}" class="text-decoration-none">
 {% endif %}
-  <div class="text-center mb-4 p-4 rounded-3 border-0"
-       style="background:linear-gradient(135deg,#1f1f2e,#3a2740);color:#f3e9d2;">
-    <div class="fs-5 fw-semibold">斯人虽远去，万古作星辰。</div>
-    <div class="opacity-75 mt-1">Ta已经离开了我们，请允许我们做出最后的道别。</div>
-  </div>
+ <div class="text-center mb-4 p-4 rounded-3 border-0"
+ style="background:linear-gradient(135deg,#1f1f2e,#3a2740);color:#f3e9d2;">
+ <div class="fs-5 fw-semibold">斯人虽远去，万古作星辰。</div>
+ <div class="opacity-75 mt-1">Ta已经离开了我们，请允许我们做出最后的道别。</div>
+ </div>
 {% if site_cfg.memorial_banner_url %}
 </a>
 {% endif %}
@@ -25,291 +25,289 @@
 {% if deleted %}
 {# 账号已被管理员删除：仅展示提示，不再暴露任何资料与内容 #}
 <div class="alert alert-warning">
-  <h4 class="alert-heading">账号已被删除</h4>
-  <p class="mb-0">因相关问题，此账号已被管理员删除。</p>
+ <h4 class="alert-heading">账号已被删除</h4>
+ <p class="mb-0">因相关问题，此账号已被管理员删除。</p>
 </div>
 {% elif restricted %}
 {# 他人访问被「禁止主页被访问」的用户：仅展示受限提示与处罚列表 #}
 <div class="alert alert-warning">
-  <h4 class="alert-heading">该用户主页已被限制访问</h4>
-  <p class="mb-0">该用户当前受到以下平台处罚：</p>
+ <h4 class="alert-heading">该用户主页已被限制访问</h4>
+ <p class="mb-0">该用户当前受到以下平台处罚：</p>
 </div>
 <ul class="list-group mb-3">
-  {% for p in punishments %}
-  <li class="list-group-item d-flex justify-content-between align-items-center">
-    <span>{{ p.type_label }}</span>
-    <span class="text-muted small">{{ p.created_at.strftime('%Y-%m-%d') if p.created_at else '' }}</span>
-  </li>
-  {% endfor %}
+ {% for p in punishments %}
+ <li class="list-group-item d-flex justify-content-between align-items-center">
+ <span>{{ p.type_label }}</span>
+ <span class="text-muted small">{{ p.created_at.strftime('%Y-%m-%d') if p.created_at else '' }}</span>
+ </li>
+ {% endfor %}
 </ul>
 {% else %}
 
 <div class="row g-3 g-lg-4">
-  <!-- 左侧资料列 -->
-  <div class="col-12 col-lg-4 col-xl-3">
-    <div class="card dna-profile-card">
-      <div class="card-body p-4">
-        <div class="d-flex flex-column gap-3">
-          {# 头像与基本信息 #}
-          <div class="d-flex align-items-center gap-3">
-            {% if u.avatar %}
-            <img src="{{ u.avatar }}" alt="头像" class="dna-avatar flex-shrink-0" style="width:96px;height:96px;">
-            {% else %}
-            <div class="dna-avatar-ph flex-shrink-0" style="width:96px;height:96px;font-size:2.4rem;">{{ u.display_name[:1] }}</div>
-            {% endif %}
-            <div class="flex-grow-1 min-w-0">
-              <h1 class="h5 mb-1 d-flex align-items-center flex-wrap gap-1">
-                <span class="text-truncate mw-100">{{ u.display_name }}</span>
-                {{ badge(u) }}
-                {% if u.role == 'super_admin' %}<span class="badge bg-danger-subtle text-danger border border-danger-subtle ms-1" style="font-size:0.68rem;font-weight:500;vertical-align:middle;">管理员</span>{% endif %}
-              </h1>
-              <div class="text-muted small text-truncate">@{{ u.username }}{% if is_self %} · <span class="dna-chip">这是你</span>{% endif %}</div>
-            </div>
-          </div>
+ <!-- 左侧资料列 -->
+ <div class="col-12 col-lg-4 col-xl-3">
+ <div class="card dna-profile-card">
+ <div class="card-body p-4">
+ <div class="d-flex flex-column gap-3">
+ {# 头像与基本信息 #}
+ <div class="d-flex align-items-center gap-3">
+ {% if u.avatar %}
+ <img src="{{ u.avatar }}" alt="头像" class="dna-avatar flex-shrink-0" style="width:96px;height:96px;">
+ {% else %}
+ <div class="dna-avatar-ph flex-shrink-0" style="width:96px;height:96px;font-size:2.4rem;">{{ u.display_name[:1] }}</div>
+ {% endif %}
+ <div class="flex-grow-1 min-w-0">
+ <h1 class="h5 mb-1 d-flex align-items-center flex-wrap gap-1">
+ <span class="text-truncate mw-100">{{ u.display_name }}</span>
+ {{ badge(u) }}
+ {% if u.role == 'super_admin' %}<span class="badge bg-danger-subtle text-danger border border-danger-subtle ms-1" style="font-size:0.68rem;font-weight:500;vertical-align:middle;">管理员</span>{% endif %}
+ </h1>
+ <div class="text-muted small text-truncate">@{{ u.username }}{% if is_self %} · <span class="dna-chip">这是你</span>{% endif %}</div>
+ </div>
+ </div>
 
-          {# 粉丝/关注/角色卡数据 #}
-          <div class="d-flex align-items-center justify-content-around text-center border-top border-bottom border-secondary border-opacity-25 py-2">
-            <div><a class="text-decoration-none text-reset" href="{{ url_for('user.following', username=u.username) }}"><strong class="text-light d-block">{{ following_count }}</strong><span class="text-muted small">关注</span></a></div>
-            <div><a class="text-decoration-none text-reset" href="{{ url_for('user.followers', username=u.username) }}"><strong class="text-light d-block">{{ follower_count }}</strong><span class="text-muted small">粉丝</span></a></div>
-            <div><strong class="text-light d-block">{{ pagination.total }}</strong><span class="text-muted small">角色卡</span></div>
-          </div>
+ {# 粉丝/关注/角色卡数据 #}
+ <div class="d-flex align-items-center justify-content-around text-center border-top border-bottom border-secondary border-opacity-25 py-2">
+ <div><a class="text-decoration-none text-reset" href="{{ url_for('user.following', username=u.username) }}"><strong class="text-light d-block">{{ following_count }}</strong><span class="text-muted small">关注</span></a></div>
+ <div><a class="text-decoration-none text-reset" href="{{ url_for('user.followers', username=u.username) }}"><strong class="text-light d-block">{{ follower_count }}</strong><span class="text-muted small">粉丝</span></a></div>
+ <div><strong class="text-light d-block">{{ pagination.total }}</strong><span class="text-muted small">角色卡</span></div>
+ </div>
 
-          {# 编辑/关注行动按钮 #}
-          <div class="d-flex flex-column gap-2">
-            {% if is_self %}
-              {% if u.is_edit_profile_banned %}
-              <span class="text-muted small text-center">你被禁止更改资料</span>
-              {% else %}
-              <a class="btn btn-sm btn-outline-secondary w-100" href="{{ url_for('user.profile_edit') }}">编辑资料</a>
-              {% endif %}
-            {% else %}
-            <form method="post" action="{{ url_for('user.user_follow', username=u.username) }}">
-              <button class="btn btn-sm btn-{{ 'outline-secondary' if is_following else 'primary' }} w-100">
-                {{ '取消关注' if is_following else '＋ 关注' }}
-              </button>
-            </form>
-            <a class="btn btn-sm btn-outline-danger w-100" href="{{ url_for('user.report', type='user', id=u.username) }}">举报</a>
-            {% endif %}
-          </div>
+ {# 编辑/关注行动按钮 #}
+ <div class="d-flex flex-column gap-2">
+ {% if is_self %}
+ {% if u.is_edit_profile_banned %}
+ <span class="text-muted small text-center">你被禁止更改资料</span>
+ {% else %}
+ <a class="btn btn-sm btn-outline-secondary w-100" href="{{ url_for('user.profile_edit') }}">编辑资料</a>
+ {% endif %}
+ {% else %}
+ <form method="post" action="{{ url_for('user.user_follow', username=u.username) }}">
+ <button class="btn btn-sm btn-{{ 'outline-secondary' if is_following else 'primary' }} w-100">
+ {{ '取消关注' if is_following else '＋ 关注' }}
+ </button>
+ </form>
+ <a class="btn btn-sm btn-outline-danger w-100" href="{{ url_for('user.report', type='user', id=u.username) }}">举报</a>
+ {% endif %}
+ </div>
 
-          {# bio / location / website / birthday / created_at #}
-          {% if u.bio or u.location or u.website or u.birthday %}
-          <div class="border-top border-secondary border-opacity-25 pt-3">
-            {% if u.bio %}<p class="mb-2 small" style="white-space:pre-wrap;">{{ u.bio }}</p>{% endif %}
-            <ul class="list-unstyled mb-0 small text-muted d-flex flex-column gap-1">
-              {% if u.location %}<li>📍 {{ u.location }}</li>{% endif %}
-              {% if u.website %}<li>🔗 <a href="{{ u.website }}" target="_blank" rel="noopener">{{ u.website }}</a></li>{% endif %}
-              {% if u.birthday %}<li>🎂 {{ u.birthday.strftime('%Y-%m-%d') }}</li>{% endif %}
-              <li>📅 加入于 {{ u.created_at.strftime('%Y-%m-%d') if u.created_at else '—' }}</li>
-            </ul>
-          </div>
-          {% endif %}
+ {# bio / location / website / birthday / created_at #}
+ {% if u.bio or u.location or u.website or u.birthday %}
+ <div class="border-top border-secondary border-opacity-25 pt-3">
+ {% if u.bio %}<p class="mb-2 small" style="white-space:pre-wrap;">{{ u.bio }}</p>{% endif %}
+ <ul class="list-unstyled mb-0 small text-muted d-flex flex-column gap-1">
+ {% if u.location %}<li>城市：{{ u.location }}</li>{% endif %}
+ {% if u.website %}<li>链接：<a href="{{ u.website }}" target="_blank" rel="noopener">{{ u.website }}</a></li>{% endif %}
+ {% if u.birthday %}<li>生日：{{ u.birthday.strftime('%Y-%m-%d') }}</li>{% endif %}
+ <li>加入：{{ u.created_at.strftime('%Y-%m-%d') if u.created_at else '—' }}</li>
+ </ul>
+ </div>
+ {% endif %}
 
-          {# is_self 下的快捷菜单触发按键（无高光描边，极简收纳） #}
-          {% if is_self %}
-          <div class="border-top border-secondary border-opacity-25 pt-3">
-            <button class="btn btn-secondary btn-sm w-100 d-flex align-items-center justify-content-between py-2 px-3 border-0" type="button" data-bs-toggle="offcanvas" data-bs-target="#userToolsOffcanvas">
-              <span class="d-flex align-items-center gap-2 fw-medium">⚙️ 功能菜单</span>
-              <span class="small opacity-75">展开 ➔</span>
-            </button>
-          </div>
-          {% endif %}
-        </div>
-      </div>
-    </div>
-  </div>
+ {# is_self 下的快捷菜单触发按键 #}
+ {% if is_self %}
+ <div class="border-top border-secondary border-opacity-25 pt-3">
+ <button class="btn btn-secondary btn-sm w-100 d-flex align-items-center justify-content-between py-2 px-3 border-0" type="button" data-bs-toggle="offcanvas" data-bs-target="#userToolsOffcanvas">
+ <span class="fw-medium">功能菜单</span>
+ <span class="small opacity-75">展开 </span>
+ </button>
+ </div>
+ {% endif %}
+ </div>
+ </div>
+ </div>
+ </div>
 
-  <!-- 右侧内容列 -->
-  <div class="col-12 col-lg-8 col-xl-9">
-    {% if punishments %}
-    <div class="alert alert-danger">
-      <strong>{{ '你' if is_self else '该用户' }}当前受到的处罚：</strong>
-      <ul class="mb-1">
-        {% for p in punishments %}<li>{{ p.type_label }}</li>{% endfor %}
-      </ul>
-      {% if is_self %}<a href="{{ url_for('user.my_punishments') }}">查看详情与申诉 →</a>{% endif %}
-    </div>
-    {% endif %}
+ <!-- 右侧内容列 -->
+ <div class="col-12 col-lg-8 col-xl-9">
+ {% if punishments %}
+ <div class="alert alert-danger">
+ <strong>{{ '你' if is_self else '该用户' }}当前受到的处罚：</strong>
+ <ul class="mb-1">
+ {% for p in punishments %}<li>{{ p.type_label }}</li>{% endfor %}
+ </ul>
+ {% if is_self %}<a href="{{ url_for('user.my_punishments') }}">查看详情与申诉 →</a>{% endif %}
+ </div>
+ {% endif %}
 
-    {# 内容分类 tab #}
-    <ul class="nav nav-tabs dna-profile-tabs mb-3">
-      <li class="nav-item">
-        <a class="nav-link {% if tab == 'cards' %}active{% endif %}" href="{{ url_for('user.profile', username=u.username, tab='cards') }}">角色卡</a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link {% if tab == 'teahouse_posts' %}active{% endif %}" href="{{ url_for('user.profile', username=u.username, tab='teahouse_posts') }}">茶馆帖子</a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link {% if tab == 'teahouse_replies' %}active{% endif %}" href="{{ url_for('user.profile', username=u.username, tab='teahouse_replies') }}">茶馆回帖</a>
-      </li>
-    </ul>
+ {# 内容分类 tab #}
+ <ul class="nav nav-tabs dna-profile-tabs mb-3">
+ <li class="nav-item">
+ <a class="nav-link {% if tab == 'cards' %}active{% endif %}" href="{{ url_for('user.profile', username=u.username, tab='cards') }}">角色卡</a>
+ </li>
+ <li class="nav-item">
+ <a class="nav-link {% if tab == 'teahouse_posts' %}active{% endif %}" href="{{ url_for('user.profile', username=u.username, tab='teahouse_posts') }}">茶馆帖子</a>
+ </li>
+ <li class="nav-item">
+ <a class="nav-link {% if tab == 'teahouse_replies' %}active{% endif %}" href="{{ url_for('user.profile', username=u.username, tab='teahouse_replies') }}">茶馆回帖</a>
+ </li>
+ </ul>
 
-    <div id="profileTabContent">
-    {% if tab == 'cards' %}
-    <h2 class="dna-section-title h5">发布的角色卡（{{ pagination.total }}）</h2>
-    {% if pagination.total == 0 %}
-      {{ empty_state('还没有发布任何角色卡。', '🎴') }}
-    {% else %}
-      {{ card_grid(cards, show_status=(is_self or is_admin)) }}
-      {{ render_pagination(pagination, 'user.profile', args) }}
-    {% endif %}
-    {% elif tab == 'teahouse_posts' %}
-    <h2 class="dna-section-title h5">茶馆帖子（{{ tp_pagination.total }}）</h2>
-    {% if tp_pagination.total == 0 %}
-      <div class="text-center text-muted py-4">还没有发布任何茶馆帖子。</div>
-    {% else %}
-      {% for p in tp_items %}
-      <div class="card mb-2">
-        <div class="card-body py-2">
-          <div class="small text-muted mb-1">
-            {{ p.created_at.strftime('%Y-%m-%d %H:%M') if p.created_at else '' }}
-            {% if p.is_hidden %}· <span class="text-danger">已隐藏</span>{% endif %}
-            {% if not p.moderated %}· <span class="text-warning">待审核</span>{% endif %}
-          </div>
-          <div style="white-space:pre-wrap;word-break:break-word;">{{ p.content | teahouse_linkify }}</div>
-          <a class="small" href="{{ url_for('teahouse.post_detail', post_id=p.id) }}">查看 / 回复 →</a>
-        </div>
-      </div>
-      {% endfor %}
-      {{ render_pagination(tp_pagination, 'user.profile', tp_args) }}
-    {% endif %}
-    {% elif tab == 'teahouse_replies' %}
-    <h2 class="dna-section-title h5">茶馆回帖（{{ tp_pagination.total }}）</h2>
-    {% if tp_pagination.total == 0 %}
-      <div class="text-center text-muted py-4">还没有发布任何茶馆回帖。</div>
-    {% else %}
-      {% for p in tp_items %}
-      <div class="card mb-2">
-        <div class="card-body py-2">
-          <div class="small text-muted mb-1">
-            {{ p.created_at.strftime('%Y-%m-%d %H:%M') if p.created_at else '' }}
-            {% if p.is_hidden %}· <span class="text-danger">已隐藏</span>{% endif %}
-            {% if not p.moderated %}· <span class="text-warning">待审核</span>{% endif %}
-          </div>
-          <div style="white-space:pre-wrap;word-break:break-word;">{{ p.content | teahouse_linkify }}</div>
-          <a class="small" href="{{ url_for('teahouse.post_detail', post_id=p.id) }}">查看原帖 →</a>
-        </div>
-      </div>
-      {% endfor %}
-      {{ render_pagination(tp_pagination, 'user.profile', tp_args) }}
-    {% endif %}
-    {% endif %}
-    </div>
-  </div>
+ <div id="profileTabContent">
+ {% if tab == 'cards' %}
+ <h2 class="dna-section-title h5">发布的角色卡（{{ pagination.total }}）</h2>
+ {% if pagination.total == 0 %}
+ {{ empty_state('还没有发布任何角色卡。', '') }}
+ {% else %}
+ {{ card_grid(cards, show_status=(is_self or is_admin)) }}
+ {{ render_pagination(pagination, 'user.profile', args) }}
+ {% endif %}
+ {% elif tab == 'teahouse_posts' %}
+ <h2 class="dna-section-title h5">茶馆帖子（{{ tp_pagination.total }}）</h2>
+ {% if tp_pagination.total == 0 %}
+ <div class="text-center text-muted py-4">还没有发布任何茶馆帖子。</div>
+ {% else %}
+ {% for p in tp_items %}
+ <div class="card mb-2">
+ <div class="card-body py-2">
+ <div class="small text-muted mb-1">
+ {{ p.created_at.strftime('%Y-%m-%d %H:%M') if p.created_at else '' }}
+ {% if p.is_hidden %}· <span class="text-danger">已隐藏</span>{% endif %}
+ {% if not p.moderated %}· <span class="text-warning">待审核</span>{% endif %}
+ </div>
+ <div style="white-space:pre-wrap;word-break:break-word;">{{ p.content | teahouse_linkify }}</div>
+ <a class="small" href="{{ url_for('teahouse.post_detail', post_id=p.id) }}">查看 / 回复 →</a>
+ </div>
+ </div>
+ {% endfor %}
+ {{ render_pagination(tp_pagination, 'user.profile', tp_args) }}
+ {% endif %}
+ {% elif tab == 'teahouse_replies' %}
+ <h2 class="dna-section-title h5">茶馆回帖（{{ tp_pagination.total }}）</h2>
+ {% if tp_pagination.total == 0 %}
+ <div class="text-center text-muted py-4">还没有发布任何茶馆回帖。</div>
+ {% else %}
+ {% for p in tp_items %}
+ <div class="card mb-2">
+ <div class="card-body py-2">
+ <div class="small text-muted mb-1">
+ {{ p.created_at.strftime('%Y-%m-%d %H:%M') if p.created_at else '' }}
+ {% if p.is_hidden %}· <span class="text-danger">已隐藏</span>{% endif %}
+ {% if not p.moderated %}· <span class="text-warning">待审核</span>{% endif %}
+ </div>
+ <div style="white-space:pre-wrap;word-break:break-word;">{{ p.content | teahouse_linkify }}</div>
+ <a class="small" href="{{ url_for('teahouse.post_detail', post_id=p.id) }}">查看原帖 →</a>
+ </div>
+ </div>
+ {% endfor %}
+ {{ render_pagination(tp_pagination, 'user.profile', tp_args) }}
+ {% endif %}
+ {% endif %}
+ </div>
+ </div>
 </div>
 {% endif %}
 
 {% if is_self %}
 <!-- 个人功能菜单 侧滑抽屉 -->
 <div class="offcanvas offcanvas-start dna-tools-offcanvas" tabindex="-1" id="userToolsOffcanvas" aria-labelledby="userToolsOffcanvasLabel">
-  <div class="offcanvas-header border-bottom border-secondary border-opacity-25 py-3">
-    <h5 class="offcanvas-title h6 mb-0 d-flex align-items-center gap-2" id="userToolsOffcanvasLabel">
-      <span>⚙️</span> <span>功能菜单</span>
-    </h5>
-    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="关闭"></button>
-  </div>
-  <div class="offcanvas-body p-3">
-    {# 1. 资产类目 #}
-    <div class="text-muted small mb-2 px-2 fw-semibold">资产</div>
-    <div class="list-group list-group-flush mb-2">
-      <a href="{{ url_for('points.detail') }}" class="list-group-item list-group-item-action d-flex align-items-center gap-2 py-2 border-0 rounded-2">
-        <span>🪙</span> <span>我的点数</span>
-      </a>
-    </div>
+ <div class="offcanvas-header border-bottom border-secondary border-opacity-25 py-3">
+ <h5 class="offcanvas-title h6 mb-0 fw-semibold" id="userToolsOffcanvasLabel">功能菜单</h5>
+ <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="关闭"></button>
+ </div>
+ <div class="offcanvas-body p-3">
+ {# 1. 资产类目 #}
+ <div class="text-muted small mb-2 px-2 fw-semibold">资产</div>
+ <div class="list-group list-group-flush mb-2">
+ <a href="{{ url_for('points.detail') }}" class="list-group-item list-group-item-action py-2 border-0 rounded-2">
+ <span>我的点数</span>
+ </a>
+ </div>
 
-    <hr class="border-secondary border-opacity-25 my-3">
+ <hr class="border-secondary border-opacity-25 my-3">
 
-    {# 2. 互动与内容类目（收藏、点赞、发布归为同类目） #}
-    <div class="text-muted small mb-2 px-2 fw-semibold">互动与内容</div>
-    <div class="list-group list-group-flush mb-2">
-      <a href="{{ url_for('user.my_favorites') }}" class="list-group-item list-group-item-action d-flex align-items-center gap-2 py-2 border-0 rounded-2 mb-1">
-        <span>⭐</span> <span>我的收藏</span>
-      </a>
-      <a href="{{ url_for('user.my_likes') }}" class="list-group-item list-group-item-action d-flex align-items-center gap-2 py-2 border-0 rounded-2 mb-1">
-        <span>❤️</span> <span>我点赞的</span>
-      </a>
-      <a href="{{ url_for('user.my_cards') }}" class="list-group-item list-group-item-action d-flex align-items-center gap-2 py-2 border-0 rounded-2">
-        <span>🎴</span> <span>我的发布</span>
-      </a>
-    </div>
+ {# 2. 互动与内容类目 #}
+ <div class="text-muted small mb-2 px-2 fw-semibold">互动与内容</div>
+ <div class="list-group list-group-flush mb-2">
+ <a href="{{ url_for('user.my_favorites') }}" class="list-group-item list-group-item-action py-2 border-0 rounded-2 mb-1">
+ <span>我的收藏</span>
+ </a>
+ <a href="{{ url_for('user.my_likes') }}" class="list-group-item list-group-item-action py-2 border-0 rounded-2 mb-1">
+ <span>我点赞的</span>
+ </a>
+ <a href="{{ url_for('user.my_cards') }}" class="list-group-item list-group-item-action py-2 border-0 rounded-2">
+ <span>我的发布</span>
+ </a>
+ </div>
 
-    <hr class="border-secondary border-opacity-25 my-3">
+ <hr class="border-secondary border-opacity-25 my-3">
 
-    {# 3. 平台与记录类目 #}
-    <div class="text-muted small mb-2 px-2 fw-semibold">平台与记录</div>
-    <div class="list-group list-group-flush mb-2">
-      <a href="{{ url_for('main.articles') }}" class="list-group-item list-group-item-action d-flex align-items-center gap-2 py-2 border-0 rounded-2 mb-1">
-        <span>📰</span> <span>官方公告</span>
-      </a>
-      <a href="{{ url_for('user.my_punishments') }}" class="list-group-item list-group-item-action d-flex align-items-center gap-2 py-2 border-0 rounded-2">
-        <span>⚖️</span> <span>我的处罚</span>
-      </a>
-    </div>
+ {# 3. 平台与记录类目 #}
+ <div class="text-muted small mb-2 px-2 fw-semibold">平台与记录</div>
+ <div class="list-group list-group-flush mb-2">
+ <a href="{{ url_for('main.articles') }}" class="list-group-item list-group-item-action py-2 border-0 rounded-2 mb-1">
+ <span>官方公告</span>
+ </a>
+ <a href="{{ url_for('user.my_punishments') }}" class="list-group-item list-group-item-action py-2 border-0 rounded-2">
+ <span>我的处罚</span>
+ </a>
+ </div>
 
-    <hr class="border-secondary border-opacity-25 my-3">
+ <hr class="border-secondary border-opacity-25 my-3">
 
-    {# 4. 账号操作类目 #}
-    <div class="list-group list-group-flush">
-      <a href="{{ url_for('auth.logout') }}" class="list-group-item list-group-item-action text-danger d-flex align-items-center gap-2 py-2 border-0 rounded-2">
-        <span>🚪</span> <span>退出登录</span>
-      </a>
-    </div>
-  </div>
+ {# 4. 账号操作类目 #}
+ <div class="list-group list-group-flush">
+ <a href="{{ url_for('auth.logout') }}" class="list-group-item list-group-item-action text-danger py-2 border-0 rounded-2">
+ <span>退出登录</span>
+ </a>
+ </div>
+ </div>
 </div>
 {% endif %}
 {% endblock %}
 
 {% block scripts %}
 <script>
-  (function () {
-    document.addEventListener('click', function (e) {
-      // 仅拦截个人主页的 Tab nav-link 点击
-      const link = e.target.closest('.nav-tabs .nav-link');
-      if (!link) return;
-      e.preventDefault();
-      
-      const url = link.getAttribute('href');
-      if (!url) return;
+ (function () {
+ document.addEventListener('click', function (e) {
+ // 仅拦截个人主页的 Tab nav-link 点击
+ const link = e.target.closest('.nav-tabs .nav-link');
+ if (!link) return;
+ e.preventDefault();
+ 
+ const url = link.getAttribute('href');
+ if (!url) return;
 
-      fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-        .then(r => {
-          if (!r.ok) throw new Error('Fetch failed');
-          return r.text();
-        })
-        .then(html => {
-          const parser = new DOMParser();
-          const doc = parser.parseFromString(html, 'text/html');
+ fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+ .then(r => {
+ if (!r.ok) throw new Error('Fetch failed');
+ return r.text();
+ })
+ .then(html => {
+ const parser = new DOMParser();
+ const doc = parser.parseFromString(html, 'text/html');
 
-          // 1. 替换 Tab 头状态，使 active 正常高亮切换
-          const newTabs = doc.querySelector('.nav-tabs');
-          const oldTabs = document.querySelector('.nav-tabs');
-          if (newTabs && oldTabs) oldTabs.innerHTML = newTabs.innerHTML;
+ // 1. 替换 Tab 头状态，使 active 正常高亮切换
+ const newTabs = doc.querySelector('.nav-tabs');
+ const oldTabs = document.querySelector('.nav-tabs');
+ if (newTabs && oldTabs) oldTabs.innerHTML = newTabs.innerHTML;
 
-          // 2. 局部替换 Tab 主内容区
-          const newWrap = doc.getElementById('profileTabContent');
-          const oldWrap = document.getElementById('profileTabContent');
-          if (newWrap && oldWrap) {
-            oldWrap.innerHTML = newWrap.innerHTML;
-          }
+ // 2. 局部替换 Tab 主内容区
+ const newWrap = doc.getElementById('profileTabContent');
+ const oldWrap = document.getElementById('profileTabContent');
+ if (newWrap && oldWrap) {
+ oldWrap.innerHTML = newWrap.innerHTML;
+ }
 
-          // 3. 动态同步浏览器地址栏 URL
-          history.pushState(null, '', url);
+ // 3. 动态同步浏览器地址栏 URL
+ history.pushState(null, '', url);
 
-          // 4. 重建图片渐显加载绑定（由于 base.html 原生脚本通常在 DOMContentLoaded 绑定，
-          // 局部更新后需要重新执行图片渐显逻辑，请调用或重建图片淡入淡出的 is-loaded 判定）
-          const newImages = oldWrap.querySelectorAll('.dna-img-fade img');
-          newImages.forEach(img => {
-            if (img.complete) {
-              img.closest('.dna-img-fade').classList.add('is-loaded');
-            } else {
-              img.addEventListener('load', function() {
-                img.closest('.dna-img-fade').classList.add('is-loaded');
-              });
-            }
-          });
-        })
-        .catch(err => console.error('Tab switch failed:', err));
-    });
-  })();
+ // 4. 重建图片渐显加载绑定（由于 base.html 原生脚本通常在 DOMContentLoaded 绑定，
+ // 局部更新后需要重新执行图片渐显逻辑，请调用或重建图片淡入淡出的 is-loaded 判定）
+ const newImages = oldWrap.querySelectorAll('.dna-img-fade img');
+ newImages.forEach(img => {
+ if (img.complete) {
+ img.closest('.dna-img-fade').classList.add('is-loaded');
+ } else {
+ img.addEventListener('load', function() {
+ img.closest('.dna-img-fade').classList.add('is-loaded');
+ });
+ }
+ });
+ })
+ .catch(err => console.error('Tab switch failed:', err));
+ });
+ })();
 </script>
 {% endblock %}

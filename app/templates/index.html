@@ -7,37 +7,37 @@
 {% block content %}
 {% if site_cfg.hero.enabled %}
 <section class="dna-hero mb-5">
-  <span class="dna-hero__eyebrow">◆ DNA · 与汝共奏</span>
-  <h1 class="dna-hero__title">
-    {{ site_cfg.hero.title or "在 DNAISLAND 遇见你的下一位 TA" }}
-  </h1>
-  <p class="lead text-secondary mb-4" style="max-width: 640px;">
-    {{ site_cfg.hero.subtitle or "一个专注角色卡的二次元创作社区。发现、收藏、分享独一无二的角色人格，让每一次对话都有灵魂。" }}
-  </p>
-  <div class="d-flex flex-wrap gap-2">
-    {% for b in site_cfg.hero.buttons %}
-    <a class="btn btn-primary btn-lg" href="{{ b.url }}">{{ b.label }}</a>
-    {% else %}
-      {% if not current_user.is_authenticated %}
-      <a class="btn btn-primary btn-lg" href="{{ url_for('auth.register') }}">立即加入 →</a>
-      <a class="btn btn-outline-light btn-lg" href="{{ url_for('auth.login') }}">登录</a>
-      {% else %}
-      <a class="btn btn-primary btn-lg" href="{{ url_for('publish.start') }}">＋ 发布角色卡</a>
-      {% endif %}
-    {% endfor %}
-  </div>
+ <span class="dna-hero__eyebrow">◆ DNA · 与汝共奏</span>
+ <h1 class="dna-hero__title">
+ {{ site_cfg.hero.title or "在 DNAISLAND 遇见你的下一位 TA" }}
+ </h1>
+ <p class="lead text-secondary mb-4" style="max-width: 640px;">
+ {{ site_cfg.hero.subtitle or "一个专注角色卡的二次元创作社区。发现、收藏、分享独一无二的角色人格，让每一次对话都有灵魂。" }}
+ </p>
+ <div class="d-flex flex-wrap gap-2">
+ {% for b in site_cfg.hero.buttons %}
+ <a class="btn btn-primary btn-lg" href="{{ b.url }}">{{ b.label }}</a>
+ {% else %}
+ {% if not current_user.is_authenticated %}
+ <a class="btn btn-primary btn-lg" href="{{ url_for('auth.register') }}">立即加入 →</a>
+ <a class="btn btn-outline-light btn-lg" href="{{ url_for('auth.login') }}">登录</a>
+ {% else %}
+ <a class="btn btn-primary btn-lg" href="{{ url_for('publish.start') }}">＋ 发布角色卡</a>
+ {% endif %}
+ {% endfor %}
+ </div>
 </section>
 {% endif %}
 
 <div class="d-flex align-items-center justify-content-between mb-3">
-  <h2 class="dna-section-title h4 mb-0">热门推荐</h2>
-  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('main.explore') }}">探索</a>
+ <h2 class="dna-section-title h4 mb-0">热门推荐</h2>
+ <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('main.explore') }}">探索</a>
 </div>
 
 {% if pagination.items %}
-  {{ card_grid(cards) }}
-  {{ render_pagination(pagination, 'main.index', args) }}
+ {{ card_grid(cards) }}
+ {{ render_pagination(pagination, 'main.index', args) }}
 {% else %}
-  {{ empty_state('还没有公开的角色卡，来发布第一张吧！', '🎴') }}
+ {{ empty_state('还没有公开的角色卡，来发布第一张吧！', '') }}
 {% endif %}
 {% endblock %}

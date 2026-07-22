@@ -11,13 +11,13 @@
       <div class="d-flex align-items-center gap-2">
         <a class="btn btn-sm btn-outline-secondary rounded-pill me-1" href="javascript:history.back()">← 返回</a>
         <h1 class="h4 mb-0 fw-bold d-flex align-items-center gap-2">
-          <span>🔔 消息通知</span>
+          <span>消息通知</span>
           {% if unread %}<span class="badge bg-danger rounded-pill px-2" style="font-size:0.75rem;">{{ unread }} 未读</span>{% endif %}
         </h1>
       </div>
       {% if unread %}
       <form method="post" action="{{ url_for('user.notifications_read_all') }}">
-        <button class="btn btn-sm btn-outline-secondary rounded-pill" type="submit">✓ 全部已读</button>
+        <button class="btn btn-sm btn-outline-secondary rounded-pill" type="submit">全部已读</button>
       </form>
       {% endif %}
     </div>

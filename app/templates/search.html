@@ -7,307 +7,307 @@
 {% block title %}搜索：{{ q }} · DNAISLAND{% endblock %}
 
 {% set counts = {
-  'card': cards_count,
-  'user': users_count,
-  'post': posts_count,
+ 'card': cards_count,
+ 'user': users_count,
+ 'post': posts_count,
 } %}
 
 {% block content %}
 <div class="mb-4">
-  <h1 class="h4 mb-1">搜索结果</h1>
-  <p class="text-secondary mb-0">
-    关键词：<strong class="text-light">{{ q or '（空）' }}</strong>
-    {% if tag %} · 标签 <span class="dna-chip">#{{ tag }}</span>{% endif %}
-  </p>
+ <h1 class="h4 mb-1">搜索结果</h1>
+ <p class="text-secondary mb-0">
+ 关键词：<strong class="text-light">{{ q or '（空）' }}</strong>
+ {% if tag %} · 标签 <span class="dna-chip">#{{ tag }}</span>{% endif %}
+ </p>
 </div>
 
 <div id="searchContentWrap">
-  {# 类型切换 + 排序 #}
-  <div class="d-flex flex-wrap align-items-center gap-2 mb-4">
-    <div class="btn-group btn-group-sm" role="group" aria-label="搜索类型">
-      <a class="btn {{ 'btn-primary' if search_type=='all' else 'btn-outline-primary' }}" href="{{ url_for('main.search', q=q, type='all', sort=sort, tag=tag) }}">全部{% if q %} <span class="badge text-bg-dark">{{ counts.card + counts.user + counts.post }}</span>{% endif %}</a>
-      <a class="btn {{ 'btn-primary' if search_type=='card' else 'btn-outline-primary' }}" href="{{ url_for('main.search', q=q, type='card', sort=sort, tag=tag) }}">角色卡 <span class="badge text-bg-dark">{{ counts.card }}</span></a>
-      <a class="btn {{ 'btn-primary' if search_type=='post' else 'btn-outline-primary' }}" href="{{ url_for('main.search', q=q, type='post', sort=sort, tag=tag) }}">茶馆动态 <span class="badge text-bg-dark">{{ counts.post }}</span></a>
-      <a class="btn {{ 'btn-primary' if search_type=='user' else 'btn-outline-primary' }}" href="{{ url_for('main.search', q=q, type='user', sort=sort, tag=tag) }}">作者 <span class="badge text-bg-dark">{{ counts.user }}</span></a>
-    </div>
-    {% if search_type in ('all','card') %}
-    <div class="btn-group btn-group-sm ms-auto" role="group" aria-label="排序">
-      <span class="btn btn-outline-secondary disabled">排序</span>
-      <a class="btn {{ 'btn-secondary' if sort=='relevance' else 'btn-outline-secondary' }}" href="{{ url_for('main.search', q=q, type=search_type, sort='relevance', tag=tag) }}">相关度</a>
-      <a class="btn {{ 'btn-secondary' if sort=='hot' else 'btn-outline-secondary' }}" href="{{ url_for('main.search', q=q, type=search_type, sort='hot', tag=tag) }}">最热</a>
-      <a class="btn {{ 'btn-secondary' if sort=='new' else 'btn-outline-secondary' }}" href="{{ url_for('main.search', q=q, type=search_type, sort='new', tag=tag) }}">最新</a>
-    </div>
-    {% endif %}
-  </div>
+ {# 类型切换 + 排序 #}
+ <div class="d-flex flex-wrap align-items-center gap-2 mb-4">
+ <div class="btn-group btn-group-sm" role="group" aria-label="搜索类型">
+ <a class="btn {{ 'btn-primary' if search_type=='all' else 'btn-outline-primary' }}" href="{{ url_for('main.search', q=q, type='all', sort=sort, tag=tag) }}">全部{% if q %} <span class="badge text-bg-dark">{{ counts.card + counts.user + counts.post }}</span>{% endif %}</a>
+ <a class="btn {{ 'btn-primary' if search_type=='card' else 'btn-outline-primary' }}" href="{{ url_for('main.search', q=q, type='card', sort=sort, tag=tag) }}">角色卡 <span class="badge text-bg-dark">{{ counts.card }}</span></a>
+ <a class="btn {{ 'btn-primary' if search_type=='post' else 'btn-outline-primary' }}" href="{{ url_for('main.search', q=q, type='post', sort=sort, tag=tag) }}">茶馆动态 <span class="badge text-bg-dark">{{ counts.post }}</span></a>
+ <a class="btn {{ 'btn-primary' if search_type=='user' else 'btn-outline-primary' }}" href="{{ url_for('main.search', q=q, type='user', sort=sort, tag=tag) }}">作者 <span class="badge text-bg-dark">{{ counts.user }}</span></a>
+ </div>
+ {% if search_type in ('all','card') %}
+ <div class="btn-group btn-group-sm ms-auto" role="group" aria-label="排序">
+ <span class="btn btn-outline-secondary disabled">排序</span>
+ <a class="btn {{ 'btn-secondary' if sort=='relevance' else 'btn-outline-secondary' }}" href="{{ url_for('main.search', q=q, type=search_type, sort='relevance', tag=tag) }}">相关度</a>
+ <a class="btn {{ 'btn-secondary' if sort=='hot' else 'btn-outline-secondary' }}" href="{{ url_for('main.search', q=q, type=search_type, sort='hot', tag=tag) }}">最热</a>
+ <a class="btn {{ 'btn-secondary' if sort=='new' else 'btn-outline-secondary' }}" href="{{ url_for('main.search', q=q, type=search_type, sort='new', tag=tag) }}">最新</a>
+ </div>
+ {% endif %}
+ </div>
 
-  {% if not q %}
-    {{ empty_state('请输入关键词开始搜索。', '🔍') }}
-  {% else %}
+ {% if not q %}
+ {{ empty_state('请输入关键词开始搜索。', '') }}
+ {% else %}
 
-    {# 当 search_type == 'all' 时 #}
-    {% if search_type == 'all' %}
-      {# 1. Spotlight 创作者卡片 #}
-      {% if users %}
-        {% set spotlight_user = users[0] %}
-        <section class="mb-4">
-          <div class="dna-search-author-spotlight">
-            <div class="d-flex flex-wrap align-items-center gap-3">
-              <a href="{{ url_for('user.profile', username=spotlight_user.username) }}" class="text-decoration-none">
-                {% if spotlight_user.avatar %}
-                  <img src="{{ spotlight_user.avatar }}" class="dna-avatar flex-shrink-0" alt="{{ spotlight_user.nickname }}" style="width:64px;height:64px;">
-                {% else %}
-                  <div class="dna-avatar-ph flex-shrink-0" style="width:64px;height:64px;font-size:1.6rem;">{{ spotlight_user.nickname[:1] }}</div>
-                {% endif %}
-              </a>
-              <div class="flex-grow-1 overflow-hidden">
-                <div class="d-flex align-items-center gap-2 flex-wrap">
-                  <a href="{{ url_for('user.profile', username=spotlight_user.username) }}" class="fw-bold fs-5 text-light text-decoration-none hover-underline">
-                    {{ hl(spotlight_user.nickname, q) }}{{ badge(spotlight_user) }}
-                  </a>
-                  <span class="text-muted small">@{{ hl(spotlight_user.username, q) }}</span>
-                </div>
-                <div class="text-muted small mt-1">
-                  已发布 <strong>{{ spotlight_user.cards|length }}</strong> 个角色卡
-                </div>
-                {% if spotlight_user.bio %}
-                  <p class="text-secondary small mb-0 mt-1 text-truncate" style="max-width: 600px;">
-                    {{ hl(spotlight_user.bio, q) }}
-                  </p>
-                {% endif %}
-              </div>
-              <div class="ms-auto flex-shrink-0 d-flex gap-2">
-                {% if current_user.is_authenticated and current_user.id != spotlight_user.id %}
-                  <form method="post" action="{{ url_for('user.user_follow', username=spotlight_user.username) }}" class="d-inline">
-                    <button class="btn btn-sm btn-primary rounded-pill px-3">＋ 关注</button>
-                  </form>
-                {% endif %}
-                <a href="{{ url_for('user.profile', username=spotlight_user.username) }}" class="btn btn-sm btn-outline-primary rounded-pill px-3">访问主页</a>
-              </div>
-            </div>
-          </div>
-        </section>
-      {% endif %}
+ {# 当 search_type == 'all' 时 #}
+ {% if search_type == 'all' %}
+ {# 1. Spotlight 创作者卡片 #}
+ {% if users %}
+ {% set spotlight_user = users[0] %}
+ <section class="mb-4">
+ <div class="dna-search-author-spotlight">
+ <div class="d-flex flex-wrap align-items-center gap-3">
+ <a href="{{ url_for('user.profile', username=spotlight_user.username) }}" class="text-decoration-none">
+ {% if spotlight_user.avatar %}
+ <img src="{{ spotlight_user.avatar }}" class="dna-avatar flex-shrink-0" alt="{{ spotlight_user.nickname }}" style="width:64px;height:64px;">
+ {% else %}
+ <div class="dna-avatar-ph flex-shrink-0" style="width:64px;height:64px;font-size:1.6rem;">{{ spotlight_user.nickname[:1] }}</div>
+ {% endif %}
+ </a>
+ <div class="flex-grow-1 overflow-hidden">
+ <div class="d-flex align-items-center gap-2 flex-wrap">
+ <a href="{{ url_for('user.profile', username=spotlight_user.username) }}" class="fw-bold fs-5 text-light text-decoration-none hover-underline">
+ {{ hl(spotlight_user.nickname, q) }}{{ badge(spotlight_user) }}
+ </a>
+ <span class="text-muted small">@{{ hl(spotlight_user.username, q) }}</span>
+ </div>
+ <div class="text-muted small mt-1">
+ 已发布 <strong>{{ spotlight_user.cards|length }}</strong> 个角色卡
+ </div>
+ {% if spotlight_user.bio %}
+ <p class="text-secondary small mb-0 mt-1 text-truncate" style="max-width: 600px;">
+ {{ hl(spotlight_user.bio, q) }}
+ </p>
+ {% endif %}
+ </div>
+ <div class="ms-auto flex-shrink-0 d-flex gap-2">
+ {% if current_user.is_authenticated and current_user.id != spotlight_user.id %}
+ <form method="post" action="{{ url_for('user.user_follow', username=spotlight_user.username) }}" class="d-inline">
+ <button class="btn btn-sm btn-primary rounded-pill px-3">＋ 关注</button>
+ </form>
+ {% endif %}
+ <a href="{{ url_for('user.profile', username=spotlight_user.username) }}" class="btn btn-sm btn-outline-primary rounded-pill px-3">访问主页</a>
+ </div>
+ </div>
+ </div>
+ </section>
+ {% endif %}
 
-      {# 2. 角色卡板块 #}
-      {% if cards %}
-        <section class="mb-5">
-          <h2 class="dna-section-title h5">角色卡 <span class="text-muted small">（{{ counts.card }}）</span></h2>
-          {{ card_grid(cards, q=q) }}
-          {% if counts.card > 4 %}
-            <div class="text-center mt-3">
-              <a class="btn btn-outline-primary btn-sm rounded-pill" href="{{ url_for('main.search', q=q, type='card', sort=sort, tag=tag) }}">查看全部角色卡 ➔</a>
-            </div>
-          {% endif %}
-        </section>
-      {% endif %}
+ {# 2. 角色卡板块 #}
+ {% if cards %}
+ <section class="mb-5">
+ <h2 class="dna-section-title h5">角色卡 <span class="text-muted small">（{{ counts.card }}）</span></h2>
+ {{ card_grid(cards, q=q) }}
+ {% if counts.card > 4 %}
+ <div class="text-center mt-3">
+ <a class="btn btn-outline-primary btn-sm rounded-pill" href="{{ url_for('main.search', q=q, type='card', sort=sort, tag=tag) }}">查看全部角色卡 </a>
+ </div>
+ {% endif %}
+ </section>
+ {% endif %}
 
-      {# 3. 社区热门讨论 (茶馆动态) 板块 #}
-      {% if posts %}
-        <section class="mb-5">
-          <h2 class="dna-section-title h5">社区热门讨论 <span class="text-muted small">（{{ counts.post }}）</span></h2>
-          <div class="dna-search-posts-list">
-            {% for p in posts %}
-              <div class="dna-search-post-card">
-                <div class="d-flex align-items-start gap-3">
-                  <a href="{{ url_for('user.profile', username=p.author.username) }}">
-                    {% if p.author.avatar %}
-                      <img src="{{ p.author.avatar }}" class="dna-avatar flex-shrink-0" alt="{{ p.author.nickname }}" style="width:40px;height:40px;">
-                    {% else %}
-                      <div class="dna-avatar-ph flex-shrink-0" style="width:40px;height:40px;font-size:1rem;">{{ p.author.nickname[:1] }}</div>
-                    {% endif %}
-                  </a>
-                  <div class="flex-grow-1 overflow-hidden">
-                    <div class="d-flex align-items-center justify-content-between mb-1">
-                      <div class="d-flex align-items-center gap-2">
-                        <a href="{{ url_for('user.profile', username=p.author.username) }}" class="fw-semibold text-light text-decoration-none">
-                          {{ p.author.display_name }}{{ badge(p.author) }}
-                        </a>
-                        <span class="text-muted small">@{{ p.author.username }}</span>
-                      </div>
-                      <small class="text-muted">{{ p.created_at.strftime('%Y-%m-%d %H:%M') if p.created_at else '' }}</small>
-                    </div>
-                    <div class="text-light mb-2" style="white-space: pre-wrap; word-break: break-word;">
-                      {{ hl(p.content, q) }}
-                    </div>
-                    <div class="d-flex align-items-center gap-3 small">
-                      <a href="{{ url_for('teahouse.post_detail', post_id=p.id) }}" class="text-decoration-none text-primary">
-                        💬 查看回复
-                      </a>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            {% endfor %}
-          </div>
-          {% if counts.post > 4 %}
-            <div class="text-center mt-3">
-              <a class="btn btn-outline-primary btn-sm rounded-pill" href="{{ url_for('main.search', q=q, type='post', sort=sort, tag=tag) }}">查看全部茶馆动态 ➔</a>
-            </div>
-          {% endif %}
-        </section>
-      {% endif %}
+ {# 3. 社区热门讨论 (茶馆动态) 板块 #}
+ {% if posts %}
+ <section class="mb-5">
+ <h2 class="dna-section-title h5">社区热门讨论 <span class="text-muted small">（{{ counts.post }}）</span></h2>
+ <div class="dna-search-posts-list">
+ {% for p in posts %}
+ <div class="dna-search-post-card">
+ <div class="d-flex align-items-start gap-3">
+ <a href="{{ url_for('user.profile', username=p.author.username) }}">
+ {% if p.author.avatar %}
+ <img src="{{ p.author.avatar }}" class="dna-avatar flex-shrink-0" alt="{{ p.author.nickname }}" style="width:40px;height:40px;">
+ {% else %}
+ <div class="dna-avatar-ph flex-shrink-0" style="width:40px;height:40px;font-size:1rem;">{{ p.author.nickname[:1] }}</div>
+ {% endif %}
+ </a>
+ <div class="flex-grow-1 overflow-hidden">
+ <div class="d-flex align-items-center justify-content-between mb-1">
+ <div class="d-flex align-items-center gap-2">
+ <a href="{{ url_for('user.profile', username=p.author.username) }}" class="fw-semibold text-light text-decoration-none">
+ {{ p.author.display_name }}{{ badge(p.author) }}
+ </a>
+ <span class="text-muted small">@{{ p.author.username }}</span>
+ </div>
+ <small class="text-muted">{{ p.created_at.strftime('%Y-%m-%d %H:%M') if p.created_at else '' }}</small>
+ </div>
+ <div class="text-light mb-2" style="white-space: pre-wrap; word-break: break-word;">
+ {{ hl(p.content, q) }}
+ </div>
+ <div class="d-flex align-items-center gap-3 small">
+ <a href="{{ url_for('teahouse.post_detail', post_id=p.id) }}" class="text-decoration-none text-primary">
+ 查看回复
+ </a>
+ </div>
+ </div>
+ </div>
+ </div>
+ {% endfor %}
+ </div>
+ {% if counts.post > 4 %}
+ <div class="text-center mt-3">
+ <a class="btn btn-outline-primary btn-sm rounded-pill" href="{{ url_for('main.search', q=q, type='post', sort=sort, tag=tag) }}">查看全部茶馆动态 </a>
+ </div>
+ {% endif %}
+ </section>
+ {% endif %}
 
-      {# 若全空 #}
-      {% if not users and not cards and not posts %}
-        {{ empty_state('没有找到相关结果。', '🔍') }}
-      {% endif %}
-    {% endif %}
+ {# 若全空 #}
+ {% if not users and not cards and not posts %}
+ {{ empty_state('没有找到相关结果。', '') }}
+ {% endif %}
+ {% endif %}
 
-    {# 当 search_type == 'card' 时 #}
-    {% if search_type == 'card' %}
-      <section class="mb-5">
-        {% if cards %}
-          {{ card_grid(cards, q=q) }}
-          {% if cards_pagination %}{{ render_pagination(cards_pagination, 'main.search', args) }}{% endif %}
-        {% else %}
-          {{ empty_state('没有找到相关角色卡。', '🎴') }}
-        {% endif %}
-      </section>
-    {% endif %}
+ {# 当 search_type == 'card' 时 #}
+ {% if search_type == 'card' %}
+ <section class="mb-5">
+ {% if cards %}
+ {{ card_grid(cards, q=q) }}
+ {% if cards_pagination %}{{ render_pagination(cards_pagination, 'main.search', args) }}{% endif %}
+ {% else %}
+ {{ empty_state('没有找到相关角色卡。', '') }}
+ {% endif %}
+ </section>
+ {% endif %}
 
-    {# 当 search_type == 'post' 时 #}
-    {% if search_type == 'post' %}
-      <section class="mb-5">
-        {% if posts %}
-          <div class="dna-search-posts-list">
-            {% for p in posts %}
-              <div class="dna-search-post-card">
-                <div class="d-flex align-items-start gap-3">
-                  <a href="{{ url_for('user.profile', username=p.author.username) }}">
-                    {% if p.author.avatar %}
-                      <img src="{{ p.author.avatar }}" class="dna-avatar flex-shrink-0" alt="{{ p.author.nickname }}" style="width:40px;height:40px;">
-                    {% else %}
-                      <div class="dna-avatar-ph flex-shrink-0" style="width:40px;height:40px;font-size:1rem;">{{ p.author.nickname[:1] }}</div>
-                    {% endif %}
-                  </a>
-                  <div class="flex-grow-1 overflow-hidden">
-                    <div class="d-flex align-items-center justify-content-between mb-1">
-                      <div class="d-flex align-items-center gap-2">
-                        <a href="{{ url_for('user.profile', username=p.author.username) }}" class="fw-semibold text-light text-decoration-none">
-                          {{ p.author.display_name }}{{ badge(p.author) }}
-                        </a>
-                        <span class="text-muted small">@{{ p.author.username }}</span>
-                      </div>
-                      <small class="text-muted">{{ p.created_at.strftime('%Y-%m-%d %H:%M') if p.created_at else '' }}</small>
-                    </div>
-                    <div class="text-light mb-2" style="white-space: pre-wrap; word-break: break-word;">
-                      {{ hl(p.content, q) }}
-                    </div>
-                    <div class="d-flex align-items-center gap-3 small">
-                      <a href="{{ url_for('teahouse.post_detail', post_id=p.id) }}" class="text-decoration-none text-primary">
-                        💬 查看回复
-                      </a>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            {% endfor %}
-          </div>
-          {% if posts_pagination %}{{ render_pagination(posts_pagination, 'main.search', args) }}{% endif %}
-        {% else %}
-          {{ empty_state('没有找到相关茶馆动态。', '💬') }}
-        {% endif %}
-      </section>
-    {% endif %}
+ {# 当 search_type == 'post' 时 #}
+ {% if search_type == 'post' %}
+ <section class="mb-5">
+ {% if posts %}
+ <div class="dna-search-posts-list">
+ {% for p in posts %}
+ <div class="dna-search-post-card">
+ <div class="d-flex align-items-start gap-3">
+ <a href="{{ url_for('user.profile', username=p.author.username) }}">
+ {% if p.author.avatar %}
+ <img src="{{ p.author.avatar }}" class="dna-avatar flex-shrink-0" alt="{{ p.author.nickname }}" style="width:40px;height:40px;">
+ {% else %}
+ <div class="dna-avatar-ph flex-shrink-0" style="width:40px;height:40px;font-size:1rem;">{{ p.author.nickname[:1] }}</div>
+ {% endif %}
+ </a>
+ <div class="flex-grow-1 overflow-hidden">
+ <div class="d-flex align-items-center justify-content-between mb-1">
+ <div class="d-flex align-items-center gap-2">
+ <a href="{{ url_for('user.profile', username=p.author.username) }}" class="fw-semibold text-light text-decoration-none">
+ {{ p.author.display_name }}{{ badge(p.author) }}
+ </a>
+ <span class="text-muted small">@{{ p.author.username }}</span>
+ </div>
+ <small class="text-muted">{{ p.created_at.strftime('%Y-%m-%d %H:%M') if p.created_at else '' }}</small>
+ </div>
+ <div class="text-light mb-2" style="white-space: pre-wrap; word-break: break-word;">
+ {{ hl(p.content, q) }}
+ </div>
+ <div class="d-flex align-items-center gap-3 small">
+ <a href="{{ url_for('teahouse.post_detail', post_id=p.id) }}" class="text-decoration-none text-primary">
+ 查看回复
+ </a>
+ </div>
+ </div>
+ </div>
+ </div>
+ {% endfor %}
+ </div>
+ {% if posts_pagination %}{{ render_pagination(posts_pagination, 'main.search', args) }}{% endif %}
+ {% else %}
+ {{ empty_state('没有找到相关茶馆动态。', '') }}
+ {% endif %}
+ </section>
+ {% endif %}
 
-    {# 当 search_type == 'user' 时 #}
-    {% if search_type == 'user' %}
-      <section class="mb-5">
-        {% if users %}
-          <div class="row g-3">
-            {% for u in users %}
-            <div class="col-12 col-sm-6 col-lg-4">
-              <a class="dna-tile" href="{{ url_for('user.profile', username=u.username) }}" style="flex-direction:row;">
-                <div class="d-flex align-items-center gap-3 p-3 w-100">
-                  {% if u.avatar %}
-                  <img src="{{ u.avatar }}" class="dna-avatar flex-shrink-0" alt="{{ u.nickname }}"
-                       style="width:52px;height:52px;">
-                  {% else %}
-                  <div class="dna-avatar-ph flex-shrink-0" style="width:52px;height:52px;font-size:1.3rem;">{{ u.nickname[:1] }}</div>
-                  {% endif %}
-                  <div class="overflow-hidden">
-                    <div class="fw-semibold text-truncate text-light">{{ hl(u.nickname, q) }}{{ badge(u) }}</div>
-                    <div class="text-muted small text-truncate">@{{ hl(u.username, q) }}</div>
-                  </div>
-                </div>
-              </a>
-            </div>
-            {% endfor %}
-          </div>
-          {% if users_pagination %}{{ render_pagination(users_pagination, 'main.search', args) }}{% endif %}
-        {% else %}
-          {{ empty_state('没有找到相关作者。', '👤') }}
-        {% endif %}
-      </section>
-    {% endif %}
+ {# 当 search_type == 'user' 时 #}
+ {% if search_type == 'user' %}
+ <section class="mb-5">
+ {% if users %}
+ <div class="row g-3">
+ {% for u in users %}
+ <div class="col-12 col-sm-6 col-lg-4">
+ <a class="dna-tile" href="{{ url_for('user.profile', username=u.username) }}" style="flex-direction:row;">
+ <div class="d-flex align-items-center gap-3 p-3 w-100">
+ {% if u.avatar %}
+ <img src="{{ u.avatar }}" class="dna-avatar flex-shrink-0" alt="{{ u.nickname }}"
+ style="width:52px;height:52px;">
+ {% else %}
+ <div class="dna-avatar-ph flex-shrink-0" style="width:52px;height:52px;font-size:1.3rem;">{{ u.nickname[:1] }}</div>
+ {% endif %}
+ <div class="overflow-hidden">
+ <div class="fw-semibold text-truncate text-light">{{ hl(u.nickname, q) }}{{ badge(u) }}</div>
+ <div class="text-muted small text-truncate">@{{ hl(u.username, q) }}</div>
+ </div>
+ </div>
+ </a>
+ </div>
+ {% endfor %}
+ </div>
+ {% if users_pagination %}{{ render_pagination(users_pagination, 'main.search', args) }}{% endif %}
+ {% else %}
+ {{ empty_state('没有找到相关作者。', '') }}
+ {% endif %}
+ </section>
+ {% endif %}
 
-  {% endif %}
+ {% endif %}
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-  const wrap = document.getElementById('searchContentWrap');
-  if (!wrap) return;
+ const wrap = document.getElementById('searchContentWrap');
+ if (!wrap) return;
 
-  document.addEventListener('click', function(e) {
-    const link = e.target.closest('#searchContentWrap .btn-group a');
-    if (!link) return;
+ document.addEventListener('click', function(e) {
+ const link = e.target.closest('#searchContentWrap .btn-group a');
+ if (!link) return;
 
-    const targetUrl = link.getAttribute('href');
-    if (!targetUrl || targetUrl.startsWith('#') || targetUrl.startsWith('javascript:')) return;
+ const targetUrl = link.getAttribute('href');
+ if (!targetUrl || targetUrl.startsWith('#') || targetUrl.startsWith('javascript:')) return;
 
-    e.preventDefault();
+ e.preventDefault();
 
-    wrap.style.opacity = '0.5';
-    wrap.style.transition = 'opacity 0.15s ease';
+ wrap.style.opacity = '0.5';
+ wrap.style.transition = 'opacity 0.15s ease';
 
-    fetch(targetUrl, {
-      headers: {
-        'X-Requested-With': 'XMLHttpRequest'
-      }
-    })
-    .then(response => response.text())
-    .then(html => {
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(html, 'text/html');
-      const newWrap = doc.getElementById('searchContentWrap');
-      if (newWrap) {
-        wrap.innerHTML = newWrap.innerHTML;
-        history.pushState(null, '', targetUrl);
-      } else {
-        window.location.href = targetUrl;
-      }
-    })
-    .catch(err => {
-      console.error('AJAX tab switch error:', err);
-      window.location.href = targetUrl;
-    })
-    .finally(() => {
-      wrap.style.opacity = '1';
-    });
-  });
+ fetch(targetUrl, {
+ headers: {
+ 'X-Requested-With': 'XMLHttpRequest'
+ }
+ })
+ .then(response => response.text())
+ .then(html => {
+ const parser = new DOMParser();
+ const doc = parser.parseFromString(html, 'text/html');
+ const newWrap = doc.getElementById('searchContentWrap');
+ if (newWrap) {
+ wrap.innerHTML = newWrap.innerHTML;
+ history.pushState(null, '', targetUrl);
+ } else {
+ window.location.href = targetUrl;
+ }
+ })
+ .catch(err => {
+ console.error('AJAX tab switch error:', err);
+ window.location.href = targetUrl;
+ })
+ .finally(() => {
+ wrap.style.opacity = '1';
+ });
+ });
 
-  window.addEventListener('popstate', function() {
-    fetch(window.location.href, {
-      headers: {
-        'X-Requested-With': 'XMLHttpRequest'
-      }
-    })
-    .then(response => response.text())
-    .then(html => {
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(html, 'text/html');
-      const newWrap = doc.getElementById('searchContentWrap');
-      if (newWrap) {
-        wrap.innerHTML = newWrap.innerHTML;
-      }
-    })
-    .catch(() => {
-      window.location.reload();
-    });
-  });
+ window.addEventListener('popstate', function() {
+ fetch(window.location.href, {
+ headers: {
+ 'X-Requested-With': 'XMLHttpRequest'
+ }
+ })
+ .then(response => response.text())
+ .then(html => {
+ const parser = new DOMParser();
+ const doc = parser.parseFromString(html, 'text/html');
+ const newWrap = doc.getElementById('searchContentWrap');
+ if (newWrap) {
+ wrap.innerHTML = newWrap.innerHTML;
+ }
+ })
+ .catch(() => {
+ window.location.reload();
+ });
+ });
 });
 </script>
 {% endblock %}

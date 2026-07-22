@@ -7,207 +7,207 @@
 
 {% block content %}
 <div class="row justify-content-center">
-  <div class="col-12 col-lg-9">
-    <a class="btn btn-sm btn-outline-secondary mb-3" href="javascript:history.back()">← 返回</a>
+ <div class="col-12 col-lg-9">
+ <a class="btn btn-sm btn-outline-secondary mb-3" href="javascript:history.back()">← 返回</a>
 
-    {# 信息头 #}
-    <div class="card mb-4 dna-detail-hero">
-      {% if images.landscape %}
-      <img src="{{ images.landscape }}" alt="{{ card.name }} 横幅"
-           style="width:100%;height:220px;object-fit:cover;opacity:.85;">
-      {% endif %}
-      <div class="card-body">
-        <div class="d-flex flex-wrap gap-3 align-items-start {% if images.landscape %}mt-n5{% endif %}">
-          {% if images.square %}
-          <img src="{{ images.square }}" alt="{{ card.name }} 头像" class="dna-avatar"
-               style="width:120px;height:120px;">
-          {% else %}
-          <div class="dna-avatar-ph" style="width:120px;height:120px;font-size:3rem;">{{ card.name[:1] }}</div>
-          {% endif %}
-          <div class="flex-grow-1">
-            <h1 class="h3 mb-1">{{ card.name }}</h1>
-            <div class="text-muted small mb-2">
-              {{ card.gender or '未知' }}{% if author %} · 作者
-              <a href="{{ url_for('user.profile', username=author.username) }}">{{ author.display_name }}</a>{{ badge(author) }}{% endif %}
-              · 浏览 {{ card.view_count }}
-              {% if card.created_at %}· 发布于 {{ card.created_at.strftime('%Y-%m-%d') }}{% endif %}
-            </div>
-            <div class="mb-2">
-              {{ status_badge(card.status, card.is_hidden) }}
-            </div>
-            {% if tags %}
-            <div class="dna-tile__tags">
-              {% for t in tags %}<span class="dna-chip">#{{ t }}</span>{% endfor %}
-            </div>
-            {% endif %}
-          </div>
-        </div>
+ {# 信息头 #}
+ <div class="card mb-4 dna-detail-hero">
+ {% if images.landscape %}
+ <img src="{{ images.landscape }}" alt="{{ card.name }} 横幅"
+ style="width:100%;height:220px;object-fit:cover;opacity:.85;">
+ {% endif %}
+ <div class="card-body">
+ <div class="d-flex flex-wrap gap-3 align-items-start {% if images.landscape %}mt-n5{% endif %}">
+ {% if images.square %}
+ <img src="{{ images.square }}" alt="{{ card.name }} 头像" class="dna-avatar"
+ style="width:120px;height:120px;">
+ {% else %}
+ <div class="dna-avatar-ph" style="width:120px;height:120px;font-size:3rem;">{{ card.name[:1] }}</div>
+ {% endif %}
+ <div class="flex-grow-1">
+ <h1 class="h3 mb-1">{{ card.name }}</h1>
+ <div class="text-muted small mb-2">
+ {{ card.gender or '未知' }}{% if author %} · 作者
+ <a href="{{ url_for('user.profile', username=author.username) }}">{{ author.display_name }}</a>{{ badge(author) }}{% endif %}
+ · 浏览 {{ card.view_count }}
+ {% if card.created_at %}· 发布于 {{ card.created_at.strftime('%Y-%m-%d') }}{% endif %}
+ </div>
+ <div class="mb-2">
+ {{ status_badge(card.status, card.is_hidden) }}
+ </div>
+ {% if tags %}
+ <div class="dna-tile__tags">
+ {% for t in tags %}<span class="dna-chip">#{{ t }}</span>{% endfor %}
+ </div>
+ {% endif %}
+ </div>
+ </div>
 
-        <div class="d-flex flex-wrap gap-2 mt-3">
-          <form method="post" action="{{ url_for('user.card_like', card_id=card.id) }}" class="d-inline">
-            <button class="btn btn-sm btn-{{ 'primary' if liked else 'outline-secondary' }}">
-              ♥ 点赞（{{ like_count }}）
-            </button>
-          </form>
-          <form method="post" action="{{ url_for('user.card_favorite', card_id=card.id) }}" class="d-inline">
-            <button class="btn btn-sm btn-outline-{{ 'warning' if favorited else 'secondary' }}">
-              ★ 收藏（{{ favorite_count }}）
-            </button>
-          </form>
-          {% if not is_owner and author %}
-          <form method="post" action="{{ url_for('user.user_follow', username=author.username) }}" class="d-inline">
-            <button class="btn btn-sm btn-outline-{{ 'secondary' if following else 'primary' }}">
-              {{ '取消关注' if following else '＋ 关注作者' }}
-            </button>
-          </form>
-          {% endif %}
-          <button class="btn btn-sm btn-outline-success" id="exportClipboardBtn"
-                  data-export-url="{{ url_for('user.card_export', card_id=card.id) }}">⧉ 复制到剪贴板</button>
-          <a class="btn btn-sm btn-outline-danger ms-auto"
-             href="{{ url_for('user.report', type='card', id=card.id) }}">举报</a>
-        </div>
-      </div>
-    </div>
+ <div class="d-flex flex-wrap gap-2 mt-3">
+ <form method="post" action="{{ url_for('user.card_like', card_id=card.id) }}" class="d-inline">
+ <button class="btn btn-sm btn-{{ 'primary' if liked else 'outline-secondary' }}">
+ 点赞（{{ like_count }}）
+ </button>
+ </form>
+ <form method="post" action="{{ url_for('user.card_favorite', card_id=card.id) }}" class="d-inline">
+ <button class="btn btn-sm btn-outline-{{ 'warning' if favorited else 'secondary' }}">
+ 收藏（{{ favorite_count }}）
+ </button>
+ </form>
+ {% if not is_owner and author %}
+ <form method="post" action="{{ url_for('user.user_follow', username=author.username) }}" class="d-inline">
+ <button class="btn btn-sm btn-outline-{{ 'secondary' if following else 'primary' }}">
+ {{ '取消关注' if following else '＋ 关注作者' }}
+ </button>
+ </form>
+ {% endif %}
+ <button class="btn btn-sm btn-outline-success" id="exportClipboardBtn"
+ data-export-url="{{ url_for('user.card_export', card_id=card.id) }}">⧉ 复制到剪贴板</button>
+ <a class="btn btn-sm btn-outline-danger ms-auto"
+ href="{{ url_for('user.report', type='card', id=card.id) }}">举报</a>
+ </div>
+ </div>
+ </div>
 
-    {% if card.persona %}
-    <div class="card mb-4">
-      <div class="card-header fw-semibold">✦ 人格设定</div>
-      <div class="card-body" style="white-space:pre-wrap;">{{ card.persona }}</div>
-    </div>
-    {% endif %}
+ {% if card.persona %}
+ <div class="card mb-4">
+ <div class="card-header fw-semibold"> 人格设定</div>
+ <div class="card-body" style="white-space:pre-wrap;">{{ card.persona }}</div>
+ </div>
+ {% endif %}
 
-    {% if card.intro %}
-    <div class="card mb-4">
-      <div class="card-header fw-semibold">✦ 简介</div>
-      <div class="card-body" style="white-space:pre-wrap;">{{ card.intro }}</div>
-    </div>
-    {% endif %}
+ {% if card.intro %}
+ <div class="card mb-4">
+ <div class="card-header fw-semibold"> 简介</div>
+ <div class="card-body" style="white-space:pre-wrap;">{{ card.intro }}</div>
+ </div>
+ {% endif %}
 
-    {% if card.opening %}
-    <div class="card mb-4">
-      <div class="card-header fw-semibold">✦ 开场白</div>
-      <div class="card-body fst-italic" style="white-space:pre-wrap;">{{ card.opening }}</div>
-    </div>
-    {% endif %}
+ {% if card.opening %}
+ <div class="card mb-4">
+ <div class="card-header fw-semibold"> 开场白</div>
+ <div class="card-body fst-italic" style="white-space:pre-wrap;">{{ card.opening }}</div>
+ </div>
+ {% endif %}
 
-    {% if dialogue %}
-    <div class="card mb-4">
-      <div class="card-header fw-semibold">✦ 对话示例</div>
-      <div class="card-body">
-        {% for turn in dialogue %}
-        <div class="mb-3">
-          {% if turn.user %}<div class="mb-1"><span class="dna-chip">用户</span> <span class="ms-1">{{ turn.user }}</span></div>{% endif %}
-          {% if turn.assistant %}<div class="text-secondary"><strong class="text-light">{{ card.name }}：</strong>{{ turn.assistant }}</div>{% endif %}
-        </div>
-        {% endfor %}
-      </div>
-    </div>
-    {% endif %}
+ {% if dialogue %}
+ <div class="card mb-4">
+ <div class="card-header fw-semibold"> 对话示例</div>
+ <div class="card-body">
+ {% for turn in dialogue %}
+ <div class="mb-3">
+ {% if turn.user %}<div class="mb-1"><span class="dna-chip">用户</span> <span class="ms-1">{{ turn.user }}</span></div>{% endif %}
+ {% if turn.assistant %}<div class="text-secondary"><strong class="text-light">{{ card.name }}：</strong>{{ turn.assistant }}</div>{% endif %}
+ </div>
+ {% endfor %}
+ </div>
+ </div>
+ {% endif %}
 
-    {% if card.original_link %}
-    <div class="mb-4">
-      <a class="btn btn-outline-primary" href="{{ card.original_link }}" target="_blank" rel="noopener">查看原始链接 ↗</a>
-    </div>
-    {% endif %}
+ {% if card.original_link %}
+ <div class="mb-4">
+ <a class="btn btn-outline-primary" href="{{ card.original_link }}" target="_blank" rel="noopener">查看原始链接 ↗</a>
+ </div>
+ {% endif %}
 
-    <div class="card mb-4">
-      <div class="card-header fw-semibold">💬 评论（{{ comment_count }}）</div>
-      <div class="card-body">
-        {% if current_user.is_authenticated %}
-        <form method="post" action="{{ url_for('user.card_comment', card_id=card.id) }}">
-          <textarea class="form-control mb-2" name="content" rows="3" placeholder="说点什么…" required></textarea>
-          <button class="btn btn-primary btn-sm" type="submit">发表评论</button>
-        </form>
-        <hr class="border-secondary opacity-25">
-        {% else %}
-        <p class="text-muted small mb-3"><a href="{{ url_for('auth.login') }}">登录</a> 后参与评论。</p>
-        {% endif %}
-        {% for cm in comments %}
-        <div class="mb-3">
-          <div class="small text-muted mb-1">
-            <a class="text-decoration-none" href="{{ url_for('user.profile', username=cm.author.username) }}">{{ cm.author.display_name }}</a>{{ badge(cm.author) }}
-            · {{ cm.created_at.strftime('%Y-%m-%d %H:%M') if cm.created_at else '' }}
-            {% if current_user.is_authenticated and cm.author.id != current_user.id %}
-            · <a class="text-decoration-none text-danger" href="{{ url_for('user.report', type='comment', id=cm.id) }}">举报</a>
-            {% endif %}
-          </div>
-          <div style="white-space:pre-wrap;">{{ cm.content }}</div>
-        </div>
-        {% else %}
-        <div class="text-muted small">还没有评论，来抢沙发～</div>
-        {% endfor %}
-      </div>
-    </div>
+ <div class="card mb-4">
+ <div class="card-header fw-semibold"> 评论（{{ comment_count }}）</div>
+ <div class="card-body">
+ {% if current_user.is_authenticated %}
+ <form method="post" action="{{ url_for('user.card_comment', card_id=card.id) }}">
+ <textarea class="form-control mb-2" name="content" rows="3" placeholder="说点什么…" required></textarea>
+ <button class="btn btn-primary btn-sm" type="submit">发表评论</button>
+ </form>
+ <hr class="border-secondary opacity-25">
+ {% else %}
+ <p class="text-muted small mb-3"><a href="{{ url_for('auth.login') }}">登录</a> 后参与评论。</p>
+ {% endif %}
+ {% for cm in comments %}
+ <div class="mb-3">
+ <div class="small text-muted mb-1">
+ <a class="text-decoration-none" href="{{ url_for('user.profile', username=cm.author.username) }}">{{ cm.author.display_name }}</a>{{ badge(cm.author) }}
+ · {{ cm.created_at.strftime('%Y-%m-%d %H:%M') if cm.created_at else '' }}
+ {% if current_user.is_authenticated and cm.author.id != current_user.id %}
+ · <a class="text-decoration-none text-danger" href="{{ url_for('user.report', type='comment', id=cm.id) }}">举报</a>
+ {% endif %}
+ </div>
+ <div style="white-space:pre-wrap;">{{ cm.content }}</div>
+ </div>
+ {% else %}
+ <div class="text-muted small">还没有评论，来抢沙发～</div>
+ {% endfor %}
+ </div>
+ </div>
 
-    {% if is_owner or is_admin %}
-    <div class="d-flex flex-wrap gap-2">
-      {% if is_owner %}
-      <a class="btn btn-sm btn-outline-primary" href="{{ url_for('user.card_edit', card_id=card.id) }}">编辑</a>
-      <form method="post" action="{{ url_for('user.card_toggle_hidden', card_id=card.id) }}" class="d-inline"
-            onsubmit="return confirm('确认{{ '取消隐藏' if card.is_hidden else '隐藏' }}该角色卡？');">
-        <button class="btn btn-sm btn-outline-{{ 'secondary' if card.is_hidden else 'warning' }}">
-          {{ '取消隐藏' if card.is_hidden else '隐藏' }}
-        </button>
-      </form>
-      {% if card.status == 'rejected' %}
-      <form method="post" action="{{ url_for('user.card_resubmit', card_id=card.id) }}" class="d-inline">
-        <button class="btn btn-sm btn-outline-success">重新提审</button>
-      </form>
-      {% endif %}
-      {% endif %}
-      {% if is_admin %}
-      <a class="btn btn-sm btn-outline-dark" href="{{ url_for('admin.cards') }}">前往后台审核</a>
-      {% endif %}
-    </div>
-    {% endif %}
-  </div>
+ {% if is_owner or is_admin %}
+ <div class="d-flex flex-wrap gap-2">
+ {% if is_owner %}
+ <a class="btn btn-sm btn-outline-primary" href="{{ url_for('user.card_edit', card_id=card.id) }}">编辑</a>
+ <form method="post" action="{{ url_for('user.card_toggle_hidden', card_id=card.id) }}" class="d-inline"
+ onsubmit="return confirm('确认{{ '取消隐藏' if card.is_hidden else '隐藏' }}该角色卡？');">
+ <button class="btn btn-sm btn-outline-{{ 'secondary' if card.is_hidden else 'warning' }}">
+ {{ '取消隐藏' if card.is_hidden else '隐藏' }}
+ </button>
+ </form>
+ {% if card.status == 'rejected' %}
+ <form method="post" action="{{ url_for('user.card_resubmit', card_id=card.id) }}" class="d-inline">
+ <button class="btn btn-sm btn-outline-success">重新提审</button>
+ </form>
+ {% endif %}
+ {% endif %}
+ {% if is_admin %}
+ <a class="btn btn-sm btn-outline-dark" href="{{ url_for('admin.cards') }}">前往后台审核</a>
+ {% endif %}
+ </div>
+ {% endif %}
+ </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-  (function () {
-    const btn = document.getElementById('exportClipboardBtn');
-    if (!btn) return;
-    btn.addEventListener('click', async function () {
-      const original = btn.textContent;
-      try {
-        const resp = await fetch(btn.dataset.exportUrl, { credentials: 'same-origin' });
-        if (resp.status === 401) {
-          let msg = '请先登录后再复制角色卡';
-          let loginUrl = '/auth/login';
-          try {
-            const data = await resp.json();
-            if (data && data.error) msg = data.error;
-            if (data && data.login_url) loginUrl = data.login_url;
-          } catch (e) {}
-          btn.textContent = '请先登录';
-          if (window.confirm(msg + '，是否前往登录？')) {
-            window.location.href = loginUrl;
-          }
-          return;
-        }
-        if (!resp.ok) throw new Error('导出失败：' + resp.status);
-        const text = await resp.text();
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          await navigator.clipboard.writeText(text);
-        } else {
-          // 兼容不支持 Clipboard API 的环境
-          const ta = document.createElement('textarea');
-          ta.value = text;
-          document.body.appendChild(ta);
-          ta.select();
-          document.execCommand('copy');
-          document.body.removeChild(ta);
-        }
-        btn.textContent = '✓ 已复制';
-      } catch (e) {
-        btn.textContent = '复制失败';
-        console.error(e);
-      } finally {
-        setTimeout(function () { btn.textContent = original; }, 1500);
-      }
-    });
-  })();
+ (function () {
+ const btn = document.getElementById('exportClipboardBtn');
+ if (!btn) return;
+ btn.addEventListener('click', async function () {
+ const original = btn.textContent;
+ try {
+ const resp = await fetch(btn.dataset.exportUrl, { credentials: 'same-origin' });
+ if (resp.status === 401) {
+ let msg = '请先登录后再复制角色卡';
+ let loginUrl = '/auth/login';
+ try {
+ const data = await resp.json();
+ if (data && data.error) msg = data.error;
+ if (data && data.login_url) loginUrl = data.login_url;
+ } catch (e) {}
+ btn.textContent = '请先登录';
+ if (window.confirm(msg + '，是否前往登录？')) {
+ window.location.href = loginUrl;
+ }
+ return;
+ }
+ if (!resp.ok) throw new Error('导出失败：' + resp.status);
+ const text = await resp.text();
+ if (navigator.clipboard && navigator.clipboard.writeText) {
+ await navigator.clipboard.writeText(text);
+ } else {
+ // 兼容不支持 Clipboard API 的环境
+ const ta = document.createElement('textarea');
+ ta.value = text;
+ document.body.appendChild(ta);
+ ta.select();
+ document.execCommand('copy');
+ document.body.removeChild(ta);
+ }
+ btn.textContent = ' 已复制';
+ } catch (e) {
+ btn.textContent = '复制失败';
+ console.error(e);
+ } finally {
+ setTimeout(function () { btn.textContent = original; }, 1500);
+ }
+ });
+ })();
 </script>
 {% endblock %}

@@ -6,67 +6,67 @@
 
 {% block content %}
 <div class="row justify-content-center">
-  <div class="col-12 col-lg-9">
-    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-4">
-      <h1 class="dna-section-title h4 mb-0">我的发布</h1>
-      <div class="d-flex flex-wrap gap-2">
-        <a class="btn btn-primary btn-sm" href="{{ url_for('publish.start') }}">＋ 发布新角色卡</a>
-      </div>
-    </div>
+ <div class="col-12 col-lg-9">
+ <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-4">
+ <h1 class="dna-section-title h4 mb-0">我的发布</h1>
+ <div class="d-flex flex-wrap gap-2">
+ <a class="btn btn-primary btn-sm" href="{{ url_for('publish.start') }}">＋ 发布新角色卡</a>
+ </div>
+ </div>
 
-    <div class="row g-3 mb-4">
-      <div class="col-4">
-        <div class="card"><div class="dna-stat">
-          <div class="dna-stat__num text-warning">{{ pending }}</div>
-          <div class="dna-stat__label">审核中</div>
-        </div></div>
-      </div>
-      <div class="col-4">
-        <div class="card"><div class="dna-stat">
-          <div class="dna-stat__num text-success">{{ approved }}</div>
-          <div class="dna-stat__label">已通过</div>
-        </div></div>
-      </div>
-      <div class="col-4">
-        <div class="card"><div class="dna-stat">
-          <div class="dna-stat__num text-danger">{{ rejected }}</div>
-          <div class="dna-stat__label">已拒绝</div>
-        </div></div>
-      </div>
-    </div>
+ <div class="row g-3 mb-4">
+ <div class="col-4">
+ <div class="card"><div class="dna-stat">
+ <div class="dna-stat__num text-warning">{{ pending }}</div>
+ <div class="dna-stat__label">审核中</div>
+ </div></div>
+ </div>
+ <div class="col-4">
+ <div class="card"><div class="dna-stat">
+ <div class="dna-stat__num text-success">{{ approved }}</div>
+ <div class="dna-stat__label">已通过</div>
+ </div></div>
+ </div>
+ <div class="col-4">
+ <div class="card"><div class="dna-stat">
+ <div class="dna-stat__num text-danger">{{ rejected }}</div>
+ <div class="dna-stat__label">已拒绝</div>
+ </div></div>
+ </div>
+ </div>
 
-    <div class="list-group">
-      {% for card in cards %}
-      <div class="list-group-item">
-        <div class="d-flex justify-content-between align-items-start gap-2">
-          <div>
-            <a class="fw-semibold text-decoration-none" href="{{ url_for('user.card_detail', card_id=card.id) }}">{{ card.name }}</a>
-            {% if card.is_hidden %}<span class="badge bg-secondary ms-1">已隐藏</span>{% endif %}
-            <div class="text-muted small mt-1">{{ card.gender or '未知' }} · {{ card.created_at.strftime('%Y-%m-%d') if card.created_at else '' }}</div>
-          </div>
-          <div class="text-nowrap">{{ status_badge(card.status) }}</div>
-        </div>
-        <div class="mt-2 d-flex flex-wrap gap-2">
-          <a class="btn btn-sm btn-outline-primary" href="{{ url_for('user.card_edit', card_id=card.id) }}">编辑</a>
-          {% if card.status == 'rejected' %}
-          <form method="post" action="{{ url_for('user.card_resubmit', card_id=card.id) }}" class="d-inline">
-            <button class="btn btn-sm btn-outline-success">重新提审</button>
-          </form>
-          {% endif %}
-          <form method="post" action="{{ url_for('user.card_toggle_hidden', card_id=card.id) }}" class="d-inline"
-                onsubmit="return confirm('确认{{ '取消隐藏' if card.is_hidden else '隐藏' }}该角色卡？');">
-            <button class="btn btn-sm btn-outline-{{ 'secondary' if card.is_hidden else 'warning' }}">
-              {{ '取消隐藏' if card.is_hidden else '隐藏' }}
-            </button>
-          </form>
-        </div>
-      </div>
-      {% else %}
-      <div class="list-group-item bg-transparent border-0 p-0">{{ empty_state('还没有发布任何角色卡。', '🎴') }}</div>
-      {% endfor %}
-    </div>
+ <div class="list-group">
+ {% for card in cards %}
+ <div class="list-group-item">
+ <div class="d-flex justify-content-between align-items-start gap-2">
+ <div>
+ <a class="fw-semibold text-decoration-none" href="{{ url_for('user.card_detail', card_id=card.id) }}">{{ card.name }}</a>
+ {% if card.is_hidden %}<span class="badge bg-secondary ms-1">已隐藏</span>{% endif %}
+ <div class="text-muted small mt-1">{{ card.gender or '未知' }} · {{ card.created_at.strftime('%Y-%m-%d') if card.created_at else '' }}</div>
+ </div>
+ <div class="text-nowrap">{{ status_badge(card.status) }}</div>
+ </div>
+ <div class="mt-2 d-flex flex-wrap gap-2">
+ <a class="btn btn-sm btn-outline-primary" href="{{ url_for('user.card_edit', card_id=card.id) }}">编辑</a>
+ {% if card.status == 'rejected' %}
+ <form method="post" action="{{ url_for('user.card_resubmit', card_id=card.id) }}" class="d-inline">
+ <button class="btn btn-sm btn-outline-success">重新提审</button>
+ </form>
+ {% endif %}
+ <form method="post" action="{{ url_for('user.card_toggle_hidden', card_id=card.id) }}" class="d-inline"
+ onsubmit="return confirm('确认{{ '取消隐藏' if card.is_hidden else '隐藏' }}该角色卡？');">
+ <button class="btn btn-sm btn-outline-{{ 'secondary' if card.is_hidden else 'warning' }}">
+ {{ '取消隐藏' if card.is_hidden else '隐藏' }}
+ </button>
+ </form>
+ </div>
+ </div>
+ {% else %}
+ <div class="list-group-item bg-transparent border-0 p-0">{{ empty_state('还没有发布任何角色卡。', '') }}</div>
+ {% endfor %}
+ </div>
 
-    {{ render_pagination(pagination, 'user.my_cards', args) }}
-  </div>
+ {{ render_pagination(pagination, 'user.my_cards', args) }}
+ </div>
 </div>
 {% endblock %}

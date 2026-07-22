@@ -1,559 +1,559 @@
 <!doctype html>
 <html lang="zh-CN" data-bs-theme="dark">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#0b0a14">
-  <title>{% block title %}DNAISLAND{% endblock %}</title>
-  <!-- 主题初始化：在首屏绘制前应用用户偏好，避免闪烁 (FOUC) -->
-  <script>
-    (function () {
-      try {
-        var t = localStorage.getItem('dna_theme');
-        if (!t) t = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
-        document.documentElement.setAttribute('data-bs-theme', t);
-      } catch (e) {
-        document.documentElement.setAttribute('data-bs-theme', 'dark');
-      }
-      // 标记 JS 可用，启用图片渐显等渐进增强样式
-      document.documentElement.classList.add('js');
-    })();
-  </script>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;800&display=swap">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-  {% block head %}{% endblock %}
+ <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1">
+ <meta name="theme-color" content="#0b0a14">
+ <title>{% block title %}DNAISLAND{% endblock %}</title>
+ <!-- 主题初始化：在首屏绘制前应用用户偏好，避免闪烁 (FOUC) -->
+ <script>
+ (function () {
+ try {
+ var t = localStorage.getItem('dna_theme');
+ if (!t) t = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+ document.documentElement.setAttribute('data-bs-theme', t);
+ } catch (e) {
+ document.documentElement.setAttribute('data-bs-theme', 'dark');
+ }
+ // 标记 JS 可用，启用图片渐显等渐进增强样式
+ document.documentElement.classList.add('js');
+ })();
+ </script>
+ <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+ <link rel="preconnect" href="https://fonts.googleapis.com">
+ <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+ <link rel="stylesheet"
+ href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;800&display=swap">
+ <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+ {% block head %}{% endblock %}
 </head>
 <body class="d-flex flex-column min-vh-100">
-  {% block header %}
-  <header>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-      <div class="container-fluid">
-        <a class="navbar-brand" href="{{ url_for('main.index') }}">DNAISLAND</a>
-        <!-- 手机端顶部工具组（搜索 + 深浅色切换 + 消息通知） -->
-        <div class="d-flex align-items-center ms-auto d-lg-none gap-2 me-1">
-          <button class="btn btn-link nav-link p-1 text-muted" id="globalSearchTriggerMobile" type="button" aria-label="展开搜索" title="搜索">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-search"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-          </button>
-          <button type="button" class="btn btn-link nav-link p-1" id="themeToggleMobile" aria-label="切换深浅色主题" title="切换深浅色">
-            <span class="theme-icon icon-sun" aria-hidden="true">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path></svg>
-            </span>
-            <span class="theme-icon icon-moon" aria-hidden="true">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
-            </span>
-          </button>
-          {% if current_user.is_authenticated %}
-          <a class="nav-link p-1 text-muted position-relative" href="{{ url_for('user.notifications') }}" aria-label="通知" title="通知">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
-            {% if unread_notifications %}
-            <span class="position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle">
-              <span class="visually-hidden">未读通知</span>
-            </span>
-            {% endif %}
-          </a>
-          {% endif %}
-        </div>
-        <div class="collapse navbar-collapse" id="mainNav">
-          <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-            <li class="nav-item">
-              <a class="nav-link" href="{{ url_for('main.index') }}">首页</a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" href="{{ url_for('main.explore') }}">探索</a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" href="{{ url_for('teahouse.index') }}">茶馆</a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" href="{{ url_for('image_gen.workbench') }}">生图</a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" href="{{ url_for('main.articles') }}">文章</a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" href="{{ url_for('publish.start') }}">发布</a>
-            </li>
-            {% if current_user.is_authenticated and current_user.is_super_admin %}
-            <li class="nav-item">
-              <a class="nav-link" href="{{ url_for('admin.review') }}">后台
-                {% if site_cfg.shutdown.enabled %}<span class="badge bg-warning text-dark ms-1">关站中</span>{% endif %}
-              </a>
-            </li>
-            {% endif %}
-            {% block nav_items %}{% endblock %}
-          </ul>
-          <ul class="navbar-nav mb-2 mb-lg-0 align-items-center">
-            <li class="nav-item">
-              <button type="button" class="btn btn-link nav-link px-2" id="globalSearchTriggerDesktop" aria-label="展开搜索" title="搜索">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-search"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-              </button>
-            </li>
-            <li class="nav-item d-flex align-items-center">
-              <button type="button" class="btn btn-link nav-link px-2" id="themeToggle"
-                      aria-label="切换深浅色主题" title="切换深浅色">
-                <span class="theme-icon icon-sun" aria-hidden="true">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none"
-                       stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                       stroke-linejoin="round" viewBox="0 0 24 24">
-                    <circle cx="12" cy="12" r="4"></circle>
-                    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path>
-                  </svg>
-                </span>
-                <span class="theme-icon icon-moon" aria-hidden="true">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none"
-                       stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                       stroke-linejoin="round" viewBox="0 0 24 24">
-                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-                  </svg>
-                </span>
-              </button>
-            </li>
-            {% if current_user.is_authenticated %}
-              <li class="nav-item">
-                <a class="nav-link position-relative" href="{{ url_for('user.notifications') }}">
-                  通知
-                  {% if unread_notifications %}
-                  <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
-                    {{ unread_notifications }}
-                  </span>
-                  {% endif %}
-                </a>
-              </li>
-              <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle" href="#" id="userMenu" role="button"
-                   data-bs-toggle="dropdown" aria-expanded="false">
-                  {{ current_user.nickname }}
-                </a>
-                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenu">
-                  <li><a class="dropdown-item" href="{{ url_for('user.profile', username=current_user.username) }}">我的主页</a></li>
-                  <li><a class="dropdown-item" href="{{ url_for('user.my_cards') }}">我的发布</a></li>
-                  <li><a class="dropdown-item" href="{{ url_for('user.my_punishments') }}">我的处罚</a></li>
-                  <li><a class="dropdown-item" href="{{ url_for('points.detail') }}">点数</a></li>
-                  <li><hr class="dropdown-divider"></li>
-                  <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}">退出</a></li>
-                </ul>
-              </li>
-            {% else %}
-              <li class="nav-item">
-                <a class="nav-link" href="{{ url_for('auth.login') }}">登录</a>
-              </li>
-              <li class="nav-item">
-                <a class="nav-link" href="{{ url_for('auth.register') }}">注册</a>
-              </li>
-            {% endif %}
-          </ul>
-        </div>
-      </div>
-      <!-- 全局滑出式搜索栏 -->
-      <div class="dna-search-overlay" id="globalSearchOverlay">
-        <div class="container-fluid h-100 d-flex align-items-center">
-          <form class="d-flex w-100 position-relative" id="navSearchForm" role="search" action="{{ url_for('main.search') }}" method="get" autocomplete="off">
-            <div class="input-group input-group-sm w-100 align-items-center">
-              <span class="input-group-text bg-transparent border-0 pe-2">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-search"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-              </span>
-              <input class="form-control border-0 bg-transparent text-light" type="search" name="q" id="navSearchInput"
-                     placeholder="搜索角色卡 / 作者..." value="{{ search_query|default('') }}" aria-label="搜索"
-                     aria-autocomplete="list" aria-expanded="false" aria-controls="navSearchSuggest" style="font-size: 1rem;">
-              <button class="btn btn-link text-muted px-2 text-decoration-none" id="globalSearchClose" type="button" style="font-size: 0.9rem;">取消</button>
-            </div>
-            <div id="navSearchSuggest" class="dropdown-menu w-100 show d-none shadow"
-                 style="position:absolute;top:100%;left:0;right:0;z-index:1050;margin-top: 10px;"></div>
-          </form>
-        </div>
-      </div>
-    </nav>
-  </header>
-  {% endblock %}
+ {% block header %}
+ <header>
+ <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+ <div class="container-fluid">
+ <a class="navbar-brand" href="{{ url_for('main.index') }}">DNAISLAND</a>
+ <!-- 手机端顶部工具组（搜索 + 深浅色切换 + 消息通知） -->
+ <div class="d-flex align-items-center ms-auto d-lg-none gap-2 me-1">
+ <button class="btn btn-link nav-link p-1 text-muted" id="globalSearchTriggerMobile" type="button" aria-label="展开搜索" title="搜索">
+ <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-search"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+ </button>
+ <button type="button" class="btn btn-link nav-link p-1" id="themeToggleMobile" aria-label="切换深浅色主题" title="切换深浅色">
+ <span class="theme-icon icon-sun" aria-hidden="true">
+ <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path></svg>
+ </span>
+ <span class="theme-icon icon-moon" aria-hidden="true">
+ <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+ </span>
+ </button>
+ {% if current_user.is_authenticated %}
+ <a class="nav-link p-1 text-muted position-relative" href="{{ url_for('user.notifications') }}" aria-label="通知" title="通知">
+ <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+ {% if unread_notifications %}
+ <span class="position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle">
+ <span class="visually-hidden">未读通知</span>
+ </span>
+ {% endif %}
+ </a>
+ {% endif %}
+ </div>
+ <div class="collapse navbar-collapse" id="mainNav">
+ <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+ <li class="nav-item">
+ <a class="nav-link" href="{{ url_for('main.index') }}">首页</a>
+ </li>
+ <li class="nav-item">
+ <a class="nav-link" href="{{ url_for('main.explore') }}">探索</a>
+ </li>
+ <li class="nav-item">
+ <a class="nav-link" href="{{ url_for('teahouse.index') }}">茶馆</a>
+ </li>
+ <li class="nav-item">
+ <a class="nav-link" href="{{ url_for('image_gen.workbench') }}">生图</a>
+ </li>
+ <li class="nav-item">
+ <a class="nav-link" href="{{ url_for('main.articles') }}">文章</a>
+ </li>
+ <li class="nav-item">
+ <a class="nav-link" href="{{ url_for('publish.start') }}">发布</a>
+ </li>
+ {% if current_user.is_authenticated and current_user.is_super_admin %}
+ <li class="nav-item">
+ <a class="nav-link" href="{{ url_for('admin.review') }}">后台
+ {% if site_cfg.shutdown.enabled %}<span class="badge bg-warning text-dark ms-1">关站中</span>{% endif %}
+ </a>
+ </li>
+ {% endif %}
+ {% block nav_items %}{% endblock %}
+ </ul>
+ <ul class="navbar-nav mb-2 mb-lg-0 align-items-center">
+ <li class="nav-item">
+ <button type="button" class="btn btn-link nav-link px-2" id="globalSearchTriggerDesktop" aria-label="展开搜索" title="搜索">
+ <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-search"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+ </button>
+ </li>
+ <li class="nav-item d-flex align-items-center">
+ <button type="button" class="btn btn-link nav-link px-2" id="themeToggle"
+ aria-label="切换深浅色主题" title="切换深浅色">
+ <span class="theme-icon icon-sun" aria-hidden="true">
+ <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none"
+ stroke="currentColor" stroke-width="2" stroke-linecap="round"
+ stroke-linejoin="round" viewBox="0 0 24 24">
+ <circle cx="12" cy="12" r="4"></circle>
+ <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path>
+ </svg>
+ </span>
+ <span class="theme-icon icon-moon" aria-hidden="true">
+ <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none"
+ stroke="currentColor" stroke-width="2" stroke-linecap="round"
+ stroke-linejoin="round" viewBox="0 0 24 24">
+ <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+ </svg>
+ </span>
+ </button>
+ </li>
+ {% if current_user.is_authenticated %}
+ <li class="nav-item">
+ <a class="nav-link position-relative" href="{{ url_for('user.notifications') }}">
+ 通知
+ {% if unread_notifications %}
+ <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+ {{ unread_notifications }}
+ </span>
+ {% endif %}
+ </a>
+ </li>
+ <li class="nav-item dropdown">
+ <a class="nav-link dropdown-toggle" href="#" id="userMenu" role="button"
+ data-bs-toggle="dropdown" aria-expanded="false">
+ {{ current_user.nickname }}
+ </a>
+ <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenu">
+ <li><a class="dropdown-item" href="{{ url_for('user.profile', username=current_user.username) }}">我的主页</a></li>
+ <li><a class="dropdown-item" href="{{ url_for('user.my_cards') }}">我的发布</a></li>
+ <li><a class="dropdown-item" href="{{ url_for('user.my_punishments') }}">我的处罚</a></li>
+ <li><a class="dropdown-item" href="{{ url_for('points.detail') }}">点数</a></li>
+ <li><hr class="dropdown-divider"></li>
+ <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}">退出</a></li>
+ </ul>
+ </li>
+ {% else %}
+ <li class="nav-item">
+ <a class="nav-link" href="{{ url_for('auth.login') }}">登录</a>
+ </li>
+ <li class="nav-item">
+ <a class="nav-link" href="{{ url_for('auth.register') }}">注册</a>
+ </li>
+ {% endif %}
+ </ul>
+ </div>
+ </div>
+ <!-- 全局滑出式搜索栏 -->
+ <div class="dna-search-overlay" id="globalSearchOverlay">
+ <div class="container-fluid h-100 d-flex align-items-center">
+ <form class="d-flex w-100 position-relative" id="navSearchForm" role="search" action="{{ url_for('main.search') }}" method="get" autocomplete="off">
+ <div class="input-group input-group-sm w-100 align-items-center">
+ <span class="input-group-text bg-transparent border-0 pe-2">
+ <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-search"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+ </span>
+ <input class="form-control border-0 bg-transparent text-light" type="search" name="q" id="navSearchInput"
+ placeholder="搜索角色卡 / 作者..." value="{{ search_query|default('') }}" aria-label="搜索"
+ aria-autocomplete="list" aria-expanded="false" aria-controls="navSearchSuggest" style="font-size: 1rem;">
+ <button class="btn btn-link text-muted px-2 text-decoration-none" id="globalSearchClose" type="button" style="font-size: 0.9rem;">取消</button>
+ </div>
+ <div id="navSearchSuggest" class="dropdown-menu w-100 show d-none shadow"
+ style="position:absolute;top:100%;left:0;right:0;z-index:1050;margin-top: 10px;"></div>
+ </form>
+ </div>
+ </div>
+ </nav>
+ </header>
+ {% endblock %}
 
-  <main class="container-fluid py-4 flex-grow-1">
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        {% for category, message in messages %}
-          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-            {{ message }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="关闭"></button>
-          </div>
-        {% endfor %}
-      {% endif %}
-    {% endwith %}
+ <main class="container-fluid py-4 flex-grow-1">
+ {% with messages = get_flashed_messages(with_categories=true) %}
+ {% if messages %}
+ {% for category, message in messages %}
+ <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+ {{ message }}
+ <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="关闭"></button>
+ </div>
+ {% endfor %}
+ {% endif %}
+ {% endwith %}
 
-    {% block content %}{% endblock %}
-  </main>
+ {% block content %}{% endblock %}
+ </main>
 
-  <footer class="footer mt-auto py-3 bg-light">
-    <div class="container-fluid text-center text-muted">
-      {% block footer %}
-      <div class="mb-1">
-        {% if site_cfg.agreements.privacy_policy_url %}
-        <a href="{{ site_cfg.agreements.privacy_policy_url }}" target="_blank" rel="noopener noreferrer" class="text-decoration-none me-2">隐私政策</a>
-        {% endif %}
-        {% if site_cfg.agreements.tos_url %}
-        <a href="{{ site_cfg.agreements.tos_url }}" target="_blank" rel="noopener noreferrer" class="text-decoration-none me-2">用户协议</a>
-        {% endif %}
-        {% if site_cfg.announcement.enabled and site_cfg.announcement.content %}
-        <a href="#" class="text-decoration-none" data-bs-toggle="modal" data-bs-target="#announcementModal">查看公告</a>
-        {% endif %}
-        {% if site_cfg.contact_email %}
-        <a href="mailto:{{ site_cfg.contact_email }}" class="text-decoration-none ms-2">联系客服</a>
-        {% endif %}
-      </div>
-      <small>DNAISLAND · 与汝共奏的角色卡社区</small>
-      {% endblock %}
-    </div>
-  </footer>
+ <footer class="footer mt-auto py-3 bg-light">
+ <div class="container-fluid text-center text-muted">
+ {% block footer %}
+ <div class="mb-1">
+ {% if site_cfg.agreements.privacy_policy_url %}
+ <a href="{{ site_cfg.agreements.privacy_policy_url }}" target="_blank" rel="noopener noreferrer" class="text-decoration-none me-2">隐私政策</a>
+ {% endif %}
+ {% if site_cfg.agreements.tos_url %}
+ <a href="{{ site_cfg.agreements.tos_url }}" target="_blank" rel="noopener noreferrer" class="text-decoration-none me-2">用户协议</a>
+ {% endif %}
+ {% if site_cfg.announcement.enabled and site_cfg.announcement.content %}
+ <a href="#" class="text-decoration-none" data-bs-toggle="modal" data-bs-target="#announcementModal">查看公告</a>
+ {% endif %}
+ {% if site_cfg.contact_email %}
+ <a href="mailto:{{ site_cfg.contact_email }}" class="text-decoration-none ms-2">联系客服</a>
+ {% endif %}
+ </div>
+ <small>DNAISLAND · 与汝共奏的角色卡社区</small>
+ {% endblock %}
+ </div>
+ </footer>
 
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+ <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
-  <script>
-    // 富文本编辑器：工具栏命令 + 提交前将内容同步到隐藏 textarea
-    (function () {
-      document.addEventListener('click', function (e) {
-        var btn = e.target.closest && e.target.closest('.rich-editor [data-cmd]');
-        if (!btn) return;
-        var editor = btn.closest('.rich-editor').querySelector('.rich-editor-area');
-        if (!editor) return;
-        e.preventDefault();
-        var cmd = btn.getAttribute('data-cmd');
-        editor.focus();
-        if (cmd === 'createLink') {
-          var url = prompt('请输入链接地址（含 http(s)://）：', 'https://');
-          if (url) document.execCommand('createLink', false, url);
-        } else {
-          document.execCommand(cmd, false, null);
-        }
-      });
-      document.addEventListener('submit', function (e) {
-        if (!e.target.querySelectorAll) return;
-        e.target.querySelectorAll('.rich-editor').forEach(function (re) {
-          var area = re.querySelector('.rich-editor-area');
-          var ta = re.querySelector('textarea');
-          if (area && ta) ta.value = area.innerHTML;
-        });
-      });
-    })();
-  </script>
+ <script>
+ // 富文本编辑器：工具栏命令 + 提交前将内容同步到隐藏 textarea
+ (function () {
+ document.addEventListener('click', function (e) {
+ var btn = e.target.closest && e.target.closest('.rich-editor [data-cmd]');
+ if (!btn) return;
+ var editor = btn.closest('.rich-editor').querySelector('.rich-editor-area');
+ if (!editor) return;
+ e.preventDefault();
+ var cmd = btn.getAttribute('data-cmd');
+ editor.focus();
+ if (cmd === 'createLink') {
+ var url = prompt('请输入链接地址（含 http(s)://）：', 'https://');
+ if (url) document.execCommand('createLink', false, url);
+ } else {
+ document.execCommand(cmd, false, null);
+ }
+ });
+ document.addEventListener('submit', function (e) {
+ if (!e.target.querySelectorAll) return;
+ e.target.querySelectorAll('.rich-editor').forEach(function (re) {
+ var area = re.querySelector('.rich-editor-area');
+ var ta = re.querySelector('textarea');
+ if (area && ta) ta.value = area.innerHTML;
+ });
+ });
+ })();
+ </script>
 
-  <!-- 公告弹窗：首次进入自动弹出；关闭后本会话内不再自动弹；页脚「查看公告」可手动再开 -->
-  {% if site_cfg.announcement.enabled and site_cfg.announcement.content %}
-  <div class="modal fade" id="announcementModal" tabindex="-1" aria-labelledby="announcementModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" id="announcementModalLabel">站点公告</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
-        </div>
-        <div class="modal-body richtext-content">{{ site_cfg.announcement.content | richtext }}</div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-primary" data-bs-dismiss="modal">我已知晓</button>
-        </div>
-      </div>
-    </div>
-  </div>
-  <script>
-    (function () {
-      var KEY = 'dna_ann_seen';
-      var modalEl = document.getElementById('announcementModal');
-      if (!modalEl) return;
-      // 关闭（含点击遮罩/按钮）后，本会话内不再自动弹出
-      modalEl.addEventListener('hidden.bs.modal', function () {
-        try { sessionStorage.setItem(KEY, '1'); } catch (e) {}
-      });
-      // 首次进入：未看过则自动弹出
-      var seen = false;
-      try { seen = sessionStorage.getItem(KEY) === '1'; } catch (e) {}
-      if (!seen) {
-        var inst = bootstrap.Modal.getOrCreateInstance(modalEl);
-        inst.show();
-      }
-    })();
-  </script>
-  {% endif %}
-  <script>
-    (function () {
-      var input = document.getElementById("navSearchInput");
-      var box = document.getElementById("navSearchSuggest");
-      var form = document.getElementById("navSearchForm");
-      if (!input || !box || !form) return;
-      var timer = null;
+ <!-- 公告弹窗：首次进入自动弹出；关闭后本会话内不再自动弹；页脚「查看公告」可手动再开 -->
+ {% if site_cfg.announcement.enabled and site_cfg.announcement.content %}
+ <div class="modal fade" id="announcementModal" tabindex="-1" aria-labelledby="announcementModalLabel" aria-hidden="true">
+ <div class="modal-dialog modal-dialog-centered modal-lg">
+ <div class="modal-content">
+ <div class="modal-header">
+ <h5 class="modal-title" id="announcementModalLabel">站点公告</h5>
+ <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+ </div>
+ <div class="modal-body richtext-content">{{ site_cfg.announcement.content | richtext }}</div>
+ <div class="modal-footer">
+ <button type="button" class="btn btn-primary" data-bs-dismiss="modal">我已知晓</button>
+ </div>
+ </div>
+ </div>
+ </div>
+ <script>
+ (function () {
+ var KEY = 'dna_ann_seen';
+ var modalEl = document.getElementById('announcementModal');
+ if (!modalEl) return;
+ // 关闭（含点击遮罩/按钮）后，本会话内不再自动弹出
+ modalEl.addEventListener('hidden.bs.modal', function () {
+ try { sessionStorage.setItem(KEY, '1'); } catch (e) {}
+ });
+ // 首次进入：未看过则自动弹出
+ var seen = false;
+ try { seen = sessionStorage.getItem(KEY) === '1'; } catch (e) {}
+ if (!seen) {
+ var inst = bootstrap.Modal.getOrCreateInstance(modalEl);
+ inst.show();
+ }
+ })();
+ </script>
+ {% endif %}
+ <script>
+ (function () {
+ var input = document.getElementById("navSearchInput");
+ var box = document.getElementById("navSearchSuggest");
+ var form = document.getElementById("navSearchForm");
+ if (!input || !box || !form) return;
+ var timer = null;
 
-      function closeBox() {
-        box.classList.add("d-none");
-        box.setAttribute("aria-expanded", "false");
-      }
-      function openBox() {
-        box.classList.remove("d-none");
-        box.setAttribute("aria-expanded", "true");
-      }
-      function escapeHtml(s) {
-        return s.replace(/[&<>"']/g, function (c) {
-          return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
-        });
-      }
-      function render(data) {
-        var cards = data.cards || [], users = data.users || [];
-        if (!cards.length && !users.length) { closeBox(); return; }
-        var html = "";
-        if (cards.length) {
-          html += '<div class="dropdown-header small text-muted">角色卡</div>';
-          cards.forEach(function (c) {
-            html += '<a class="dropdown-item" href="' + c.url + '">' +
-              escapeHtml(c.name) + ' <span class="text-muted small">' + escapeHtml(c.gender || "") + '</span></a>';
-          });
-        }
-        if (users.length) {
-          html += '<div class="dropdown-header small text-muted">作者</div>';
-          users.forEach(function (u) {
-            var tick = u.verified ? ' <span class="badge bg-info">✓</span>' : "";
-            html += '<a class="dropdown-item" href="' + u.url + '">@' +
-              escapeHtml(u.nickname) + tick + '</a>';
-          });
-        }
-        html += '<div class="dropdown-divider"></div>' +
-          '<a class="dropdown-item text-primary" href="#" id="navSearchAll">查看全部结果 →</a>';
-        box.innerHTML = html;
-        openBox();
-        var allLink = document.getElementById("navSearchAll");
-        if (allLink) allLink.addEventListener("click", function (e) { e.preventDefault(); form.submit(); });
-      }
+ function closeBox() {
+ box.classList.add("d-none");
+ box.setAttribute("aria-expanded", "false");
+ }
+ function openBox() {
+ box.classList.remove("d-none");
+ box.setAttribute("aria-expanded", "true");
+ }
+ function escapeHtml(s) {
+ return s.replace(/[&<>"']/g, function (c) {
+ return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+ });
+ }
+ function render(data) {
+ var cards = data.cards || [], users = data.users || [];
+ if (!cards.length && !users.length) { closeBox(); return; }
+ var html = "";
+ if (cards.length) {
+ html += '<div class="dropdown-header small text-muted">角色卡</div>';
+ cards.forEach(function (c) {
+ html += '<a class="dropdown-item" href="' + c.url + '">' +
+ escapeHtml(c.name) + ' <span class="text-muted small">' + escapeHtml(c.gender || "") + '</span></a>';
+ });
+ }
+ if (users.length) {
+ html += '<div class="dropdown-header small text-muted">作者</div>';
+ users.forEach(function (u) {
+ var tick = u.verified ? ' <span class="badge bg-info"></span>' : "";
+ html += '<a class="dropdown-item" href="' + u.url + '">@' +
+ escapeHtml(u.nickname) + tick + '</a>';
+ });
+ }
+ html += '<div class="dropdown-divider"></div>' +
+ '<a class="dropdown-item text-primary" href="#" id="navSearchAll">查看全部结果 →</a>';
+ box.innerHTML = html;
+ openBox();
+ var allLink = document.getElementById("navSearchAll");
+ if (allLink) allLink.addEventListener("click", function (e) { e.preventDefault(); form.submit(); });
+ }
 
-      input.addEventListener("input", function () {
-        var q = input.value.trim();
-        clearTimeout(timer);
-        if (q.length < 1) { closeBox(); return; }
-        timer = setTimeout(function () {
-          fetch('{{ url_for("main.search_suggest") }}?q=' + encodeURIComponent(q))
-            .then(function (r) { return r.json(); })
-            .then(render)
-            .catch(closeBox);
-        }, 200);
-      });
-      document.addEventListener("click", function (e) {
-        if (!form.contains(e.target)) closeBox();
-      });
-      input.addEventListener("keydown", function (e) {
-        if (e.key === "Escape") closeBox();
-      });
-    })();
-  </script>
-  <!-- 主题切换：同步导航栏配色类并持久化用户选择 -->
-  <script>
-    (function () {
-      var KEY = 'dna_theme';
-      var root = document.documentElement;
-      var nav = document.querySelector('.navbar');
-      function apply(t) {
-        root.setAttribute('data-bs-theme', t);
-        if (nav) {
-          nav.classList.toggle('navbar-dark', t === 'dark');
-          nav.classList.toggle('navbar-light', t === 'light');
-        }
-      }
-      // 与 head 中的初始化保持一致，并同步导航栏的 Bootstrap 配色类
-      apply(root.getAttribute('data-bs-theme') || 'dark');
-      var btn = document.getElementById('themeToggle');
-      var btnMobile = document.getElementById('themeToggleMobile');
-      function toggleTheme() {
-        var next = root.getAttribute('data-bs-theme') === 'light' ? 'dark' : 'light';
-        apply(next);
-        try { localStorage.setItem(KEY, next); } catch (e) {}
-      }
-      if (btn) btn.addEventListener('click', toggleTheme);
-      if (btnMobile) btnMobile.addEventListener('click', toggleTheme);
-    })();
-  </script>
-  <!-- 文章封面渐显：图片加载完成后从黑色模糊占位平滑过渡到清晰图 -->
-  <script>
-    (function () {
-      function bindFade(root) {
-        root.querySelectorAll('.dna-img-fade').forEach(function (box) {
-          var img = box.querySelector('.dna-img-fade__img');
-          if (!img) return;
-          function done() { box.classList.add('is-loaded'); }
-          // 关键修复：图片解码完成后，浏览器默认会在“同一渲染帧”内把清晰图与
-          // is-loaded 一起应用，导致过渡没有起点 → 看起来硬切。
-          // 这里先等一帧，让“已解码的模糊图”真正绘制出来，再于下一帧切换状态，
-          // 过渡才会从模糊平滑散去为清晰（而非直接蹦成清晰图）。
-          function reveal() {
-            var paint = function () {
-              void img.offsetWidth;                       // 强制提交当前（模糊）帧
-              requestAnimationFrame(function () {
-                requestAnimationFrame(done);             // 下一帧再切换，确保过渡有起点
-              });
-            };
-            if (img.decode) { img.decode().then(paint).catch(done); } else { paint(); }
-          }
-          if (img.complete && img.naturalWidth > 0) { reveal(); }
-          else {
-            img.addEventListener('load', reveal);
-            img.addEventListener('error', function () { box.classList.add('is-error'); });
-          }
-        });
-      }
-      bindFade(document);
-      window.bindFade = bindFade;   // 供 AJAX 动态插入的图片复用模糊→清晰动画
-    })();
-  </script>
-  {% block scripts %}{% endblock %}
-  <script>
-    // 生图结果下载：数据库存 WebP，点击时前端转成 PNG 再下载
-    document.addEventListener('click', function (e) {
-      var el = e.target.closest('.js-dlpng');
-      if (!el) return;
-      e.preventDefault();
-      var src = el.getAttribute('data-src');
-      var name = el.getAttribute('data-name') || 'image.png';
-      var im = new Image();
-      im.onload = function () {
-        var cv = document.createElement('canvas');
-        cv.width = im.naturalWidth;
-        cv.height = im.naturalHeight;
-        cv.getContext('2d').drawImage(im, 0, 0);
-        cv.toBlob(function (blob) {
-          if (!blob) return;
-          var a = document.createElement('a');
-          a.href = URL.createObjectURL(blob);
-          a.download = name;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(a.href);
-        }, 'image/png');
-      };
-      im.src = src;
-    });
-  </script>
+ input.addEventListener("input", function () {
+ var q = input.value.trim();
+ clearTimeout(timer);
+ if (q.length < 1) { closeBox(); return; }
+ timer = setTimeout(function () {
+ fetch('{{ url_for("main.search_suggest") }}?q=' + encodeURIComponent(q))
+ .then(function (r) { return r.json(); })
+ .then(render)
+ .catch(closeBox);
+ }, 200);
+ });
+ document.addEventListener("click", function (e) {
+ if (!form.contains(e.target)) closeBox();
+ });
+ input.addEventListener("keydown", function (e) {
+ if (e.key === "Escape") closeBox();
+ });
+ })();
+ </script>
+ <!-- 主题切换：同步导航栏配色类并持久化用户选择 -->
+ <script>
+ (function () {
+ var KEY = 'dna_theme';
+ var root = document.documentElement;
+ var nav = document.querySelector('.navbar');
+ function apply(t) {
+ root.setAttribute('data-bs-theme', t);
+ if (nav) {
+ nav.classList.toggle('navbar-dark', t === 'dark');
+ nav.classList.toggle('navbar-light', t === 'light');
+ }
+ }
+ // 与 head 中的初始化保持一致，并同步导航栏的 Bootstrap 配色类
+ apply(root.getAttribute('data-bs-theme') || 'dark');
+ var btn = document.getElementById('themeToggle');
+ var btnMobile = document.getElementById('themeToggleMobile');
+ function toggleTheme() {
+ var next = root.getAttribute('data-bs-theme') === 'light' ? 'dark' : 'light';
+ apply(next);
+ try { localStorage.setItem(KEY, next); } catch (e) {}
+ }
+ if (btn) btn.addEventListener('click', toggleTheme);
+ if (btnMobile) btnMobile.addEventListener('click', toggleTheme);
+ })();
+ </script>
+ <!-- 文章封面渐显：图片加载完成后从黑色模糊占位平滑过渡到清晰图 -->
+ <script>
+ (function () {
+ function bindFade(root) {
+ root.querySelectorAll('.dna-img-fade').forEach(function (box) {
+ var img = box.querySelector('.dna-img-fade__img');
+ if (!img) return;
+ function done() { box.classList.add('is-loaded'); }
+ // 关键修复：图片解码完成后，浏览器默认会在“同一渲染帧”内把清晰图与
+ // is-loaded 一起应用，导致过渡没有起点 → 看起来硬切。
+ // 这里先等一帧，让“已解码的模糊图”真正绘制出来，再于下一帧切换状态，
+ // 过渡才会从模糊平滑散去为清晰（而非直接蹦成清晰图）。
+ function reveal() {
+ var paint = function () {
+ void img.offsetWidth; // 强制提交当前（模糊）帧
+ requestAnimationFrame(function () {
+ requestAnimationFrame(done); // 下一帧再切换，确保过渡有起点
+ });
+ };
+ if (img.decode) { img.decode().then(paint).catch(done); } else { paint(); }
+ }
+ if (img.complete && img.naturalWidth > 0) { reveal(); }
+ else {
+ img.addEventListener('load', reveal);
+ img.addEventListener('error', function () { box.classList.add('is-error'); });
+ }
+ });
+ }
+ bindFade(document);
+ window.bindFade = bindFade; // 供 AJAX 动态插入的图片复用模糊→清晰动画
+ })();
+ </script>
+ {% block scripts %}{% endblock %}
+ <script>
+ // 生图结果下载：数据库存 WebP，点击时前端转成 PNG 再下载
+ document.addEventListener('click', function (e) {
+ var el = e.target.closest('.js-dlpng');
+ if (!el) return;
+ e.preventDefault();
+ var src = el.getAttribute('data-src');
+ var name = el.getAttribute('data-name') || 'image.png';
+ var im = new Image();
+ im.onload = function () {
+ var cv = document.createElement('canvas');
+ cv.width = im.naturalWidth;
+ cv.height = im.naturalHeight;
+ cv.getContext('2d').drawImage(im, 0, 0);
+ cv.toBlob(function (blob) {
+ if (!blob) return;
+ var a = document.createElement('a');
+ a.href = URL.createObjectURL(blob);
+ a.download = name;
+ document.body.appendChild(a);
+ a.click();
+ document.body.removeChild(a);
+ URL.revokeObjectURL(a.href);
+ }, 'image/png');
+ };
+ im.src = src;
+ });
+ </script>
 
-  <script>
-    (function () {
-      var triggerDesktop = document.getElementById('globalSearchTriggerDesktop');
-      var triggerMobile = document.getElementById('globalSearchTriggerMobile');
-      var overlay = document.getElementById('globalSearchOverlay');
-      var closeBtn = document.getElementById('globalSearchClose');
-      var input = document.getElementById('navSearchInput');
+ <script>
+ (function () {
+ var triggerDesktop = document.getElementById('globalSearchTriggerDesktop');
+ var triggerMobile = document.getElementById('globalSearchTriggerMobile');
+ var overlay = document.getElementById('globalSearchOverlay');
+ var closeBtn = document.getElementById('globalSearchClose');
+ var input = document.getElementById('navSearchInput');
 
-      function openSearch() {
-        if (overlay) {
-          overlay.classList.add('show');
-          if (input) input.focus();
-        }
-      }
+ function openSearch() {
+ if (overlay) {
+ overlay.classList.add('show');
+ if (input) input.focus();
+ }
+ }
 
-      function closeSearch() {
-        if (overlay) {
-          overlay.classList.remove('show');
-        }
-      }
+ function closeSearch() {
+ if (overlay) {
+ overlay.classList.remove('show');
+ }
+ }
 
-      if (triggerDesktop) triggerDesktop.addEventListener('click', openSearch);
-      if (triggerMobile) triggerMobile.addEventListener('click', openSearch);
-      if (closeBtn) closeBtn.addEventListener('click', closeSearch);
+ if (triggerDesktop) triggerDesktop.addEventListener('click', openSearch);
+ if (triggerMobile) triggerMobile.addEventListener('click', openSearch);
+ if (closeBtn) closeBtn.addEventListener('click', closeSearch);
 
-      document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape') closeSearch();
-      });
-    })();
+ document.addEventListener('keydown', function (e) {
+ if (e.key === 'Escape') closeSearch();
+ });
+ })();
 
-    // 全局智能返回拦截器
-    document.addEventListener('click', function (e) {
-      var backBtn = e.target.closest('a[href="javascript:history.back()"], .btn[href="javascript:history.back()"]');
-      if (!backBtn) return;
-      e.preventDefault();
-      
-      // 如果有上一页 referrer 且包含本站域名，正常执行 history.back()
-      if (document.referrer && document.referrer.indexOf(window.location.host) !== -1) {
-        history.back();
-      } else {
-        // 否则安全降级退回首页，防止微信/分享跳转进来的新客点击返回时无响应
-        window.location.href = '/';
-      }
-    });
-  </script>
-  <!-- 移动端贴底 Tab 导航 -->
-  <nav class="dna-mobile-nav">
-    <a href="{{ url_for('main.index') }}" class="dna-mobile-nav__item {% if request.endpoint == 'main.index' %}active{% endif %}">
-      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
-      <span>首页</span>
-    </a>
-    <a href="{{ url_for('main.explore') }}" class="dna-mobile-nav__item {% if request.endpoint == 'main.explore' %}active{% endif %}">
-      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon></svg>
-      <span>探索</span>
-    </a>
-    <button type="button" class="dna-mobile-nav__item border-0 bg-transparent {% if request.endpoint and request.endpoint.startswith('publish.') %}active{% endif %}" id="mobilePlusBtn" aria-label="发布或生图">
-      <svg id="mobilePlusSvg" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-      <span>＋发布</span>
-    </button>
-    <a href="{{ url_for('teahouse.index') }}" class="dna-mobile-nav__item {% if request.endpoint and request.endpoint.startswith('teahouse.') %}active{% endif %}">
-      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-      <span>茶馆</span>
-    </a>
-    {% if current_user.is_authenticated %}
-    <a href="{{ url_for('user.profile', username=current_user.username) }}" class="dna-mobile-nav__item {% if request.endpoint == 'user.profile' and request.view_args.get('username') == current_user.username %}active{% endif %}">
-      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-      <span>我的</span>
-    </a>
-    {% else %}
-    <a href="{{ url_for('auth.login') }}" class="dna-mobile-nav__item {% if request.endpoint == 'auth.login' %}active{% endif %}">
-      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path><polyline points="10 17 15 12 10 7"></polyline><line x1="15" y1="12" x2="3" y2="12"></line></svg>
-      <span>登录</span>
-    </a>
-    {% endif %}
-  </nav>
+ // 全局智能返回拦截器
+ document.addEventListener('click', function (e) {
+ var backBtn = e.target.closest('a[href="javascript:history.back()"], .btn[href="javascript:history.back()"]');
+ if (!backBtn) return;
+ e.preventDefault();
+ 
+ // 如果有上一页 referrer 且包含本站域名，正常执行 history.back()
+ if (document.referrer && document.referrer.indexOf(window.location.host) !== -1) {
+ history.back();
+ } else {
+ // 否则安全降级退回首页，防止微信/分享跳转进来的新客点击返回时无响应
+ window.location.href = '/';
+ }
+ });
+ </script>
+ <!-- 移动端贴底 Tab 导航 -->
+ <nav class="dna-mobile-nav">
+ <a href="{{ url_for('main.index') }}" class="dna-mobile-nav__item {% if request.endpoint == 'main.index' %}active{% endif %}">
+ <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+ <span>首页</span>
+ </a>
+ <a href="{{ url_for('main.explore') }}" class="dna-mobile-nav__item {% if request.endpoint == 'main.explore' %}active{% endif %}">
+ <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon></svg>
+ <span>探索</span>
+ </a>
+ <button type="button" class="dna-mobile-nav__item border-0 bg-transparent {% if request.endpoint and request.endpoint.startswith('publish.') %}active{% endif %}" id="mobilePlusBtn" aria-label="发布或生图">
+ <svg id="mobilePlusSvg" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+ <span>＋发布</span>
+ </button>
+ <a href="{{ url_for('teahouse.index') }}" class="dna-mobile-nav__item {% if request.endpoint and request.endpoint.startswith('teahouse.') %}active{% endif %}">
+ <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+ <span>茶馆</span>
+ </a>
+ {% if current_user.is_authenticated %}
+ <a href="{{ url_for('user.profile', username=current_user.username) }}" class="dna-mobile-nav__item {% if request.endpoint == 'user.profile' and request.view_args.get('username') == current_user.username %}active{% endif %}">
+ <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+ <span>我的</span>
+ </a>
+ {% else %}
+ <a href="{{ url_for('auth.login') }}" class="dna-mobile-nav__item {% if request.endpoint == 'auth.login' %}active{% endif %}">
+ <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path><polyline points="10 17 15 12 10 7"></polyline><line x1="15" y1="12" x2="3" y2="12"></line></svg>
+ <span>登录</span>
+ </a>
+ {% endif %}
+ </nav>
 
-  <!-- 移动端底栏 + 号弹出的全屏高斯模糊蒙层与 2 大选项按钮 -->
-  <div class="dna-mobile-plus-overlay" id="mobilePlusOverlay">
-    <div class="dna-mobile-plus-popup" id="mobilePlusPopup">
-      <div class="d-flex flex-column gap-3 p-3">
-        <a href="{{ url_for('publish.start') }}" class="btn btn-lg btn-primary d-flex align-items-center justify-content-center gap-2 py-3 shadow-lg rounded-3">
-          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg>
-          <span class="fw-bold">🎴 发布角色卡</span>
-        </a>
-        <a href="{{ url_for('image_gen.workbench') }}" class="btn btn-lg d-flex align-items-center justify-content-center gap-2 py-3 shadow-lg rounded-3" style="background: linear-gradient(135deg, #a855f7, #ec4899); color: #fff; border: none;">
-          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 8v8M8 12h8"></path></svg>
-          <span class="fw-bold">🎨 AI 生图工作台</span>
-        </a>
-      </div>
-    </div>
-  </div>
+ <!-- 移动端底栏 + 号弹出的全屏高斯模糊蒙层与 2 大选项按钮 -->
+ <div class="dna-mobile-plus-overlay" id="mobilePlusOverlay">
+ <div class="dna-mobile-plus-popup" id="mobilePlusPopup">
+ <div class="d-flex flex-column gap-3 p-3">
+ <a href="{{ url_for('publish.start') }}" class="btn btn-lg btn-primary d-flex align-items-center justify-content-center gap-2 py-3 shadow-lg rounded-3">
+ <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-plus-square"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+ <span class="fw-bold">发布角色卡</span>
+ </a>
+ <a href="{{ url_for('image_gen.workbench') }}" class="btn btn-lg d-flex align-items-center justify-content-center gap-2 py-3 shadow-lg rounded-3" style="background: linear-gradient(135deg, #a855f7, #ec4899); color: #fff; border: none;">
+ <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-image"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+ <span class="fw-bold">AI 生图工作台</span>
+ </a>
+ </div>
+ </div>
+ </div>
 
-  <script>
-    (function () {
-      var plusBtn = document.getElementById('mobilePlusBtn');
-      var plusSvg = document.getElementById('mobilePlusSvg');
-      var overlay = document.getElementById('mobilePlusOverlay');
-      if (!plusBtn || !overlay) return;
+ <script>
+ (function () {
+ var plusBtn = document.getElementById('mobilePlusBtn');
+ var plusSvg = document.getElementById('mobilePlusSvg');
+ var overlay = document.getElementById('mobilePlusOverlay');
+ if (!plusBtn || !overlay) return;
 
-      function togglePlusMenu(e) {
-        e.preventDefault();
-        var isOpen = overlay.classList.contains('show');
-        if (isOpen) {
-          closePlusMenu();
-        } else {
-          openPlusMenu();
-        }
-      }
+ function togglePlusMenu(e) {
+ e.preventDefault();
+ var isOpen = overlay.classList.contains('show');
+ if (isOpen) {
+ closePlusMenu();
+ } else {
+ openPlusMenu();
+ }
+ }
 
-      function openPlusMenu() {
-        overlay.classList.add('show');
-        document.body.classList.add('is-mobile-plus-open');
-        if (plusSvg) plusSvg.classList.add('dna-mobile-plus-rotated');
-      }
+ function openPlusMenu() {
+ overlay.classList.add('show');
+ document.body.classList.add('is-mobile-plus-open');
+ if (plusSvg) plusSvg.classList.add('dna-mobile-plus-rotated');
+ }
 
-      function closePlusMenu() {
-        overlay.classList.remove('show');
-        document.body.classList.remove('is-mobile-plus-open');
-        if (plusSvg) plusSvg.classList.remove('dna-mobile-plus-rotated');
-      }
+ function closePlusMenu() {
+ overlay.classList.remove('show');
+ document.body.classList.remove('is-mobile-plus-open');
+ if (plusSvg) plusSvg.classList.remove('dna-mobile-plus-rotated');
+ }
 
-      plusBtn.addEventListener('click', togglePlusMenu);
-      overlay.addEventListener('click', function (e) {
-        if (e.target === overlay) closePlusMenu();
-      });
-    })();
-  </script>
+ plusBtn.addEventListener('click', togglePlusMenu);
+ overlay.addEventListener('click', function (e) {
+ if (e.target === overlay) closePlusMenu();
+ });
+ })();
+ </script>
 </body>
 </html>

@@ -6,61 +6,59 @@
 {% block header %}{% endblock %}
 
 {% set sorts = [
-  {'key': 'hot',   'label': '🔥 最热'},
-  {'key': 'new',   'label': '✨ 最新'},
-  {'key': 'likes', 'label': '💜 最多赞'},
+ {'key': 'hot', 'label': '最热'},
+ {'key': 'new', 'label': '最新'},
+ {'key': 'likes', 'label': '最多赞'},
 ] %}
 
 {% block content %}
 <div class="d-flex align-items-center justify-content-between mb-3">
-  <h1 class="h4 mb-0 fw-bold d-flex align-items-center gap-2">
-    <span>🔍 探索角色卡</span>
-  </h1>
-  {% if gender or tag %}
-  <a class="btn btn-sm btn-outline-secondary rounded-pill" href="{{ url_for('main.explore') }}">清除筛选 ✕</a>
-  {% endif %}
+ <h1 class="h4 mb-0 fw-bold">探索角色卡</h1>
+ {% if gender or tag %}
+ <a class="btn btn-sm btn-outline-secondary rounded-pill" href="{{ url_for('main.explore') }}">清除筛选 </a>
+ {% endif %}
 </div>
 
 <!-- 第 1 行：性别与排序 单行横划胶囊栏 -->
 <div class="dna-horizontal-tabs mb-2">
-  <span class="text-muted small align-self-center me-1 flex-shrink-0">性别:</span>
-  <a class="dna-tab-pill {{ 'active' if not gender }}"
-     href="{{ url_for('main.explore', sort=sort, tag=tag) }}">全部</a>
-  {% for g in genders %}
-    <a class="dna-tab-pill {{ 'active' if gender == g }}"
-       href="{{ url_for('main.explore', gender=g, sort=sort, tag=tag) }}">{{ g }}</a>
-  {% endfor %}
+ <span class="text-muted small align-self-center me-1 flex-shrink-0">性别:</span>
+ <a class="dna-tab-pill {{ 'active' if not gender }}"
+ href="{{ url_for('main.explore', sort=sort, tag=tag) }}">全部</a>
+ {% for g in genders %}
+ <a class="dna-tab-pill {{ 'active' if gender == g }}"
+ href="{{ url_for('main.explore', gender=g, sort=sort, tag=tag) }}">{{ g }}</a>
+ {% endfor %}
 
-  <span class="text-muted small align-self-center ms-2 me-1 flex-shrink-0">排序:</span>
-  {% for s in sorts %}
-    <a class="dna-tab-pill {{ 'active' if sort == s.key }}"
-       href="{{ url_for('main.explore', sort=s.key, gender=gender, tag=tag) }}">{{ s.label }}</a>
-  {% endfor %}
+ <span class="text-muted small align-self-center ms-2 me-1 flex-shrink-0">排序:</span>
+ {% for s in sorts %}
+ <a class="dna-tab-pill {{ 'active' if sort == s.key }}"
+ href="{{ url_for('main.explore', sort=s.key, gender=gender, tag=tag) }}">{{ s.label }}</a>
+ {% endfor %}
 </div>
 
 <!-- 第 2 行：热门标签单行横划胶囊栏 -->
 {% if tags %}
 <div class="dna-horizontal-tabs mb-3">
-  <span class="text-muted small align-self-center me-1 flex-shrink-0">标签:</span>
-  <a class="dna-tab-pill {{ 'active' if not tag }}"
-     href="{{ url_for('main.explore', gender=gender, sort=sort) }}">#全部</a>
-  {% for t in tags %}
-    <a class="dna-tab-pill {{ 'active' if tag == t.tag }}"
-       href="{{ url_for('main.explore', tag=t.tag, gender=gender, sort=sort) }}">
-      #{{ t.tag }} <span class="opacity-75 ms-1" style="font-size:0.72rem;">{{ t.count }}</span>
-    </a>
-  {% endfor %}
+ <span class="text-muted small align-self-center me-1 flex-shrink-0">标签:</span>
+ <a class="dna-tab-pill {{ 'active' if not tag }}"
+ href="{{ url_for('main.explore', gender=gender, sort=sort) }}">#全部</a>
+ {% for t in tags %}
+ <a class="dna-tab-pill {{ 'active' if tag == t.tag }}"
+ href="{{ url_for('main.explore', tag=t.tag, gender=gender, sort=sort) }}">
+ #{{ t.tag }} <span class="opacity-75 ms-1" style="font-size:0.72rem;">{{ t.count }}</span>
+ </a>
+ {% endfor %}
 </div>
 {% endif %}
 
 {% if pagination.items %}
 <div class="row g-2 g-md-3 dna-explore-grid mb-4">
-  {% for card in cards %}
-  <div class="col-6 col-sm-4 col-md-3 col-lg-2">{{ card_tile(card) }}</div>
-  {% endfor %}
+ {% for card in cards %}
+ <div class="col-6 col-sm-4 col-md-3 col-lg-2">{{ card_tile(card) }}</div>
+ {% endfor %}
 </div>
 {{ render_pagination(pagination, 'main.explore', args) }}
 {% else %}
-{{ empty_state('没有符合条件的角色卡，换个筛选试试～', '🧭') }}
+{{ empty_state('没有符合条件的角色卡，换个筛选试试～', '') }}
 {% endif %}
 {% endblock %}
