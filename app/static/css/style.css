@@ -1103,11 +1103,11 @@ body.is-mobile-plus-open header {
   }
 }
 
-/* 手机端：底部抽屉 */
+/* 手机端：底部抽屉（bottom 留出底部导航高度 52px） */
 @media (max-width: 767.98px) {
   .dna-comment-drawer {
-    left: 0; right: 0; bottom: 0;
-    height: 80vh;
+    left: 0; right: 0; bottom: 52px;
+    height: calc(80vh - 52px);
     border-radius: 16px 16px 0 0;
     border-top: 1px solid var(--dna-border, rgba(255,255,255,0.08));
     transform: translateY(100%);
