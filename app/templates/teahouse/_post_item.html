@@ -1,10 +1,10 @@
 {% macro render_post(post, stats, thread=false, top=false, focus=false, root_id=None, depth=0) %}
 {% set s = stats.get(post.id, {'like_count': 0, 'liked': false, 'reply_count': 0}) %}
 {% set visible = teapost_visible(post) %}
-<div class="card mb-2 {% if depth > 0 %}ms-4 border-start{% endif %} {% if top or focus %}border-primary{% endif %}{% if focus %} id="focus"{% endif %}"
+<div class="card dna-post-card mb-2 {% if depth > 0 %}ms-3 border-start{% endif %} {% if top or focus %}border-primary{% endif %}{% if focus %} id="focus"{% endif %}"
      {% if not top and not focus %}style="cursor:pointer;"
      onclick="if(event.target.closest('a,button,form'))return; window.location.href='{{ url_for('teahouse.post_detail', post_id=post.id) }}'"{% endif %}>
-  <div class="card-body py-3">
+  <div class="card-body p-3 py-2">
     {% if post.parent_id and root_id is not none and post.parent_id != root_id and visible %}
     <div class="small text-muted mb-1">回复 @{{ post.parent.author.display_name }}</div>
     {% endif %}

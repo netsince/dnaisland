@@ -1016,3 +1016,12 @@ body.is-mobile-plus-open header {
   100% { transform: scale(1); }
 }
 
+/* 茶馆帖子卡片收紧与 8px 微型精细圆角 */
+.dna-post-card {
+  border-radius: 8px !important;
+  border: 1px solid var(--dna-border, rgba(255, 255, 255, 0.08));
+}
+.dna-post-card .card-body {
+  padding: 10px 14px !important;
+}
+
