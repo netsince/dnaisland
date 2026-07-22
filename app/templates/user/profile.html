@@ -44,10 +44,15 @@
 </ul>
 {% else %}
 
-<div class="mb-3">
+<div class="mb-3 d-flex align-items-center justify-content-between gap-2">
   <button type="button" class="btn btn-sm btn-outline-secondary" onclick="history.back()">
     <i class="bi bi-arrow-left"></i> {{ _('返回') }}
   </button>
+  {% if is_self %}
+  <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="offcanvas" data-bs-target="#userToolsOffcanvas">
+    <i class="bi bi-list"></i> 功能菜单
+  </button>
+  {% endif %}
 </div>
 
 <div class="row g-3 g-lg-4">
@@ -113,15 +118,7 @@
  </div>
  {% endif %}
 
- {# is_self 下的快捷菜单触发按键 #}
- {% if is_self %}
- <div class="border-top border-secondary border-opacity-25 pt-3">
- <button class="btn btn-secondary btn-sm w-100 d-flex align-items-center justify-content-between py-2 px-3 border-0" type="button" data-bs-toggle="offcanvas" data-bs-target="#userToolsOffcanvas">
- <span class="fw-medium">功能菜单</span>
- <span class="small opacity-75">展开 </span>
- </button>
- </div>
- {% endif %}
+
  </div>
  </div>
  </div>
