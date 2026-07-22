@@ -21,6 +21,7 @@ from flask_login import current_user, login_required
 from ..extensions import db
 from ..models import GenerationLog, GenerationModel, PointTransaction
 from ..services.image_gen_service import generate_images
+from ..services.image_service import raw_bytes_to_webp_data_url
 from ..services.site_service import get_site_config
 
 image_gen_bp = Blueprint("image_gen", __name__, url_prefix="/image-gen")
@@ -105,11 +106,16 @@ def generate():
 
     # 参考图（最多 5 张）
     references = []
+    ref_b64_list = []
     for f in request.files.getlist("references")[:MAX_REFERENCES]:
         if f and f.filename:
             data = f.read()
             if data:
                 references.append((f.filename, data, f.mimetype or "image/png"))
+                try:
+                    ref_b64_list.append(raw_bytes_to_webp_data_url(data))
+                except Exception:
+                    pass
     ref_count = len(references)
     if ref_count:
         labels = "、".join(f"图片{i + 1}" for i in range(ref_count))
@@ -150,6 +156,7 @@ def generate():
             references_count=ref_count,
             status="failed",
             images="[]",
+            reference_images=json.dumps(ref_b64_list),
             points_spent=0,
             error=str(e)[:500],
         )
@@ -174,6 +181,7 @@ def generate():
         references_count=ref_count,
         status=status,
         images=json.dumps(images, ensure_ascii=False),
+        reference_images=json.dumps(ref_b64_list),
         points_spent=spent,
     )
     db.session.add(log)

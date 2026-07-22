@@ -54,6 +54,7 @@ class GenerationLog(db.Model):
         db.String(10), nullable=False, default="success"
     )  # success / partial / failed
     images = db.Column(LONGTEXT, nullable=True)  # JSON 数组：base64 data URL 列表
+    reference_images = db.Column(LONGTEXT, nullable=True)  # JSON 数组：参考图的 WebP Data URL 列表
     points_spent = db.Column(
         db.Integer, nullable=False, server_default="0", default=0
     )
@@ -71,3 +72,13 @@ class GenerationLog(db.Model):
             return data if isinstance(data, list) else []
         except (ValueError, TypeError):
             return []
+
+    def reference_image_list(self):
+        if not self.reference_images:
+            return []
+        try:
+            data = json.loads(self.reference_images)
+            return data if isinstance(data, list) else []
+        except (ValueError, TypeError):
+            return []
+

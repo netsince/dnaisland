@@ -75,6 +75,16 @@
 
   <div class="gd-sec">提示词</div>
   <pre class="gd-prompt">{{ log.prompt }}</pre>
+  {% if log.reference_image_list() %}
+  <div class="mb-3 mt-3">
+    <div class="small text-muted mb-2">上传的参考图（{{ log.reference_image_list()|length }} 张）：</div>
+    <div class="d-flex gap-2 flex-wrap">
+      {% for ref_img in log.reference_image_list() %}
+      <img src="{{ ref_img }}" class="rounded border border-secondary" style="width: 60px; height: 60px; object-fit: cover;" alt="参考图">
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
   {% if st == 'failed' and log.error %}
   <div class="alert alert-danger mt-3 mb-0">{{ log.error }}</div>
   {% endif %}
