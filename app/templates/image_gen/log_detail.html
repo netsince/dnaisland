@@ -6,23 +6,21 @@
 {% block head %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/glightbox@3.3.0/dist/css/glightbox.min.css">
 <style>
-  /* 高屏效·极小 Padding·沉浸看图容器 */
   .gd-viewport-wrap {
     max-width: 900px;
     margin: 0 auto;
     padding-inline: 4px;
   }
 
-  /* 第一视觉区：纯粹大图展示（极小 Padding，零裁剪，看图绝无打断） */
+  /* 主大图卡片：使用项目动态主题变量，完美适配黑/白双模式 */
   .gd-main-stage {
-    background: #0a0912;
-    border: 1px solid var(--dna-border, #242236);
+    background: var(--dna-surface-solid, var(--dna-surface));
+    border: 1px solid var(--dna-border);
     border-radius: 12px;
     padding: 6px;
     margin-bottom: 0.75rem;
   }
   
-  /* 彻底覆盖全局 16/9 与 cover 裁切，全宽无损展现自然比例 */
   .gd-main-stage .dna-img-fade {
     aspect-ratio: auto !important;
     height: auto !important;
@@ -40,22 +38,22 @@
     border-radius: 8px;
   }
 
-  /* 提示词与垫图下沉区：高利用率、极小留白 */
+  /* 提示词与垫图下沉区 */
   .gd-bottom-stage {
-    background: var(--dna-surface, #141320);
-    border: 1px solid var(--dna-border, #242236);
+    background: var(--dna-surface);
+    border: 1px solid var(--dna-border);
     border-radius: 12px;
     padding: 0.75rem 0.85rem;
   }
 
   .gd-prompt-text {
-    background: rgba(0, 0, 0, 0.25);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    background: var(--dna-bg-2, rgba(0, 0, 0, 0.05));
+    border: 1px solid var(--dna-border);
     border-radius: 8px;
     padding: 0.65rem 0.75rem;
     font-size: 0.9rem;
     line-height: 1.5;
-    color: #e2e2f0;
+    color: var(--dna-text);
     white-space: pre-wrap;
     word-break: break-word;
   }
@@ -64,8 +62,8 @@
     display: inline-block;
     border-radius: 6px;
     overflow: hidden;
-    border: 1px solid var(--dna-border, #28253d);
-    background: #0a0914;
+    border: 1px solid var(--dna-border);
+    background: var(--dna-bg-2);
     padding: 2px;
     flex: none;
   }
@@ -82,7 +80,7 @@
 
 {% block content %}
 <div class="container-fluid py-2 gd-viewport-wrap">
-  <!-- 1. 低密度头部：极简导航（绝不抢占视觉，看图不打断） -->
+  <!-- 1. 头部导航 -->
   <div class="d-flex align-items-center justify-content-between mb-2 px-1">
     <a class="btn btn-sm btn-link text-muted text-decoration-none px-0 py-0 fs-7" href="{{ url_for('image_gen.logs') }}">
       <i class="bi bi-arrow-left me-1"></i> 返回记录
@@ -95,7 +93,7 @@
   {% set imgs = log.image_list() %}
   {% set st = log.status %}
 
-  <!-- 2. 绝对主角第一屏：极小 Padding 纯粹看图（零裁剪，最高利用率） -->
+  <!-- 2. 第一屏：大图展现（跟随黑/白模式主题变量） -->
   {% if imgs %}
   {% for img in imgs %}
   <div class="gd-main-stage">
@@ -105,13 +103,13 @@
       </a>
     </div>
 
-    <!-- 紧贴大图的极简操作栏 -->
+    <!-- 极简操作栏 -->
     <div class="d-flex align-items-center justify-content-between pt-2 px-1 flex-wrap gap-2">
       <div class="text-muted fs-7">
-        尺寸 <strong class="text-light">{{ log.size or 'auto' }}</strong>
+        尺寸 <strong>{{ log.size or 'auto' }}</strong>
       </div>
       <div class="d-flex align-items-center gap-2">
-        <a class="btn btn-sm btn-outline-light rounded-pill px-3 py-1 fs-7 js-dlpng" href="{{ img }}" data-src="{{ img }}" data-name="artwork_{{ log.id }}_{{ loop.index }}.png">
+        <a class="btn btn-sm btn-outline-secondary rounded-pill px-3 py-1 fs-7 js-dlpng" href="{{ img }}" data-src="{{ img }}" data-name="artwork_{{ log.id }}_{{ loop.index }}.png">
           <i class="bi bi-download me-1"></i> 下载原图
         </a>
         <a class="btn btn-sm btn-primary rounded-pill px-3 py-1 fs-7" href="{{ url_for('image_gen.workbench') }}?prompt={{ log.prompt|urlencode }}" style="background: linear-gradient(90deg, #a855f7, #ec4899); border:none;">
@@ -129,12 +127,12 @@
   <div class="alert alert-danger rounded-3 mb-2 py-2 fs-7">{{ log.error }}</div>
   {% endif %}
 
-  <!-- 3. 信息下沉区：提示词 Prompt + 垫图参考 -->
+  <!-- 3. 下沉区：提示词 Prompt + 垫图参考 -->
   <div class="gd-bottom-stage">
     <!-- 提示词 -->
     <div class="mb-2.5">
       <div class="d-flex align-items-center justify-content-between mb-1">
-        <div class="fw-bold text-light fs-7"><i class="bi bi-chat-quote me-1 text-primary"></i> 提示词 Prompt</div>
+        <div class="fw-bold small"><i class="bi bi-chat-quote me-1 text-primary"></i> 提示词 Prompt</div>
         <button type="button" class="btn btn-link btn-sm text-decoration-none p-0 text-muted fs-7" id="copyPromptBtn">
           <i class="bi bi-clipboard me-1"></i> <span id="copyPromptText">复制</span>
         </button>
@@ -142,10 +140,10 @@
       <div class="gd-prompt-text" id="promptTextContent">{{ log.prompt }}</div>
     </div>
 
-    <!-- 垫图参考（无损自然比例，极小 Padding） -->
+    <!-- 垫图参考 -->
     {% if log.reference_image_list() %}
     <div class="mb-2.5">
-      <div class="fw-bold text-light fs-7 mb-1.5"><i class="bi bi-images me-1 text-primary"></i> 所用参考图（{{ log.reference_image_list()|length }} 张）</div>
+      <div class="fw-bold small mb-1.5"><i class="bi bi-images me-1 text-primary"></i> 所用参考图（{{ log.reference_image_list()|length }} 张）</div>
       <div class="d-flex gap-2 overflow-x-auto pb-1">
         {% for ref_img in log.reference_image_list() %}
         <div class="gd-ref-chip dna-img-fade">
