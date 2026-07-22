@@ -687,6 +687,9 @@ body, .navbar, .footer, .card, .dna-tile, .dna-hero,
 }
 .dna-search-overlay .input-group-text svg {
   color: var(--dna-muted);
+  flex-shrink: 0;
+  display: inline-block;
+  vertical-align: middle;
 }
 .dna-search-overlay input:focus {
   box-shadow: none !important;
