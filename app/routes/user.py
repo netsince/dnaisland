@@ -72,7 +72,7 @@ def _default_avatar_svg(ch):
     )
 
 
-@user_bp.route("/avatar/<int:user_id>")
+@user_bp.route("/user/avatar/<int:user_id>")
 def avatar(user_id):
     """用户头像：base64 data URL -> WEBP 二进制，避免内联膨胀 HTML。无头像时返回首字母占位图。"""
     u = db.session.get(User, user_id)
