@@ -721,3 +721,40 @@ body, .navbar, .footer, .card, .dna-tile, .dna-hero,
   }
 }
 
+/* 搜索作者 Spotlight 焦点卡片 */
+.dna-search-author-spotlight {
+  background: var(--dna-surface-solid);
+  border: 1px solid var(--dna-border-strong);
+  border-radius: var(--dna-radius);
+  padding: 1.2rem;
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--dna-shadow);
+}
+.dna-search-author-spotlight::before {
+  content: "匹配创作者";
+  position: absolute;
+  top: 0; right: 0;
+  background: var(--dna-grad);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 10px;
+  border-bottom-left-radius: 8px;
+}
+
+/* 搜索动态卡片 */
+.dna-search-post-card {
+  border: 1px solid var(--dna-border);
+  border-radius: var(--dna-radius-sm);
+  background: var(--dna-surface);
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+  transition: transform 0.18s ease, border-color 0.18s ease;
+}
+.dna-search-post-card:hover {
+  border-color: var(--dna-accent);
+  transform: translateY(-2px);
+}
+
+

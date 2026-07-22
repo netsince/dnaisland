@@ -4,6 +4,7 @@ from sqlalchemy import case, func, or_
 
 from ..extensions import db
 from ..models import Article, Card, CardLike, CardTag, Punishment, User
+from ..models.teahouse import TeaPost
 from ..services.card_service import attach_covers, popular_tags
 
 main_bp = Blueprint("main", __name__)
@@ -91,6 +92,14 @@ def _user_search_query(q, sort):
     return base.order_by(*order)
 
 
+def _post_search_query(q):
+    return TeaPost.query.filter(
+        TeaPost.parent_id.is_(None),
+        TeaPost.is_hidden.is_(False),
+        TeaPost.content.ilike(f"%{q}%")
+    ).order_by(TeaPost.created_at.desc())
+
+
 @main_bp.route("/search")
 def search():
     q = (request.args.get("q") or "").strip()
@@ -99,7 +108,7 @@ def search():
     tag = (request.args.get("tag") or "").strip() or None
     page = request.args.get("page", 1, type=int)
 
-    valid_types = ("all", "card", "user")
+    valid_types = ("all", "card", "user", "post")
     if search_type not in valid_types:
         search_type = "all"
     valid_sorts = ("relevance", "hot", "new")
@@ -114,16 +123,21 @@ def search():
     cards_pagination = None
     users = []
     users_pagination = None
+    posts = []
+    posts_pagination = None
     cards_count = 0
     users_count = 0
+    posts_count = 0
 
     if q:
         cards_count = _card_search_query(q, sort, tag).count()
         users_count = _user_search_query(q, sort).count()
+        posts_count = _post_search_query(q).count()
 
         if search_type == "all":
             cards = attach_covers(_card_search_query(q, sort, tag).limit(4).all())
             users = _user_search_query(q, sort).limit(3).all()
+            posts = _post_search_query(q).limit(4).all()
         elif search_type == "card":
             cards_pagination = _card_search_query(q, sort, tag).paginate(
                 page=page, per_page=12, error_out=False
@@ -134,6 +148,11 @@ def search():
                 page=page, per_page=20, error_out=False
             )
             users = users_pagination.items
+        elif search_type == "post":
+            posts_pagination = _post_search_query(q).paginate(
+                page=page, per_page=15, error_out=False
+            )
+            posts = posts_pagination.items
 
     return render_template(
         "search.html",
@@ -148,6 +167,9 @@ def search():
         users=users,
         users_pagination=users_pagination,
         users_count=users_count,
+        posts=posts,
+        posts_pagination=posts_pagination,
+        posts_count=posts_count,
         args=args,
     )
 
