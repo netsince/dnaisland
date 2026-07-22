@@ -72,6 +72,16 @@
       <i class="bi bi-clipboard"></i>
       <span>复制卡片</span>
     </button>
+    <button type="button" class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1 rounded-pill"
+            id="commentDrawerTrigger"
+            data-api-url="{{ url_for('user.card_comments_api', card_id=card.id) }}"
+            data-post-url="{{ url_for('user.card_comment', card_id=card.id) }}"
+            data-logged-in="{{ 'true' if current_user.is_authenticated else 'false' }}"
+            data-login-url="{{ url_for('auth.login') }}"
+            style="padding:5px 12px;">
+      <i class="bi bi-chat-square"></i>
+      <span>评论（{{ comment_count }}）</span>
+    </button>
     <a class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1 rounded-pill ms-auto opacity-75"
        href="{{ url_for('user.report', type='card', id=card.id) }}" style="padding:5px 12px;">
       <i class="bi bi-flag"></i>
@@ -126,17 +136,6 @@
     </a>
   </div>
   {% endif %}
-
-  <!-- 评论触发按钮 -->
-  <button type="button" class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-2 mb-4"
-          id="commentDrawerTrigger"
-          data-api-url="{{ url_for('user.card_comments_api', card_id=card.id) }}"
-          data-post-url="{{ url_for('user.card_comment', card_id=card.id) }}"
-          data-logged-in="{{ 'true' if current_user.is_authenticated else 'false' }}"
-          data-login-url="{{ url_for('auth.login') }}">
-    <i class="bi bi-chat-square"></i>
-    <span>评论（{{ comment_count }}）</span>
-  </button>
 
   {% if is_owner or is_admin %}
   <div class="d-flex flex-wrap gap-2">
@@ -206,7 +205,11 @@
     drawer.classList.add('show');
     overlay.classList.add('show');
     document.body.style.overflow = 'hidden';
-    if (page === 1) loadComments();
+    // 立即渲染输入框，不等 API
+    if (page === 1) {
+      buildFooter();
+      loadComments();
+    }
   }
   function close() {
     drawer.classList.remove('show');
@@ -255,7 +258,6 @@
         if (page === 1) {
           body.innerHTML = '';
           title.textContent = '评论（' + data.total + '）';
-          buildFooter(data.total);
         }
         if (data.items.length === 0 && page === 1) {
           body.innerHTML = '<div class="text-muted text-center py-4">还没有评论，来抢沙发～</div>';
