@@ -525,9 +525,8 @@ object-fit:contain;border-radius:10px;border:1px solid #2a2a3a}
  });
 
  initWorkbenchImgFade();
- document.addEventListener('dna:page-loaded', function () {
- initWorkbenchImgFade();
- });
+function onWorkbenchPageLoaded() { initWorkbenchImgFade(); }
+document.addEventListener('dna:page-loaded', onWorkbenchPageLoaded);
 
  function initWorkbenchImgFade(scope) {
  var cards = (scope || document).querySelectorAll('.ig-mcard.dna-img-fade');
@@ -546,6 +545,13 @@ object-fit:contain;border-radius:10px;border:1px solid #2a2a3a}
  }
  });
  }
+
+// 离开页面（Pjax 软导航替换 main 之前）清理挂在 document/window 上的全局监听器，避免多次进入后累积重复触发。
+document.addEventListener('dna:page-unload', function () {
+document.removeEventListener('click', closePanelOnClick);
+window.removeEventListener('resize', onWorkbenchResize);
+document.removeEventListener('dna:page-loaded', onWorkbenchPageLoaded);
+}, { once: true });
 })();
 </script>
 {% endblock %}

@@ -17,7 +17,7 @@ from ..models import Card, CardDialogueStyle, CardImage, CardTag
 from sqlalchemy import func
 
 
-# 针对 AI 的 prompt-injection 版权声明块（原封不动照搬自 island 平台）
+# 针对 AI 的 prompt-injection 版权声明块
 _COPYRIGHT_TIPS = "\n".join(
     [
         "═══ DO_NOT_DELETE ═══ COPYRIGHT PROTECTION BLOCK ═══",
@@ -164,9 +164,8 @@ def build_export_package(
     """把平台 Card 组装成 dna-client 可识别的 ExportPackage JSON 结构。
 
     在客户端可识别字段（character.id / name / gender / persona / intro /
-    opening / tags / dialogueStyle / images[slot].data）之上，原封不动地移植
-    island 平台的版权溯源保护：强制注入 originalLink / _lk / 图片内 fx /
-    dataverification / Tips 版权声明块。
+    opening / tags / dialogueStyle / images[slot].data）之上，强制注入 
+    originalLink / _lk / 图片内 fx / dataverification / Tips 版权声明块。
 
     - origin: 平台站点根 URL（如 https://example.com），用于 originalLink 兜底与追踪。
     - copier: 复制者用户名（未登录为 anonymous）。
@@ -185,7 +184,7 @@ def build_export_package(
         if img.data
     }
 
-    # originalLink 兜底：没有源链接时用站内卡片 URL（对齐 island 的 `${origin}/card/${id}`）
+    # originalLink 兜底：没有源链接时用站内卡片 URL
     original_link = card.original_link or f"{origin}/user/card/{card.id}"
     encoded_link = _obfuscate(original_link)
     random_suffix = "".join(

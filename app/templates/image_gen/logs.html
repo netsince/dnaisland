@@ -177,10 +177,11 @@
 
   // 视口尺寸变化时自适应重新分列
   var resizeTimer;
-  window.addEventListener('resize', function () {
+  function onLogsResize() {
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(renderHorizontalMasonry, 100);
-  });
+  }
+  window.addEventListener('resize', onLogsResize);
 
   // 流式生成完后刷新拉取逻辑
   function loadLogsFlow() {
@@ -214,6 +215,11 @@
     sessionStorage.removeItem('ig_just_generated');
     setTimeout(loadLogsFlow, 200);
   }
+
+  // 离开页面时移除全局 resize 监听器，避免多次进入后累积重复重排。
+  document.addEventListener('dna:page-unload', function () {
+    window.removeEventListener('resize', onLogsResize);
+  }, { once: true });
 })();
 </script>
 {% endblock %}

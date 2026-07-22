@@ -82,7 +82,7 @@
  }
 
  // 复制链接功能
- document.addEventListener('click', function (e) {
+ function onCopyPostLink(e) {
  var btn = e.target.closest('.js-copy-post-link');
  if (!btn) return;
  e.preventDefault();
@@ -94,7 +94,13 @@
  setTimeout(function () { btn.innerHTML = orig; }, 1800);
  });
  }
- });
+ }
+
+ document.addEventListener('click', onCopyPostLink);
+ // 离开页面时移除全局监听器，避免多次进入信息流后重复累积触发复制链接。
+ document.addEventListener('dna:page-unload', function () {
+ document.removeEventListener('click', onCopyPostLink);
+ }, { once: true });
  })();
 </script>
 {% endblock %}

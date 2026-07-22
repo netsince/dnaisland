@@ -8,7 +8,8 @@
   <div class="col-12 col-md-8 col-lg-6">
     <h2 class="h4 mb-4 text-center">发布角色卡</h2>
     <div class="d-grid gap-3">
-      <button type="button" class="btn btn-primary btn-lg" id="btnJson">从 JSON 识别</button>
+      <button type="button" class="btn btn-primary btn-lg" id="btnClipboard">从剪贴板识别</button>
+      <button type="button" class="btn btn-outline-secondary btn-lg" id="btnJson">从 JSON 识别</button>
       <a href="{{ url_for('publish.edit') }}" class="btn btn-outline-primary btn-lg text-center">直接开始编辑</a>
     </div>
 
@@ -24,10 +25,30 @@
 
 {% block scripts %}
 <script>
-  const btn = document.getElementById('btnJson');
+  const btnClipboard = document.getElementById('btnClipboard');
+  const btnJson = document.getElementById('btnJson');
   const form = document.getElementById('jsonForm');
-  btn.addEventListener('click', () => {
+  const ta = document.getElementById('json');
+
+  btnJson.addEventListener('click', () => {
     form.style.display = form.style.display === 'none' ? 'block' : 'none';
+  });
+
+  btnClipboard.addEventListener('click', async () => {
+    let text;
+    try {
+      text = await navigator.clipboard.readText();
+    } catch (e) {
+      showToast('无法读取剪贴板，请允许权限后手动粘贴', 'danger');
+      form.style.display = 'block';
+      return;
+    }
+    if (!text || !text.trim()) {
+      showToast('剪贴板为空，请先复制角色卡 JSON', 'warning');
+      return;
+    }
+    if (ta) ta.value = text;
+    form.submit();
   });
 </script>
 {% endblock %}

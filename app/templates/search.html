@@ -251,67 +251,77 @@
 
 {% block scripts %}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
- const wrap = document.getElementById('searchContentWrap');
- if (!wrap) return;
+(function () {
+const wrap = document.getElementById('searchContentWrap');
+if (!wrap) return;
 
- document.addEventListener('click', function(e) {
- const link = e.target.closest('#searchContentWrap .btn-group a');
- if (!link) return;
+function onTabClick(e) {
+const link = e.target.closest('#searchContentWrap .btn-group a');
+if (!link) return;
 
- const targetUrl = link.getAttribute('href');
- if (!targetUrl || targetUrl.startsWith('#') || targetUrl.startsWith('javascript:')) return;
+const targetUrl = link.getAttribute('href');
+if (!targetUrl || targetUrl.startsWith('#') || targetUrl.startsWith('javascript:')) return;
 
- e.preventDefault();
+e.preventDefault();
 
- wrap.style.opacity = '0.5';
- wrap.style.transition = 'opacity 0.15s ease';
+wrap.style.opacity = '0.5';
+wrap.style.transition = 'opacity 0.15s ease';
 
- fetch(targetUrl, {
- headers: {
- 'X-Requested-With': 'XMLHttpRequest'
- }
- })
- .then(response => response.text())
- .then(html => {
- const parser = new DOMParser();
- const doc = parser.parseFromString(html, 'text/html');
- const newWrap = doc.getElementById('searchContentWrap');
- if (newWrap) {
- wrap.innerHTML = newWrap.innerHTML;
- history.pushState(null, '', targetUrl);
- } else {
- window.location.href = targetUrl;
- }
- })
- .catch(err => {
- console.error('AJAX tab switch error:', err);
- window.location.href = targetUrl;
- })
- .finally(() => {
- wrap.style.opacity = '1';
- });
- });
-
- window.addEventListener('popstate', function() {
- fetch(window.location.href, {
- headers: {
- 'X-Requested-With': 'XMLHttpRequest'
- }
- })
- .then(response => response.text())
- .then(html => {
- const parser = new DOMParser();
- const doc = parser.parseFromString(html, 'text/html');
- const newWrap = doc.getElementById('searchContentWrap');
- if (newWrap) {
- wrap.innerHTML = newWrap.innerHTML;
- }
- })
- .catch(() => {
- window.location.reload();
- });
- });
+fetch(targetUrl, {
+headers: {
+'X-Requested-With': 'XMLHttpRequest'
+}
+})
+.then(response => response.text())
+.then(html => {
+const parser = new DOMParser();
+const doc = parser.parseFromString(html, 'text/html');
+const newWrap = doc.getElementById('searchContentWrap');
+if (newWrap) {
+wrap.innerHTML = newWrap.innerHTML;
+history.pushState(null, '', targetUrl);
+} else {
+window.location.href = targetUrl;
+}
+})
+.catch(err => {
+console.error('AJAX tab switch error:', err);
+window.location.href = targetUrl;
+})
+.finally(() => {
+wrap.style.opacity = '1';
 });
+}
+
+function onPopState() {
+fetch(window.location.href, {
+headers: {
+'X-Requested-With': 'XMLHttpRequest'
+}
+})
+.then(response => response.text())
+.then(html => {
+const parser = new DOMParser();
+const doc = parser.parseFromString(html, 'text/html');
+const newWrap = doc.getElementById('searchContentWrap');
+if (newWrap) {
+wrap.innerHTML = newWrap.innerHTML;
+}
+})
+.catch(() => {
+window.location.reload();
+});
+}
+
+// block scripts 在完整加载或 Pjax 软导航后都已就绪，直接绑定即可（DOMContentLoaded 在软导航后不会再触发）。
+document.addEventListener('click', onTabClick);
+window.addEventListener('popstate', onPopState);
+
+// 离开页面时移除全局监听器，避免 Pjax 多次进入后重复累积触发。
+document.addEventListener('dna:page-unload', function () {
+document.removeEventListener('click', onTabClick);
+window.removeEventListener('popstate', onPopState);
+}, { once: true });
+})();
 </script>
 {% endblock %}

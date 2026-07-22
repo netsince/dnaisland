@@ -222,9 +222,14 @@
     document.addEventListener('DOMContentLoaded', initLightbox);
   }
 
-  document.addEventListener('dna:page-loaded', function () {
+  function onLightboxPageLoaded() {
     setTimeout(initLightbox, 50);
-  });
+  }
+  document.addEventListener('dna:page-loaded', onLightboxPageLoaded);
+  // 离开页面时移除，避免多次进入图集详情后重复累积监听（dna:page-loaded 在每次软导航都会触发）。
+  document.addEventListener('dna:page-unload', function () {
+    document.removeEventListener('dna:page-loaded', onLightboxPageLoaded);
+  }, { once: true });
 })();
 </script>
 <script>

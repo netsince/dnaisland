@@ -724,7 +724,10 @@ function showToast(message, type) {
           newScript.onload = newScript.onerror = runNext;
           oldScript.parentNode.replaceChild(newScript, oldScript);
         } else {
-          newScript.textContent = oldScript.textContent;
+          // 用 IIFE 包裹内联脚本，使其顶层 const/let/function 每次执行都拥有独立作用域。
+          // 否则 Pjax 软导航重复执行同一段脚本时，顶层 const/let 会触发“标识符已声明”错误，
+          // 导致整段脚本中断（典型表现：首次进入正常，离开再回来后按钮点不动，需硬刷新）。
+          newScript.textContent = '(function(){\n' + oldScript.textContent + '\n})();';
           oldScript.parentNode.replaceChild(newScript, oldScript);
           runNext();
         }
@@ -773,6 +776,10 @@ function showToast(message, type) {
         document.body.className = doc.body.className;
         document.body.style.overflow = '';
         syncHeadStyles(doc);
+
+        // 通知当前页面即将被替换，便于页面清理挂在 document/window 上的全局监听器，
+        // 避免 Pjax 软导航（只替换 <main>）导致旧页面的全局监听器在后续导航中累积、重复触发。
+        document.dispatchEvent(new CustomEvent('dna:page-unload'));
 
         main.innerHTML = newMain.innerHTML;
 

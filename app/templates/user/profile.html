@@ -294,7 +294,7 @@
 {% block scripts %}
 <script>
  (function () {
- document.addEventListener('click', function (e) {
+ function onProfileTabClick(e) {
  // 仅拦截个人主页的 Tab nav-link 点击
  const link = e.target.closest('.nav-tabs .nav-link');
  if (!link) return;
@@ -340,8 +340,14 @@
  }
  });
  })
- .catch(err => console.error('Tab switch failed:', err));
- });
- })();
+.catch(err => console.error('Tab switch failed:', err));
+}
+
+document.addEventListener('click', onProfileTabClick);
+// 离开页面时移除全局监听器，避免多次进入个人主页后重复累积触发 Tab 切换。
+document.addEventListener('dna:page-unload', function () {
+document.removeEventListener('click', onProfileTabClick);
+}, { once: true });
+})();
 </script>
 {% endblock %}

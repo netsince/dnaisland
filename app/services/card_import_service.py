@@ -25,7 +25,7 @@ def parse_export_package(json_str: str) -> dict:
     if not isinstance(character, dict):
         raise ValueError("缺少 character 字段")
 
-    # 版权溯源保护检测：命中任意一层保护即拦截（原封不动对齐 island 平台策略）
+    # 版权溯源保护检测：命中任意一层保护即拦截
     has_original_link = bool(str(data.get("originalLink") or "").strip())
     has_hidden_lk = bool(str(data.get("_lk") or "").strip())
     has_image_fx = False
@@ -77,6 +77,6 @@ def parse_export_package(json_str: str) -> dict:
         "tags": tags,
         "dialogue_style": dialogue_style,
         "images": images,
-        # 导入成功后强制清空源链接（对齐 island：通过检测的卡视为无原作者标记）
+        # 导入成功后强制清空源链接
         "original_link": "",
     }
