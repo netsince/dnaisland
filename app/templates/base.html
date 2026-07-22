@@ -621,12 +621,18 @@ function showToast(message, type) {
 
     function syncHeadStyles(doc) {
       try {
+        // 清理上一个页面装载的临时 Pjax 样式
+        var oldTemps = document.head.querySelectorAll('[data-pjax-temp]');
+        oldTemps.forEach(function (el) { el.remove(); });
+
         var newStyles = doc.head.querySelectorAll('style, link[rel="stylesheet"]');
         newStyles.forEach(function (style) {
           if (style.tagName === 'LINK') {
             var href = style.getAttribute('href');
             if (href && !document.head.querySelector('link[href="' + href + '"]')) {
-              document.head.appendChild(style.cloneNode(true));
+              var newLink = style.cloneNode(true);
+              newLink.setAttribute('data-pjax-temp', 'true');
+              document.head.appendChild(newLink);
             }
           } else if (style.tagName === 'STYLE') {
             var content = style.textContent;
@@ -634,7 +640,9 @@ function showToast(message, type) {
               return s.textContent === content;
             });
             if (!exists) {
-              document.head.appendChild(style.cloneNode(true));
+              var newStyle = style.cloneNode(true);
+              newStyle.setAttribute('data-pjax-temp', 'true');
+              document.head.appendChild(newStyle);
             }
           }
         });
