@@ -28,6 +28,7 @@
   {% block head %}{% endblock %}
 </head>
 <body class="d-flex flex-column min-vh-100">
+  {% block header %}
   <header>
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
       <div class="container-fluid">
@@ -167,6 +168,7 @@
       </div>
     </nav>
   </header>
+  {% endblock %}
 
   <main class="container-fluid py-4 flex-grow-1">
     {% with messages = get_flashed_messages(with_categories=true) %}
