@@ -1267,3 +1267,10 @@ body.is-mobile-plus-open header {
   white-space: pre-wrap;
 }
 
+/* 专属控制：手机端（<992px）隐藏顶栏 Header，电脑端正常保留 */
+@media (max-width: 991.98px) {
+  body.dna-hide-header-on-mobile header {
+    display: none !important;
+  }
+}
+

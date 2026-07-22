@@ -49,9 +49,9 @@ function showToast(message, type) {
  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
  {% block head %}{% endblock %}
 </head>
-<body class="d-flex flex-column min-vh-100">
+<body class="d-flex flex-column min-vh-100 {% block body_class %}{% endblock %}">
  {% block header %}
- <header class="d-none d-lg-block">
+ <header>
  <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
  <div class="container-fluid">
  <a class="navbar-brand" href="{{ url_for('main.index') }}">DNAISLAND</a>
