@@ -3,6 +3,7 @@
 {% from "macros/cards.html" import card_tile, empty_state %}
 
 {% block title %}探索 · DNAISLAND{% endblock %}
+{% block header %}{% endblock %}
 
 {% set sorts = [
   {'key': 'hot',   'label': '🔥 最热'},
@@ -11,58 +12,49 @@
 ] %}
 
 {% block content %}
-<section class="dna-hero mb-4">
-  <span class="dna-hero__eyebrow">◆ 探索 · EXPLORE</span>
-  <h1 class="dna-hero__title">发现 <span class="dna-gradient-text">所有角色</span></h1>
-  <p class="lead text-secondary mb-0" style="max-width: 640px;">
-    按性别、标签与热度自由筛选，从海量角色卡中找到你的本命。
-  </p>
-</section>
-
-<div class="dna-filterbar">
-  <div class="dna-filterbar__group">
-    <span class="dna-filterbar__label">性别</span>
-    <a class="dna-chip-btn {{ 'is-active' if not gender }}"
-       href="{{ url_for('main.explore', sort=sort, tag=tag) }}">全部</a>
-    {% for g in genders %}
-      <a class="dna-chip-btn {{ 'is-active' if gender == g }}"
-         href="{{ url_for('main.explore', gender=g, sort=sort, tag=tag) }}">{{ g }}</a>
-    {% endfor %}
-  </div>
-  <div class="dna-filterbar__group">
-    <span class="dna-filterbar__label">排序</span>
-    {% for s in sorts %}
-      <a class="dna-chip-btn {{ 'is-active' if sort == s.key }}"
-         href="{{ url_for('main.explore', sort=s.key, gender=gender, tag=tag) }}">{{ s.label }}</a>
-    {% endfor %}
-  </div>
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h1 class="h4 mb-0 fw-bold d-flex align-items-center gap-2">
+    <span>🔍 探索角色卡</span>
+  </h1>
+  {% if gender or tag %}
+  <a class="btn btn-sm btn-outline-secondary rounded-pill" href="{{ url_for('main.explore') }}">清除筛选 ✕</a>
+  {% endif %}
 </div>
 
+<!-- 第 1 行：性别与排序 单行横划胶囊栏 -->
+<div class="dna-horizontal-tabs mb-2">
+  <span class="text-muted small align-self-center me-1 flex-shrink-0">性别:</span>
+  <a class="dna-tab-pill {{ 'active' if not gender }}"
+     href="{{ url_for('main.explore', sort=sort, tag=tag) }}">全部</a>
+  {% for g in genders %}
+    <a class="dna-tab-pill {{ 'active' if gender == g }}"
+       href="{{ url_for('main.explore', gender=g, sort=sort, tag=tag) }}">{{ g }}</a>
+  {% endfor %}
+
+  <span class="text-muted small align-self-center ms-2 me-1 flex-shrink-0">排序:</span>
+  {% for s in sorts %}
+    <a class="dna-tab-pill {{ 'active' if sort == s.key }}"
+       href="{{ url_for('main.explore', sort=s.key, gender=gender, tag=tag) }}">{{ s.label }}</a>
+  {% endfor %}
+</div>
+
+<!-- 第 2 行：热门标签单行横划胶囊栏 -->
 {% if tags %}
-<div class="mb-4">
-  <div class="dna-section-title h6 mb-2">热门标签</div>
-  <div class="dna-tagcloud">
-    {% for t in tags %}
-      {% set w = (t.count / tags[0].count)|round(2) %}
-      <a class="dna-tag {{ 'is-active' if tag == t.tag }}" style="--w:{{ w }}"
-         href="{{ url_for('main.explore', tag=t.tag, gender=gender, sort=sort) }}">
-        #{{ t.tag }}<span class="dna-tag__count">{{ t.count }}</span>
-      </a>
-    {% endfor %}
-  </div>
-</div>
-{% endif %}
-
-{% if gender or tag %}
-<div class="dna-active-filters">
-  {% if gender %}<span class="dna-chip-btn is-active">性别：{{ gender }}</span>{% endif %}
-  {% if tag %}<span class="dna-chip-btn is-active">#{{ tag }}</span>{% endif %}
-  <a class="dna-chip-btn dna-active-filters__clear" href="{{ url_for('main.explore') }}">清除筛选 ✕</a>
+<div class="dna-horizontal-tabs mb-3">
+  <span class="text-muted small align-self-center me-1 flex-shrink-0">标签:</span>
+  <a class="dna-tab-pill {{ 'active' if not tag }}"
+     href="{{ url_for('main.explore', gender=gender, sort=sort) }}">#全部</a>
+  {% for t in tags %}
+    <a class="dna-tab-pill {{ 'active' if tag == t.tag }}"
+       href="{{ url_for('main.explore', tag=t.tag, gender=gender, sort=sort) }}">
+      #{{ t.tag }} <span class="opacity-75 ms-1" style="font-size:0.72rem;">{{ t.count }}</span>
+    </a>
+  {% endfor %}
 </div>
 {% endif %}
 
 {% if pagination.items %}
-<div class="row g-3 dna-explore-grid">
+<div class="row g-2 g-md-3 dna-explore-grid mb-4">
   {% for card in cards %}
   <div class="col-6 col-sm-4 col-md-3 col-lg-2">{{ card_tile(card) }}</div>
   {% endfor %}
