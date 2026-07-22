@@ -10,7 +10,7 @@
  {% endif %}
  <div class="d-flex align-items-center gap-2 mb-2">
  {% if post.author.avatar %}
- <img src="{{ post.author.avatar }}" alt="头像" class="rounded-circle"
+ <img src="{{ url_for('user.avatar', user_id=post.author.id) }}" alt="头像" class="rounded-circle"
  style="width:40px;height:40px;object-fit:cover;">
  {% else %}
  <div class="rounded-circle bg-secondary text-center text-light"
@@ -84,7 +84,7 @@
  {% endif %}
  <div class="d-flex align-items-center gap-2 mb-2">
  {% if post.author.avatar %}
- <img src="{{ post.author.avatar }}" alt="头像" class="rounded-circle"
+ <img src="{{ url_for('user.avatar', user_id=post.author.id) }}" alt="头像" class="rounded-circle"
  style="width:40px;height:40px;object-fit:cover;">
  {% else %}
  <div class="rounded-circle bg-secondary text-center text-light"

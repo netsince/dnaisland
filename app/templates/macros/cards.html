@@ -16,7 +16,7 @@
 <a class="dna-tile" href="{{ url_for('user.card_detail', card_id=card.id) }}">
  <div class="dna-tile__media">
  {% if card.cover %}
- <img src="{{ card.cover }}" alt="{{ card.name }}" loading="lazy">
+ <img src="{{ url_for('user.card_image', card_id=card.id, slot='square') }}" alt="{{ card.name }}" loading="lazy">
  {% else %}
  <div class="dna-tile__ph">{{ card.name[:1] if card.name else '?' }}</div>
  {% endif %}

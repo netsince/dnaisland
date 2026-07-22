@@ -1,5 +1,6 @@
 import json
 import re
+from io import BytesIO
 
 from datetime import datetime
 from flask import (
@@ -11,6 +12,7 @@ from flask import (
     redirect,
     render_template,
     request,
+    send_file,
     url_for,
 )
 from flask_login import current_user, login_required
@@ -45,7 +47,7 @@ STATUS_BADGE_HTML = {
     "rejected": '<span class="badge bg-danger">已拒绝</span>',
     "pending": '<span class="badge bg-warning text-dark">审核中</span>',
 }
-from ..services.image_service import compress_image, crop_square_and_compress
+from ..services.image_service import compress_image, crop_square_and_compress, data_url_to_webp_bytes
 from ..services.card_service import (
     attach_covers,
     build_export_package,
@@ -53,6 +55,34 @@ from ..services.card_service import (
 )
 
 user_bp = Blueprint("user", __name__)
+
+
+@user_bp.route("/avatar/<int:user_id>")
+def avatar(user_id):
+    """用户头像：base64 data URL -> WEBP 二进制，避免内联膨胀 HTML。"""
+    u = db.session.get(User, user_id)
+    if not u or not u.avatar:
+        abort(404)
+    try:
+        webp = data_url_to_webp_bytes(u.avatar, max_edge=256, quality=82)
+    except Exception:
+        abort(404)
+    return send_file(BytesIO(webp), mimetype="image/webp", cache_timeout=86400)
+
+
+@user_bp.route("/card-image/<card_id>/<slot>")
+def card_image(card_id, slot):
+    """角色卡图片（square/landscape/portrait）：base64 -> WEBP。"""
+    if slot not in ("square", "landscape", "portrait"):
+        abort(404)
+    img = CardImage.query.filter_by(card_id=card_id, slot=slot).first()
+    if not img or not img.data:
+        abort(404)
+    try:
+        webp = data_url_to_webp_bytes(img.data, max_edge=1024, quality=82)
+    except Exception:
+        abort(404)
+    return send_file(BytesIO(webp), mimetype="image/webp", cache_timeout=86400)
 
 REPORT_TARGETS = ("card", "comment", "user", "teapost")
 REPORT_REASONS = [
@@ -624,6 +654,7 @@ def card_comments_api(card_id):
             "content": cm.content,
             "created_at": cm.created_at.strftime("%Y-%m-%d %H:%M") if cm.created_at else "",
             "author": {
+                "id": cm.author.id,
                 "username": cm.author.username,
                 "display_name": cm.author.display_name,
                 "avatar": cm.author.avatar or "",

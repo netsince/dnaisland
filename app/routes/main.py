@@ -1,13 +1,30 @@
-from flask import Blueprint, jsonify, render_template, request, url_for
+from flask import Blueprint, abort, jsonify, render_template, request, send_file, url_for
 from flask_login import current_user
 from sqlalchemy import case, func, or_
+from io import BytesIO
 
 from ..extensions import db
 from ..models import Article, Card, CardLike, CardTag, Punishment, User
 from ..models.teahouse import TeaPost
 from ..services.card_service import attach_covers, popular_tags
+from ..services.image_service import data_url_to_webp_bytes
 
 main_bp = Blueprint("main", __name__)
+
+
+@main_bp.route("/article-cover/<int:article_id>")
+def article_cover(article_id):
+    """文章封面：仅 base64 类型走此端点转 WEBP；URL 类型由模板直接引用外链。"""
+    a = db.session.get(Article, article_id)
+    if not a or not a.cover:
+        abort(404)
+    if a.cover.startswith("data:"):
+        try:
+            webp = data_url_to_webp_bytes(a.cover, max_edge=1024, quality=82)
+        except Exception:
+            abort(404)
+        return send_file(BytesIO(webp), mimetype="image/webp", cache_timeout=86400)
+    abort(404)
 
 
 @main_bp.route("/")

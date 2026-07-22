@@ -33,7 +33,7 @@
  <div class="card h-100 shadow-sm">
  {% if a.cover %}
  <div class="dna-img-fade dna-img-fade--top">
- <img src="{{ a.cover }}" class="dna-img-fade__img" alt="">
+ <img src="{% if a.cover.startswith('data:') %}{{ url_for('main.article_cover', article_id=a.id) }}{% else %}{{ a.cover }}{% endif %}" class="dna-img-fade__img" alt="">
  </div>
  {% endif %}
  <div class="card-body d-flex flex-column">

@@ -13,7 +13,7 @@
   <div class="col-12 col-lg-9">
     <div class="card mb-3">
       {% if images.square %}
-      <img src="{{ images.square }}" class="card-img-top" style="max-height:320px;object-fit:cover;" alt="square">
+      <img src="{{ url_for('user.card_image', card_id=card.id, slot='square') }}" class="card-img-top" style="max-height:320px;object-fit:cover;" alt="square">
       {% endif %}
       <div class="card-body">
         <h5 class="card-title">{{ card.name }}</h5>
@@ -37,8 +37,8 @@
         {% if images.landscape or images.portrait %}
         <h6 class="mt-3">其他图片</h6>
         <div class="d-flex gap-2 flex-wrap">
-          {% if images.landscape %}<img src="{{ images.landscape }}" class="img-fluid rounded" style="max-height:160px;" alt="landscape">{% endif %}
-          {% if images.portrait %}<img src="{{ images.portrait }}" class="img-fluid rounded" style="max-height:160px;" alt="portrait">{% endif %}
+          {% if images.landscape %}<img src="{{ url_for('user.card_image', card_id=card.id, slot='landscape') }}" class="img-fluid rounded" style="max-height:160px;" alt="landscape">{% endif %}
+          {% if images.portrait %}<img src="{{ url_for('user.card_image', card_id=card.id, slot='portrait') }}" class="img-fluid rounded" style="max-height:160px;" alt="portrait">{% endif %}
         </div>
         {% endif %}
 

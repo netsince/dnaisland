@@ -54,7 +54,7 @@
  <div class="d-flex flex-wrap align-items-center gap-3">
  <a href="{{ url_for('user.profile', username=spotlight_user.username) }}" class="text-decoration-none">
  {% if spotlight_user.avatar %}
- <img src="{{ spotlight_user.avatar }}" class="dna-avatar flex-shrink-0" alt="{{ spotlight_user.nickname }}" style="width:64px;height:64px;">
+ <img src="{{ url_for('user.avatar', user_id=spotlight_user.id) }}" class="dna-avatar flex-shrink-0" alt="{{ spotlight_user.nickname }}" style="width:64px;height:64px;">
  {% else %}
  <div class="dna-avatar-ph flex-shrink-0" style="width:64px;height:64px;font-size:1.6rem;">{{ spotlight_user.nickname[:1] }}</div>
  {% endif %}
@@ -115,7 +115,7 @@
  <div class="d-flex align-items-start gap-3">
  <a href="{{ url_for('user.profile', username=p.author.username) }}">
  {% if p.author.avatar %}
- <img src="{{ p.author.avatar }}" class="dna-avatar flex-shrink-0" alt="{{ p.author.nickname }}" style="width:40px;height:40px;">
+ <img src="{{ url_for('user.avatar', user_id=p.author.id) }}" class="dna-avatar flex-shrink-0" alt="{{ p.author.nickname }}" style="width:40px;height:40px;">
  {% else %}
  <div class="dna-avatar-ph flex-shrink-0" style="width:40px;height:40px;font-size:1rem;">{{ p.author.nickname[:1] }}</div>
  {% endif %}
@@ -179,7 +179,7 @@
  <div class="d-flex align-items-start gap-3">
  <a href="{{ url_for('user.profile', username=p.author.username) }}">
  {% if p.author.avatar %}
- <img src="{{ p.author.avatar }}" class="dna-avatar flex-shrink-0" alt="{{ p.author.nickname }}" style="width:40px;height:40px;">
+ <img src="{{ url_for('user.avatar', user_id=p.author.id) }}" class="dna-avatar flex-shrink-0" alt="{{ p.author.nickname }}" style="width:40px;height:40px;">
  {% else %}
  <div class="dna-avatar-ph flex-shrink-0" style="width:40px;height:40px;font-size:1rem;">{{ p.author.nickname[:1] }}</div>
  {% endif %}
@@ -224,7 +224,7 @@
  <a class="dna-tile" href="{{ url_for('user.profile', username=u.username) }}" style="flex-direction:row;">
  <div class="d-flex align-items-center gap-3 p-3 w-100">
  {% if u.avatar %}
- <img src="{{ u.avatar }}" class="dna-avatar flex-shrink-0" alt="{{ u.nickname }}"
+ <img src="{{ url_for('user.avatar', user_id=u.id) }}" class="dna-avatar flex-shrink-0" alt="{{ u.nickname }}"
  style="width:52px;height:52px;">
  {% else %}
  <div class="dna-avatar-ph flex-shrink-0" style="width:52px;height:52px;font-size:1.3rem;">{{ u.nickname[:1] }}</div>

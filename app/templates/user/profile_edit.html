@@ -17,7 +17,7 @@
         <div class="mb-2">
           <img id="avatarPreview" class="rounded-circle" alt="头像"
                style="width:80px;height:80px;object-fit:cover;display:{% if u.avatar %}block{% else %}none{% endif %};"
-               src="{{ u.avatar or '' }}">
+               src="{{ url_for('user.avatar', user_id=u.id) if u.avatar else '' }}">
           {% if not u.avatar %}
           <div id="avatarPlaceholder" class="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center" style="width:80px;height:80px;font-size:1.8rem;">{{ u.nickname[:1] }}</div>
           {% endif %}

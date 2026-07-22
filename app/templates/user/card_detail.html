@@ -13,8 +13,8 @@
 {% if images.landscape %}
 <div class="dna-card-banner">
   {% set _f = (card.cover_focus or '50,50').split(',') %}
-  <a class="glightbox" href="{{ images.landscape }}" data-type="image" aria-label="查看原图">
-    <img src="{{ images.landscape }}" alt="{{ card.name }}"
+  <a class="glightbox" href="{{ url_for('user.card_image', card_id=card.id, slot='landscape') }}" data-type="image" aria-label="查看原图">
+    <img src="{{ url_for('user.card_image', card_id=card.id, slot='landscape') }}" alt="{{ card.name }}"
          class="dna-card-banner__img {{ 'is-cover' if card.cover_focus else '' }}"
          style="object-position:{{ _f[0]|trim }}% {{ _f[1]|trim }}%"
          onerror="this.style.display='none'">
@@ -32,7 +32,7 @@
   {# 信息头 #}
   <div class="d-flex gap-3 align-items-end mb-3 {% if images.landscape %}mt-n5{% endif %}">
     {% if images.square %}
-    <img src="{{ images.square }}" alt="{{ card.name }} 头像" class="dna-avatar flex-shrink-0"
+    <img src="{{ url_for('user.card_image', card_id=card.id, slot='square') }}" alt="{{ card.name }} 头像" class="dna-avatar flex-shrink-0"
          style="width:100px;height:100px;border:3px solid var(--bs-body-bg);">
     {% else %}
     <div class="dna-avatar-ph flex-shrink-0" style="width:100px;height:100px;font-size:2.5rem;border:3px solid var(--bs-body-bg);">{{ card.name[:1] }}</div>
@@ -279,7 +279,7 @@
 
   function avatarEl(author) {
     if (author.avatar) {
-      return '<img src="' + author.avatar + '" class="dna-comment-item__avatar" alt="">';
+      return '<img src="/user/avatar/' + author.id + '" class="dna-comment-item__avatar" alt="">';
     }
     return '<div class="dna-comment-item__avatar">' + (author.display_name[0] || '?') + '</div>';
   }

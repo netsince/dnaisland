@@ -64,7 +64,7 @@
  {# 头像与基本信息 #}
  <div class="d-flex align-items-center gap-3">
  {% if u.avatar %}
- <img src="{{ u.avatar }}" alt="头像" class="dna-avatar flex-shrink-0" style="width:96px;height:96px;">
+ <img src="{{ url_for('user.avatar', user_id=u.id) }}" alt="头像" class="dna-avatar flex-shrink-0" style="width:96px;height:96px;">
  {% else %}
  <div class="dna-avatar-ph flex-shrink-0" style="width:96px;height:96px;font-size:2.4rem;">{{ u.display_name[:1] }}</div>
  {% endif %}
@@ -214,7 +214,7 @@
     {% set card = comment_cards.get(c.card_id) %}
     {% if card %}
     <a class="d-flex align-items-center gap-2 mb-2 text-decoration-none text-reset" href="{{ url_for('user.card_detail', card_id=card.id) }}?comment={{ c.id }}">
-      {% if card.cover %}<img src="{{ card.cover }}" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:6px;">{% endif %}
+      {% if card.cover %}<img src="{{ url_for('user.card_image', card_id=card.id, slot='square') }}" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:6px;">{% endif %}
       <span class="fw-medium">{{ card.name }}</span>
     </a>
     {% else %}
