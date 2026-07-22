@@ -519,12 +519,12 @@ mark, .bg-warning-subtle {
 /* ============================================================
    主题切换按钮（图标随 data-bs-theme 自动切换）
    ============================================================ */
-#themeToggle { text-decoration: none; }
+#themeToggle, #themeToggleMobile { text-decoration: none; }
 .theme-icon { display: inline-flex; align-items: center; }
-#themeToggle .icon-sun { display: none; }
-#themeToggle .icon-moon { display: inline-flex; }
-[data-bs-theme="light"] #themeToggle .icon-sun { display: inline-flex; }
-[data-bs-theme="light"] #themeToggle .icon-moon { display: none; }
+#themeToggle .icon-sun, #themeToggleMobile .icon-sun { display: none; }
+#themeToggle .icon-moon, #themeToggleMobile .icon-moon { display: inline-flex; }
+[data-bs-theme="light"] #themeToggle .icon-sun, [data-bs-theme="light"] #themeToggleMobile .icon-sun { display: inline-flex; }
+[data-bs-theme="light"] #themeToggle .icon-moon, [data-bs-theme="light"] #themeToggleMobile .icon-moon { display: none; }
 
 /* 主题切换时的平滑过渡 */
 body, .navbar, .footer, .card, .dna-tile, .dna-hero,
