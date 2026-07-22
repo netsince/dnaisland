@@ -1284,3 +1284,8 @@ body.is-mobile-plus-open header {
   }
 }
 
+/* 角色卡详情页：手机和电脑端顶部均保持 0 padding 贴顶 */
+body.dna-page-card-detail main {
+  padding-top: 0 !important;
+}
+
