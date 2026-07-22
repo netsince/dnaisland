@@ -973,3 +973,46 @@ body.is-mobile-plus-open header {
   transform: rotate(135deg) !important;
 }
 
+/* 茶馆单行横划胶囊 Tab 栏 */
+.dna-horizontal-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  white-space: nowrap;
+  padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.dna-horizontal-tabs::-webkit-scrollbar {
+  display: none;
+}
+.dna-tab-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.84rem;
+  font-weight: 500;
+  color: var(--dna-muted, #94a3b8);
+  background: var(--dna-surface, #1e1b30);
+  border: 1px solid var(--dna-border, rgba(255,255,255,0.08));
+  text-decoration: none !important;
+  transition: all 0.18s ease;
+}
+.dna-tab-pill:hover,
+.dna-tab-pill.active {
+  color: #fff;
+  background: var(--dna-accent, #a855f7);
+  border-color: var(--dna-accent, #a855f7);
+}
+
+/* 红心 Pulse 弹跳动画 */
+.dna-like-btn:active .dna-heart-icon {
+  animation: heartPulse 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+@keyframes heartPulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.4); }
+  100% { transform: scale(1); }
+}
+

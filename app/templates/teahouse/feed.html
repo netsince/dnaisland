@@ -3,45 +3,44 @@
 {% from "teahouse/_post_item.html" import render_post with context %}
 
 {% block title %}茶馆 · DNAISLAND{% endblock %}
+{% block header %}{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
   <div class="col-12 col-lg-8">
-    <h2 class="h4 mb-3">茶馆</h2>
+    <div class="d-flex align-items-center justify-content-between mb-3">
+      <h1 class="h4 mb-0 fw-bold d-flex align-items-center gap-2">
+        <span>🍵 茶馆讨论</span>
+      </h1>
+    </div>
 
-    <div class="d-flex justify-content-end mb-2">
-      <div class="btn-group btn-group-sm flex-wrap" role="group" aria-label="筛选">
-        <a class="btn btn-outline-secondary {% if sort == 'new' %}active{% endif %}"
-           href="{{ url_for('teahouse.index', sort='new') }}">最新</a>
-        <a class="btn btn-outline-secondary {% if sort == 'hot' %}active{% endif %}"
-           href="{{ url_for('teahouse.index', sort='hot') }}">最热</a>
-        {% if current_user.is_authenticated %}
-        <a class="btn btn-outline-secondary {% if sort == 'follow' %}active{% endif %}"
-           href="{{ url_for('teahouse.index', sort='follow') }}">只看关注</a>
-        <a class="btn btn-outline-secondary {% if sort == 'fans' %}active{% endif %}"
-           href="{{ url_for('teahouse.index', sort='fans') }}">只看粉丝</a>
-        {% endif %}
-        <a class="btn btn-outline-secondary {% if sort == 'random' %}active{% endif %}"
-           href="{{ url_for('teahouse.index', sort='random') }}">随机看</a>
-      </div>
+    <!-- 移动端单行横向滑动筛选胶囊栏 -->
+    <div class="dna-horizontal-tabs mb-3">
+      {% if current_user.is_authenticated %}
+      <a class="dna-tab-pill {% if sort == 'follow' %}active{% endif %}" href="{{ url_for('teahouse.index', sort='follow') }}">👥 只看关注</a>
+      <a class="dna-tab-pill {% if sort == 'fans' %}active{% endif %}" href="{{ url_for('teahouse.index', sort='fans') }}">❤️ 只看粉丝</a>
+      {% endif %}
+      <a class="dna-tab-pill {% if sort == 'hot' %}active{% endif %}" href="{{ url_for('teahouse.index', sort='hot') }}">🔥 最热</a>
+      <a class="dna-tab-pill {% if sort == 'new' %}active{% endif %}" href="{{ url_for('teahouse.index', sort='new') }}">✨ 最新</a>
+      <a class="dna-tab-pill {% if sort == 'random' %}active{% endif %}" href="{{ url_for('teahouse.index', sort='random') }}">🎲 随机看</a>
     </div>
 
     {% if current_user.is_authenticated %}
-    <div class="card mb-4">
-      <div class="card-body">
-        <form method="post" action="{{ url_for('teahouse.create_post') }}">
-          <textarea class="form-control" name="content" id="postContent" rows="3"
+    <div class="card mb-3 dna-post-create-card">
+      <div class="card-body p-3">
+        <form method="post" action="{{ url_for('teahouse.create_post') }}" id="teahousePostForm">
+          <textarea class="form-control" name="content" id="postContent" rows="1"
                     maxlength="{{ max_len }}" placeholder="有什么想说的？发布到茶馆…"></textarea>
-          <div class="d-flex justify-content-between align-items-center mt-2">
-            <small class="text-muted"><span id="counter">0</span>/{{ max_len }}</small>
-            <button class="btn btn-primary btn-sm" type="submit">发布</button>
+          <div class="d-flex justify-content-between align-items-center mt-2 d-none" id="postActions">
+            <small class="text-muted" id="postCounterBox"><span id="counter">0</span> / {{ max_len }}</small>
+            <button class="btn btn-primary btn-sm px-3" type="submit">发布</button>
           </div>
         </form>
       </div>
     </div>
     {% else %}
-    <div class="alert alert-secondary">
-      请<a href="{{ url_for('auth.login') }}" class="alert-link">登录</a>后参与茶馆讨论。
+    <div class="alert alert-secondary py-2 small mb-3">
+      💡 请 <a href="{{ url_for('auth.login') }}" class="alert-link">登录</a> 后参与茶馆讨论。
     </div>
     {% endif %}
 
@@ -57,10 +56,47 @@
 
 {% block scripts %}
 <script>
-  var ta = document.getElementById('postContent');
-  if (ta) {
+  (function () {
+    var ta = document.getElementById('postContent');
+    var actions = document.getElementById('postActions');
     var counter = document.getElementById('counter');
-    ta.addEventListener('input', function () { counter.textContent = ta.value.length; });
-  }
+    var counterBox = document.getElementById('postCounterBox');
+    var maxLen = parseInt("{{ max_len }}") || 280;
+
+    if (ta) {
+      ta.addEventListener('focus', function () {
+        ta.rows = 3;
+        if (actions) actions.classList.remove('d-none');
+      });
+      ta.addEventListener('input', function () {
+        var len = ta.value.length;
+        if (counter) counter.textContent = len;
+        if (counterBox) {
+          if (len >= maxLen * 0.9) {
+            counterBox.classList.add('text-danger');
+            counterBox.classList.remove('text-muted');
+          } else {
+            counterBox.classList.remove('text-danger');
+            counterBox.classList.add('text-muted');
+          }
+        }
+      });
+    }
+
+    // 复制链接功能
+    document.addEventListener('click', function (e) {
+      var btn = e.target.closest('.js-copy-post-link');
+      if (!btn) return;
+      e.preventDefault();
+      var url = btn.getAttribute('data-url');
+      if (url && navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(function () {
+          var orig = btn.innerHTML;
+          btn.innerHTML = '<span>✓ 已复制</span>';
+          setTimeout(function () { btn.innerHTML = orig; }, 1800);
+        });
+      }
+    });
+  })();
 </script>
 {% endblock %}

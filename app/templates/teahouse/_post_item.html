@@ -34,18 +34,24 @@
       <div class="text-muted small fst-italic">内容已隐藏</div>
     {% endif %}
 
-    <div class="d-flex flex-wrap gap-3 mt-2 small text-muted align-items-center">
-      <a class="text-decoration-none text-reset" href="{{ url_for('teahouse.post_detail', post_id=post.id) }}">💬 {{ s.reply_count }} 回复</a>
+    <div class="d-flex flex-wrap gap-3 mt-2 small text-muted align-items-center pt-2 border-top border-secondary border-opacity-10">
+      <a class="btn btn-sm btn-link text-decoration-none text-muted p-0 d-flex align-items-center gap-1" href="{{ url_for('teahouse.post_detail', post_id=post.id) }}">
+        <span>💬</span> <span>{{ s.reply_count }} 回复</span>
+      </a>
       {% if current_user.is_authenticated %}
       <form method="post" action="{{ url_for('teahouse.like', post_id=post.id) }}" class="d-inline m-0 p-0">
-        <button class="btn btn-sm btn-link p-0 text-decoration-none {{ 'text-danger' if s.liked else 'text-muted' }}" type="submit">❤ {{ s.like_count }}</button>
+        <button class="btn btn-sm btn-link p-0 text-decoration-none d-flex align-items-center gap-1 {{ 'text-danger fw-bold' if s.liked else 'text-muted' }} dna-like-btn" type="submit">
+          <span class="dna-heart-icon">❤️</span> <span>{{ s.like_count }}</span>
+        </button>
       </form>
       {% else %}
-      <span>❤ {{ s.like_count }}</span>
+      <span class="d-flex align-items-center gap-1">❤️ {{ s.like_count }}</span>
       {% endif %}
-      <a class="text-decoration-none text-reset" href="{{ url_for('teahouse.post_detail', post_id=post.id) }}#reply">↩ 回复</a>
+      <button type="button" class="btn btn-sm btn-link text-decoration-none text-muted p-0 ms-2 js-copy-post-link" data-url="{{ url_for('teahouse.post_detail', post_id=post.id, _external=True) }}">
+        <span>🔗 分享</span>
+      </button>
       {% if current_user.is_authenticated %}
-      <a class="text-decoration-none text-reset ms-auto" href="{{ url_for('user.report', type='teapost', id=post.id) }}">举报</a>
+      <a class="text-decoration-none text-muted small ms-auto opacity-75" href="{{ url_for('user.report', type='teapost', id=post.id) }}">举报</a>
       {% endif %}
     </div>
 
