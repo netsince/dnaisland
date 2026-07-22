@@ -39,6 +39,13 @@ def create_app(config_object=None):
     # context）也能访问到，避免 'current_user' is undefined 报错
     app.jinja_env.globals["current_user"] = current_user
 
+    # 翻译函数占位：项目未接入 Flask-Babel 时，模板里用 _('...') 做文案占位，
+    # 这里提供透传实现，避免 " '_' is undefined " 报错。后续接入 i18n 时替换即可。
+    def _(s, *args, **kwargs):
+        return s
+
+    app.jinja_env.globals["_"] = _
+
     # 判断某条茶馆帖对当前用户是否可见：未隐藏可见；隐藏帖仅作者/超级管理员可见
     def _teapost_visible(post):
         if not post.is_hidden:

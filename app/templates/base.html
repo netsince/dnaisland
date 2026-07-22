@@ -456,8 +456,13 @@
     if (!form) return;
     if (form.dataset.confirm && !window.confirm(form.dataset.confirm)) return;
     e.preventDefault();
-    var btn = form.querySelector('button[type="submit"]');
-    if (!btn || btn.disabled) return;
+      // 优先取真正被点击的按钮（submit 事件的 submitter），
+      // 否则取点击位置所在的 button（兼容未显式写 type="submit" 的按钮，点图标也能命中），
+      // 最后回退到第一个非 button/reset 的按钮
+      var btn = e.submitter
+        || (e.target && e.target.closest ? e.target.closest('button') : null)
+        || form.querySelector('button:not([type="button"]):not([type="reset"])');
+      if (!btn || btn.disabled) return;
     btn.disabled = true;
     fetch(form.action, {
       method: 'POST',

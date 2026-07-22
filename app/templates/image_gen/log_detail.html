@@ -43,6 +43,16 @@
  font-size:13px;font-weight:600;padding:7px 14px;border-radius:10px;transition:filter .2s}
  .gen-dl:hover{filter:brightness(1.1)}
 
+ .gd-refs{display:flex;gap:14px;flex-wrap:wrap}
+ .gd-ref{position:relative;width:128px;height:128px;border-radius:12px;overflow:hidden;
+ background:#111;border:1px solid #26263a;cursor:zoom-in;transition:transform .3s,border-color .3s}
+ .gd-ref:hover{transform:translateY(-3px);border-color:#a855f7}
+ .gd-ref img{width:100%;height:100%;object-fit:cover;display:block}
+ .gd-ref__dl{position:absolute;right:6px;bottom:6px;width:28px;height:28px;border-radius:50%;
+ background:linear-gradient(90deg,#a855f7,#ec4899);color:#fff;font-size:14px;line-height:28px;
+ text-align:center;text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,.5);z-index:2}
+ .gd-ref__dl:hover{filter:brightness(1.1)}
+
  .gd-empty{text-align:center;color:#9a9ab0;padding:60px 0}
  .gd-empty .big{font-size:40px;display:block;margin-bottom:10px;opacity:.6}
  @media (max-width:576px){ .gd-head h2{font-size:19px} }
@@ -77,10 +87,16 @@
  <pre class="gd-prompt">{{ log.prompt }}</pre>
  {% if log.reference_image_list() %}
  <div class="mb-3 mt-3">
- <div class="small text-muted mb-2">上传的参考图（{{ log.reference_image_list()|length }} 张）：</div>
- <div class="d-flex gap-2 flex-wrap">
+ <div class="small text-muted mb-2">上传的参考图（{{ log.reference_image_list()|length }} 张，点击可放大查看，↓ 可下载 PNG）：</div>
+ <div class="gd-refs">
  {% for ref_img in log.reference_image_list() %}
- <img src="{{ ref_img }}" class="rounded border border-secondary" style="width: 60px; height: 60px; object-fit: cover;" alt="参考图">
+ <div class="gd-ref">
+ <a class="glightbox" href="{{ ref_img }}" data-type="image">
+ <img src="{{ ref_img }}" alt="参考图">
+ </a>
+ <a class="gd-ref__dl js-dlpng" href="{{ ref_img }}" data-src="{{ ref_img }}"
+ data-name="reference_{{ log.id }}_{{ loop.index }}.png" title="下载 PNG">↓</a>
+ </div>
  {% endfor %}
  </div>
  </div>

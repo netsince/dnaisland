@@ -64,6 +64,7 @@ def edit():
     intro = request.form.get("intro") or ""
     opening = request.form.get("opening") or ""
     original_link = request.form.get("original_link") or ""
+    cover_focus = request.form.get("cover_focus") or None
     # 不读取客户端传入的 id，始终由平台自动分配新 id
     card_id = str(uuid.uuid4())
 
@@ -103,6 +104,7 @@ def edit():
         intro=intro,
         opening=opening,
         original_link=original_link or None,
+        cover_focus=cover_focus,
         status="pending",  # 未审核
     )
     db.session.add(card)

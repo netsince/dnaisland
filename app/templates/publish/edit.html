@@ -14,6 +14,7 @@
     <form method="post" action="{{ action_url or url_for('publish.edit') }}" id="cardForm">
       <input type="hidden" name="original_link" value="{{ prefill.original_link if prefill else '' }}">
       <input type="hidden" name="images_json" id="imagesJson" value="">
+      <input type="hidden" name="cover_focus" id="coverFocus" value="{{ prefill.cover_focus if prefill else '' }}">
       <input type="hidden" name="dialogue_style_json" id="dialogueStyleJson" value="">
       <input type="hidden" name="tags" id="tagsInput" value="{{ prefill.tags|join(',') if prefill else '' }}">
 
@@ -67,13 +68,21 @@
             <div class="border rounded p-2 h-100">
               <div class="form-label small">
                 {% if slot == 'square' %}1:1 形象
-                {% elif slot == 'landscape' %}16:9 形象
+                {% elif slot == 'landscape' %}16:9 形象（头图）
                 {% else %}9:16 形象{% endif %}
               </div>
-              <img class="img-fluid rounded mb-2 bg-light" id="img-preview-{{ slot }}"
-                   alt="{{ slot }}" style="min-height:80px;width:100%;object-fit:cover;">
+              <div class="position-relative d-inline-block w-100{% if slot == 'landscape' %} mb-2{% endif %}">
+                <img class="img-fluid rounded bg-light" id="img-preview-{{ slot }}"
+                     alt="{{ slot }}" style="min-height:80px;width:100%;object-fit:cover;{% if slot == 'landscape' %}cursor:crosshair{% endif %}">
+                {% if slot == 'landscape' %}
+                <span class="focus-marker" id="focusMarker" style="display:none"></span>
+                {% endif %}
+              </div>
               <input type="file" class="form-control form-control-sm mb-2"
                      accept="image/*" data-slot="{{ slot }}">
+              {% if slot == 'landscape' %}
+              <div class="form-text mb-2">点击上方预览图设定封面焦点（脸部）。留空则居中显示，头图以原比例完整展示。</div>
+              {% endif %}
               <button type="button" class="btn btn-sm btn-outline-danger w-100"
                       data-clear="{{ slot }}">移除</button>
             </div>
@@ -193,10 +202,36 @@
       if (fi) fi.value = "";
       refreshPreview(slot);
       syncImages();
+      if (slot === 'landscape') { focusInput.value = ''; showFocusMarker(); }
     });
   });
   ["square", "landscape", "portrait"].forEach(refreshPreview);
   syncImages();
+
+  // ---- 封面焦点（脸部）选取 ----
+  const focusInput = document.getElementById('coverFocus');
+  const lsPreview = document.getElementById('img-preview-landscape');
+  const focusMarker = document.getElementById('focusMarker');
+  function showFocusMarker() {
+    const v = focusInput.value;
+    if (!v) { focusMarker.style.display = 'none'; return; }
+    const p = v.split(',');
+    if (p.length < 2) { focusMarker.style.display = 'none'; return; }
+    focusMarker.style.left = p[0] + '%';
+    focusMarker.style.top = p[1] + '%';
+    focusMarker.style.display = '';
+  }
+  lsPreview.addEventListener('click', e => {
+    if (!lsPreview.getAttribute('src')) return;
+    const r = lsPreview.getBoundingClientRect();
+    let xp = (e.clientX - r.left) / r.width * 100;
+    let yp = (e.clientY - r.top) / r.height * 100;
+    xp = Math.max(0, Math.min(100, xp));
+    yp = Math.max(0, Math.min(100, yp));
+    focusInput.value = xp.toFixed(1) + ',' + yp.toFixed(1);
+    showFocusMarker();
+  });
+  showFocusMarker();
 
   // ---- 标签 chips ----
   let tagsArr = (document.getElementById('tagsInput').value || "")

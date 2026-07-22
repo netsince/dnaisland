@@ -23,6 +23,8 @@ class Card(db.Model):
     status = db.Column(db.String(20), server_default="pending")
     is_hidden = db.Column(db.Boolean, server_default="0", nullable=False, index=True)
     view_count = db.Column(db.Integer, server_default="0")
+    # 头图封面焦点（脸部位置），格式 "x%,y%" 如 "50,30"，留空则居中
+    cover_focus = db.Column(db.String(16), nullable=True)
 
     author = db.relationship("User", backref="cards")
 

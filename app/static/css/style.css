@@ -1054,11 +1054,33 @@ body.is-mobile-plus-open header {
   margin-right: -50vw;
   overflow: hidden;
   background: #0b0a14;
+  max-height: 62vh;
 }
-.dna-card-banner img {
+/* 默认 retain 原比例：完整显示、不裁切（信箱式留边），不再占满整窗 */
+.dna-card-banner img,
+.dna-card-banner__img {
   display: block;
   width: 100%;
   height: auto;
+  max-height: 62vh;
+  object-fit: contain;
+}
+/* 作者设定了焦点后才用 cover 填满，并按焦点定位，避免切到下巴/身子 */
+.dna-card-banner img.is-cover,
+.dna-card-banner__img.is-cover {
+  object-fit: cover;
+  height: 62vh;
+}
+
+/* 编辑页：封面焦点标记 */
+.focus-marker {
+  position: absolute;
+  width: 22px; height: 22px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 2px rgba(0,0,0,.55);
+  pointer-events: none;
 }
 .dna-card-banner__fade {
   position: absolute;

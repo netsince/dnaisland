@@ -4,7 +4,6 @@
 {% block title %}生图记录 · DNAISLAND{% endblock %}
 
 {% block head %}
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/glightbox@3.3.0/dist/css/glightbox.min.css">
 <style>
  .mg-wrap{max-width:1200px;margin:0 auto}
  .mg-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;
@@ -20,13 +19,12 @@
  .mg-item{position:relative;break-inside:avoid;margin-bottom:18px;border-radius:16px;overflow:hidden;
  background:#1f1f2e;border:1px solid #26263a;
  transition:transform .3s cubic-bezier(.2,.7,.3,1),box-shadow .3s,border-color .3s;
- cursor:zoom-in}
+ cursor:pointer}
  .mg-item:hover{transform:translateY(-4px);border-color:#a855f7;
  box-shadow:0 14px 34px rgba(0,0,0,.45)}
  .mg-item.dna-img-fade{aspect-ratio:auto;background:#0b0b12}
  .mg-item.dna-img-fade .dna-img-fade__img{height:auto;transition:transform .5s cubic-bezier(.2,.7,.3,1)}
  .mg-item:hover .dna-img-fade__img{transform:scale(1.04)}
- .mg-item .glightbox{display:block}
  .mg-item img{width:100%;display:block}
  .mg-meta{position:absolute;left:0;right:0;bottom:0;padding:28px 13px 12px;
  background:linear-gradient(transparent,rgba(0,0,0,.82));color:#fff;font-size:12px;
@@ -42,14 +40,6 @@
  .mg-meta .info{color:#d7d7e6}
  .mg-meta a{pointer-events:auto}
  .mg-detail{color:#fff;text-decoration:underline;text-underline-offset:2px;margin-left:6px}
- .mg-refs{position:absolute;top:8px;left:8px;display:flex;gap:6px;flex-wrap:wrap;z-index:3}
- .mg-ref{position:relative;line-height:0}
- .mg-ref img{display:block;width:76px;height:76px;object-fit:cover;border-radius:10px;
- border:1px solid rgba(255,255,255,.25);box-shadow:0 4px 12px rgba(0,0,0,.45);cursor:zoom-in}
- .mg-ref .dl{position:absolute;right:-6px;bottom:-6px;width:24px;height:24px;border-radius:50%;
- background:linear-gradient(90deg,#a855f7,#ec4899);color:#fff;font-size:13px;line-height:24px;
- text-align:center;text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,.55);z-index:4}
- .mg-ref .dl:hover{filter:brightness(1.1)}
  .mg-empty{text-align:center;color:#9a9ab0;padding:80px 0;font-size:15px}
  .mg-empty .big{font-size:40px;display:block;margin-bottom:10px;opacity:.6}
 
@@ -77,22 +67,9 @@
  {% set imgs = l.image_list() %}
  {% if imgs %}
  <div class="mg-item dna-img-fade">
- <a class="glightbox" href="{{ imgs[0] }}" data-type="image" data-gallery="genlogs">
+ <a href="{{ url_for('image_gen.log_detail', log_id=l.id) }}" style="display:block">
  <img src="{{ imgs[0] }}" alt="生成图" class="dna-img-fade__img" loading="lazy">
  </a>
- {% if l.reference_image_list() %}
- <div class="mg-refs">
- {% for ref in l.reference_image_list() %}
- <div class="mg-ref">
- <a class="glightbox" href="{{ ref }}" data-type="image">
- <img src="{{ ref }}" alt="参考图" loading="lazy">
- </a>
- <a class="dl js-dlpng" href="{{ ref }}" data-src="{{ ref }}"
- data-name="reference-{{ l.id }}-{{ loop.index }}.png" title="下载 PNG">↓</a>
- </div>
- {% endfor %}
- </div>
- {% endif %}
  <div class="mg-meta">
  <div class="row1">
  <span class="title">{{ l.model_name }}
@@ -115,14 +92,4 @@
  {% endif %}
 </div>
 
-{% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/glightbox@3.3.0/dist/js/glightbox.min.js"></script>
-<script>
- document.addEventListener('DOMContentLoaded', function () {
- if (window.GLightbox) {
- GLightbox({ selector: '.glightbox', touchNavigation: true, loop: false });
- }
- });
-</script>
-{% endblock %}
 {% endblock %}

@@ -112,9 +112,12 @@
   form.addEventListener('submit', function (e) {
     e.preventDefault();
     var ta = document.getElementById('replyContent');
-    var btn = form.querySelector('button[type="submit"]');
-    if (!ta || !ta.value.trim() || btn.disabled) return;
-    btn.disabled = true;
+    // 与 base.html 的 js-toggle 保持一致：优先用被点击按钮，回退就近/首个提交按钮
+    var btn = e.submitter
+      || (e.target && e.target.closest ? e.target.closest('button') : null)
+      || form.querySelector('button:not([type="button"]):not([type="reset"])');
+    if (!ta || !ta.value.trim() || (btn && btn.disabled)) return;
+    if (btn) btn.disabled = true;
     fetch(form.action, {
       method: 'POST',
       headers: { 'X-Requested-With': 'XMLHttpRequest' },

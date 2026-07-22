@@ -744,6 +744,7 @@ def card_edit(card_id):
         card.intro = request.form.get("intro") or ""
         card.opening = request.form.get("opening") or ""
         card.original_link = request.form.get("original_link") or None
+        card.cover_focus = request.form.get("cover_focus") or None
         card.status = "pending"  # 编辑后自动重新提审
 
         # 标签覆盖式更新
@@ -805,6 +806,7 @@ def card_edit(card_id):
         "opening": card.opening,
         "tags": tags,
         "original_link": card.original_link or "",
+        "cover_focus": card.cover_focus or "",
     }
     return render_template(
         "publish/edit.html",
