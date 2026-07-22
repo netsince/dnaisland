@@ -6,7 +6,7 @@
 {% block head %}
 <style>
   .ig-side{width:400px;flex:none;background:var(--panel,#171722);border-right:1px solid var(--line,#2a2a3a);
-           padding:22px;display:flex;flex-direction:column;gap:18px;overflow:auto;height:calc(100vh - 56px)}
+           padding:22px;display:flex;flex-direction:column;gap:18px}
   .ig-brand{display:flex;align-items:center;justify-content:space-between}
   .ig-brand h1{font-size:18px;font-weight:700;background:linear-gradient(90deg,#a855f7,#ec4899);
                -webkit-background-clip:text;background-clip:text;color:transparent;margin:0}
@@ -25,7 +25,7 @@
   .ig-gen{margin-top:auto;background:linear-gradient(90deg,#a855f7,#ec4899);border:none;color:#fff;
           font-size:15px;font-weight:600;padding:14px;border-radius:12px;cursor:pointer}
   .ig-gen:hover{filter:brightness(1.08)}
-  .ig-main{flex:1;padding:26px;overflow:auto;height:calc(100vh - 56px)}
+  .ig-main{flex:1;padding:26px}
   .ig-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px}
   .ig-chips{display:flex;gap:8px;flex-wrap:wrap}
   .ig-chip{font-size:12px;color:#9a9ab0;background:#171722;border:1px solid #2a2a3a;padding:7px 13px;border-radius:20px;cursor:pointer}
@@ -137,6 +137,7 @@
         <label class="ig-drop">＋ 点击或拖拽上传图片
           <input type="file" name="references" multiple accept="image/png,image/jpeg,image/webp">
         </label>
+        <div id="refPreviewContainer" class="d-flex gap-2 flex-wrap mt-2"></div>
       </div>
       <div style="margin-top:auto;display:flex;align-items:center;gap:12px;">
         <button type="submit" class="ig-gen" id="genBtn">✦ 生成</button>
@@ -233,9 +234,43 @@
     var grid = document.getElementById('igGrid');
     var pointsEl = document.getElementById('igPoints');
 
+    // 1. 参考图选择后的 60x60px 微边框实时缩略图预览
+    var refInput = form.querySelector('input[name=references]');
+    var refPreviewContainer = document.getElementById('refPreviewContainer');
+    if (refInput && refPreviewContainer) {
+      refInput.addEventListener('change', function () {
+        refPreviewContainer.innerHTML = '';
+        var files = Array.from(refInput.files || []);
+        files.forEach(function (file) {
+          if (!file.type.startsWith('image/')) return;
+          var reader = new FileReader();
+          reader.onload = function (e) {
+            var img = document.createElement('img');
+            img.src = e.target.result;
+            img.className = 'rounded border border-secondary';
+            img.style.cssText = 'width: 60px; height: 60px; object-fit: cover;';
+            img.alt = '参考图预览';
+            refPreviewContainer.appendChild(img);
+          };
+          reader.readAsDataURL(file);
+        });
+      });
+    }
+
+    // 3. 页面 DOMContentLoaded 加载时，移动端检测到 ig_just_generated 标记则自动聚焦结果区
+    document.addEventListener('DOMContentLoaded', function () {
+      if (sessionStorage.getItem('ig_just_generated') === '1' && window.innerWidth <= 768) {
+        sessionStorage.removeItem('ig_just_generated');
+        document.getElementById('igGrid')?.scrollIntoView({ behavior: 'smooth' });
+      }
+    });
+
     // AJAX 提交：按钮旁显示「正在生成中」，结果就地插入画廊
     form.addEventListener('submit', function (e) {
       e.preventDefault();
+      // 2. 提交生图表单时标记 SESSION_STORAGE
+      sessionStorage.setItem('ig_just_generated', '1');
+
       var promptEl = form.querySelector('[name=prompt]');
       var modelEl = form.querySelector('[name=model]');
       if (!modelEl.value) {
@@ -275,8 +310,14 @@
               if (window.bindFade) window.bindFade(a);   // 新插入图片触发模糊→清晰动画
             });
             promptEl.value = '';
+            if (refInput) refInput.value = '';
+            if (refPreviewContainer) refPreviewContainer.innerHTML = '';
             var empty = grid.querySelector('.ig-empty');
             if (empty) empty.remove();
+            if (window.innerWidth <= 768) {
+              sessionStorage.removeItem('ig_just_generated');
+              document.getElementById('igGrid')?.scrollIntoView({ behavior: 'smooth' });
+            }
           } else {
             statusEl.textContent = data.error || '生成失败';
             statusEl.style.color = '#ec4899';

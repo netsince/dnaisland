@@ -859,3 +859,19 @@ body, .navbar, .footer, .card, .dna-tile, .dna-hero,
     border-bottom: 1px solid var(--dna-border);
   }
 }
+
+@media (min-width: 769px) {
+  .ig-side {
+    position: sticky;
+    top: 64px;
+    height: calc(100vh - 74px);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  .ig-main {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
