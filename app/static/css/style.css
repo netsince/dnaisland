@@ -1071,7 +1071,7 @@ body.is-mobile-plus-open header {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.5);
-  z-index: 1040;
+  z-index: 1055;
   transition: opacity 0.25s ease;
   opacity: 0;
 }
@@ -1083,7 +1083,7 @@ body.is-mobile-plus-open header {
 /* 抽屉通用基础 */
 .dna-comment-drawer {
   position: fixed;
-  z-index: 1050;
+  z-index: 1060;
   background: var(--bs-body-bg, #12111c);
   display: flex;
   flex-direction: column;
@@ -1103,11 +1103,11 @@ body.is-mobile-plus-open header {
   }
 }
 
-/* 手机端：底部抽屉（bottom 留出底部导航高度 52px） */
+/* 手机端：底部抽屉（层级高于底部导航，直接盖住） */
 @media (max-width: 767.98px) {
   .dna-comment-drawer {
-    left: 0; right: 0; bottom: 52px;
-    height: calc(80vh - 52px);
+    left: 0; right: 0; bottom: 0;
+    height: 80vh;
     border-radius: 16px 16px 0 0;
     border-top: 1px solid var(--dna-border, rgba(255,255,255,0.08));
     transform: translateY(100%);
