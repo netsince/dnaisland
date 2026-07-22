@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}生图详情 · DNAISLAND{% endblock %}
+{% block title %}生图作品详情 · DNAISLAND{% endblock %}
 {% block body_class %}dna-hide-header-on-mobile{% endblock %}
 
 {% block head %}
@@ -11,13 +11,21 @@
     margin: 0 auto;
   }
   
-  /* 纯粹原图展示，无任何强加边框或油腻背景 */
-  .gd-main-image {
-    width: 100%;
-    height: auto;
-    display: block;
+  /* 彻底重写&覆盖全局 style.css 的 16/9 aspect-ratio 与 object-fit: cover 裁切大坑 */
+  .gd-detail-img-wrap {
+    aspect-ratio: auto !important;
+    height: auto !important;
+    width: 100% !important;
     border-radius: 12px;
-    margin: 0 auto;
+    overflow: hidden;
+    margin: 0 auto 1rem auto;
+  }
+  .gd-detail-img-wrap img.dna-img-fade__img {
+    width: 100% !important;
+    height: auto !important;
+    object-fit: contain !important;
+    max-height: none !important;
+    display: block;
   }
 
   .gd-prompt-block {
@@ -56,13 +64,13 @@
   {% set imgs = log.image_list() %}
   {% set st = log.status %}
 
-  <!-- 1. 核心第一视觉区：自然原图展现 (零裁剪，纯粹展图) -->
+  <!-- 1. 核心第一视觉区：彻底解除 16/9 锁死，原图自然比例展示 -->
   {% if imgs %}
   <div class="mb-4">
     {% for img in imgs %}
-    <div class="mb-3 dna-img-fade text-center" style="border-radius: 12px; overflow: hidden;">
+    <div class="gd-detail-img-wrap dna-img-fade text-center">
       <a class="glightbox" href="{{ img }}" data-type="image" data-gallery="gendetail" title="点击放大查看原图">
-        <img src="{{ img }}" class="gd-main-image dna-img-fade__img" alt="生成图 {{ loop.index }}" loading="lazy">
+        <img src="{{ img }}" class="dna-img-fade__img" alt="生成图 {{ loop.index }}" loading="lazy">
       </a>
     </div>
     <div class="d-flex align-items-center justify-content-end mb-4">
