@@ -12,23 +12,27 @@
  .mg-head h2{font-size:22px;font-weight:700;margin:0;
  background:linear-gradient(90deg,#a855f7,#ec4899);
  -webkit-background-clip:text;background-clip:text;color:transparent}
- .mg-head .sub{font-size:13px;color:#9a9ab0;margin-top:4px}
- .mg-head .pill{font-size:12px;color:#cfcfe0;background:#1f1f2e;border:1px solid #2a2a3a;
+ .mg-head .sub{font-size:13px;color:var(--dna-muted, #9a9ab0);margin-top:4px}
+ .mg-head .pill{font-size:12px;color:var(--dna-text, #cfcfe0);background:var(--dna-surface, #1f1f2e);border:1px solid var(--dna-border, #2a2a3a);
  padding:6px 12px;border-radius:20px;white-space:nowrap}
 
- .masonry{column-count:3;column-gap:18px}
- .mg-item{position:relative;break-inside:avoid;margin-bottom:18px;border-radius:16px;overflow:hidden;
- background:#1f1f2e;border:1px solid #26263a;
+ /* 替换原本竖排 column-count，改用横向从左到右网格 (Horizontal Z-order Grid) */
+ .masonry {
+   display: grid;
+   grid-template-columns: repeat(3, 1fr);
+   gap: 18px;
+ }
+ .mg-item{position:relative;border-radius:14px;overflow:hidden;
+ background:var(--dna-surface, #1f1f2e);border:1px solid var(--dna-border, #26263a);
  transition:transform .3s cubic-bezier(.2,.7,.3,1),box-shadow .3s,border-color .3s;
- cursor:pointer}
+ cursor:pointer; display: flex; flex-direction: column;}
  .mg-item:hover{transform:translateY(-4px);border-color:#a855f7;
- box-shadow:0 14px 34px rgba(0,0,0,.45)}
- .mg-item.dna-img-fade{aspect-ratio:auto;background:#0b0b12}
- .mg-item.dna-img-fade .dna-img-fade__img{height:auto;transition:transform .5s cubic-bezier(.2,.7,.3,1)}
+ box-shadow:0 14px 34px rgba(0,0,0,.35)}
+ .mg-item.dna-img-fade{aspect-ratio: 4 / 3; background:var(--dna-bg-2, #0b0b12)}
+ .mg-item.dna-img-fade .dna-img-fade__img{width:100%; height:100%; object-fit:cover; transition:transform .5s cubic-bezier(.2,.7,.3,1)}
  .mg-item:hover .dna-img-fade__img{transform:scale(1.04)}
- .mg-item img{width:100%;display:block}
  .mg-meta{position:absolute;left:0;right:0;bottom:0;padding:28px 13px 12px;
- background:linear-gradient(transparent,rgba(0,0,0,.82));color:#fff;font-size:12px;
+ background:linear-gradient(transparent,rgba(0,0,0,.85));color:#fff;font-size:12px;
  display:flex;flex-direction:column;gap:3px;pointer-events:none;
  opacity:.92;transition:opacity .3s}
  .mg-item:hover .mg-meta{opacity:1}
@@ -41,14 +45,14 @@
  .mg-meta .info{color:#d7d7e6}
  .mg-meta a{pointer-events:auto}
  .mg-detail{color:#fff;text-decoration:underline;text-underline-offset:2px;margin-left:6px}
- .mg-empty{text-align:center;color:#9a9ab0;padding:80px 0;font-size:15px}
+ .mg-empty{text-align:center;color:var(--dna-muted, #9a9ab0);padding:80px 0;font-size:15px}
  .mg-empty .big{font-size:40px;display:block;margin-bottom:10px;opacity:.6}
- .mg-skeleton{min-height:220px;border-radius:16px;margin-bottom:18px;break-inside:avoid;
+ .mg-skeleton{aspect-ratio: 4 / 3; border-radius:14px;
  background:linear-gradient(90deg,rgba(255,255,255,.03) 25%,rgba(255,255,255,.09) 37%,rgba(255,255,255,.03) 63%)!important;
  background-size:400% 100%!important;animation:dnaSkeletonShimmer 1.4s ease infinite!important}
 
- @media (max-width: 992px){ .masonry{column-count:2} }
- @media (max-width: 576px){ .masonry{column-count:1} .mg-head h2{font-size:19px} }
+ @media (max-width: 992px){ .masonry{grid-template-columns: repeat(2, 1fr);} }
+ @media (max-width: 576px){ .masonry{grid-template-columns: 1fr;} .mg-head h2{font-size:19px} }
 </style>
 {% endblock %}
 
@@ -57,7 +61,7 @@
  <div class="mg-head">
  <div>
  <h2>我的生图记录</h2>
- <div class="sub">点击任意图片可放大查看，悬停可下载 PNG 或查看详情</div>
+ <div class="sub">点击任意图片可查看详情，包含完整的生成提示词与参数</div>
  </div>
  <div class="d-flex align-items-center gap-2">
  {% if pagination %}<span class="pill">共 {{ pagination.total }} 条</span>{% endif %}
@@ -71,7 +75,7 @@
  {% set imgs = l.image_list() %}
  {% if imgs %}
  <div class="mg-item dna-img-fade">
- <a href="{{ url_for('image_gen.log_detail', log_id=l.id) }}" style="display:block">
+ <a href="{{ url_for('image_gen.log_detail', log_id=l.id) }}" style="display:block; width:100%; height:100%;">
  <img src="{{ imgs[0] }}" alt="生成图" class="dna-img-fade__img" loading="lazy">
  </a>
  <div class="mg-meta">
@@ -92,7 +96,7 @@
  </div>
  {{ render_pagination(pagination, 'image_gen.logs', {}) }}
  {% else %}
- <div class="mg-empty"><span class="big">️</span>还没有生图记录，去工作台创作第一张吧。</div>
+ <div class="mg-empty"><span class="big">🖼️</span>还没有生图记录，去工作台创作第一张吧。</div>
  {% endif %}
 </div>
 
@@ -101,28 +105,61 @@
 {% block scripts %}
 <script>
 (function () {
-  function initImgFade(scope) {
-    var wraps = (scope || document).querySelectorAll('.mg-item.dna-img-fade');
-    wraps.forEach(function (wrap) {
-      var img = wrap.querySelector('img');
-      if (!img) return;
-      if (img.complete) {
-        wrap.classList.add('is-loaded');
-      } else {
-        img.addEventListener('load', function () {
-          wrap.classList.add('is-loaded');
-        });
-        img.addEventListener('error', function () {
-          wrap.classList.add('is-loaded');
-        });
-      }
-    });
+  var wrap = document.querySelector('.masonry');
+  if (!wrap) return;
+
+  function loadLogsFlow() {
+    fetch('/image-gen/api/logs', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        if (!res.ok || !res.logs || !res.logs.length) return;
+        var existing = wrap.querySelectorAll('.mg-item');
+        if (existing.length < res.logs.length) {
+          wrap.innerHTML = '';
+          res.logs.forEach(function (l) {
+            var imgs = l.images || [];
+            if (!imgs.length) return;
+            var item = document.createElement('div');
+            item.className = 'mg-item dna-img-fade';
+            var stClass = l.status === 'success' ? 'ok' : (l.status === 'partial' ? 'part' : 'fail');
+            var stText = l.status === 'success' ? '成功' : (l.status === 'partial' ? '部分' : '失败');
+            item.innerHTML = '<a href="/image-gen/logs/' + l.id + '" style="display:block; width:100%; height:100%;">' +
+              '<img src="' + imgs[0] + '" alt="生成图" class="dna-img-fade__img" loading="lazy"></a>' +
+              '<div class="mg-meta">' +
+                '<div class="row1"><span class="title">' + l.model_name + ' <span class="mg-status ' + stClass + '">' + stText + '</span></span></div>' +
+                '<div class="info">' + (l.size || 'auto') + ' · ' + l.count + ' 张请求 · 消耗 ' + l.points_spent + ' 点</div>' +
+                '<div class="info">' + l.created_at + ' <a class="mg-detail" href="/image-gen/logs/' + l.id + '">详情 →</a></div>' +
+              '</div>';
+            wrap.appendChild(item);
+            
+            var img = item.querySelector('img');
+            if (img.complete) {
+              item.classList.add('is-loaded');
+            } else {
+              img.addEventListener('load', function () { item.classList.add('is-loaded'); });
+            }
+          });
+        }
+      })
+      .catch(function (e) { console.error(e); });
   }
 
-  initImgFade();
-  document.addEventListener('dna:page-loaded', function () {
-    initImgFade();
+  // 绑定淡入处理
+  wrap.querySelectorAll('.mg-item img').forEach(function (img) {
+    var p = img.closest('.mg-item');
+    if (img.complete) {
+      if (p) p.classList.add('is-loaded');
+    } else {
+      img.addEventListener('load', function () {
+        if (p) p.classList.add('is-loaded');
+      });
+    }
   });
+
+  if (sessionStorage.getItem('ig_just_generated')) {
+    sessionStorage.removeItem('ig_just_generated');
+    setTimeout(loadLogsFlow, 200);
+  }
 })();
 </script>
 {% endblock %}
