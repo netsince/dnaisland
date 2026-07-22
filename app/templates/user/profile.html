@@ -120,6 +120,7 @@
       </li>
     </ul>
 
+    <div id="profileTabContent">
     {% if tab == 'cards' %}
     <h2 class="dna-section-title h5">发布的角色卡（{{ pagination.total }}）</h2>
     {% if pagination.total == 0 %}
@@ -169,7 +170,63 @@
       {{ render_pagination(tp_pagination, 'user.profile', tp_args) }}
     {% endif %}
     {% endif %}
+    </div>
     {% endif %}
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    document.addEventListener('click', function (e) {
+      // 仅拦截个人主页的 Tab nav-link 点击
+      const link = e.target.closest('.nav-tabs .nav-link');
+      if (!link) return;
+      e.preventDefault();
+      
+      const url = link.getAttribute('href');
+      if (!url) return;
+
+      fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(r => {
+          if (!r.ok) throw new Error('Fetch failed');
+          return r.text();
+        })
+        .then(html => {
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(html, 'text/html');
+
+          // 1. 替换 Tab 头状态，使 active 正常高亮切换
+          const newTabs = doc.querySelector('.nav-tabs');
+          const oldTabs = document.querySelector('.nav-tabs');
+          if (newTabs && oldTabs) oldTabs.innerHTML = newTabs.innerHTML;
+
+          // 2. 局部替换 Tab 主内容区
+          const newWrap = doc.getElementById('profileTabContent');
+          const oldWrap = document.getElementById('profileTabContent');
+          if (newWrap && oldWrap) {
+            oldWrap.innerHTML = newWrap.innerHTML;
+          }
+
+          // 3. 动态同步浏览器地址栏 URL
+          history.pushState(null, '', url);
+
+          // 4. 重建图片渐显加载绑定（由于 base.html 原生脚本通常在 DOMContentLoaded 绑定，
+          // 局部更新后需要重新执行图片渐显逻辑，请调用或重建图片淡入淡出的 is-loaded 判定）
+          const newImages = oldWrap.querySelectorAll('.dna-img-fade img');
+          newImages.forEach(img => {
+            if (img.complete) {
+              img.closest('.dna-img-fade').classList.add('is-loaded');
+            } else {
+              img.addEventListener('load', function() {
+                img.closest('.dna-img-fade').classList.add('is-loaded');
+              });
+            }
+          });
+        })
+        .catch(err => console.error('Tab switch failed:', err));
+    });
+  })();
+</script>
 {% endblock %}
