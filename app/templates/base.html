@@ -633,12 +633,14 @@ function showToast(message, type) {
 
     function loadPage(url, pushHistory) {
       var main = document.querySelector('main');
+      var loader = document.getElementById('pjaxLoader');
       if (!main) {
         location.href = url;
         return;
       }
 
       main.classList.add('dna-page-loading');
+      if (loader) loader.classList.add('show');
 
       fetch(url, {
         headers: { 'X-Requested-With': 'XMLHttpRequest' },
@@ -686,6 +688,7 @@ function showToast(message, type) {
       })
       .finally(function () {
         main.classList.remove('dna-page-loading');
+        if (loader) loader.classList.remove('show');
       });
     }
 
@@ -788,5 +791,10 @@ function showToast(message, type) {
  </script>
 <!-- 轻提示容器：全局 toast 统一挂载于此 -->
 <div id="toast-container" class="dna-toast-container" aria-live="polite" aria-atomic="false"></div>
+
+<!-- 全局 AJAX Pjax 切换 Loading 遮罩与脉冲动画 -->
+<div class="dna-pjax-loader" id="pjaxLoader">
+  <div class="ldr"></div>
+</div>
 </body>
 </html>
