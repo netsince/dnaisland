@@ -581,6 +581,128 @@ function showToast(message, type) {
  window.location.href = '/';
  }
  });
+
+  /* ===== DNAISLAND 全局 AJAX SPA 无感切页路由引擎 ===== */
+  (function () {
+    if (!window.history || !window.history.pushState) return;
+
+    function isIgnoredLink(a) {
+      if (!a || a.tagName !== 'A') return true;
+      var href = a.getAttribute('href');
+      if (!href || href.startsWith('#') || href.startsWith('javascript:') || href.startsWith('mailto:') || href.startsWith('tel:')) return true;
+      if (a.hasAttribute('download') || a.getAttribute('target') === '_blank') return true;
+      if (a.hasAttribute('data-no-pjax')) return true;
+      if (a.origin !== location.origin) return true;
+      return false;
+    }
+
+    function updateActiveNavLinks(targetUrl) {
+      try {
+        var pathname = new URL(targetUrl, location.origin).pathname;
+        var navItems = document.querySelectorAll('.dna-mobile-nav__item');
+        navItems.forEach(function (item) {
+          var itemHref = item.getAttribute('href');
+          if (!itemHref) return;
+          var itemPath = new URL(itemHref, location.origin).pathname;
+          if (itemPath === pathname) item.classList.add('active');
+          else item.classList.remove('active');
+        });
+
+        var pcLinks = document.querySelectorAll('.navbar-nav .nav-link');
+        pcLinks.forEach(function (link) {
+          var linkHref = link.getAttribute('href');
+          if (!linkHref) return;
+          var linkPath = new URL(linkHref, location.origin).pathname;
+          if (linkPath === pathname && linkPath !== '#') link.classList.add('active');
+          else link.classList.remove('active');
+        });
+      } catch (e) {}
+    }
+
+    function executeScripts(container) {
+      var scripts = container.querySelectorAll('script');
+      scripts.forEach(function (oldScript) {
+        var newScript = document.createElement('script');
+        Array.from(oldScript.attributes).forEach(function (attr) {
+          newScript.setAttribute(attr.name, attr.value);
+        });
+        newScript.textContent = oldScript.textContent;
+        oldScript.parentNode.replaceChild(newScript, oldScript);
+      });
+    }
+
+    function loadPage(url, pushHistory) {
+      var main = document.querySelector('main');
+      if (!main) {
+        location.href = url;
+        return;
+      }
+
+      main.classList.add('dna-page-loading');
+
+      fetch(url, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin'
+      })
+      .then(function (res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        var ct = res.headers.get('content-type') || '';
+        if (!ct.includes('text/html')) {
+          location.href = url;
+          return null;
+        }
+        return res.text();
+      })
+      .then(function (htmlText) {
+        if (!htmlText) return;
+        var parser = new DOMParser();
+        var doc = parser.parseFromString(htmlText, 'text/html');
+        var newMain = doc.querySelector('main');
+
+        if (!newMain) {
+          location.href = url;
+          return;
+        }
+
+        document.title = doc.title || document.title;
+        document.body.className = doc.body.className;
+
+        main.innerHTML = newMain.innerHTML;
+        executeScripts(main);
+
+        if (pushHistory) {
+          history.pushState({ pjax: true, url: url }, '', url);
+        }
+
+        updateActiveNavLinks(url);
+        window.scrollTo({ top: 0, behavior: 'instant' });
+
+        if (window.bindFade) window.bindFade(main);
+        document.dispatchEvent(new CustomEvent('dna:page-loaded', { detail: { url: url } }));
+      })
+      .catch(function (err) {
+        console.warn('Pjax load failed, falling back to full reload:', err);
+        location.href = url;
+      })
+      .finally(function () {
+        main.classList.remove('dna-page-loading');
+      });
+    }
+
+    document.addEventListener('click', function (e) {
+      var a = e.target.closest ? e.target.closest('a') : null;
+      if (isIgnoredLink(a)) return;
+      if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+
+      var url = a.getAttribute('href');
+      e.preventDefault();
+      loadPage(url, true);
+    });
+
+    window.addEventListener('popstate', function () {
+      loadPage(location.href, false);
+    });
+  })();
  </script>
  <!-- 移动端贴底 Tab 导航 -->
  <nav class="dna-mobile-nav">

@@ -1289,3 +1289,12 @@ body.dna-page-card-detail main {
   padding-top: 0 !important;
 }
 
+/* ===== Pjax 全局 AJAX 无感切页过渡动画 ===== */
+main {
+  transition: opacity 0.15s ease-in-out;
+}
+main.dna-page-loading {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
