@@ -7,42 +7,36 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/glightbox@3.3.0/dist/css/glightbox.min.css">
 <style>
   .gd-viewport-wrap {
-    max-width: 900px;
+    max-width: 880px;
     margin: 0 auto;
     padding-inline: 4px;
   }
 
-  /* 主大图卡片：使用项目动态主题变量，完美适配黑/白双模式 */
-  .gd-main-stage {
-    background: var(--dna-surface-solid, var(--dna-surface));
-    border: 1px solid var(--dna-border);
-    border-radius: 12px;
-    padding: 6px;
-    margin-bottom: 0.75rem;
-  }
-  
-  .gd-main-stage .dna-img-fade {
-    aspect-ratio: auto !important;
-    height: auto !important;
-    width: 100% !important;
-    border-radius: 8px !important;
-    overflow: hidden;
-  }
-  .gd-main-stage img.dna-img-fade__img {
+  /* 图片直接作为独立最外层节点，彻底无任何父级容器卡片与背景框 */
+  img.gd-standalone-art {
     width: 100% !important;
     height: auto !important;
     object-fit: contain !important;
-    max-height: 80vh !important;
+    max-height: 82vh !important;
     display: block;
-    margin: 0 auto;
-    border-radius: 8px;
+    margin: 0 auto 0.75rem auto;
+    border-radius: 10px;
   }
 
-  /* 提示词与垫图下沉区 */
-  .gd-bottom-stage {
+  /* 下载与操作单独在下方的独立小容器中 */
+  .gd-action-bar {
     background: var(--dna-surface);
     border: 1px solid var(--dna-border);
-    border-radius: 12px;
+    border-radius: 10px;
+    padding: 0.65rem 0.85rem;
+    margin-bottom: 0.85rem;
+  }
+
+  /* 提示词与垫图单独在下方的独立小容器中 */
+  .gd-info-section {
+    background: var(--dna-surface);
+    border: 1px solid var(--dna-border);
+    border-radius: 10px;
     padding: 0.75rem 0.85rem;
   }
 
@@ -80,7 +74,7 @@
 
 {% block content %}
 <div class="container-fluid py-2 gd-viewport-wrap">
-  <!-- 1. 头部导航 -->
+  <!-- 1. 顶部返回导航 -->
   <div class="d-flex align-items-center justify-content-between mb-2 px-1">
     <a class="btn btn-sm btn-link text-muted text-decoration-none px-0 py-0 fs-7" href="{{ url_for('image_gen.logs') }}">
       <i class="bi bi-arrow-left me-1"></i> 返回记录
@@ -93,29 +87,25 @@
   {% set imgs = log.image_list() %}
   {% set st = log.status %}
 
-  <!-- 2. 第一屏：大图展现（跟随黑/白模式主题变量） -->
+  <!-- 2. 图片绝对独立：无任何父级容器卡片包裹 -->
   {% if imgs %}
   {% for img in imgs %}
-  <div class="gd-main-stage">
-    <div class="dna-img-fade text-center">
-      <a class="glightbox d-block" href="{{ img }}" data-type="image" data-gallery="gendetail" title="点击放大查看原图">
-        <img src="{{ img }}" class="dna-img-fade__img" alt="生成作品 {{ loop.index }}" loading="lazy">
-      </a>
-    </div>
+  <a class="glightbox d-block dna-img-fade mb-2" href="{{ img }}" data-type="image" data-gallery="gendetail" title="点击放大查看原图" style="aspect-ratio: auto !important;">
+    <img src="{{ img }}" class="gd-standalone-art dna-img-fade__img" alt="生成作品 {{ loop.index }}" loading="lazy">
+  </a>
 
-    <!-- 极简操作栏 -->
-    <div class="d-flex align-items-center justify-content-between pt-2 px-1 flex-wrap gap-2">
-      <div class="text-muted fs-7">
-        尺寸 <strong>{{ log.size or 'auto' }}</strong>
-      </div>
-      <div class="d-flex align-items-center gap-2">
-        <a class="btn btn-sm btn-outline-secondary rounded-pill px-3 py-1 fs-7 js-dlpng" href="{{ img }}" data-src="{{ img }}" data-name="artwork_{{ log.id }}_{{ loop.index }}.png">
-          <i class="bi bi-download me-1"></i> 下载原图
-        </a>
-        <a class="btn btn-sm btn-primary rounded-pill px-3 py-1 fs-7" href="{{ url_for('image_gen.workbench') }}?prompt={{ log.prompt|urlencode }}" style="background: linear-gradient(90deg, #a855f7, #ec4899); border:none;">
-          <i class="bi bi-magic me-1"></i> 同款生成
-        </a>
-      </div>
+  <!-- 下载与操作单独在下方独立小容器中 -->
+  <div class="gd-action-bar d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <div class="text-muted fs-7">
+      尺寸 <strong>{{ log.size or 'auto' }}</strong>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      <a class="btn btn-sm btn-outline-secondary rounded-pill px-3 py-1 fs-7 js-dlpng" href="{{ img }}" data-src="{{ img }}" data-name="artwork_{{ log.id }}_{{ loop.index }}.png">
+        <i class="bi bi-download me-1"></i> 下载原图
+      </a>
+      <a class="btn btn-sm btn-primary rounded-pill px-3 py-1 fs-7" href="{{ url_for('image_gen.workbench') }}?prompt={{ log.prompt|urlencode }}" style="background: linear-gradient(90deg, #a855f7, #ec4899); border:none;">
+        <i class="bi bi-magic me-1"></i> 同款生成
+      </a>
     </div>
   </div>
   {% endfor %}
@@ -127,8 +117,8 @@
   <div class="alert alert-danger rounded-3 mb-2 py-2 fs-7">{{ log.error }}</div>
   {% endif %}
 
-  <!-- 3. 下沉区：提示词 Prompt + 垫图参考 -->
-  <div class="gd-bottom-stage">
+  <!-- 3. 提示词与垫图单独在下方小容器中 -->
+  <div class="gd-info-section">
     <!-- 提示词 -->
     <div class="mb-2.5">
       <div class="d-flex align-items-center justify-content-between mb-1">
@@ -156,7 +146,7 @@
     </div>
     {% endif %}
 
-    <!-- 4. 底层极简次要参数 -->
+    <!-- 4. 次要参数归纳 -->
     <div class="d-flex align-items-center gap-3 text-muted fs-7 pt-2 border-top border-secondary border-opacity-10 flex-wrap">
       <span>模型：{{ log.model_name }}</span>
       <span>消耗：{{ log.points_spent }} 点</span>
