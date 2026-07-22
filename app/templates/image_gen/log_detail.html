@@ -34,6 +34,71 @@
     background: transparent !important;
   }
 
+  /* ===== 图片轮播（左右滑动 banner） ===== */
+  .gd-carousel {
+    position: relative;
+    margin-bottom: 0.75rem;
+  }
+  .gd-carousel-viewport {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 10px;
+    scrollbar-width: none; /* Firefox 隐藏滚动条 */
+  }
+  .gd-carousel-viewport::-webkit-scrollbar { display: none; }
+  .gd-slide {
+    flex: 0 0 100%;
+    width: 100%;
+    scroll-snap-align: center;
+  }
+  .gd-slide .gd-pure-img-anchor,
+  .gd-slide .gd-standalone-art {
+    margin-bottom: 0;
+  }
+  .gd-car-arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 38px;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.45);
+    color: #fff;
+    font-size: 1.1rem;
+    cursor: pointer;
+    z-index: 3;
+    transition: background 0.2s ease;
+  }
+  .gd-car-arrow:hover { background: rgba(0, 0, 0, 0.65); }
+  .gd-car-arrow--prev { left: 10px; }
+  .gd-car-arrow--next { right: 10px; }
+  .gd-car-dots {
+    position: absolute;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 6px;
+    z-index: 3;
+  }
+  .gd-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.45);
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.2s ease;
+  }
+  .gd-dot.is-active { background: #fff; transform: scale(1.25); }
+  .gd-car-counter { margin-left: 0.4rem; }
+
   /* 屏蔽 GLightbox 放大弹窗底部的白条与冗余描述文字 */
   .gslide-description, .gslide-title, .gdesc-inner, .gslide-desc {
     display: none !important;
@@ -106,20 +171,36 @@
   {% set imgs = log.image_list() %}
   {% set st = log.status %}
 
-  <!-- 2. 图片绝对独立：纯粹展现 -->
+  <!-- 2. 图片轮播：左右滑动切换，操作栏随当前图联动 -->
   {% if imgs %}
-  {% for img in imgs %}
-  <a class="glightbox gd-pure-img-anchor mb-2.5" href="{{ url_for('image_gen.output_image', log_id=log.id, idx=loop.index0) }}" data-type="image" data-gallery="gendetail">
-    <img src="{{ url_for('image_gen.output_image', log_id=log.id, idx=loop.index0) }}" class="gd-standalone-art" alt="生成作品 {{ loop.index }}" loading="lazy" decoding="async">
-  </a>
+  <div class="gd-carousel">
+    <div class="gd-carousel-viewport" id="gdCarousel">
+      {% for img in imgs %}
+      <div class="gd-slide">
+        <a class="glightbox gd-pure-img-anchor" href="{{ url_for('image_gen.output_image', log_id=log.id, idx=loop.index0) }}" data-type="image" data-gallery="gendetail">
+          <img src="{{ url_for('image_gen.output_image', log_id=log.id, idx=loop.index0) }}" class="gd-standalone-art" alt="生成作品 {{ loop.index }}" loading="lazy" decoding="async">
+        </a>
+      </div>
+      {% endfor %}
+    </div>
 
-  <!-- 操作栏：舒适内边距 -->
+    {% if imgs|length > 1 %}
+    <button type="button" class="gd-car-arrow gd-car-arrow--prev" id="gdPrev" aria-label="上一张"><i class="bi bi-chevron-left"></i></button>
+    <button type="button" class="gd-car-arrow gd-car-arrow--next" id="gdNext" aria-label="下一张"><i class="bi bi-chevron-right"></i></button>
+    <div class="gd-car-dots" id="gdDots">
+      {% for img in imgs %}<span class="gd-dot" data-i="{{ loop.index0 }}"></span>{% endfor %}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- 操作栏：仅一份，下载原图随当前张联动 -->
   <div class="gd-action-bar d-flex align-items-center justify-content-between flex-wrap gap-2">
     <div class="text-muted fs-7">
       尺寸 <strong class="text-light me-2">{{ log.size or 'auto' }}</strong>
+      {% if imgs|length > 1 %}<span class="gd-car-counter" id="gdCounter">1 / {{ imgs|length }}</span>{% endif %}
     </div>
     <div class="d-flex align-items-center gap-2">
-      <a class="btn btn-sm btn-outline-secondary rounded-pill px-3 py-1.5 fs-7 js-dlpng" href="{{ url_for('image_gen.output_image', log_id=log.id, idx=loop.index0) }}" data-src="{{ url_for('image_gen.output_image', log_id=log.id, idx=loop.index0) }}" data-name="artwork_{{ log.id }}_{{ loop.index }}.png">
+      <a class="btn btn-sm btn-outline-secondary rounded-pill px-3 py-1.5 fs-7 js-dlpng" id="gdDownload" href="{{ url_for('image_gen.output_image', log_id=log.id, idx=0) }}" data-src="{{ url_for('image_gen.output_image', log_id=log.id, idx=0) }}" data-name="artwork_{{ log.id }}_1.png" data-log-id="{{ log.id }}">
         <i class="bi bi-download me-1"></i> 下载原图
       </a>
       <a class="btn btn-sm btn-primary rounded-pill px-3 py-1.5 fs-7" href="{{ url_for('image_gen.workbench') }}?prompt={{ log.prompt|urlencode }}" style="background: linear-gradient(90deg, #a855f7, #ec4899); border:none;">
@@ -127,7 +208,6 @@
       </a>
     </div>
   </div>
-  {% endfor %}
   {% else %}
   <div class="text-center text-muted py-5 small">本次未产出图像。</div>
   {% endif %}
@@ -198,6 +278,54 @@
   document.addEventListener('dna:page-loaded', function () {
     setTimeout(initLightbox, 50);
   });
+
+  // 图片轮播：随当前张联动「下载原图」
+  var viewport = document.getElementById('gdCarousel');
+  if (viewport) {
+    var slides = viewport.querySelectorAll('.gd-slide');
+    var total = slides.length;
+    var dots = document.querySelectorAll('#gdDots .gd-dot');
+    var counter = document.getElementById('gdCounter');
+    var download = document.getElementById('gdDownload');
+
+    function syncCarousel() {
+      var idx = viewport.clientWidth ? Math.round(viewport.scrollLeft / viewport.clientWidth) : 0;
+      idx = Math.max(0, Math.min(total - 1, idx));
+      if (counter) counter.textContent = (idx + 1) + ' / ' + total;
+      for (var i = 0; i < dots.length; i++) {
+        dots[i].classList.toggle('is-active', i === idx);
+      }
+      if (download) {
+        var logId = download.getAttribute('data-log-id');
+        var url = '/image-gen/output/' + logId + '/' + idx;
+        download.setAttribute('href', url);
+        download.setAttribute('data-src', url);
+        download.setAttribute('data-name', 'artwork_' + logId + '_' + (idx + 1) + '.png');
+      }
+    }
+
+    viewport.addEventListener('scroll', function () {
+      window.requestAnimationFrame(syncCarousel);
+    }, { passive: true });
+
+    var prevBtn = document.getElementById('gdPrev');
+    var nextBtn = document.getElementById('gdNext');
+    if (prevBtn) prevBtn.addEventListener('click', function () {
+      viewport.scrollBy({ left: -viewport.clientWidth, behavior: 'smooth' });
+    });
+    if (nextBtn) nextBtn.addEventListener('click', function () {
+      viewport.scrollBy({ left: viewport.clientWidth, behavior: 'smooth' });
+    });
+    for (var d = 0; d < dots.length; d++) {
+      (function (dot) {
+        dot.addEventListener('click', function () {
+          var i = parseInt(dot.getAttribute('data-i'), 10) || 0;
+          viewport.scrollTo({ left: i * viewport.clientWidth, behavior: 'smooth' });
+        });
+      })(dots[d]);
+    }
+    syncCarousel();
+  }
 
   // 复制 Prompt
   var copyBtn = document.getElementById('copyPromptBtn');

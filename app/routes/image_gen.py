@@ -31,6 +31,9 @@ from ..services.site_service import get_site_config
 
 image_gen_bp = Blueprint("image_gen", __name__, url_prefix="/image-gen")
 
+# 正在进行中的生图任务用户集合，用于防止同一用户并发生图
+ACTIVE_GENERATION_TASKS: set = set()
+
 # 宽高比 -> OpenAI size（照搬 infinite-canvas 默认 1k 分辨率）；auto 不传 size
 ASPECT_TO_SIZE = {
     "1:1": "1024x1024",
