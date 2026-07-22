@@ -785,7 +785,7 @@ body, .navbar, .footer, .card, .dna-tile, .dna-hero,
 }
 .dna-mobile-nav__item i {
   font-size: 1.35rem;
-  margin-bottom: 1px;
+  margin-bottom: 0;
   opacity: 0.8;
   transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.15s ease, color 0.15s ease;
 }
@@ -811,7 +811,7 @@ body, .navbar, .footer, .card, .dna-tile, .dna-hero,
 body.is-mobile-plus-open #mobilePlusBtn span {
   max-height: 16px;
   opacity: 1;
-  margin-top: 2px;
+  margin-top: -1px;
   color: var(--dna-accent, #a855f7);
 }
 
