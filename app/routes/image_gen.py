@@ -200,45 +200,22 @@ def generate():
                 )
             )
         db.session.commit()
-        user_id=current_user.id,
-        model_id=model.id,
-        model_name=model.display_name,
-        prompt=prompt,
-        size=size,
-        count=count,
-        references_count=ref_count,
-        status=status,
-        images=json.dumps(images, ensure_ascii=False),
-        reference_images=json.dumps(ref_b64_list),
-        points_spent=spent,
-    )
-    db.session.add(log)
-    if spent:
-        current_user.points = balance - spent
-        db.session.add(
-            PointTransaction(
-                user_id=current_user.id,
-                delta=-spent,
-                balance_after=current_user.points,
-                reason=f"生图消耗（{model.display_name} ×{actual}）",
-                source="consume",
-            )
-        )
-    db.session.commit()
 
-    if want_json:
-        return jsonify(
-            ok=True,
-            log_id=log.id,
-            model_name=model.display_name,
-            size=size,
-            images=images,
-            points_spent=spent,
-            balance=current_user.points,
-            status=status,
-        )
-    flash(f"生图完成，成功 {actual} 张，消耗 {spent} 点", "success")
-    return redirect(url_for("image_gen.log_detail", log_id=log.id))
+        if want_json:
+            return jsonify(
+                ok=True,
+                log_id=log.id,
+                model_name=model.display_name,
+                size=size,
+                images=images,
+                points_spent=spent,
+                balance=current_user.points,
+                status=status,
+            )
+        flash(f"生图完成，成功 {actual} 张，消耗 {spent} 点", "success")
+        return redirect(url_for("image_gen.log_detail", log_id=log.id))
+    finally:
+        ACTIVE_GENERATION_TASKS.discard(current_user.id)
 
 
 @image_gen_bp.route("/api/logs")
