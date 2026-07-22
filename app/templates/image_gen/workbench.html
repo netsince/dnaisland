@@ -45,12 +45,13 @@
  .ig-empty{color:#9a9ab0;text-align:center;padding:60px 0}
 
  /* 参考图预览缩略图（上传区）：保持原始比例 */
- .ig-ref{position:relative;flex:none;line-height:0}
+ .ig-ref{position:relative;flex:none;line-height:1.2;text-align:center}
  .ig-ref img{display:block;max-width:120px;max-height:120px;width:auto;height:auto;
  object-fit:contain;border-radius:10px;border:1px solid #2a2a3a;cursor:zoom-in}
  .ig-ref__del{position:absolute;top:3px;right:3px;width:20px;height:20px;border:none;border-radius:50%;
  background:rgba(0,0,0,.55);color:#fff;font-size:13px;line-height:20px;text-align:center;cursor:pointer;padding:0}
  .ig-ref__del:hover{background:rgba(236,72,153,.9)}
+ .ig-ref__tag{font-size:11px;color:#9a9ab0;margin-top:4px;text-align:center;font-weight:500}
 
  /* 参考图放大查看弹窗（遵从原始比例） */
  .ig-viewer{position:fixed;inset:0;z-index:1080;display:none;
@@ -320,8 +321,12 @@
  selectedRefs.splice(idx, 1);
  renderRefs();
  });
+ var tag = document.createElement('div');
+ tag.className = 'ig-ref__tag';
+ tag.textContent = '图片' + (idx + 1);
  wrap.appendChild(img);
  wrap.appendChild(del);
+ wrap.appendChild(tag);
  refPreviewContainer.appendChild(wrap);
  };
  reader.readAsDataURL(file);
