@@ -656,6 +656,7 @@ function showToast(message, type) {
     }
 
     function loadPage(url, pushHistory) {
+      if (window.closeMobilePlusMenu) window.closeMobilePlusMenu();
       var main = document.querySelector('main');
       var loader = document.getElementById('pjaxLoader');
       if (!main) {
@@ -808,9 +809,18 @@ function showToast(message, type) {
  if (plusSvg) plusSvg.classList.remove('dna-mobile-plus-rotated');
  }
 
+ window.closeMobilePlusMenu = closePlusMenu;
+
  plusBtn.addEventListener('click', togglePlusMenu);
  overlay.addEventListener('click', function (e) {
  if (e.target === overlay) closePlusMenu();
+ });
+
+ var popupLinks = overlay.querySelectorAll('a');
+ popupLinks.forEach(function (link) {
+   link.addEventListener('click', function () {
+     closePlusMenu();
+   });
  });
  })();
  </script>
