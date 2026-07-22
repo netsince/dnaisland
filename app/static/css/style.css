@@ -1044,6 +1044,41 @@ body.is-mobile-plus-open header {
   border-radius: 50%;
 }
 
+/* ============ 轻提示 toast（替代 alert） ============ */
+.dna-toast-container{
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 1100;
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+  max-width: min(90vw, 360px);
+  pointer-events: none; /* 容器不挡点击，仅提示条本身可交互 */
+}
+.dna-toast{
+  pointer-events: auto;
+  padding: .65rem .9rem;
+  border-radius: .5rem;
+  color: #fff;
+  background: #333;
+  box-shadow: 0 6px 16px rgba(0,0,0,.28);
+  font-size: .875rem;
+  line-height: 1.4;
+  word-break: break-word;
+  opacity: 0;
+  transform: translateX(16px);
+  transition: opacity .2s ease, transform .2s ease;
+}
+.dna-toast.is-show{
+  opacity: 1;
+  transform: none;
+}
+.dna-toast--danger{ background: #dc3545; }
+.dna-toast--success{ background: #198754; }
+.dna-toast--info{ background: #0d6efd; }
+.dna-toast--warning{ background: #f0ad4e; }
+
 /* ===== 角色卡详情页全宽横幅封面（保持原图比例，不裁剪） ===== */
 .dna-card-banner {
   width: 100vw;

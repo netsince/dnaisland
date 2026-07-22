@@ -416,10 +416,10 @@
           body.innerHTML = '<div class="text-center text-muted py-3">加载中…</div>';
           loadComments();
         } else {
-          alert(data.error || '发布失败');
+          showToast(data.error || '发布失败', 'danger');
         }
       })
-      .catch(function() { alert('网络错误，请重试'); });
+      .catch(function() { showToast('网络错误，请重试', 'danger'); });
     });
   }
 })();
