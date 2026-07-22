@@ -661,24 +661,42 @@ body, .navbar, .footer, .card, .dna-tile, .dna-hero,
 /* 浅色模式下，原深色专用文本类改为可读深色 */
 [data-bs-theme="light"] .text-light { color: var(--dna-text) !important; }
 
-/* 手机端搜索抽屉 */
-.dna-mobile-search-drawer {
+/* 全局滑出式搜索栏 */
+.dna-search-overlay {
   display: none;
-  position: fixed;
-  top: 0; left: 0; right: 0;
-  background: rgba(12, 10, 22, 0.98);
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 1040;
+  background: var(--dna-bg-2);
+  align-items: center;
   border-bottom: 1px solid var(--dna-border);
-  z-index: 1045;
-  padding-top: max(10px, safe-area-inset-top);
-  box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+  padding-inline: 1rem;
 }
-.dna-mobile-search-drawer.show {
-  display: block;
-  animation: slideDownSearch 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+.dna-search-overlay.show {
+  display: flex;
+  animation: slideDownSearchOverlay 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
-@keyframes slideDownSearch {
-  from { transform: translateY(-100%); }
-  to { transform: translateY(0); }
+@keyframes slideDownSearchOverlay {
+  from { opacity: 0; transform: translateY(-100%); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.dna-search-overlay .input-group-text {
+  background: transparent !important;
+  border: none !important;
+}
+.dna-search-overlay .input-group-text svg {
+  color: var(--dna-muted);
+}
+.dna-search-overlay input:focus {
+  box-shadow: none !important;
+  outline: none !important;
+  background: transparent !important;
+  color: #fff !important;
+}
+
+.dna-mobile-search-drawer {
+  display: none !important;
 }
 
 @media (max-width: 768px) {
