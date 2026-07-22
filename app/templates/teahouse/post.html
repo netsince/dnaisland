@@ -39,9 +39,10 @@
     <div class="card mb-3" id="reply">
       <div class="card-body">
         <form method="post" action="{{ url_for('teahouse.reply', post_id=post.id) }}">
-          <textarea class="form-control" name="content" rows="3" maxlength="{{ max_len }}"
+          <textarea class="form-control" name="content" id="replyContent" rows="3" maxlength="{{ max_len }}"
                     placeholder="回复 @{{ post.author.username }}…"></textarea>
-          <div class="text-end mt-2">
+          <div class="d-flex justify-content-between align-items-center mt-2">
+            <small class="text-muted" id="replyCounterContainer"><span id="replyCounter">0</span> / {{ max_len }}</small>
             <button class="btn btn-primary btn-sm" type="submit">回复</button>
           </div>
         </form>
@@ -79,4 +80,26 @@
   if (f) { f.scrollIntoView(); }
 </script>
 {% endif %}
+<script>
+(function () {
+  var ta = document.getElementById('replyContent');
+  var counter = document.getElementById('replyCounter');
+  var container = document.getElementById('replyCounterContainer');
+  var maxLen = parseInt("{{ max_len }}") || 500;
+  if (ta && counter && container) {
+    ta.addEventListener('input', function () {
+      var len = ta.value.length;
+      counter.textContent = len;
+      
+      if (len >= maxLen * 0.9) {
+        container.classList.add('text-danger');
+        container.classList.remove('text-muted');
+      } else {
+        container.classList.remove('text-danger');
+        container.classList.add('text-muted');
+      }
+    });
+  }
+})();
+</script>
 {% endblock %}
