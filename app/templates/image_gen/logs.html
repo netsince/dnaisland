@@ -40,11 +40,16 @@
  .mg-status.part{background:rgba(210,153,34,.18);color:#f0c040}
  .mg-status.fail{background:rgba(248,81,73,.18);color:#ff7b72}
  .mg-meta .info{color:#d7d7e6}
- .mg-meta a,.mg-meta .dl-btn{pointer-events:auto}
- .dl-btn{cursor:pointer;background:rgba(255,255,255,.16);padding:3px 10px;border-radius:9px;
- white-space:nowrap;transition:background .2s}
- .dl-btn:hover{background:rgba(255,255,255,.3)}
+ .mg-meta a{pointer-events:auto}
  .mg-detail{color:#fff;text-decoration:underline;text-underline-offset:2px;margin-left:6px}
+ .mg-refs{position:absolute;top:8px;left:8px;display:flex;gap:6px;flex-wrap:wrap;z-index:3}
+ .mg-ref{position:relative;line-height:0}
+ .mg-ref img{display:block;width:76px;height:76px;object-fit:cover;border-radius:10px;
+ border:1px solid rgba(255,255,255,.25);box-shadow:0 4px 12px rgba(0,0,0,.45);cursor:zoom-in}
+ .mg-ref .dl{position:absolute;right:-6px;bottom:-6px;width:24px;height:24px;border-radius:50%;
+ background:linear-gradient(90deg,#a855f7,#ec4899);color:#fff;font-size:13px;line-height:24px;
+ text-align:center;text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,.55);z-index:4}
+ .mg-ref .dl:hover{filter:brightness(1.1)}
  .mg-empty{text-align:center;color:#9a9ab0;padding:80px 0;font-size:15px}
  .mg-empty .big{font-size:40px;display:block;margin-bottom:10px;opacity:.6}
 
@@ -75,6 +80,19 @@
  <a class="glightbox" href="{{ imgs[0] }}" data-type="image" data-gallery="genlogs">
  <img src="{{ imgs[0] }}" alt="生成图" class="dna-img-fade__img" loading="lazy">
  </a>
+ {% if l.reference_image_list() %}
+ <div class="mg-refs">
+ {% for ref in l.reference_image_list() %}
+ <div class="mg-ref">
+ <a class="glightbox" href="{{ ref }}" data-type="image">
+ <img src="{{ ref }}" alt="参考图" loading="lazy">
+ </a>
+ <a class="dl js-dlpng" href="{{ ref }}" data-src="{{ ref }}"
+ data-name="reference-{{ l.id }}-{{ loop.index }}.png" title="下载 PNG">↓</a>
+ </div>
+ {% endfor %}
+ </div>
+ {% endif %}
  <div class="mg-meta">
  <div class="row1">
  <span class="title">{{ l.model_name }}
@@ -82,7 +100,6 @@
  {% elif l.status == 'partial' %}<span class="mg-status part">部分</span>
  {% elif l.status == 'failed' %}<span class="mg-status fail">失败</span>{% endif %}
  </span>
- <span class="dl-btn js-dlpng" data-src="{{ imgs[0] }}" data-name="gen_{{ l.id }}.png" onclick="event.stopPropagation();event.preventDefault()">↓ PNG</span>
  </div>
  <div class="info">{{ l.size or 'auto' }} · {{ l.count }} 张请求 · 消耗 {{ l.points_spent }} 点</div>
  <div class="info">{{ l.created_at.strftime('%Y-%m-%d %H:%M') }}
