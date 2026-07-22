@@ -2,6 +2,7 @@ from flask import Blueprint, abort, jsonify, render_template, request, send_file
 from flask_login import current_user
 from sqlalchemy import case, func, or_
 from io import BytesIO
+import base64
 
 from ..extensions import db
 from ..models import Article, Card, CardLike, CardTag, Punishment, User
@@ -14,11 +15,22 @@ main_bp = Blueprint("main", __name__)
 
 @main_bp.route("/article-cover/<int:article_id>")
 def article_cover(article_id):
-    """文章封面：仅 base64 类型走此端点转 WEBP；URL 类型由模板直接引用外链。"""
+    """文章封面：base64 类型走此端点转 WEBP；已为 WebP 的 data URL 直接发送；URL 类型由模板直接引用外链。"""
     a = db.session.get(Article, article_id)
     if not a or not a.cover:
         abort(404)
     if a.cover.startswith("data:"):
+        # 上传时已转 WebP 的，直接解码发送，避免二次压缩损失
+        if a.cover.startswith("data:image/webp"):
+            try:
+                b64 = a.cover.split(",", 1)[1]
+                return send_file(
+                    BytesIO(base64.b64decode(b64)),
+                    mimetype="image/webp",
+                    cache_timeout=86400,
+                )
+            except Exception:
+                pass
         try:
             webp = data_url_to_webp_bytes(a.cover, max_edge=1024, quality=82)
         except Exception:

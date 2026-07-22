@@ -48,6 +48,7 @@ from ..models.punishment import (
     APPEAL_REJECTED,
     PUNISHMENT_TYPES,
 )
+from ..services.image_service import compress_image, raw_bytes_to_webp_data_url
 from ..services.notification_service import notify
 from ..services.site_service import get_site_config
 
@@ -1290,6 +1291,36 @@ def articles():
     )
 
 
+def _resolve_article_cover(existing):
+    """解析文章封面的上传来源，返回待存储的值（URL 字符串或 WebP base64 data URL）。
+
+    - 勾选 remove_cover -> 清空为 None
+    - 上传了图片文件 -> 转 WebP(base64 data URL) 存储
+    - 填写了 URL（或遗留 base64） -> 原样或转 WebP 存储
+    - 都未提供 -> 保留 existing 原值
+    """
+    if request.form.get("remove_cover"):
+        return None
+    f = request.files.get("cover_file")
+    if f and f.filename:
+        raw = f.read()
+        if raw:
+            try:
+                return raw_bytes_to_webp_data_url(raw, max_edge=1024, quality=82)
+            except Exception:
+                flash("封面图片处理失败，请重试", "warning")
+                return existing.cover if existing else None
+    url = (request.form.get("cover_url") or "").strip()
+    if url:
+        if url.startswith("data:"):
+            try:
+                return compress_image(url)
+            except Exception:
+                return existing.cover if existing else None
+        return url
+    return existing.cover if existing else None
+
+
 @admin_bp.route("/articles/create", methods=["GET", "POST"])
 @super_admin_required
 def article_create():
@@ -1303,7 +1334,7 @@ def article_create():
             title=title,
             summary=(request.form.get("summary") or "").strip() or None,
             content=content,
-            cover=(request.form.get("cover") or "").strip() or None,
+            cover=_resolve_article_cover(None),
             author_id=current_user.id,
             is_published=request.form.get("is_published") == "1",
             show_author=request.form.get("show_author") != "0",
@@ -1325,7 +1356,7 @@ def article_edit(article_id):
         a.title = (request.form.get("title") or "").strip() or a.title
         a.summary = (request.form.get("summary") or "").strip() or None
         a.content = request.form.get("content") or a.content
-        a.cover = (request.form.get("cover") or "").strip() or None
+        a.cover = _resolve_article_cover(a)
         a.is_published = request.form.get("is_published") == "1"
         a.show_author = request.form.get("show_author") != "0"
         db.session.commit()
