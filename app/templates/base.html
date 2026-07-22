@@ -619,6 +619,30 @@ function showToast(message, type) {
       } catch (e) {}
     }
 
+    function syncHeadStyles(doc) {
+      try {
+        var newStyles = doc.head.querySelectorAll('style, link[rel="stylesheet"]');
+        newStyles.forEach(function (style) {
+          if (style.tagName === 'LINK') {
+            var href = style.getAttribute('href');
+            if (href && !document.head.querySelector('link[href="' + href + '"]')) {
+              document.head.appendChild(style.cloneNode(true));
+            }
+          } else if (style.tagName === 'STYLE') {
+            var content = style.textContent;
+            var exists = Array.from(document.head.querySelectorAll('style')).some(function (s) {
+              return s.textContent === content;
+            });
+            if (!exists) {
+              document.head.appendChild(style.cloneNode(true));
+            }
+          }
+        });
+      } catch (e) {
+        console.warn('Sync head styles failed:', e);
+      }
+    }
+
     function executeScripts(container) {
       var scripts = container.querySelectorAll('script');
       scripts.forEach(function (oldScript) {
@@ -668,6 +692,7 @@ function showToast(message, type) {
 
         document.title = doc.title || document.title;
         document.body.className = doc.body.className;
+        syncHeadStyles(doc);
 
         main.innerHTML = newMain.innerHTML;
         executeScripts(main);
