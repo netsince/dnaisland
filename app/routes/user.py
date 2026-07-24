@@ -845,11 +845,18 @@ def card_comment(card_id):
         target_dir = os.path.join(
             current_app.root_path, "static", "uploads", "comments", ym_dir
         )
-        os.makedirs(target_dir, exist_ok=True)
-
         filename_uuid = f"{uuid.uuid4().hex}.{ext}"
         save_path = os.path.join(target_dir, filename_uuid)
-        image_file.save(save_path)
+        try:
+            os.makedirs(target_dir, exist_ok=True)
+            image_file.save(save_path)
+        except Exception as e:
+            current_app.logger.error(f"评论图片保存失败: {e}")
+            err_msg = "图片保存失败，请重试"
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                return jsonify({"error": err_msg}), 500
+            flash(err_msg, "danger")
+            return redirect(url_for("user.card_detail", card_id=card_id))
 
         image_url = f"uploads/comments/{ym_dir}/{filename_uuid}"
 
