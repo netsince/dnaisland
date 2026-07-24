@@ -1634,3 +1634,153 @@ main.dna-page-loading {
   opacity: 1;
 }
 
+/* ===== 茶馆专属交互组件 (tea-*) ===== */
+.tea-compose {
+  border: 1px solid var(--dna-border, rgba(255, 255, 255, .12));
+  border-radius: 16px;
+  background: var(--bs-body-bg);
+}
+.tea-compose__avatar,
+.tea-compose__avatar-ph {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  font-size: 1.05rem;
+  object-fit: cover;
+}
+.tea-compose__avatar-ph { color: #fff; }
+.tea-compose__input {
+  border: 0;
+  background: transparent;
+  width: 100%;
+  resize: none;
+  padding: 10px 2px 4px;
+  line-height: 1.6;
+  font-size: .98rem;
+  color: var(--bs-body-color);
+  outline: none;
+}
+.tea-compose__input::placeholder { color: var(--bs-secondary-color); }
+.tea-compose__input:focus { outline: none; box-shadow: none; }
+.tea-compose--reply .tea-compose__input { padding-top: 4px; }
+
+/* 工具栏 */
+.tea-compose__bar {
+  border-top: 1px solid var(--dna-border, rgba(255, 255, 255, .1));
+}
+.tea-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: .85rem;
+  color: var(--dna-accent, #a855f7);
+  transition: background-color .15s ease;
+  white-space: nowrap;
+}
+.tea-tool:hover { background: rgba(168, 85, 247, .12); }
+.tea-tool i { font-size: 1.05rem; line-height: 1; }
+
+/* 已选中的角色卡 / 配图：紫色胶囊 */
+.tea-card-picked,
+.tea-image-picked {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(168, 85, 247, .12);
+  color: var(--dna-accent, #a855f7);
+  border: 1px solid rgba(168, 85, 247, .3);
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: .82rem;
+}
+.tea-card-picked img,
+.tea-image-picked img { border-radius: 6px; }
+.tea-card-picked .btn-link,
+.tea-image-picked .btn-link {
+  color: var(--dna-accent, #a855f7);
+  font-size: 1rem;
+  line-height: 1;
+}
+.tea-card-picked:not(.d-none) + [data-pick-card],
+.tea-image-picked:not(.d-none) + [data-pick-image] { display: none; }
+
+/* 话题内联 pill */
+.tea-compose__topic {
+  flex: 1 1 140px;
+  min-width: 120px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 999px;
+  padding: 5px 12px;
+  background: var(--bs-tertiary-bg, rgba(255, 255, 255, .05));
+}
+.tea-compose__topic .hash {
+  color: var(--dna-accent, #a855f7);
+  font-weight: 700;
+}
+.tea-compose__topic input {
+  border: 0;
+  background: transparent;
+  outline: none;
+  width: 100%;
+  color: var(--bs-body-color);
+  padding: 2px 0;
+}
+.tea-compose__topic input::placeholder { color: var(--bs-secondary-color); }
+
+/* 发布区 */
+.tea-compose__publish {
+  background: var(--dna-accent, #a855f7);
+  border-color: var(--dna-accent, #a855f7);
+  border-radius: 999px;
+  font-weight: 600;
+}
+.tea-compose__publish:hover { filter: brightness(1.08); }
+
+.tea-card-ref {
+  border: 1px solid var(--dna-border, rgba(255, 255, 255, .12));
+  border-radius: 12px;
+  padding: 8px 10px;
+  background: var(--bs-body-bg);
+  transition: background-color .15s ease, border-color .15s ease;
+  max-width: 340px;
+}
+.tea-card-ref:hover { background: rgba(168, 85, 247, .08); border-color: var(--dna-accent, #a855f7); }
+.tea-card-ref__thumb { width: 42px; height: 42px; }
+.tea-card-ref__img,
+.tea-card-ref__ph {
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--bs-secondary-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+}
+.tea-card-ref__body { min-width: 0; }
+.tea-card-ref__name { line-height: 1.2; }
+.tea-card-ref__author { line-height: 1.2; }
+
+.tea-related-post {
+  border: 1px solid var(--dna-border, rgba(255, 255, 255, .1));
+  border-radius: 12px;
+  padding: 10px 12px;
+  transition: background-color .15s ease, border-color .15s ease;
+}
+.tea-related-post:hover { background: rgba(168, 85, 247, .06); border-color: var(--dna-accent, #a855f7); }
+.tea-related-post__body { min-width: 0; }
+.tea-related-post__text {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.4;
+}
+

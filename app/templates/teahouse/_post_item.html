@@ -1,14 +1,19 @@
 {% macro render_card_chip(post) %}
 {%- if post.card -%}
-{%- set _cavatar = post.card.images | selectattr('slot', 'equalto', 'square') | first -%}
-<div class="d-inline-flex align-items-center gap-2 border rounded-pill px-2 py-1 mb-2 small bg-body-secondary">
-  <i class="bi bi-person-badge"></i>
-  <span class="text-muted">关联角色卡</span>
-  <a href="{{ url_for('user.card_detail', card_id=post.card.id) }}" class="d-flex align-items-center gap-2 text-decoration-none text-reset">
-    {% if _cavatar %}<img src="{{ _cavatar.data }}" alt="" class="rounded-circle" style="width:24px;height:24px;object-fit:cover;">{% endif %}
-    <strong>{{ post.card.name }}</strong>
-  </a>
-</div>
+<a href="{{ url_for('user.card_detail', card_id=post.card.id) }}" class="tea-card-ref d-flex align-items-center gap-2 mb-2 text-decoration-none">
+  <div class="tea-card-ref__thumb flex-shrink-0">
+    {% if post.card.images %}
+    <img src="{{ url_for('user.card_image', card_id=post.card.id, slot='square') }}" alt="" class="tea-card-ref__img">
+    {% else %}
+    <div class="tea-card-ref__ph">{{ post.card.name[:1] }}</div>
+    {% endif %}
+  </div>
+  <div class="tea-card-ref__body min-w-0">
+    <div class="tea-card-ref__tag small text-muted"><i class="bi bi-person-badge me-1"></i>关联角色卡</div>
+    <div class="tea-card-ref__name fw-semibold text-truncate">{{ post.card.name }}</div>
+    {% if post.card.author %}<div class="tea-card-ref__author small text-muted text-truncate">by {{ post.card.author.display_name }}</div>{% endif %}
+  </div>
+</a>
 {%- endif -%}
 {% endmacro %}
 

@@ -108,6 +108,31 @@
     </a>
   </div>
 
+  {# 反向聚合：用这张卡发的茶馆帖 #}
+  <section class="tea-related mb-4">
+    <h2 class="h6 fw-semibold text-muted mb-2"><i class="bi bi-chat-square me-1"></i>用这张卡发的茶馆帖</h2>
+    {% set _linked = linked_posts | selectattr('parent_id', 'none') | list %}
+    {% if _linked %}
+    <div class="d-flex flex-column gap-2">
+      {% for p in _linked %}
+      <a href="{{ url_for('teahouse.post_detail', post_id=p.id) }}" class="tea-related-post text-decoration-none">
+        <div class="d-flex gap-2 align-items-center">
+          <div class="tea-related-post__avatar flex-shrink-0">
+            {% if p.author.avatar %}<img src="{{ url_for('user.avatar', user_id=p.author.id) }}" class="rounded-circle" style="width:34px;height:34px;object-fit:cover;">{% else %}<div class="rounded-circle bg-secondary text-light d-flex align-items-center justify-content-center" style="width:34px;height:34px;font-size:.9rem;">{{ p.author.display_name[:1] }}</div>{% endif %}
+          </div>
+          <div class="tea-related-post__body min-w-0">
+            <div class="tea-related-post__meta small text-muted">{{ p.author.display_name }} · {{ p.created_at.strftime('%Y-%m-%d') if p.created_at else '' }}</div>
+            <div class="tea-related-post__text text-reset">{{ p.content[:80] }}{% if p.content|length > 80 %}…{% endif %}</div>
+          </div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-muted small mb-0">还没有人用这张卡发过茶馆帖。</p>
+    {% endif %}
+  </section>
+
   <hr class="border-secondary border-opacity-25 mb-4">
 
   {% if card.intro %}
