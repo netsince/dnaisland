@@ -816,10 +816,13 @@ def card_comment(card_id):
 
     reply_to_id = request.form.get("reply_to_id", type=int)
     valid_reply_to_id = None
+    parent_cm = None
     if reply_to_id:
         parent_cm = db.session.get(Comment, reply_to_id)
         if parent_cm and parent_cm.card_id == card_id:
             valid_reply_to_id = parent_cm.id
+        else:
+            parent_cm = None
 
     db.session.add(
         Comment(
@@ -829,6 +832,21 @@ def card_comment(card_id):
             reply_to_id=valid_reply_to_id,
         )
     )
+    if parent_cm and parent_cm.user_id != current_user.id:
+        notify(
+            user_id=parent_cm.user_id,
+            message=f'{current_user.display_name} 在《{card.name}》中回复了你："{content[:30]}"',
+            type_="comment_reply",
+            related_card_id=card.id,
+        )
+    elif card.author_id != current_user.id:
+        notify(
+            user_id=card.author_id,
+            message=f"{current_user.display_name} 在你的角色卡《{card.name}》下发表了评论",
+            type_="card_comment",
+            related_card_id=card.id,
+        )
+
     db.session.commit()
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
         return jsonify({"ok": True})
@@ -851,6 +869,15 @@ def card_comment_like(card_id, comment_id):
     else:
         db.session.add(CommentLike(user_id=current_user.id, comment_id=comment_id))
         is_now_liked = True
+        if cm.user_id != current_user.id:
+            card = db.session.get(Card, card_id)
+            if card:
+                notify(
+                    user_id=cm.user_id,
+                    message=f"{current_user.display_name} 点赞了你在《{card.name}》下的评论",
+                    type_="comment_like",
+                    related_card_id=card.id,
+                )
     db.session.commit()
     new_count = CommentLike.query.filter_by(comment_id=comment_id).count()
     return jsonify({"ok": True, "liked": is_now_liked, "count": new_count})
