@@ -241,7 +241,7 @@
   var body    = document.getElementById('commentDrawerBody');
   var footer  = document.getElementById('commentDrawerFooter');
   var title   = document.getElementById('commentDrawerTitle');
-  if (!trigger || !drawer) return;
+  if (!trigger || !drawer || !overlay || !body || !footer) return;
 
   var apiUrl    = trigger.dataset.apiUrl;
   var postUrl   = trigger.dataset.postUrl;
@@ -544,6 +544,7 @@
     var submitBtn = document.getElementById('cmSubmitBtn');
     var emojiToggle = document.getElementById('cmEmojiToggle');
     var emojiBar = document.getElementById('cmEmojiBar');
+    if (!form || !input || !charCountEl || !submitBtn || !emojiToggle || !emojiBar) return;
 
     function updateCharCount() {
       var len = input.value.length;
@@ -582,11 +583,15 @@
       var btn = e.target.closest('.dna-emoji-btn');
       if (!btn) return;
       var emoji = btn.dataset.emoji || btn.textContent;
-      var start = input.selectionStart || 0;
-      var end = input.selectionEnd || 0;
+      var hasSelection = typeof input.selectionStart === 'number' && input.selectionStart !== null;
+      var start = hasSelection ? input.selectionStart : input.value.length;
+      var end = hasSelection ? input.selectionEnd : input.value.length;
       var val = input.value;
       input.value = val.substring(0, start) + emoji + val.substring(end);
-      input.selectionStart = input.selectionEnd = start + emoji.length;
+      var newPos = start + emoji.length;
+      if (typeof input.setSelectionRange === 'function') {
+        input.setSelectionRange(newPos, newPos);
+      }
       input.focus();
       updateCharCount();
       emojiBar.classList.remove('show');

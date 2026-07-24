@@ -7,6 +7,7 @@
 :root {
   /* 品牌色 —— 霓虹紫 / 品红 / 青 */
   --dna-accent: #a855f7;
+  --dna-accent-rgb: 168, 85, 247;
   --dna-accent-2: #ec4899;
   --dna-accent-3: #22d3ee;
   --dna-grad: linear-gradient(135deg, #a855f7 0%, #ec4899 55%, #f472b6 100%);
@@ -558,6 +559,7 @@ body, .navbar, .footer, .card, .dna-tile, .dna-hero,
 [data-bs-theme="light"] {
   /* 品牌色保持霓虹质感（略提亮以适配浅底） */
   --dna-accent: #9333ea;
+  --dna-accent-rgb: 147, 51, 234;
   --dna-accent-2: #db2777;
   --dna-accent-3: #0891b2;
   --dna-grad: linear-gradient(135deg, #9333ea 0%, #db2777 55%, #ec4899 100%);
@@ -1172,17 +1174,19 @@ body.is-mobile-plus-open header {
 /* ===== 评论抽屉 ===== */
 /* 遮罩 */
 .dna-comment-overlay {
-  display: none;
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.5);
   z-index: 1055;
-  transition: opacity 0.25s ease;
   opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.25s ease, visibility 0.25s ease;
 }
 .dna-comment-overlay.show {
-  display: block;
   opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
 }
 
 /* 抽屉通用基础 */
@@ -1226,7 +1230,7 @@ body.is-mobile-plus-open header {
 .dna-comment-drawer__handle {
   display: none;
   width: 40px; height: 4px;
-  background: rgba(255,255,255,0.15);
+  background: var(--dna-border-strong, rgba(128, 128, 128, 0.25));
   border-radius: 2px;
   margin: 10px auto 0;
   flex-shrink: 0;
