@@ -22,7 +22,7 @@ from ..services.verification_code_service import (
     create_code,
     verify_code,
 )
-from ..utils import get_user_by_username
+from ..utils import get_user_by_username, respond
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
 
