@@ -195,6 +195,10 @@ object-fit:contain;border-radius:10px;border:1px solid #2a2a3a}
  <button class="ig-sheet__close" id="igSheetClose" type="button" aria-label="关闭">✕</button>
  </div>
  <div class="ig-sheet__body">
+ <div id="igLoading" class="text-center text-muted py-5">
+  <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+  <span>正在加载生成日志…</span>
+ </div>
 <div class="ig-masonry-row" id="igGrid">
  <div class="ig-col"></div>
  <div class="ig-col"></div>
@@ -404,61 +408,67 @@ object-fit:contain;border-radius:10px;border:1px solid #2a2a3a}
  }
  renderWorkbenchMasonry();
 
- // CSR 动态从 API 异步加载历史日志
- function loadWorkbenchLogs() {
- fetch('/image-gen/api/logs?page=1', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
- .then(function (r) { return r.json(); })
- .then(function (res) {
- if (!res.ok || !res.items) return;
- var rawContainer = document.getElementById('igRawItems');
- if (!rawContainer) return;
- rawContainer.innerHTML = '';
- var sBody = document.querySelector('.ig-sheet__body');
- var oldEmpty = sBody ? sBody.querySelector('.ig-empty') : null;
- if (oldEmpty) oldEmpty.remove();
+  // CSR 动态从 API 异步加载历史日志
+  function loadWorkbenchLogs() {
+    var loadingEl = document.getElementById('igLoading');
+    if (loadingEl) loadingEl.classList.remove('d-none');
+    fetch('/image-gen/api/logs?page=1', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        if (loadingEl) loadingEl.classList.add('d-none');
+        if (!res.ok || !res.items) return;
+        var rawContainer = document.getElementById('igRawItems');
+        if (!rawContainer) return;
+        rawContainer.innerHTML = '';
+        var sBody = document.querySelector('.ig-sheet__body');
+        var oldEmpty = sBody ? sBody.querySelector('.ig-empty') : null;
+        if (oldEmpty) oldEmpty.remove();
 
- if (res.items.length === 0) {
- var empty = document.createElement('div');
- empty.className = 'ig-empty';
- empty.textContent = '还没有生成记录，左侧填写提示词开始创作吧。';
- if (sBody) sBody.appendChild(empty);
- return;
- }
+        if (res.items.length === 0) {
+          var empty = document.createElement('div');
+          empty.className = 'ig-empty';
+          empty.textContent = '还没有生成记录，左侧填写提示词开始创作吧。';
+          if (sBody) sBody.appendChild(empty);
+          return;
+        }
 
- res.items.forEach(function (l) {
- var container = document.createElement('div');
- container.className = 'ig-mitem';
- var a = document.createElement('a');
- a.className = 'ig-mcard dna-img-fade dna-img-skeleton';
- if (l.size && l.size !== 'auto') {
- a.setAttribute('data-aspect', l.size);
- }
- a.href = l.detail_url;
- var firstImg = l.first_image || (l.images && l.images[0]);
- a.innerHTML = '<img src="' + firstImg + '" alt="生成图" class="dna-img-fade__img" loading="lazy" decoding="async">' +
- '<span class="tag">' + (l.size || 'auto') + ' · ' + l.model_name + '</span>';
- container.appendChild(a);
+        res.items.forEach(function (l) {
+          var container = document.createElement('div');
+          container.className = 'ig-mitem';
+          var a = document.createElement('a');
+          a.className = 'ig-mcard dna-img-fade dna-img-skeleton';
+          if (l.size && l.size !== 'auto') {
+            a.setAttribute('data-aspect', l.size);
+          }
+          a.href = l.detail_url;
+          var firstImg = l.first_image || (l.images && l.images[0]);
+          a.innerHTML = '<img src="' + firstImg + '" alt="生成图" class="dna-img-fade__img" loading="lazy" decoding="async">' +
+            '<span class="tag">' + (l.size || 'auto') + ' · ' + l.model_name + '</span>';
+          container.appendChild(a);
 
- if (l.references && l.references.length) {
- var refsDiv = document.createElement('div');
- refsDiv.className = 'ig-refs';
- l.references.forEach(function (refUrl) {
- var rImg = document.createElement('img');
- rImg.src = refUrl;
- rImg.alt = '参考图';
- rImg.setAttribute('loading', 'lazy');
- rImg.setAttribute('decoding', 'async');
- refsDiv.appendChild(rImg);
- });
- container.appendChild(refsDiv);
- }
- rawContainer.appendChild(container);
- });
- renderWorkbenchMasonry();
- })
- .catch(function (e) { console.error(e); });
- }
- loadWorkbenchLogs();
+          if (l.references && l.references.length) {
+            var refsDiv = document.createElement('div');
+            refsDiv.className = 'ig-refs';
+            l.references.forEach(function (refUrl) {
+              var rImg = document.createElement('img');
+              rImg.src = refUrl;
+              rImg.alt = '参考图';
+              rImg.setAttribute('loading', 'lazy');
+              rImg.setAttribute('decoding', 'async');
+              refsDiv.appendChild(rImg);
+            });
+            container.appendChild(refsDiv);
+          }
+          rawContainer.appendChild(container);
+        });
+        renderWorkbenchMasonry();
+      })
+      .catch(function (e) {
+        if (loadingEl) loadingEl.classList.add('d-none');
+        console.error(e);
+      });
+  }
+  loadWorkbenchLogs();
 
  var resizeTimer;
  window.addEventListener('resize', function () {
