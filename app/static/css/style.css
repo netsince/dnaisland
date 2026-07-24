@@ -65,7 +65,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-::selection { background: rgba(168, 85, 247, .4); color: #fff; }
+::selection { background: var(--dna-border-strong); color: var(--bs-emphasis-color); }
 
 /* 滚动条 */
 * { scrollbar-width: thin; scrollbar-color: rgba(168,85,247,.5) transparent; }
@@ -87,7 +87,7 @@ body {
   background: none;
   -webkit-background-clip: initial;
   background-clip: initial;
-  color: #ffffff !important;
+  color: var(--bs-emphasis-color) !important;
 }
 .navbar .nav-link {
   color: var(--dna-muted) !important;
@@ -97,7 +97,7 @@ body {
   transition: color 0.15s ease, background 0.15s ease;
 }
 .navbar .nav-link:hover,
-.navbar .nav-link.active { color: #ffffff !important; background: rgba(255, 255, 255, 0.06); }
+.navbar .nav-link.active { color: var(--bs-emphasis-color) !important; background: rgba(255, 255, 255, 0.06); }
 .navbar .dropdown-menu {
   background-color: var(--dna-surface);
   border: 1px solid var(--dna-border);
@@ -121,7 +121,7 @@ body {
 .card-header {
   background: rgba(255, 255, 255, 0.02);
   border-bottom: 1px solid var(--dna-border);
-  color: #ffffff;
+  color: var(--bs-emphasis-color);
   font-weight: 600;
 }
 .list-group-item {
@@ -129,7 +129,7 @@ body {
   border-color: var(--dna-border);
   color: var(--dna-text);
 }
-.list-group-item-primary { background: rgba(255, 255, 255, 0.06); color: #ffffff; }
+.list-group-item-primary { background: rgba(255, 255, 255, 0.06); color: var(--bs-emphasis-color); }
 
 /* ---------------- 按钮 ---------------- */
 .btn {
@@ -140,13 +140,13 @@ body {
 .btn:active { transform: translateY(1px); }
 .btn-primary {
   border: none;
-  background: #f4f4f5;
-  color: #09090b;
+  background: var(--dna-inverse-bg);
+  color: var(--dna-inverse-text);
   box-shadow: none;
 }
 .btn-primary:hover, .btn-primary:focus {
-  background: #ffffff;
-  color: #09090b;
+  background: var(--dna-inverse-bg-hover);
+  color: var(--dna-inverse-text);
   box-shadow: none;
 }
 .btn-outline-primary {
@@ -155,29 +155,29 @@ body {
 }
 .btn-outline-primary:hover {
   background: rgba(255, 255, 255, 0.08);
-  border-color: #ffffff;
-  color: #ffffff;
+  border-color: var(--bs-emphasis-color);
+  color: var(--bs-emphasis-color);
 }
 
 /* ---------------- 徽章 ---------------- */
 .badge { font-weight: 500; letter-spacing: 0.2px; border-radius: 4px; }
 .text-bg-primary, .badge.bg-primary {
-  background: #18181b !important;
-  color: #a1a1aa !important;
+  background: var(--dna-chip-bg) !important;
+  color: var(--dna-muted) !important;
   border: 1px solid var(--dna-border);
 }
 
 /* ---------------- 表单 ---------------- */
 .form-control, .form-select {
-  background: #121215;
+  background: var(--dna-surface);
   border: 1px solid var(--dna-border);
   color: var(--dna-text);
   border-radius: var(--dna-radius-sm);
 }
 .form-control:focus, .form-select:focus {
-  background: #121215;
+  background: var(--dna-surface);
   border-color: var(--dna-border-strong);
-  color: #ffffff;
+  color: var(--bs-emphasis-color);
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1);
 }
 .form-label { color: var(--dna-muted); font-weight: 500; }
@@ -191,16 +191,16 @@ body {
   border-radius: 12px;
 }
 .dropdown-item { color: var(--dna-text); border-radius: 8px; }
-.dropdown-item:hover, .dropdown-item:focus { background: var(--dna-grad-soft); color: #fff; }
+.dropdown-item:hover, .dropdown-item:focus { background: var(--dna-grad-soft); color: var(--bs-emphasis-color); }
 .dropdown-header { color: var(--dna-muted); }
 .dropdown-divider { border-color: var(--dna-border); }
 
 /* ---------------- 提示 ---------------- */
 main .alert { max-width: 760px; margin-inline: auto; border: 1px solid var(--dna-border); border-radius: 12px; }
-.alert-success { background: rgba(34,197,94,.14); color: #86efac; }
-.alert-danger  { background: rgba(239,68,68,.14); color: #fca5a5; }
-.alert-warning { background: rgba(234,179,8,.14); color: #fde68a; }
-.alert-info    { background: rgba(34,211,238,.14); color: #a5f3fc; }
+.alert-success { background: var(--dna-alert-success-bg); color: var(--dna-alert-success-text); }
+.alert-danger  { background: var(--dna-alert-danger-bg); color: var(--dna-alert-danger-text); }
+.alert-warning { background: var(--dna-alert-warning-bg); color: var(--dna-alert-warning-text); }
+.alert-info    { background: var(--dna-alert-info-bg); color: var(--dna-alert-info-text); }
 
 /* ---------------- 分页 ---------------- */
 .pagination { --bs-pagination-bg: transparent; --bs-pagination-color: var(--dna-muted); --bs-pagination-border-color: var(--dna-border); }
@@ -227,15 +227,25 @@ a { color: var(--dna-link); }
   background:
     radial-gradient(120% 140% at 0% 0%, rgba(168,85,247,.35), transparent 55%),
     radial-gradient(120% 140% at 100% 20%, rgba(34,211,238,.28), transparent 55%),
-    rgba(18, 15, 34, .6);
+    var(--dna-hero-bg);
   box-shadow: var(--dna-shadow);
+}
+.dna-hero__bg {
+  position: absolute; inset: 0;
+  background-size: cover;
+  background-position: center;
+  filter: blur(28px);
+  opacity: 0.25;
+  transform: scale(1.1);
+  mask-image: radial-gradient(80% 80% at 50% 0%, var(--dna-overlay-dark), transparent);
+  -webkit-mask-image: radial-gradient(80% 80% at 50% 0%, var(--dna-overlay-dark), transparent);
 }
 .dna-hero::after {
   content: "";
   position: absolute; inset: 0;
   background-image: radial-gradient(rgba(255,255,255,.06) 1px, transparent 1px);
   background-size: 22px 22px;
-  mask-image: radial-gradient(80% 80% at 50% 0%, #000, transparent);
+  mask-image: radial-gradient(80% 80% at 50% 0%, var(--dna-overlay-dark), transparent);
   pointer-events: none;
 }
 .dna-hero__eyebrow {
@@ -349,19 +359,19 @@ a { color: var(--dna-link); }
 
 /* mark 高亮 */
 mark, .bg-warning-subtle {
-  background: rgba(236, 72, 153, .3) !important;
-  color: #fff !important; border-radius: 4px; padding: 0 .15em;
+  background: var(--dna-chip-bg) !important;
+  color: var(--dna-text) !important; border-radius: 4px; padding: 0 .15em;
 }
 
 /* 后台侧边栏 */
 .sidebar.bg-light {
-  background: rgba(18, 15, 34, .7) !important;
+  background: var(--dna-surface) !important;
   border-right: 1px solid var(--dna-border);
   border-radius: var(--dna-radius);
 }
 .sidebar .nav-link { color: var(--dna-muted); border-radius: 10px; }
-.sidebar .nav-link:hover { background: rgba(255,255,255,.05); color: #fff; }
-.sidebar .nav-pills .nav-link.active { background: var(--dna-grad); color: #fff; }
+.sidebar .nav-link:hover { background: var(--dna-surface-hover); color: var(--bs-emphasis-color); }
+.sidebar .nav-pills .nav-link.active { background: var(--bs-body-color); color: var(--bs-body-bg); }
 
 /* 表格（后台） */
 .table { --bs-table-bg: transparent; --bs-table-color: var(--dna-text); --bs-table-border-color: var(--dna-border); }
@@ -440,7 +450,7 @@ mark, .bg-warning-subtle {
 .richtext-content p { margin: 0 0 1rem; }
 .richtext-content h1, .richtext-content h2, .richtext-content h3,
 .richtext-content h4, .richtext-content h5 {
-  margin: 1.4rem 0 .8rem; font-weight: 700; line-height: 1.3; color: #fff;
+  margin: 1.4rem 0 .8rem; font-weight: 700; line-height: 1.3; color: var(--dna-emphasis);
 }
 .richtext-content a { color: var(--bs-link-color); text-decoration: underline; }
 .richtext-content ul, .richtext-content ol { margin: 0 0 1rem 1.25rem; padding-left: 0; }
@@ -448,25 +458,22 @@ mark, .bg-warning-subtle {
 .richtext-content img { max-width: 100%; height: auto; border-radius: var(--dna-radius-sm); margin: .5rem 0; }
 .richtext-content blockquote {
   margin: 1rem 0; padding: .6rem 1rem; border-left: 3px solid var(--dna-accent);
-  background: rgba(168, 85, 247, .08); border-radius: var(--dna-radius-sm); color: var(--dna-muted);
+  background: var(--dna-surface-solid); border-radius: var(--dna-radius-sm); color: var(--dna-muted);
 }
 .richtext-content code {
-  background: rgba(255, 255, 255, .08); padding: .1rem .35rem; border-radius: 5px; font-size: .9em;
+  background: var(--dna-surface-solid); padding: .1rem .35rem; border-radius: 5px; font-size: .9em;
 }
 .richtext-content pre {
-  background: rgba(0, 0, 0, .35); padding: 1rem; border-radius: var(--dna-radius-sm);
+  background: var(--dna-bg-2); padding: 1rem; border-radius: var(--dna-radius-sm);
   overflow: auto; border: 1px solid var(--dna-border);
 }
 
 .article-body { font-size: 1.02rem; }
 
-/* 文章正文：富文本编辑器会为每个元素写死 inline color:rgb(0,0,0)，
-   其优先级高于主题样式，导致深色模式下正文发黑、且切换主题无变化。
-   用 !important 强制覆盖行内黑色，让正文在深色=纯白、浅色=纯黑之间互相切换。 */
 [data-bs-theme="dark"] .article-body,
-[data-bs-theme="dark"] .article-body * { color: #fff !important; }
+[data-bs-theme="dark"] .article-body * { color: var(--dna-text) !important; }
 [data-bs-theme="light"] .article-body,
-[data-bs-theme="light"] .article-body * { color: #000 !important; }
+[data-bs-theme="light"] .article-body * { color: var(--dna-text) !important; }
 [data-bs-theme="dark"] .article-body table,
 [data-bs-theme="dark"] .article-body table td,
 [data-bs-theme="dark"] .article-body table th { border-color: var(--dna-border-strong) !important; }
@@ -479,7 +486,7 @@ mark, .bg-warning-subtle {
    ============================================================ */
 .dna-img-fade {
   position: relative;
-  background: #000;                 /* 未加载时统一为黑色 */
+  background: var(--dna-bg);
   overflow: hidden;
   border-radius: var(--dna-radius);
   aspect-ratio: 16 / 9;             /* 预留空间，避免加载时布局跳动 */
@@ -551,7 +558,7 @@ mark, .bg-warning-subtle {
  gap: .5rem;
  margin: 0;
  padding: 1rem;
- background: var(--dna-bg, #fff);
+ background: var(--dna-bg);
 }
 .rich-editor.is-fullscreen .rich-editor-area {
  flex: 1 1 auto;
@@ -628,7 +635,7 @@ body, .navbar, .footer, .card, .dna-tile, .dna-hero,
   background-color: var(--dna-bg);
   background-image: none;
 }
-[data-bs-theme="light"] ::selection { background: rgba(0, 0, 0, 0.15); color: #000000; }
+[data-bs-theme="light"] ::selection { background: rgba(0, 0, 0, 0.15); color: var(--bs-emphasis-color); }
 
 /* 导航栏 */
 [data-bs-theme="light"] .navbar.bg-dark {
@@ -653,7 +660,7 @@ body, .navbar, .footer, .card, .dna-tile, .dna-hero,
 [data-bs-theme="light"] .form-select { background: rgba(255, 255, 255, .75); color: var(--dna-text); }
 [data-bs-theme="light"] .form-control::placeholder { color: var(--dna-muted); }
 [data-bs-theme="light"] .form-control:focus,
-[data-bs-theme="light"] .form-select:focus { background: #fff; color: var(--dna-text); }
+[data-bs-theme="light"] .form-select:focus { background: var(--dna-surface); color: var(--dna-text); }
 [data-bs-theme="light"] .input-group-text { background: rgba(0, 0, 0, .03); color: var(--dna-muted); }
 
 /* 下拉 / 建议框 */
@@ -664,10 +671,6 @@ body, .navbar, .footer, .card, .dna-tile, .dna-hero,
 
 /* 提示 */
 [data-bs-theme="light"] main .alert { border-color: var(--dna-border); }
-[data-bs-theme="light"] .alert-success { background: rgba(34, 197, 94, .12); color: #15803d; }
-[data-bs-theme="light"] .alert-danger  { background: rgba(239, 68, 68, .12); color: #b91c1c; }
-[data-bs-theme="light"] .alert-warning { background: rgba(234, 179, 8, .14); color: #a16207; }
-[data-bs-theme="light"] .alert-info    { background: rgba(34, 211, 238, .12); color: #0e7490; }
 
 /* Hero / 自定义组件 */
 [data-bs-theme="light"] .dna-hero {
@@ -701,7 +704,7 @@ body, .navbar, .footer, .card, .dna-tile, .dna-hero,
 
 /* 高亮 mark */
 [data-bs-theme="light"] mark,
-[data-bs-theme="light"] .bg-warning-subtle { background: rgba(219, 39, 119, .18) !important; color: #831843 !important; }
+[data-bs-theme="light"] .bg-warning-subtle { background: var(--dna-chip-bg) !important; color: var(--dna-text) !important; }
 
 /* 浅色模式下，原深色专用文本类改为可读深色 */
 [data-bs-theme="light"] .text-light { color: var(--dna-text) !important; }
@@ -740,7 +743,7 @@ body, .navbar, .footer, .card, .dna-tile, .dna-hero,
   box-shadow: none !important;
   outline: none !important;
   background: transparent !important;
-  color: #fff !important;
+  color: var(--bs-emphasis-color) !important;
 }
 
 .dna-mobile-search-drawer {
@@ -780,8 +783,8 @@ body, .navbar, .footer, .card, .dna-tile, .dna-hero,
   content: "匹配创作者";
   position: absolute;
   top: 0; right: 0;
-  background: var(--dna-grad);
-  color: #fff;
+  background: var(--bs-body-color);
+  color: var(--bs-body-bg);
   font-size: 0.68rem;
   font-weight: 700;
   padding: 2px 10px;
@@ -808,7 +811,7 @@ body, .navbar, .footer, .card, .dna-tile, .dna-hero,
   position: fixed;
   bottom: 0; left: 0; right: 0;
   height: 52px;
-  background: rgba(18, 15, 34, 0.98);
+  background: var(--dna-bg-2);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   border-top: 1px solid var(--dna-border);
@@ -835,7 +838,7 @@ body, .navbar, .footer, .card, .dna-tile, .dna-hero,
   transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.15s ease, color 0.15s ease;
 }
 .dna-mobile-nav__item.active, .dna-mobile-nav__item:hover {
-  color: #fff;
+  color: var(--bs-emphasis-color);
 }
 .dna-mobile-nav__item.active i {
   opacity: 1;
@@ -857,7 +860,7 @@ body.is-mobile-plus-open #mobilePlusBtn span {
   max-height: 16px;
   opacity: 1;
   margin-top: -1px;
-  color: var(--dna-accent, #a855f7);
+  color: var(--bs-body-color);
 }
 
 @media (max-width: 768px) {
@@ -944,7 +947,7 @@ body.is-mobile-plus-open #mobilePlusBtn span {
 .ig-card-skeleton {
   aspect-ratio: 1;
   border-radius: 14px;
-  background: linear-gradient(135deg, #1a1829, #2d2640);
+  background: var(--dna-surface);
   border: 1.5px dashed var(--dna-accent);
   display: flex;
   flex-direction: column;
@@ -982,20 +985,20 @@ body.is-mobile-plus-open #mobilePlusBtn span {
 
 /* 个人功能菜单侧滑抽屉 */
 .dna-tools-offcanvas {
-  background-color: var(--dna-surface-solid, #171527) !important;
-  color: var(--dna-text, #e2e8f0);
-  border-right: 1px solid var(--dna-border, rgba(255,255,255,0.1));
+  background-color: var(--dna-surface-solid) !important;
+  color: var(--dna-text);
+  border-right: 1px solid var(--dna-border);
   max-width: 280px;
 }
 .dna-tools-offcanvas .list-group-item {
   background-color: transparent;
-  color: var(--dna-text, #e2e8f0);
+  color: var(--dna-text);
   border: none !important;
   transition: background-color 0.15s ease, color 0.15s ease;
 }
 .dna-tools-offcanvas .list-group-item:hover {
   background-color: rgba(255, 255, 255, 0.08);
-  color: #fff;
+  color: var(--bs-emphasis-color);
 }
 
 /* 移动端底栏 + 号弹出大按钮、全屏高斯模糊与 + 变 × 旋转 */
@@ -1093,19 +1096,19 @@ body.is-mobile-plus-open header {
 /* 通知列表卡片收紧与 8px 微型精细圆角 */
 .dna-notification-item {
   border-radius: 8px !important;
-  background: var(--dna-surface, #1e1b30);
-  border: 1px solid var(--dna-border, rgba(255,255,255,0.08)) !important;
+  background: var(--dna-surface);
+  border: 1px solid var(--dna-border) !important;
   padding: 10px 14px !important;
   transition: background-color 0.15s ease;
 }
 .dna-notification-item.is-unread {
-  border-left: 3px solid var(--dna-accent, #a855f7) !important;
-  background: rgba(168, 85, 247, 0.06) !important;
+  border-left: 3px solid var(--dna-border-strong) !important;
+  background: var(--dna-surface-solid) !important;
 }
 .dna-unread-dot {
   display: inline-block;
   width: 7px; height: 7px;
-  background-color: #ef4444;
+  background-color: var(--bs-danger);
   border-radius: 50%;
 }
 
@@ -1119,14 +1122,14 @@ body.is-mobile-plus-open header {
   flex-direction: column;
   gap: .5rem;
   max-width: min(90vw, 360px);
-  pointer-events: none; /* 容器不挡点击，仅提示条本身可交互 */
+  pointer-events: none;
 }
 .dna-toast{
   pointer-events: auto;
   padding: .65rem .9rem;
   border-radius: .5rem;
-  color: #fff;
-  background: #333;
+  color: var(--dna-inverse-text);
+  background: var(--dna-inverse-bg);
   box-shadow: 0 6px 16px rgba(0,0,0,.28);
   font-size: .875rem;
   line-height: 1.4;
@@ -1139,10 +1142,10 @@ body.is-mobile-plus-open header {
   opacity: 1;
   transform: none;
 }
-.dna-toast--danger{ background: #dc3545; }
-.dna-toast--success{ background: #198754; }
-.dna-toast--info{ background: #0d6efd; }
-.dna-toast--warning{ background: #f0ad4e; }
+.dna-toast--danger{ background: var(--bs-danger); }
+.dna-toast--success{ background: var(--bs-success); }
+.dna-toast--info{ background: var(--bs-primary); }
+.dna-toast--warning{ background: var(--bs-warning); }
 
 /* ===== 角色卡详情页全宽横幅封面（保持原图比例，不裁剪） ===== */
 .dna-card-banner {
@@ -1179,7 +1182,7 @@ body.is-mobile-plus-open header {
 .focus-marker {
   position: absolute;
   width: 22px; height: 22px;
-  border: 2px solid #fff;
+  border: 2px solid var(--bs-emphasis-color);
   border-radius: 50%;
   transform: translate(-50%, -50%);
   box-shadow: 0 0 0 2px rgba(0,0,0,.55);
@@ -1191,9 +1194,9 @@ body.is-mobile-plus-open header {
   pointer-events: none;
   background:
     /* 左右两边羽化淡出到背景色 */
-    linear-gradient(to right, var(--bs-body-bg, #12111c) 0%, transparent 10%, transparent 90%, var(--bs-body-bg, #12111c) 100%),
+    linear-gradient(to right, var(--bs-body-bg) 0%, transparent 10%, transparent 90%, var(--bs-body-bg) 100%),
     /* 底部羽化（与页面融合） */
-    linear-gradient(to bottom, transparent 40%, var(--bs-body-bg, #12111c) 100%);
+    linear-gradient(to bottom, transparent 40%, var(--bs-body-bg) 100%);
 }
 
 /* ===== 评论抽屉 ===== */
@@ -1218,7 +1221,7 @@ body.is-mobile-plus-open header {
 .dna-comment-drawer {
   position: fixed;
   z-index: 1060;
-  background: var(--bs-body-bg, #12111c);
+  background: var(--bs-body-bg);
   display: flex;
   flex-direction: column;
   transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
@@ -1229,7 +1232,7 @@ body.is-mobile-plus-open header {
   .dna-comment-drawer {
     top: 0; right: 0; bottom: 0;
     width: 420px;
-    border-left: 1px solid var(--dna-border, rgba(255,255,255,0.08));
+    border-left: 1px solid var(--dna-border);
     transform: translateX(100%);
   }
   .dna-comment-drawer.show {
@@ -1243,7 +1246,7 @@ body.is-mobile-plus-open header {
     left: 0; right: 0; bottom: 0;
     height: 80vh;
     border-radius: 16px 16px 0 0;
-    border-top: 1px solid var(--dna-border, rgba(255,255,255,0.08));
+    border-top: 1px solid var(--dna-border);
     transform: translateY(100%);
   }
   .dna-comment-drawer.show {
@@ -1255,7 +1258,7 @@ body.is-mobile-plus-open header {
 .dna-comment-drawer__handle {
   display: none;
   width: 40px; height: 4px;
-  background: var(--dna-border-strong, rgba(128, 128, 128, 0.25));
+  background: var(--dna-border-strong);
   border-radius: 2px;
   margin: 10px auto 0;
   flex-shrink: 0;
@@ -1270,7 +1273,7 @@ body.is-mobile-plus-open header {
   align-items: center;
   justify-content: space-between;
   padding: 14px 16px 12px;
-  border-bottom: 1px solid var(--dna-border, rgba(255,255,255,0.08));
+  border-bottom: 1px solid var(--dna-border);
   flex-shrink: 0;
 }
 
@@ -1292,7 +1295,7 @@ body.is-mobile-plus-open header {
 /* 抽屉底部输入区 */
 .dna-comment-drawer__footer {
   padding: 10px 16px;
-  border-top: 1px solid var(--dna-border, rgba(255,255,255,0.08));
+  border-top: 1px solid var(--dna-border);
   flex-shrink: 0;
 }
 
@@ -1301,23 +1304,23 @@ body.is-mobile-plus-open header {
   display: flex;
   gap: 10px;
   padding: 10px 0;
-  border-bottom: 1px solid var(--dna-border, rgba(255,255,255,0.06));
+  border-bottom: 1px solid var(--dna-border);
 }
 .dna-comment-item:last-child {
   border-bottom: none;
 }
 .dna-comment-item--focus {
-  background: rgba(var(--dna-accent-rgb, 99, 102, 241), 0.16);
+  background: var(--dna-surface-hover);
   border-radius: 8px;
   padding-left: 8px;
   padding-right: 8px;
-  box-shadow: 0 0 0 1px rgba(var(--dna-accent-rgb, 99, 102, 241), 0.5) inset;
+  box-shadow: 0 0 0 1px var(--dna-border-strong) inset;
 }
 
 /* 置顶评论卡片样式 */
 .dna-comment-item--pinned {
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(168, 85, 247, 0.08) 100%);
-  border: 1px solid rgba(245, 158, 11, 0.35);
+  background: var(--dna-surface-solid);
+  border: 1px solid var(--dna-border-strong);
   border-radius: 8px;
   padding-left: 8px;
   padding-right: 8px;
@@ -1329,9 +1332,9 @@ body.is-mobile-plus-open header {
   font-size: 0.68rem;
   padding: 0.1rem 0.35rem;
   border-radius: 4px;
-  background: rgba(245, 158, 11, 0.15);
-  color: #f59e0b;
-  border: 1px solid rgba(245, 158, 11, 0.3);
+  background: var(--dna-chip-bg);
+  color: var(--bs-warning);
+  border: 1px solid var(--dna-border);
   vertical-align: middle;
 }
 
@@ -1347,7 +1350,7 @@ body.is-mobile-plus-open header {
   transform: scale(0.9);
 }
 .dna-comment-like-btn.liked {
-  color: #dc3545 !important;
+  color: var(--bs-danger) !important;
 }
 
 /* 抽屉 Header 排序 Tabs */
@@ -1355,7 +1358,7 @@ body.is-mobile-plus-open header {
   display: flex;
   align-items: center;
   gap: 4px;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--dna-surface);
   padding: 2px 4px;
   border-radius: 6px;
 }
@@ -1363,18 +1366,18 @@ body.is-mobile-plus-open header {
   font-size: 0.75rem;
   padding: 2px 8px;
   border-radius: 4px;
-  color: var(--dna-muted, #94a3b8);
+  color: var(--dna-muted);
   background: transparent;
   border: none;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 .dna-comment-sort-btn:hover {
-  color: var(--bs-body-color, #fff);
+  color: var(--bs-emphasis-color);
 }
 .dna-comment-sort-btn.active {
-  background: var(--dna-accent, #6366f1);
-  color: #ffffff;
+  background: var(--bs-body-color);
+  color: var(--bs-body-bg);
   font-weight: 500;
 }
 .dna-comment-item__avatar {
@@ -1382,7 +1385,7 @@ body.is-mobile-plus-open header {
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
-  background: var(--dna-surface, #1e1b30);
+  background: var(--dna-surface);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1395,7 +1398,7 @@ body.is-mobile-plus-open header {
 }
 .dna-comment-item__meta {
   font-size: 0.78rem;
-  color: var(--dna-muted, #94a3b8);
+  color: var(--dna-muted);
   margin-bottom: 2px;
 }
 .dna-comment-item__text {
@@ -1415,7 +1418,7 @@ body.is-mobile-plus-open header {
 
 /* 评论删除按钮 */
 .dna-comment-del-btn {
-  color: var(--bs-danger, #dc3545) !important;
+  color: var(--bs-danger) !important;
   font-size: 0.78rem;
   cursor: pointer;
   transition: opacity 0.15s ease, text-decoration 0.15s ease;
@@ -1437,7 +1440,7 @@ body.is-mobile-plus-open header {
   height: 64px;
   object-fit: cover;
   border-radius: 8px;
-  border: 1px solid var(--dna-border, rgba(255, 255, 255, 0.15));
+  border: 1px solid var(--dna-border);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 .dna-comment-img-preview .dna-comment-img-remove {
@@ -1448,8 +1451,8 @@ body.is-mobile-plus-open header {
   height: 18px;
   border-radius: 50%;
   background: rgba(0, 0, 0, 0.75);
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: var(--bs-emphasis-color);
+  border: 1px solid var(--dna-border);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1460,7 +1463,7 @@ body.is-mobile-plus-open header {
   transition: background-color 0.15s ease, transform 0.15s ease;
 }
 .dna-comment-img-preview .dna-comment-img-remove:hover {
-  background: var(--bs-danger, #dc3545);
+  background: var(--bs-danger);
   transform: scale(1.1);
 }
 
@@ -1511,14 +1514,14 @@ body.is-mobile-plus-open header {
   bottom: 100%;
   left: 0;
   margin-bottom: 6px;
-  background: var(--dna-surface-solid, #171327);
-  border: 1px solid var(--dna-border, rgba(255, 255, 255, 0.12));
+  background: var(--dna-surface-solid);
+  border: 1px solid var(--dna-border);
   border-radius: 10px;
   padding: 6px;
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  box-shadow: var(--dna-shadow, 0 8px 24px rgba(0, 0, 0, 0.4));
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
   z-index: 10;
   opacity: 0;
   visibility: hidden;
@@ -1538,7 +1541,7 @@ body.is-mobile-plus-open header {
   font-size: 1.1rem;
   line-height: 1;
   cursor: pointer;
-  transition: background-color 0.15s ease, transform 0.1s ease;
+  transition: background-color 0.15s ease, transform 0.10s ease;
 }
 .dna-emoji-btn:hover {
   background: rgba(255, 255, 255, 0.12);
@@ -1547,7 +1550,7 @@ body.is-mobile-plus-open header {
 .dna-emoji-toggle-btn {
   background: transparent;
   border: none;
-  color: var(--dna-muted, #94a3b8);
+  color: var(--dna-muted);
   font-size: 1.1rem;
   padding: 2px 4px;
   border-radius: 6px;
@@ -1556,7 +1559,7 @@ body.is-mobile-plus-open header {
   transition: color 0.15s ease, background-color 0.15s ease;
 }
 .dna-emoji-toggle-btn:hover {
-  color: var(--bs-emphasis-color, #fff);
+  color: var(--bs-emphasis-color);
   background: rgba(255, 255, 255, 0.08);
 }
 
@@ -1614,13 +1617,13 @@ main.dna-page-loading {
   width: 33px;
   height: 33px;
   border-radius: 50%;
-  background: #1100ff;
-  box-shadow: 0 0 0 0 #1100ff;
+  background: var(--bs-primary);
+  box-shadow: 0 0 0 0 var(--bs-primary);
   animation: rd 1.5s infinite;
 }
 @keyframes rd {
   0% {
-    box-shadow: 0 0 0 0 #1100ff;
+    box-shadow: 0 0 0 0 var(--bs-primary);
   }
   100% {
     box-shadow: 0 0 0 calc(33px) transparent;
@@ -1661,7 +1664,7 @@ main.dna-page-loading {
 
 /* ===== 茶馆专属交互组件 (tea-*) ===== */
 .tea-compose {
-  border: 1px solid var(--dna-border, rgba(255, 255, 255, .12));
+  border: 1px solid var(--dna-border);
   border-radius: 16px;
   background: var(--bs-body-bg);
 }
@@ -1673,7 +1676,7 @@ main.dna-page-loading {
   font-size: 1.05rem;
   object-fit: cover;
 }
-.tea-compose__avatar-ph { color: #fff; }
+.tea-compose__avatar-ph { color: var(--bs-emphasis-color); }
 .tea-compose__input {
   border: 0;
   background: transparent;
@@ -1691,7 +1694,7 @@ main.dna-page-loading {
 
 /* 工具栏 */
 .tea-compose__bar {
-  border-top: 1px solid var(--dna-border, rgba(255, 255, 255, .1));
+  border-top: 1px solid var(--dna-border);
 }
 .tea-tool {
   display: inline-flex;
@@ -1702,22 +1705,22 @@ main.dna-page-loading {
   border-radius: 999px;
   padding: 6px 10px;
   font-size: .85rem;
-  color: var(--dna-accent, #a855f7);
+  color: var(--dna-text);
   transition: background-color .15s ease;
   white-space: nowrap;
 }
-.tea-tool:hover { background: rgba(168, 85, 247, .12); }
+.tea-tool:hover { background: var(--dna-chip-bg); }
 .tea-tool i { font-size: 1.05rem; line-height: 1; }
 
-/* 已选中的角色卡 / 配图：紫色胶囊 */
+/* 已选中的角色卡 / 配图 */
 .tea-card-picked,
 .tea-image-picked {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: rgba(168, 85, 247, .12);
-  color: var(--dna-accent, #a855f7);
-  border: 1px solid rgba(168, 85, 247, .3);
+  background: var(--dna-chip-bg);
+  color: var(--dna-text);
+  border: 1px solid var(--dna-border);
   border-radius: 999px;
   padding: 5px 10px;
   font-size: .82rem;
@@ -1726,7 +1729,7 @@ main.dna-page-loading {
 .tea-image-picked img { border-radius: 6px; }
 .tea-card-picked .btn-link,
 .tea-image-picked .btn-link {
-  color: var(--dna-accent, #a855f7);
+  color: var(--dna-text);
   font-size: 1rem;
   line-height: 1;
 }
@@ -1745,7 +1748,7 @@ main.dna-page-loading {
   background: var(--bs-tertiary-bg, rgba(255, 255, 255, .05));
 }
 .tea-compose__topic .hash {
-  color: var(--dna-accent, #a855f7);
+  color: var(--dna-accent);
   font-weight: 700;
 }
 .tea-compose__topic input {
@@ -1760,22 +1763,23 @@ main.dna-page-loading {
 
 /* 发布区 */
 .tea-compose__publish {
-  background: var(--dna-accent, #a855f7);
-  border-color: var(--dna-accent, #a855f7);
+  background: var(--dna-accent);
+  border-color: var(--dna-accent);
+  color: var(--bs-body-bg);
   border-radius: 999px;
   font-weight: 600;
 }
 .tea-compose__publish:hover { filter: brightness(1.08); }
 
 .tea-card-ref {
-  border: 1px solid var(--dna-border, rgba(255, 255, 255, .12));
+  border: 1px solid var(--dna-border);
   border-radius: 12px;
   padding: 8px 10px;
   background: var(--bs-body-bg);
   transition: background-color .15s ease, border-color .15s ease;
   max-width: 340px;
 }
-.tea-card-ref:hover { background: rgba(168, 85, 247, .08); border-color: var(--dna-accent, #a855f7); }
+.tea-card-ref:hover { background: var(--dna-surface-hover); border-color: var(--dna-border-strong); }
 .tea-card-ref__thumb { width: 42px; height: 42px; }
 .tea-card-ref__img,
 .tea-card-ref__ph {
@@ -1794,12 +1798,12 @@ main.dna-page-loading {
 .tea-card-ref__author { line-height: 1.2; }
 
 .tea-related-post {
-  border: 1px solid var(--dna-border, rgba(255, 255, 255, .1));
+  border: 1px solid var(--dna-border);
   border-radius: 12px;
   padding: 10px 12px;
   transition: background-color .15s ease, border-color .15s ease;
 }
-.tea-related-post:hover { background: rgba(168, 85, 247, .06); border-color: var(--dna-accent, #a855f7); }
+.tea-related-post:hover { background: var(--dna-surface-hover); border-color: var(--dna-border-strong); }
 .tea-related-post__body { min-width: 0; }
 .tea-related-post__text {
   display: -webkit-box;
