@@ -1533,7 +1533,26 @@ data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded=
     } catch (err) {}
   }
   checkAutoCardReference();
-  document.addEventListener('dna:page-loaded', checkAutoCardReference);
+  // 侧边栏退出登录：点击退出登录后发送退出请求，并强制完整刷新一次页面
+  document.addEventListener('click', function (e) {
+    var logoutLink = e.target.closest && e.target.closest('a[href*="/auth/logout"]');
+    if (!logoutLink) return;
+    e.preventDefault();
+    var href = logoutLink.getAttribute('href') || "{{ url_for('auth.logout') }}";
+    fetch(href, {
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      credentials: 'same-origin'
+    })
+    .then(function (res) { return res.json(); })
+    .then(function (data) {
+      var target = (data && data.redirect_url) ? data.redirect_url : "{{ url_for('main.index') }}";
+      window.location.href = target;
+      window.location.reload(true);
+    })
+    .catch(function () {
+      window.location.href = href;
+    });
+  });
 
   function updateCounter() {
     if (textarea && counter) {
