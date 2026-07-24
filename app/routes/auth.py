@@ -23,6 +23,7 @@ from ..services.verification_code_service import (
     create_code,
     verify_code,
 )
+from ..utils import get_user_by_username
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
 
@@ -98,7 +99,7 @@ def register():
             )
             return render_template("auth/register.html")
 
-        if User.query.filter_by(username=username).first():
+        if get_user_by_username(username):
             flash("该用户名已被注册", "danger")
             return render_template("auth/register.html")
         if User.query.filter_by(email=email).first():

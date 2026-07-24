@@ -13,7 +13,15 @@ import string
 from datetime import datetime
 
 from ..extensions import db
-from ..models import Card, CardDialogueStyle, CardImage, CardTag
+from ..models import (
+    Card,
+    CardDialogueStyle,
+    CardFavorite,
+    CardImage,
+    CardLike,
+    CardTag,
+    Comment,
+)
 from sqlalchemy import func
 
 
@@ -151,6 +159,23 @@ def load_card_images(card_id):
         img.slot: img.data
         for img in CardImage.query.filter_by(card_id=card_id).all()
     }
+
+
+def cascade_delete_card(card):
+    """删除角色卡及其全部关联记录（标签 / 对话风格 / 图片 / 评论 / 点赞 / 收藏）。
+
+    统一替代 admin.py 中 card_delete 与 report_action 各自内联的级联删除，
+    避免重复实现导致部分关联表被漏删而留下孤儿记录。
+    """
+    card_id = card.id
+    Comment.query.filter_by(card_id=card_id).delete()
+    CardLike.query.filter_by(card_id=card_id).delete()
+    CardFavorite.query.filter_by(card_id=card_id).delete()
+    CardTag.query.filter_by(card_id=card_id).delete()
+    CardDialogueStyle.query.filter_by(card_id=card_id).delete()
+    CardImage.query.filter_by(card_id=card_id).delete()
+    db.session.delete(card)
+    db.session.commit()
 
 
 def build_export_package(

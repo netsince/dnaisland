@@ -3,7 +3,6 @@ import json
 import os
 import re
 import uuid
-from io import BytesIO
 
 from datetime import datetime
 from flask import (
@@ -46,8 +45,10 @@ from ..models.punishment import (
     APPEAL_REJECTED,
     PUNISHMENT_TYPES,
 )
-from ..services.notification_service import notify
+from ..services.notification_service import notify, notify_super_admins
+from ..services.report_service import describe_report_target
 from ..services.sticker_service import sanitize_stickers
+from ..utils import get_user_by_username, status_counts, toggle_relation
 
 # 审核状态徽章 HTML（与 macros/cards.html::status_badge 保持一致，供 AJAX 局部更新）
 STATUS_BADGE_HTML = {
@@ -55,7 +56,7 @@ STATUS_BADGE_HTML = {
     "rejected": '<span class="badge bg-danger">已拒绝</span>',
     "pending": '<span class="badge bg-warning text-dark">审核中</span>',
 }
-from ..services.image_service import compress_image, crop_square_and_compress, data_url_to_webp_bytes
+from ..services.image_service import compress_image, crop_square_and_compress, send_webp
 from ..services.card_service import (
     attach_covers,
     build_export_package,
@@ -83,11 +84,7 @@ def avatar(user_id):
     """用户头像：base64 data URL -> WEBP 二进制，避免内联膨胀 HTML。无头像时返回首字母占位图。"""
     u = db.session.get(User, user_id)
     if u and u.avatar:
-        try:
-            webp = data_url_to_webp_bytes(u.avatar, max_edge=256, quality=82)
-            return send_file(BytesIO(webp), mimetype="image/webp", max_age=86400)
-        except Exception:
-            pass
+        return send_webp(u.avatar, max_edge=256, quality=82)
     ch = (u.display_name or u.username or "?")[0] if u else "?"
     return Response(
         _default_avatar_svg(ch),
@@ -104,11 +101,7 @@ def card_image(card_id, slot):
     img = CardImage.query.filter_by(card_id=card_id, slot=slot).first()
     if not img or not img.data:
         abort(404)
-    try:
-        webp = data_url_to_webp_bytes(img.data, max_edge=1024, quality=82)
-    except Exception:
-        abort(404)
-    return send_file(BytesIO(webp), mimetype="image/webp", max_age=86400)
+    return send_webp(img.data, max_edge=1024, quality=82)
 
 REPORT_TARGETS = ("card", "comment", "user", "teapost")
 REPORT_REASONS = [
@@ -351,13 +344,10 @@ def punish_appeal(punishment_id):
     p.appeal_status = APPEAL_PENDING
     p.appeal_at = db.func.now()
     db.session.commit()
-    for admin in _User.query.filter_by(role="super_admin").all():
-        notify(
-            admin.id,
-            f'用户 {current_user.nickname} 对处罚「{PUNISHMENT_TYPES.get(p.type, p.type)}」提交了申诉，请到「处罚申诉」处理。',
-            type_="punish",
-        )
-    db.session.commit()
+    notify_super_admins(
+        f'用户 {current_user.nickname} 对处罚「{PUNISHMENT_TYPES.get(p.type, p.type)}」提交了申诉，请到「处罚申诉」处理。',
+        type_="punish",
+    )
     flash("申诉已提交，等待管理员处理（仅可申诉一次）", "success")
     return redirect(url_for("user.my_punishments"))
 
@@ -368,17 +358,11 @@ def card_detail(card_id):
     if not card:
         abort(404)
 
-    author = card.author
     is_owner = current_user.is_authenticated and current_user.id == card.author_id
     is_admin = current_user.is_authenticated and current_user.is_super_admin
-    is_public = (
-        card.status == "approved"
-        and not card.is_hidden
-        and not (author and (author.is_cards_hidden or author.is_profile_banned))
-    )
 
     # 隐藏卡、未通过审核的卡、以及被封禁作者的卡，仅对作者与管理员可见
-    if not (is_public or is_owner or is_admin):
+    if not (card.is_public or is_owner or is_admin):
         abort(404)
 
     # 外部带 comment 参数进入时，自动展开评论区并定位到对应评论
@@ -485,15 +469,9 @@ def card_export(card_id):
     if not card:
         abort(404)
 
-    author = card.author
     is_owner = current_user.is_authenticated and current_user.id == card.author_id
     is_admin = current_user.is_authenticated and current_user.is_super_admin
-    is_public = (
-        card.status == "approved"
-        and not card.is_hidden
-        and not (author and (author.is_cards_hidden or author.is_profile_banned))
-    )
-    if not (is_public or is_owner or is_admin):
+    if not (card.is_public or is_owner or is_admin):
         abort(404)
 
     # 收集复制者上下文，用于版权溯源（cp/pd/up/ct/ci）
@@ -529,12 +507,7 @@ def my_cards():
         .order_by(Card.created_at.desc())
         .paginate(page=page, per_page=12, error_out=False)
     )
-    stats = dict(
-        db.session.query(Card.status, func.count(Card.id))
-        .filter(Card.author_id == current_user.id)
-        .group_by(Card.status)
-        .all()
-    )
+    stats = status_counts(Card, Card.query.filter_by(author_id=current_user.id))
     return render_template(
         "user/my_cards.html",
         cards=attach_covers(pagination.items),
@@ -593,21 +566,19 @@ def card_like(card_id):
     card = db.session.get(Card, card_id)
     if not card:
         abort(404)
-    existing = CardLike.query.filter_by(user_id=current_user.id, card_id=card_id).first()
-    if existing:
-        db.session.delete(existing)
-        flash("已取消点赞", "info")
-    else:
-        db.session.add(CardLike(user_id=current_user.id, card_id=card_id))
-        flash("已点赞", "success")
-    db.session.commit()
+    now_active, count = toggle_relation(
+        CardLike.query.filter_by(user_id=current_user.id, card_id=card_id).first(),
+        CardLike(user_id=current_user.id, card_id=card_id),
+        CardLike.query.filter_by(card_id=card_id),
+    )
+    flash("已点赞" if now_active else "已取消点赞", "success" if now_active else "info")
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
         # 局部提交：返回新状态供前端切换按钮，不整页刷新
         return jsonify({
             "ok": True,
             "action": "like",
-            "state": existing is None,
-            "count": CardLike.query.filter_by(card_id=card_id).count(),
+            "state": now_active,
+            "count": count,
         })
     return redirect(url_for("user.card_detail", card_id=card_id))
 
@@ -618,21 +589,19 @@ def card_favorite(card_id):
     card = db.session.get(Card, card_id)
     if not card:
         abort(404)
-    existing = CardFavorite.query.filter_by(user_id=current_user.id, card_id=card_id).first()
-    if existing:
-        db.session.delete(existing)
-        flash("已取消收藏", "info")
-    else:
-        db.session.add(CardFavorite(user_id=current_user.id, card_id=card_id))
-        flash("已收藏", "success")
-    db.session.commit()
+    now_active, count = toggle_relation(
+        CardFavorite.query.filter_by(user_id=current_user.id, card_id=card_id).first(),
+        CardFavorite(user_id=current_user.id, card_id=card_id),
+        CardFavorite.query.filter_by(card_id=card_id),
+    )
+    flash("已收藏" if now_active else "已取消收藏", "success" if now_active else "info")
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
         # 局部提交：返回新状态供前端切换按钮，不整页刷新
         return jsonify({
             "ok": True,
             "action": "favorite",
-            "state": existing is None,
-            "count": CardFavorite.query.filter_by(card_id=card_id).count(),
+            "state": now_active,
+            "count": count,
         })
     return redirect(url_for("user.card_detail", card_id=card_id))
 
@@ -647,20 +616,18 @@ def user_follow(username):
     if str(target.id) == str(current_user.get_id()):
         flash("不能关注自己", "warning")
     else:
-        existing = UserFollow.query.filter_by(
-            follower_id=current_user.id, following_id=target.id
-        ).first()
-        if existing:
-            db.session.delete(existing)
-            now_following = False
-            flash("已取消关注", "info")
-        else:
-            db.session.add(
-                UserFollow(follower_id=current_user.id, following_id=target.id)
-            )
+        now_following, _ = toggle_relation(
+            UserFollow.query.filter_by(
+                follower_id=current_user.id, following_id=target.id
+            ).first(),
+            UserFollow(follower_id=current_user.id, following_id=target.id),
+            UserFollow.query.filter_by(following_id=target.id),
+        )
+        if now_following:
             notify(target.id, f"{current_user.nickname} 关注了你", type_="follow")
-            now_following = True
             flash("已关注", "success")
+        else:
+            flash("已取消关注", "info")
         db.session.commit()
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
         # 局部提交：返回新状态供前端切换按钮，不整页刷新
@@ -925,26 +892,22 @@ def card_comment_like(card_id, comment_id):
     cm = db.session.get(Comment, comment_id)
     if not cm or cm.card_id != card_id:
         abort(404)
-    existing = CommentLike.query.filter_by(
-        user_id=current_user.id, comment_id=comment_id
-    ).first()
-    if existing:
-        db.session.delete(existing)
-        is_now_liked = False
-    else:
-        db.session.add(CommentLike(user_id=current_user.id, comment_id=comment_id))
-        is_now_liked = True
-        if cm.user_id != current_user.id:
-            card = db.session.get(Card, card_id)
-            if card:
-                notify(
-                    user_id=cm.user_id,
-                    message=f"{current_user.display_name} 点赞了你在《{card.name}》下的评论",
-                    type_="comment_like",
-                    related_card_id=card.id,
-                )
-    db.session.commit()
-    new_count = CommentLike.query.filter_by(comment_id=comment_id).count()
+    is_now_liked, new_count = toggle_relation(
+        CommentLike.query.filter_by(
+            user_id=current_user.id, comment_id=comment_id
+        ).first(),
+        CommentLike(user_id=current_user.id, comment_id=comment_id),
+        CommentLike.query.filter_by(comment_id=comment_id),
+    )
+    if is_now_liked and cm.user_id != current_user.id:
+        card = db.session.get(Card, card_id)
+        if card:
+            notify(
+                user_id=cm.user_id,
+                message=f"{current_user.display_name} 点赞了你在《{card.name}》下的评论",
+                type_="comment_like",
+                related_card_id=card.id,
+            )
     return jsonify({"ok": True, "liked": is_now_liked, "count": new_count})
 
 
@@ -1176,59 +1139,18 @@ def _follow_items(users, include_banned):
 
 
 def User_query_by_username(username):
-    from ..models import User
-
-    return User.query.filter_by(username=username).first()
+    return get_user_by_username(username)
 
 
 def resolve_report_target(target_type, raw_id):
-    """根据类型与原始 id 解析被举报对象，返回 (canonical_id, display, target_url) 或 None。"""
-    from ..models import Comment, TeaPost, User
+    """根据类型与原始 id 解析被举报对象，返回 (canonical_id, display, target_url) 或 None。
 
-    if target_type == "card":
-        card = db.session.get(Card, raw_id)
-        if not card:
-            return None
-        return (
-            str(card.id),
-            card.name,
-            url_for("user.card_detail", card_id=card.id),
-        )
-    if target_type == "comment":
-        comment = db.session.get(Comment, raw_id)
-        if not comment:
-            return None
-        return (
-            str(comment.id),
-            comment.content[:30],
-            url_for("user.card_detail", card_id=comment.card_id),
-        )
-    if target_type == "user":
-        u = User_query_by_username(raw_id)
-        if not u:
-            try:
-                u = db.session.get(User, int(raw_id))
-            except (TypeError, ValueError):
-                u = None
-        if not u:
-            return None
-        return (
-            str(u.id),
-            u.nickname,
-            url_for("user.profile", username=u.username),
-        )
-    if target_type == "teapost":
-        if not raw_id.isdigit():
-            return None
-        tp = db.session.get(TeaPost, int(raw_id))
-        if not tp:
-            return None
-        return (
-            str(tp.id),
-            tp.content[:30],
-            url_for("teahouse.post_detail", post_id=tp.id),
-        )
-    return None
+    委托给 report_service.describe_report_target，避免与后台解析逻辑重复实现。
+    """
+    d = describe_report_target(target_type, raw_id)
+    if not d:
+        return None
+    return d["id"], d["display"], d["url"]
 
 
 @user_bp.route("/report", methods=["GET", "POST"])
@@ -1279,16 +1201,10 @@ def report():
                 )
             )
             db.session.commit()
-            # 通知所有超级管理员
-            from ..models import User
-
-            for admin in User.query.filter_by(role="super_admin").all():
-                notify(
-                    admin.id,
-                    f'收到一条对{target_type}的举报：{display}',
-                    type_="report",
-                )
-            db.session.commit()
+            notify_super_admins(
+                f'收到一条对{target_type}的举报：{display}',
+                type_="report",
+            )
             flash("举报已提交，管理员会尽快处理", "success")
             return redirect(target_url)
 

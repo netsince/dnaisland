@@ -61,6 +61,19 @@ class Card(db.Model):
             q = q.filter(cls.author_id.notin_(hidden_ids))
         return q
 
+    @property
+    def is_public(self):
+        """单卡是否对公众可见：已通过、未隐藏，且作者未被封禁/隐藏卡片。
+
+        用于 card_detail / card_export 等单卡访问的 404 拦截，与 visible_to 口径一致。
+        """
+        author = self.author
+        return (
+            self.status == "approved"
+            and not self.is_hidden
+            and not (author and (author.is_cards_hidden or author.is_profile_banned))
+        )
+
 
 class CardTag(db.Model):
     __tablename__ = "card_tags"

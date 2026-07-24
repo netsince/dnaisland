@@ -57,10 +57,32 @@ from ..models.punishment import (
     APPEAL_REJECTED,
     PUNISHMENT_TYPES,
 )
+from ..services.card_service import cascade_delete_card
 from ..services.image_service import compress_image, raw_bytes_to_webp_data_url
 from ..services.notification_service import notify
+from ..services.report_service import describe_report_target
 from ..services.site_service import get_site_config
 from ..services.sticker_service import invalidate_sticker_cache
+from ..utils import get_user_by_username, status_counts
+
+
+def apply_mute(user_id, reason, notify_msg):
+    """对指定用户施加禁言处罚，替代 comment_reject / tea_post_reject 中重复的内联逻辑。"""
+    u = db.session.get(User, user_id)
+    if not u or u.has_punishment("mute"):
+        return
+    u.is_muted = True
+    db.session.add(
+        Punishment(
+            user_id=u.id,
+            type="mute",
+            reason=reason,
+            handled_by=current_user.id,
+        )
+    )
+    db.session.commit()
+    notify(u.id, notify_msg, type_="punish")
+    db.session.commit()
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -123,7 +145,7 @@ def user_create():
         if not (username and nickname and email and password):
             flash("请填写用户名、昵称、邮箱和密码", "danger")
             return render_template("admin/user_form.html", user=None)
-        if User.query.filter_by(username=username).first():
+        if get_user_by_username(username):
             flash("用户名已存在", "danger")
             return render_template("admin/user_form.html", user=None)
         if User.query.filter_by(email=email).first():
@@ -730,14 +752,7 @@ def card_delete(card_id):
     card = db.session.get(Card, card_id)
     if not card:
         abort(404)
-    CardTag.query.filter_by(card_id=card.id).delete()
-    CardDialogueStyle.query.filter_by(card_id=card.id).delete()
-    CardImage.query.filter_by(card_id=card.id).delete()
-    Comment.query.filter_by(card_id=card.id).delete()
-    CardLike.query.filter_by(card_id=card.id).delete()
-    CardFavorite.query.filter_by(card_id=card.id).delete()
-    db.session.delete(card)
-    db.session.commit()
+    cascade_delete_card(card)
     flash("角色卡已删除", "success")
     return redirect(url_for("admin.cards"))
 
@@ -755,9 +770,7 @@ def review():
         page=page, per_page=20, error_out=False
     )
     # 统计各状态数量
-    stats = dict(
-        db.session.query(Card.status, func.count(Card.id)).group_by(Card.status).all()
-    )
+    stats = status_counts(Card)
     return render_template(
         "admin/review_list.html",
         cards=pagination.items,
@@ -874,11 +887,7 @@ def reports():
     pagination = query.order_by(Report.created_at.desc()).paginate(
         page=page, per_page=20, error_out=False
     )
-    stats = dict(
-        db.session.query(Report.status, func.count(Report.id))
-        .group_by(Report.status)
-        .all()
-    )
+    stats = status_counts(Report)
     # 统计同一被举报对象被举报的次数，用于在列表中提示“多人举报”
     rows = (
         db.session.query(Report.target_type, Report.target_id, func.count(Report.id))
@@ -905,27 +914,12 @@ def report_detail(report_id):
     if not r:
         abort(404)
 
-    target_info = {"type": r.target_type, "link": None, "snippet": ""}
-    if r.target_type == "card":
-        card = db.session.get(Card, r.target_id)
-        if card:
-            target_info["link"] = url_for("user.card_detail", card_id=card.id)
-            target_info["snippet"] = f"名称：{card.name}\n简介：{card.intro[:200]}"
-    elif r.target_type == "comment":
-        comment = db.session.get(Comment, int(r.target_id))
-        if comment:
-            target_info["link"] = url_for("user.card_detail", card_id=comment.card_id)
-            target_info["snippet"] = comment.content
-    elif r.target_type == "user":
-        u = db.session.get(User, int(r.target_id))
-        if u:
-            target_info["link"] = url_for("user.profile", username=u.username)
-            target_info["snippet"] = f"用户名：{u.username}\n昵称：{u.nickname}\n邮箱：{u.email}"
-    elif r.target_type == "teapost":
-        tp = db.session.get(TeaPost, int(r.target_id))
-        if tp:
-            target_info["link"] = url_for("teahouse.post_detail", post_id=tp.id)
-            target_info["snippet"] = f"作者：@{tp.author.username}\n内容：{tp.content}"
+    desc = describe_report_target(r.target_type, r.target_id)
+    target_info = {
+        "type": r.target_type,
+        "link": desc["url"] if desc else None,
+        "snippet": desc["snippet"] if desc else "（目标不存在）",
+    }
 
     # 统计同一被举报对象被多少人举报，便于管理员判断严重程度
     related = Report.query.filter_by(
@@ -981,10 +975,7 @@ def report_action(report_id):
     elif action == "delete_card" and r.target_type == "card":
         card = db.session.get(Card, r.target_id)
         if card:
-            CardTag.query.filter_by(card_id=card.id).delete()
-            CardDialogueStyle.query.filter_by(card_id=card.id).delete()
-            CardImage.query.filter_by(card_id=card.id).delete()
-            db.session.delete(card)
+            cascade_delete_card(card)
     elif action == "delete_comment" and r.target_type == "comment":
         comment = db.session.get(Comment, int(r.target_id))
         if comment:
@@ -1077,20 +1068,11 @@ def comment_reject(comment_id):
     # 可选：拒绝的同时禁言该用户（复用 mute 处罚）
     mute = request.form.get("mute") == "1"
     if mute:
-        u = db.session.get(User, c.user_id)
-        if u and not u.has_punishment("mute"):
-            db.session.add(
-                Punishment(
-                    user_id=u.id,
-                    type="mute",
-                    reason="评论被拒绝时管理员施加禁言",
-                    handled_by=current_user.id,
-                )
-            )
-            db.session.commit()
-            notify(u.id, "你已被平台禁言，暂时无法发表评论。", type_="punish")
-            db.session.commit()
-        db.session.commit()
+        apply_mute(
+            c.user_id,
+            "评论被拒绝时管理员施加禁言",
+            "你已被平台禁言，暂时无法发表评论。",
+        )
 
     flash(
         "已拒绝该评论（已隐藏并通知用户）" + ("，并禁言该用户" if mute else ""),
@@ -1167,7 +1149,8 @@ def notify_send():
             pattern = username.replace("*", "%")
             users = User.query.filter(User.username.like(pattern)).all()
         else:
-            users = User.query.filter_by(username=username).all()
+            u = get_user_by_username(username)
+            users = [u] if u else []
         if not users:
             flash("没有匹配的用户", "warning")
             return render_template("admin/notify.html", templates=NOTIFY_TEMPLATES)
@@ -1232,19 +1215,11 @@ def tea_post_reject(post_id):
     # 可选：拒绝的同时禁言该用户（复用 mute 处罚）
     mute = request.form.get("mute") == "1"
     if mute:
-        u = db.session.get(User, p.user_id)
-        if u and not u.has_punishment("mute"):
-            db.session.add(
-                Punishment(
-                    user_id=u.id,
-                    type="mute",
-                    reason="茶馆帖子被拒绝时管理员施加禁言",
-                    handled_by=current_user.id,
-                )
-            )
-            db.session.commit()
-            notify(u.id, "你已被平台禁言，暂时无法在茶馆发言。", type_="punish")
-            db.session.commit()
+        apply_mute(
+            p.user_id,
+            "茶馆帖子被拒绝时管理员施加禁言",
+            "你已被平台禁言，暂时无法在茶馆发言。",
+        )
     flash(
         "已拒绝该茶馆帖子（已隐藏并通知用户）" + ("，并禁言该用户" if mute else ""),
         "success",

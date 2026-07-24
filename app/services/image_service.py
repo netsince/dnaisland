@@ -108,3 +108,16 @@ def data_url_to_webp_bytes(data_url: str, max_edge: int = 1024, quality: int = 8
     except Exception:
         return raw
 
+
+def send_webp(data_url: str, max_edge: int = 1024, quality: int = 82):
+    """将存储的 Data URL 转为 WebP 字节并以 image/webp 响应返回。
+
+    统一替代各路由中重复的 send_file(BytesIO(data_url_to_webp_bytes(...))) 写法。
+    """
+    from flask import BytesIO, send_file
+
+    if not data_url:
+        return ("", 404)
+    webp = data_url_to_webp_bytes(data_url, max_edge=max_edge, quality=quality)
+    return send_file(BytesIO(webp), mimetype="image/webp", max_age=86400)
+

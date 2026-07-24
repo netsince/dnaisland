@@ -8,7 +8,7 @@ from ..extensions import db
 from ..models import Article, Card, CardLike, CardTag, Punishment, User
 from ..models.teahouse import TeaPost
 from ..services.card_service import attach_covers, popular_tags
-from ..services.image_service import data_url_to_webp_bytes
+from ..services.image_service import send_webp
 
 main_bp = Blueprint("main", __name__)
 
@@ -31,11 +31,7 @@ def article_cover(article_id):
                 )
             except Exception:
                 pass
-        try:
-            webp = data_url_to_webp_bytes(a.cover, max_edge=1024, quality=82)
-        except Exception:
-            abort(404)
-        return send_file(BytesIO(webp), mimetype="image/webp", max_age=86400)
+        return send_webp(a.cover, max_edge=1024, quality=82)
     abort(404)
 
 

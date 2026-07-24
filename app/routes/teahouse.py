@@ -32,6 +32,7 @@ from ..models import (
 from ..services.image_service import compress_image
 from ..services.notification_service import notify
 from ..services.sticker_service import sanitize_stickers
+from ..utils import get_user_by_username, toggle_relation
 
 # 配图：仅支持单图
 TEA_MAX_IMAGES = 1
@@ -129,7 +130,7 @@ def _notify_mentions(content, post, actor):
         if name in seen:
             continue
         seen.add(name)
-        u = User.query.filter_by(username=name).first()
+        u = get_user_by_username(name)
         if not u or u.id == actor.id:
             continue
         exists = (
@@ -573,21 +574,14 @@ def like(post_id):
         abort(404)
     if p.is_deleted and not current_user.is_super_admin:
         abort(404)
-    existing = TeaPostLike.query.filter_by(
-        user_id=current_user.id, post_id=post_id
-    ).first()
-    if existing:
-        db.session.delete(existing)
-        now_liked = False
-        # 聚合：取消点赞时移除该用户对此帖的未读点赞通知，避免重复刷屏
-        Notification.query.filter_by(
-            user_id=p.user_id, type="like", is_read=False
-        ).filter(Notification.message.contains(f"/teahouse/{p.id}")).delete(
-            synchronize_session=False
-        )
-    else:
-        db.session.add(TeaPostLike(user_id=current_user.id, post_id=post_id))
-        now_liked = True
+    now_liked, count = toggle_relation(
+        TeaPostLike.query.filter_by(
+            user_id=current_user.id, post_id=post_id
+        ).first(),
+        TeaPostLike(user_id=current_user.id, post_id=post_id),
+        TeaPostLike.query.filter_by(post_id=post_id),
+    )
+    if now_liked:
         # 点赞通知：被点赞者开启偏好、且非本人（可聚合：同帖不重复）
         if p.user_id != current_user.id:
             author = p.author
@@ -608,6 +602,13 @@ def like(post_id):
                         f"{current_user.nickname} 赞了你在茶馆的帖子：{url}",
                         type_="like",
                     )
+    else:
+        # 聚合：取消点赞时移除该用户对此帖的未读点赞通知，避免重复刷屏
+        Notification.query.filter_by(
+            user_id=p.user_id, type="like", is_read=False
+        ).filter(Notification.message.contains(f"/teahouse/{p.id}")).delete(
+            synchronize_session=False
+        )
     db.session.commit()
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
         # 局部提交：返回新状态供前端切换按钮，不整页刷新
@@ -615,7 +616,7 @@ def like(post_id):
             "ok": True,
             "action": "like",
             "state": now_liked,
-            "count": TeaPostLike.query.filter_by(post_id=post_id).count(),
+            "count": count,
         })
     return redirect(request.referrer or url_for("teahouse.post_detail", post_id=post_id))
 
@@ -628,23 +629,20 @@ def favorite(post_id):
         abort(404)
     if p.is_deleted and not current_user.is_super_admin:
         abort(404)
-    existing = TeaPostFavorite.query.filter_by(
-        user_id=current_user.id, post_id=post_id
-    ).first()
-    if existing:
-        db.session.delete(existing)
-        now_fav = False
-    else:
-        db.session.add(TeaPostFavorite(user_id=current_user.id, post_id=post_id))
-        now_fav = True
-    db.session.commit()
+    now_fav, count = toggle_relation(
+        TeaPostFavorite.query.filter_by(
+            user_id=current_user.id, post_id=post_id
+        ).first(),
+        TeaPostFavorite(user_id=current_user.id, post_id=post_id),
+        TeaPostFavorite.query.filter_by(post_id=post_id),
+    )
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
         # 局部提交：返回新状态供前端切换按钮，不整页刷新
         return jsonify({
             "ok": True,
             "action": "favorite",
             "state": now_fav,
-            "count": TeaPostFavorite.query.filter_by(post_id=post_id).count(),
+            "count": count,
         })
     return redirect(request.referrer or url_for("teahouse.post_detail", post_id=post_id))
 
