@@ -168,7 +168,7 @@ def user_create():
 @admin_bp.route("/users/<int:user_id>/edit", methods=["GET", "POST"])
 @super_admin_required
 def user_edit(user_id):
-    u = db.session.get_or_404(User, user_id)
+    u = db.get_or_404(User, user_id)
     if request.method == "POST":
         u.username = (request.form.get("username") or "").strip() or u.username
         u.nickname = (request.form.get("nickname") or "").strip() or u.nickname
@@ -214,7 +214,7 @@ def user_edit(user_id):
 @admin_bp.route("/users/<int:user_id>/delete", methods=["POST"])
 @super_admin_required
 def user_delete(user_id):
-    u = db.session.get_or_404(User, user_id)
+    u = db.get_or_404(User, user_id)
     if u.id == current_user.id:
         flash("不能删除当前登录的账号", "danger")
         return redirect(url_for("admin.users"))
@@ -230,7 +230,7 @@ def user_delete(user_id):
 @admin_bp.route("/users/<int:user_id>/points")
 @super_admin_required
 def user_points(user_id):
-    u = db.session.get_or_404(User, user_id)
+    u = db.get_or_404(User, user_id)
     page = request.args.get("page", 1, type=int)
     query = PointTransaction.query.filter_by(user_id=u.id).order_by(
         PointTransaction.created_at.desc()
@@ -364,7 +364,7 @@ def keys_generate():
 @admin_bp.route("/keys/<int:key_id>/toggle", methods=["POST"])
 @super_admin_required
 def key_toggle(key_id):
-    key = db.session.get_or_404(RedemptionKey, key_id)
+    key = db.get_or_404(RedemptionKey, key_id)
     key.active = not key.active
     db.session.commit()
     flash("兑换码状态已更新", "success")
@@ -406,7 +406,7 @@ def image_models():
 @admin_bp.route("/image-models/<int:model_id>/toggle", methods=["POST"])
 @super_admin_required
 def image_model_toggle(model_id):
-    m = db.session.get_or_404(GenerationModel, model_id)
+    m = db.get_or_404(GenerationModel, model_id)
     m.enabled = not m.enabled
     db.session.commit()
     flash("模型状态已更新", "success")
@@ -416,7 +416,7 @@ def image_model_toggle(model_id):
 @admin_bp.route("/image-models/<int:model_id>/delete", methods=["POST"])
 @super_admin_required
 def image_model_delete(model_id):
-    m = db.session.get_or_404(GenerationModel, model_id)
+    m = db.get_or_404(GenerationModel, model_id)
     db.session.delete(m)
     db.session.commit()
     flash("模型已删除", "success")
@@ -459,7 +459,7 @@ def stickers():
 @admin_bp.route("/stickers/series/<int:sid>/delete", methods=["POST"])
 @super_admin_required
 def sticker_series_delete(sid):
-    s = db.session.get_or_404(StickerSeries, sid)
+    s = db.get_or_404(StickerSeries, sid)
     db.session.delete(s)  # 级联删除其下表情
     db.session.commit()
     invalidate_sticker_cache()
@@ -512,7 +512,7 @@ def sticker_upload():
 @admin_bp.route("/stickers/<int:sticker_id>/delete", methods=["POST"])
 @super_admin_required
 def sticker_delete(sticker_id):
-    st = db.session.get_or_404(Sticker, sticker_id)
+    st = db.get_or_404(Sticker, sticker_id)
     db.session.delete(st)
     db.session.commit()
     invalidate_sticker_cache()
@@ -544,7 +544,7 @@ def image_logs():
 @admin_bp.route("/users/<int:user_id>/punish", methods=["GET", "POST"])
 @super_admin_required
 def user_punish(user_id):
-    u = db.session.get_or_404(User, user_id)
+    u = db.get_or_404(User, user_id)
 
     if request.method == "POST":
         selected = request.form.getlist("types")
@@ -603,7 +603,7 @@ def user_punish(user_id):
 @admin_bp.route("/punish/<int:punishment_id>/revoke", methods=["POST"])
 @super_admin_required
 def punish_revoke(punishment_id):
-    p = db.session.get_or_404(Punishment, punishment_id)
+    p = db.get_or_404(Punishment, punishment_id)
     if p.is_active:
         p.status = "revoked"
         db.session.commit()
@@ -705,7 +705,7 @@ def cards():
 @admin_bp.route("/cards/<card_id>/edit", methods=["GET", "POST"])
 @super_admin_required
 def card_edit(card_id):
-    card = db.session.get_or_404(Card, card_id)
+    card = db.get_or_404(Card, card_id)
     if request.method == "POST":
         card.name = (request.form.get("name") or "").strip() or card.name
         card.gender = request.form.get("gender") or card.gender
@@ -727,7 +727,7 @@ def card_edit(card_id):
 @admin_bp.route("/cards/<card_id>/delete", methods=["POST"])
 @super_admin_required
 def card_delete(card_id):
-    card = db.session.get_or_404(Card, card_id)
+    card = db.get_or_404(Card, card_id)
     cascade_delete_card(card)
     flash("角色卡已删除", "success")
     return redirect(url_for("admin.cards"))
@@ -760,7 +760,7 @@ def review():
 @admin_bp.route("/review/<card_id>")
 @super_admin_required
 def review_detail(card_id):
-    card = db.session.get_or_404(Card, card_id)
+    card = db.get_or_404(Card, card_id)
     author = db.session.get(User, card.author_id)
     tags = [t.tag for t in CardTag.query.filter_by(card_id=card.id).all()]
     dialogue = (
@@ -884,7 +884,7 @@ def reports():
 @admin_bp.route("/reports/<int:report_id>")
 @super_admin_required
 def report_detail(report_id):
-    r = db.session.get_or_404(Report, report_id)
+    r = db.get_or_404(Report, report_id)
 
     desc = describe_report_target(r.target_type, r.target_id)
     target_info = {
@@ -916,7 +916,7 @@ def report_detail(report_id):
 @admin_bp.route("/reports/<int:report_id>/resolve", methods=["POST"])
 @super_admin_required
 def report_resolve(report_id):
-    r = db.session.get_or_404(Report, report_id)
+    r = db.get_or_404(Report, report_id)
     _resolve_target_reports(
         r.target_type,
         r.target_id,
@@ -933,7 +933,7 @@ def report_resolve(report_id):
 @admin_bp.route("/reports/<int:report_id>/action", methods=["POST"])
 @super_admin_required
 def report_action(report_id):
-    r = db.session.get_or_404(Report, report_id)
+    r = db.get_or_404(Report, report_id)
     action = (request.form.get("action") or "").strip()
 
     if action == "hide_card" and r.target_type == "card":
@@ -1005,7 +1005,7 @@ def comment_moderation():
 @admin_bp.route("/comments/<int:comment_id>/approve", methods=["POST"])
 @super_admin_required
 def comment_approve(comment_id):
-    c = db.session.get_or_404(Comment, comment_id)
+    c = db.get_or_404(Comment, comment_id)
     c.moderated = True  # 同意：保持可见
     db.session.commit()
     flash("已通过该评论，继续可见", "success")
@@ -1015,7 +1015,7 @@ def comment_approve(comment_id):
 @admin_bp.route("/comments/<int:comment_id>/reject", methods=["POST"])
 @super_admin_required
 def comment_reject(comment_id):
-    c = db.session.get_or_404(Comment, comment_id)
+    c = db.get_or_404(Comment, comment_id)
     # 拒绝：隐藏评论 + 标记已审核
     c.is_hidden = True
     c.moderated = True
@@ -1081,7 +1081,7 @@ def comments():
 @admin_bp.route("/comments/<int:comment_id>/delete", methods=["POST"])
 @super_admin_required
 def comment_delete(comment_id):
-    c = db.session.get_or_404(Comment, comment_id)
+    c = db.get_or_404(Comment, comment_id)
     db.session.delete(c)
     db.session.commit()
     flash("评论已删除", "success")
@@ -1153,7 +1153,7 @@ def tea_moderation():
 @admin_bp.route("/teahouse/<int:post_id>/approve", methods=["POST"])
 @super_admin_required
 def tea_post_approve(post_id):
-    p = db.session.get_or_404(TeaPost, post_id)
+    p = db.get_or_404(TeaPost, post_id)
     p.moderated = True  # 同意：保持可见
     db.session.commit()
     flash("已通过该茶馆帖子，继续可见", "success")
@@ -1163,7 +1163,7 @@ def tea_post_approve(post_id):
 @admin_bp.route("/teahouse/<int:post_id>/reject", methods=["POST"])
 @super_admin_required
 def tea_post_reject(post_id):
-    p = db.session.get_or_404(TeaPost, post_id)
+    p = db.get_or_404(TeaPost, post_id)
     # 拒绝：隐藏帖子 + 标记已审核 + 通知作者
     p.is_hidden = True
     p.moderated = True
@@ -1291,7 +1291,7 @@ def tea_posts():
 @admin_bp.route("/teahouse/<int:post_id>/hide", methods=["POST"])
 @super_admin_required
 def tea_post_hide(post_id):
-    p = db.session.get_or_404(TeaPost, post_id)
+    p = db.get_or_404(TeaPost, post_id)
     p.is_hidden = not p.is_hidden
     db.session.commit()
     flash("已切换帖子隐藏状态", "success")
@@ -1301,7 +1301,7 @@ def tea_post_hide(post_id):
 @admin_bp.route("/teahouse/<int:post_id>/delete", methods=["POST"])
 @super_admin_required
 def tea_post_delete(post_id):
-    p = db.session.get_or_404(TeaPost, post_id)
+    p = db.get_or_404(TeaPost, post_id)
     _cascade_delete_teapost(p)
     db.session.commit()
     flash("茶馆帖子及其全部回复、点赞、收藏、投票等关联数据已删除", "success")
@@ -1311,7 +1311,7 @@ def tea_post_delete(post_id):
 @admin_bp.route("/teahouse/<int:post_id>/restore", methods=["POST"])
 @super_admin_required
 def tea_post_restore(post_id):
-    p = db.session.get_or_404(TeaPost, post_id)
+    p = db.get_or_404(TeaPost, post_id)
     if not p.is_deleted:
         flash("该帖子未被删除", "warning")
         return redirect(url_for("admin.tea_posts"))
@@ -1480,7 +1480,7 @@ def article_create():
 @admin_bp.route("/articles/<int:article_id>/edit", methods=["GET", "POST"])
 @super_admin_required
 def article_edit(article_id):
-    a = db.session.get_or_404(Article, article_id)
+    a = db.get_or_404(Article, article_id)
     if request.method == "POST":
         a.title = (request.form.get("title") or "").strip() or a.title
         a.summary = (request.form.get("summary") or "").strip() or None
@@ -1497,7 +1497,7 @@ def article_edit(article_id):
 @admin_bp.route("/articles/<int:article_id>/delete", methods=["POST"])
 @super_admin_required
 def article_delete(article_id):
-    a = db.session.get_or_404(Article, article_id)
+    a = db.get_or_404(Article, article_id)
     db.session.delete(a)
     db.session.commit()
     flash("文章已删除", "success")
@@ -1508,7 +1508,7 @@ def article_delete(article_id):
 @super_admin_required
 def article_toggle_author(article_id):
     """切换发布者是否公开（隐藏时显示为匿名管理员）。"""
-    a = db.session.get_or_404(Article, article_id)
+    a = db.get_or_404(Article, article_id)
     a.show_author = not a.show_author
     db.session.commit()
     flash("已切换发布者显示状态", "success")

@@ -123,7 +123,7 @@ def _too_frequent(user_id):
 
 def _require_visible_post(post_id):
     """校验帖子存在且对当前用户可见（未删除/未隐藏）；否则 404。返回 TeaPost 实例。"""
-    p = db.session.get_or_404(TeaPost, post_id)
+    p = db.get_or_404(TeaPost, post_id)
     if p.is_deleted and not current_user.is_super_admin:
         abort(404)
     if p.is_hidden and not (

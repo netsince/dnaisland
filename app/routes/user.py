@@ -330,7 +330,7 @@ def my_punishments():
 def punish_appeal(punishment_id):
     from ..models import User as _User
 
-    p = db.session.get_or_404(Punishment, punishment_id)
+    p = db.get_or_404(Punishment, punishment_id)
     if p.user_id != current_user.id:
         abort(404)
     if not p.can_appeal:
@@ -355,7 +355,7 @@ def punish_appeal(punishment_id):
 
 @user_bp.route("/card/<card_id>")
 def card_detail(card_id):
-    card = db.session.get_or_404(Card, card_id)
+    card = db.get_or_404(Card, card_id)
 
     is_owner = current_user.is_authenticated and current_user.id == card.author_id
     is_admin = current_user.is_authenticated and current_user.is_super_admin
@@ -464,7 +464,7 @@ def card_export(card_id):
             login_url=url_for("auth.login"),
         ), 401
 
-    card = db.session.get_or_404(Card, card_id)
+    card = db.get_or_404(Card, card_id)
 
     is_owner = current_user.is_authenticated and current_user.id == card.author_id
     is_admin = current_user.is_authenticated and current_user.is_super_admin
@@ -560,7 +560,7 @@ def my_likes():
 @user_bp.route("/card/<card_id>/like", methods=["POST"])
 @login_required
 def card_like(card_id):
-    card = db.session.get_or_404(Card, card_id)
+    card = db.get_or_404(Card, card_id)
     now_active, count = toggle_relation(
         CardLike.query.filter_by(user_id=current_user.id, card_id=card_id).first(),
         CardLike(user_id=current_user.id, card_id=card_id),
@@ -579,7 +579,7 @@ def card_like(card_id):
 @user_bp.route("/card/<card_id>/favorite", methods=["POST"])
 @login_required
 def card_favorite(card_id):
-    card = db.session.get_or_404(Card, card_id)
+    card = db.get_or_404(Card, card_id)
     now_active, count = toggle_relation(
         CardFavorite.query.filter_by(user_id=current_user.id, card_id=card_id).first(),
         CardFavorite(user_id=current_user.id, card_id=card_id),
@@ -772,7 +772,7 @@ def card_comments_api(card_id):
 @login_required
 @block_if_muted(message="你已被禁言，暂时无法评论")
 def card_comment(card_id):
-    card = db.session.get_or_404(Card, card_id)
+    card = db.get_or_404(Card, card_id)
     content = (request.form.get("content") or "").strip()
     content, _ = sanitize_stickers(content, max_count=20)
     if not content:
@@ -868,7 +868,7 @@ def card_comment(card_id):
 @user_bp.route("/card/<card_id>/comment/<int:comment_id>/like", methods=["POST"])
 @login_required
 def card_comment_like(card_id, comment_id):
-    cm = db.session.get_or_404(Comment, comment_id)
+    cm = db.get_or_404(Comment, comment_id)
     if cm.card_id != card_id:
         abort(404)
     is_now_liked, new_count = toggle_relation(
@@ -893,10 +893,10 @@ def card_comment_like(card_id, comment_id):
 @user_bp.route("/card/<card_id>/comment/<int:comment_id>/pin", methods=["POST"])
 @login_required
 def card_comment_pin(card_id, comment_id):
-    cm = db.session.get_or_404(Comment, comment_id)
+    cm = db.get_or_404(Comment, comment_id)
     if cm.card_id != card_id:
         abort(404)
-    card = db.session.get_or_404(Card, card_id)
+    card = db.get_or_404(Card, card_id)
     ensure_owner_or_admin(card.author_id, message="无权置顶此评论")
     cm.is_pinned = not cm.is_pinned
     db.session.commit()
@@ -906,7 +906,7 @@ def card_comment_pin(card_id, comment_id):
 @user_bp.route("/card/<card_id>/comment/<int:comment_id>/delete", methods=["POST"])
 @login_required
 def card_comment_delete(card_id, comment_id):
-    cm = db.session.get_or_404(Comment, comment_id)
+    cm = db.get_or_404(Comment, comment_id)
     if cm.card_id != card_id:
         abort(404)
     ensure_owner_or_admin(cm.user_id, message="无权删除此评论")
@@ -918,7 +918,7 @@ def card_comment_delete(card_id, comment_id):
 @user_bp.route("/my/card/<card_id>/resubmit", methods=["POST"])
 @login_required
 def card_resubmit(card_id):
-    card = db.session.get_or_404(Card, card_id)
+    card = db.get_or_404(Card, card_id)
     if card.author_id != current_user.id:
         abort(404)
     if card.status != "rejected":
@@ -938,7 +938,7 @@ def card_resubmit(card_id):
 @user_bp.route("/my/card/<card_id>/toggle-hidden", methods=["POST"])
 @login_required
 def card_toggle_hidden(card_id):
-    card = db.session.get_or_404(Card, card_id)
+    card = db.get_or_404(Card, card_id)
     if card.author_id != current_user.id:
         abort(404)
     card.is_hidden = not card.is_hidden
@@ -955,7 +955,7 @@ def card_toggle_hidden(card_id):
 @user_bp.route("/my/card/<card_id>/edit", methods=["GET", "POST"])
 @login_required
 def card_edit(card_id):
-    card = db.session.get_or_404(Card, card_id)
+    card = db.get_or_404(Card, card_id)
     if card.author_id != current_user.id:
         abort(404)
 
