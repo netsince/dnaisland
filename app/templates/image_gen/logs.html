@@ -93,6 +93,11 @@
     </div>
   </div>
 
+  <div id="mgLoading" class="text-center text-muted py-5">
+    <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+    <span>正在加载生成记录…</span>
+  </div>
+
   <div class="mg-masonry-row" id="mgMasonryRow">
     <div class="mg-col"></div>
     <div class="mg-col"></div>
@@ -190,12 +195,16 @@
     });
   }
 
+  var loadingEl = document.getElementById('mgLoading');
+
   function loadLogs(page) {
     page = page || 1;
     currentPage = page;
+    if (loadingEl) loadingEl.classList.remove('d-none');
     fetch('/image-gen/api/logs?page=' + page, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
       .then(function (r) { return r.json(); })
       .then(function (res) {
+        if (loadingEl) loadingEl.classList.add('d-none');
         if (!res.ok) return;
         if (totalPill) {
           totalPill.textContent = '共 ' + res.total + ' 条';
@@ -233,7 +242,10 @@
         renderPaginationControls(res);
         window.scrollTo({ top: 0, behavior: 'smooth' });
       })
-      .catch(function (e) { console.error(e); });
+      .catch(function (e) {
+        if (loadingEl) loadingEl.classList.add('d-none');
+        console.error(e);
+      });
   }
 
   loadLogs(1);
