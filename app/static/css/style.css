@@ -69,30 +69,34 @@ body {
 
 /* ---------------- 导航栏 ---------------- */
 .navbar.bg-dark {
-  background: rgba(12, 10, 22, .72) !important;
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  background: rgba(9, 9, 11, 0.85) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--dna-border);
 }
 .navbar { position: sticky; top: 0; z-index: 1030; }
 .navbar-brand {
   font-weight: 800;
   letter-spacing: 1px;
-  background: var(--dna-grad);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  background: none;
+  -webkit-background-clip: initial;
+  background-clip: initial;
+  color: #ffffff !important;
 }
 .navbar .nav-link {
   color: var(--dna-muted) !important;
   font-weight: 500;
-  border-radius: 8px;
-  padding-inline: .75rem;
-  transition: color .18s ease, background .18s ease;
+  border-radius: var(--dna-radius-sm);
+  padding-inline: 0.75rem;
+  transition: color 0.15s ease, background 0.15s ease;
 }
 .navbar .nav-link:hover,
-.navbar .nav-link.active { color: #fff !important; background: rgba(255,255,255,.06); }
-.navbar .dropdown-menu { border: 1px solid var(--dna-border); box-shadow: var(--dna-shadow); }
+.navbar .nav-link.active { color: #ffffff !important; background: rgba(255, 255, 255, 0.06); }
+.navbar .dropdown-menu {
+  background-color: var(--dna-surface);
+  border: 1px solid var(--dna-border);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
 
 /* ---------------- 卡片 / 表面 ---------------- */
 .card {
