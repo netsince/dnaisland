@@ -11,9 +11,8 @@
 <div class="row justify-content-center">
   <div class="col-12 col-lg-8">
     <h2 class="h4 mb-4">编辑角色卡</h2>
-    <form method="post" action="{{ action_url or url_for('publish.edit') }}" id="cardForm">
+    <form method="post" action="{{ action_url or url_for('publish.edit') }}" id="cardForm" enctype="multipart/form-data">
       <input type="hidden" name="original_link" value="{{ prefill.original_link if prefill else '' }}">
-      <input type="hidden" name="images_json" id="imagesJson" value="">
       <input type="hidden" name="cover_focus" id="coverFocus" value="{{ prefill.cover_focus if prefill else '' }}">
       <input type="hidden" name="dialogue_style_json" id="dialogueStyleJson" value="">
       <input type="hidden" name="tags" id="tagsInput" value="{{ prefill.tags|join(',') if prefill else '' }}">
@@ -131,19 +130,24 @@
   const ASPECT = { square: 1, landscape: 16 / 9, portrait: 9 / 16 };
 
   // ---- 图片 ----
+  // 取值为 Blob（新裁剪的图，走 multipart 文件上传）或 data URL 字符串（服务端预填、未更改的图）
   let imagesObj = Object.assign({}, imagesInitial);
-  function syncImages() {
-    document.getElementById('imagesJson').value = JSON.stringify(imagesObj);
-  }
   function refreshPreview(slot) {
     const el = document.getElementById('img-preview-' + slot);
-    if (imagesObj[slot]) {
-      el.src = imagesObj[slot];
-      el.style.display = '';
-    } else {
+    const v = imagesObj[slot];
+    if (!v) {
       el.removeAttribute('src');
       el.style.display = 'none';
+      return;
     }
+    if (v instanceof Blob) {
+      if (el._objUrl) URL.revokeObjectURL(el._objUrl);
+      el._objUrl = URL.createObjectURL(v);
+      el.src = el._objUrl;
+    } else {
+      el.src = v;
+    }
+    el.style.display = '';
   }
 
   let cropper = null;
@@ -185,28 +189,26 @@
   document.getElementById('cropConfirm').addEventListener('click', () => {
     if (!cropper) return;
     const canvas = cropper.getCroppedCanvas();
-    const dataUrl = canvas.toDataURL('image/png');
-    imagesObj[currentSlot] = dataUrl;
-    refreshPreview(currentSlot);
-    syncImages();
-    cropper.destroy();
-    cropper = null;
-    cropModal.hide();
+    canvas.toBlob(blob => {
+      imagesObj[currentSlot] = blob;
+      refreshPreview(currentSlot);
+      cropper.destroy();
+      cropper = null;
+      cropModal.hide();
+    }, 'image/webp', 0.92);
   });
 
   document.querySelectorAll('[data-clear]').forEach(btn => {
     btn.addEventListener('click', e => {
       const slot = e.target.dataset.clear;
-      imagesObj[slot] = "";
+      imagesObj[slot] = null;
       const fi = document.querySelector('input[type="file"][data-slot="' + slot + '"]');
       if (fi) fi.value = "";
       refreshPreview(slot);
-      syncImages();
       if (slot === 'landscape') { focusInput.value = ''; showFocusMarker(); }
     });
   });
   ["square", "landscape", "portrait"].forEach(refreshPreview);
-  syncImages();
 
   // ---- 封面焦点（脸部）选取 ----
   const focusInput = document.getElementById('coverFocus');
@@ -333,5 +335,44 @@
   });
 
   renderDialogue();
+
+  // ---- 提交：将图片作为 multipart 文件直传（不再 base64 内联）----
+  const cardForm = document.getElementById('cardForm');
+  cardForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    const fd = new FormData(cardForm);
+    const keep = {};
+    for (const slot of ['square', 'landscape', 'portrait']) {
+      const v = imagesObj[slot];
+      if (!v) continue;
+      if (v instanceof Blob) {
+        fd.append('image_' + slot, v, slot + '.webp');
+      } else {
+        keep[slot] = v; // 服务端预填且未更改的 data URL
+      }
+    }
+    fd.append('images_keep_json', JSON.stringify(keep));
+    try {
+      const resp = await fetch(cardForm.action, {
+        method: 'POST',
+        body: fd,
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      });
+      if (resp.redirected) {
+        window.location.href = resp.url;
+        return;
+      }
+      if (resp.ok) {
+        const html = await resp.text();
+        document.open();
+        document.write(html);
+        document.close();
+      } else {
+        alert('提交失败（' + resp.status + '），请重试');
+      }
+    } catch (err) {
+      alert('提交失败，请检查网络后重试');
+    }
+  });
 </script>
 {% endblock %}

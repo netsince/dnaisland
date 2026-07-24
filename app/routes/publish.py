@@ -16,7 +16,7 @@ from sqlalchemy.exc import IntegrityError
 from ..extensions import db
 from ..models import Card, CardDialogueStyle, CardImage, CardTag
 from ..services.card_import_service import parse_export_package
-from ..services.image_service import compress_image
+from ..services.image_service import compress_image, raw_bytes_to_webp_data_url
 
 publish_bp = Blueprint("publish", __name__, url_prefix="/publish")
 
@@ -87,13 +87,20 @@ def edit():
 
     images = {}
     try:
-        img_dict = json.loads(request.form.get("images_json") or "{}")
-        if isinstance(img_dict, dict):
-            for slot in ("square", "landscape", "portrait"):
-                if img_dict.get(slot):
-                    images[slot] = compress_image(str(img_dict[slot]))
-    except json.JSONDecodeError:
-        images = {}
+        keep = json.loads(request.form.get("images_keep_json") or "{}")
+    except (json.JSONDecodeError, TypeError):
+        keep = {}
+    if not isinstance(keep, dict):
+        keep = {}
+    for slot in ("square", "landscape", "portrait"):
+        f = request.files.get("image_" + slot)
+        if f and f.filename:
+            raw = f.read()
+            if raw:
+                images[slot] = raw_bytes_to_webp_data_url(raw, max_edge=1024, quality=80)
+                continue
+        if keep.get(slot):
+            images[slot] = compress_image(str(keep[slot]))
 
     card = Card(
         id=card_id,

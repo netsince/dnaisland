@@ -996,16 +996,30 @@ def card_edit(card_id):
         # 图片覆盖式更新
         CardImage.query.filter_by(card_id=card.id).delete()
         try:
-            img_dict = json.loads(request.form.get("images_json") or "{}")
-        except json.JSONDecodeError:
-            img_dict = {}
+            keep = json.loads(request.form.get("images_keep_json") or "{}")
+        except (json.JSONDecodeError, TypeError):
+            keep = {}
+        if not isinstance(keep, dict):
+            keep = {}
         for slot in ("square", "landscape", "portrait"):
-            if img_dict.get(slot):
+            f = request.files.get("image_" + slot)
+            if f and f.filename:
+                raw = f.read()
+                if raw:
+                    db.session.add(
+                        CardImage(
+                            card_id=card.id,
+                            slot=slot,
+                            data=raw_bytes_to_webp_data_url(raw, max_edge=1024, quality=80),
+                        )
+                    )
+                    continue
+            if keep.get(slot):
                 db.session.add(
                     CardImage(
                         card_id=card.id,
                         slot=slot,
-                        data=compress_image(str(img_dict[slot])),
+                        data=compress_image(str(keep[slot])),
                     )
                 )
 
