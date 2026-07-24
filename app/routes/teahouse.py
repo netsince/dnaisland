@@ -409,8 +409,10 @@ def create_post():
 
     return respond(
         url_for("teahouse.post_detail", post_id=post.id),
-        flash_msg="发布成功", flash_cat="success",
+        flash_msg="发布成功",
+        flash_cat="success",
         action="post",
+        redirect_url=url_for("teahouse.post_detail", post_id=post.id),
     )
 
 
