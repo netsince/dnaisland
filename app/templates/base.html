@@ -511,12 +511,13 @@ function showToast(message, type) {
     if (badge) badge.classList.toggle('d-none', !data.state);
   }
 
-  // 全部已读：移除按钮与未读红点
+  // 全部已读：移除按钮与未读红点后整页刷新，使通知列表的未读状态同步
   function applyReadAll(btn) {
     var form = btn.closest('form');
     if (form) form.remove();
     var badge = document.querySelector('.js-unread-badge');
     if (badge) badge.remove();
+    window.location.reload();
   }
 
   // 重新提审：移除按钮 + 更新状态徽章
