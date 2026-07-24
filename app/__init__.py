@@ -1,7 +1,7 @@
 import os
 
 from dotenv import load_dotenv
-from flask import Flask, jsonify, redirect, request, url_for
+from flask import Flask, current_app, g, jsonify, redirect, request, url_for
 from flask_login import current_user, logout_user
 from markupsafe import Markup
 
@@ -213,5 +213,32 @@ def create_app(config_object=None):
             logout_user()
             flash("该账号已被封禁或注销，无法继续使用。", "warning")
             return redirect(url_for("main.index"))
+
+    @app.before_request
+    def _negotiate_response():
+        # 统一内容协商：XHR 或 /api/ 前缀视为期望 JSON 响应，供 respond() 使用
+        g.want_json = (
+            request.headers.get("X-Requested-With") == "XMLHttpRequest"
+            or request.path.startswith("/api/")
+        )
+
+    @app.errorhandler(400)
+    @app.errorhandler(403)
+    @app.errorhandler(404)
+    @app.errorhandler(405)
+    @app.errorhandler(429)
+    def _json_error(error):
+        # API/XHR 请求统一返回 JSON；普通请求回退到 Flask 默认错误页
+        if getattr(g, "want_json", False):
+            code = error.code or 400
+            return jsonify(ok=False, error=getattr(error, "description", "请求错误"), code=code), code
+        return error
+
+    @app.errorhandler(500)
+    def _json_500(error):
+        if getattr(g, "want_json", False):
+            current_app.logger.exception("服务器内部错误: %s", error)
+            return jsonify(ok=False, error="服务器内部错误", code=500), 500
+        return error
 
     return app

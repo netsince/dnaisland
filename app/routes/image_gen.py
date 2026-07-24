@@ -14,21 +14,20 @@ from flask import (
     redirect,
     render_template,
     request,
-    send_file,
     url_for,
 )
 from flask_login import current_user, login_required
-from io import BytesIO
 
 from ..extensions import db
 from ..models import GenerationLog, GenerationModel, PointTransaction
 from ..services.image_gen_service import generate_images
 from ..services.image_service import (
-    data_url_to_bytes_and_mime,
+    send_webp,
     data_url_to_webp_bytes,
     raw_bytes_to_webp_data_url,
 )
 from ..services.site_service import get_site_config
+from ..utils import is_xhr, ensure_owner_or_admin
 
 image_gen_bp = Blueprint("image_gen", __name__, url_prefix="/image-gen")
 
@@ -70,16 +69,8 @@ def workbench():
 
 
 def _serve_webp_from_data_url(data_url):
-    """把某条生图记录的 base64 Data URL 转为二进制发送（带 HTTP 强缓存）。"""
-    if not data_url:
-        abort(404)
-    try:
-        raw, mime = data_url_to_bytes_and_mime(data_url)
-    except Exception:
-        abort(404)
-    resp = send_file(BytesIO(raw), mimetype=mime, max_age=86400)
-    resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
-    return resp
+    # 复用 image_service.send_webp，避免重复实现 data-url 解析与发送
+    return send_webp(data_url)
 
 
 @image_gen_bp.route("/output/<int:log_id>/<int:idx>")
@@ -89,8 +80,7 @@ def output_image(log_id, idx):
     log = db.session.get(GenerationLog, log_id)
     if not log:
         abort(404)
-    if log.user_id != current_user.id and not current_user.is_super_admin:
-        abort(403)
+    ensure_owner_or_admin(log.user_id)
     imgs = log.image_list()
     if idx < 0 or idx >= len(imgs):
         abort(404)
@@ -104,8 +94,7 @@ def reference_image(log_id, idx):
     log = db.session.get(GenerationLog, log_id)
     if not log:
         abort(404)
-    if log.user_id != current_user.id and not current_user.is_super_admin:
-        abort(403)
+    ensure_owner_or_admin(log.user_id)
     refs = log.reference_image_list()
     if idx < 0 or idx >= len(refs):
         abort(404)
@@ -115,7 +104,7 @@ def reference_image(log_id, idx):
 @image_gen_bp.route("/generate", methods=["POST"])
 @login_required
 def generate():
-    want_json = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+    want_json = is_xhr()
 
     def early(msg):
         if want_json:
@@ -321,7 +310,7 @@ def api_logs():
 @image_gen_bp.route("/logs")
 @login_required
 def logs():
-    if request.headers.get("X-Requested-With") == "XMLHttpRequest" and request.args.get("json"):
+    if is_xhr() and request.args.get("json"):
         return api_logs()
     return render_template("image_gen/logs.html")
 
@@ -332,6 +321,5 @@ def log_detail(log_id):
     log = db.session.get(GenerationLog, log_id)
     if not log:
         abort(404)
-    if log.user_id != current_user.id and not current_user.is_super_admin:
-        abort(403)
+    ensure_owner_or_admin(log.user_id)
     return render_template("image_gen/log_detail.html", log=log)

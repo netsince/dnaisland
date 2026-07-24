@@ -48,7 +48,8 @@ from ..models.punishment import (
 from ..services.notification_service import notify, notify_super_admins
 from ..services.report_service import describe_report_target
 from ..services.sticker_service import sanitize_stickers
-from ..utils import get_user_by_username, status_counts, toggle_relation
+from ..utils import get_user_by_username, status_counts, toggle_relation, is_xhr, respond, ensure_owner_or_admin
+from ..decorators import block_if_muted
 
 # 审核状态徽章 HTML（与 macros/cards.html::status_badge 保持一致，供 AJAX 局部更新）
 STATUS_BADGE_HTML = {
@@ -117,7 +118,7 @@ REPORT_REASONS = [
 
 @user_bp.route("/user/<username>")
 def profile(username):
-    u = User_query_by_username(username)
+    u = get_user_by_username(username)
     if not u:
         abort(404)
     is_self = current_user.is_authenticated and current_user.id == u.id
@@ -202,7 +203,7 @@ def profile(username):
 
 @user_bp.route("/user/<username>/followers")
 def followers(username):
-    u = User_query_by_username(username)
+    u = get_user_by_username(username)
     if not u:
         abort(404)
     is_self = current_user.is_authenticated and current_user.id == u.id
@@ -228,7 +229,7 @@ def followers(username):
 
 @user_bp.route("/user/<username>/following")
 def following(username):
-    u = User_query_by_username(username)
+    u = get_user_by_username(username)
     if not u:
         abort(404)
     is_self = current_user.is_authenticated and current_user.id == u.id
@@ -329,8 +330,8 @@ def my_punishments():
 def punish_appeal(punishment_id):
     from ..models import User as _User
 
-    p = db.session.get(Punishment, punishment_id)
-    if not p or p.user_id != current_user.id:
+    p = db.session.get_or_404(Punishment, punishment_id)
+    if p.user_id != current_user.id:
         abort(404)
     if not p.can_appeal:
         flash("该处罚不可申诉或你已提交过申诉", "warning")
@@ -354,9 +355,7 @@ def punish_appeal(punishment_id):
 
 @user_bp.route("/card/<card_id>")
 def card_detail(card_id):
-    card = db.session.get(Card, card_id)
-    if not card:
-        abort(404)
+    card = db.session.get_or_404(Card, card_id)
 
     is_owner = current_user.is_authenticated and current_user.id == card.author_id
     is_admin = current_user.is_authenticated and current_user.is_super_admin
@@ -465,9 +464,7 @@ def card_export(card_id):
             login_url=url_for("auth.login"),
         ), 401
 
-    card = db.session.get(Card, card_id)
-    if not card:
-        abort(404)
+    card = db.session.get_or_404(Card, card_id)
 
     is_owner = current_user.is_authenticated and current_user.id == card.author_id
     is_admin = current_user.is_authenticated and current_user.is_super_admin
@@ -563,53 +560,45 @@ def my_likes():
 @user_bp.route("/card/<card_id>/like", methods=["POST"])
 @login_required
 def card_like(card_id):
-    card = db.session.get(Card, card_id)
-    if not card:
-        abort(404)
+    card = db.session.get_or_404(Card, card_id)
     now_active, count = toggle_relation(
         CardLike.query.filter_by(user_id=current_user.id, card_id=card_id).first(),
         CardLike(user_id=current_user.id, card_id=card_id),
         CardLike.query.filter_by(card_id=card_id),
     )
-    flash("已点赞" if now_active else "已取消点赞", "success" if now_active else "info")
-    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-        # 局部提交：返回新状态供前端切换按钮，不整页刷新
-        return jsonify({
-            "ok": True,
-            "action": "like",
-            "state": now_active,
-            "count": count,
-        })
-    return redirect(url_for("user.card_detail", card_id=card_id))
+    return respond(
+        url_for("user.card_detail", card_id=card_id),
+        flash_msg="已点赞" if now_active else "已取消点赞",
+        flash_cat="success" if now_active else "info",
+        action="like",
+        state=now_active,
+        count=count,
+    )
 
 
 @user_bp.route("/card/<card_id>/favorite", methods=["POST"])
 @login_required
 def card_favorite(card_id):
-    card = db.session.get(Card, card_id)
-    if not card:
-        abort(404)
+    card = db.session.get_or_404(Card, card_id)
     now_active, count = toggle_relation(
         CardFavorite.query.filter_by(user_id=current_user.id, card_id=card_id).first(),
         CardFavorite(user_id=current_user.id, card_id=card_id),
         CardFavorite.query.filter_by(card_id=card_id),
     )
-    flash("已收藏" if now_active else "已取消收藏", "success" if now_active else "info")
-    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-        # 局部提交：返回新状态供前端切换按钮，不整页刷新
-        return jsonify({
-            "ok": True,
-            "action": "favorite",
-            "state": now_active,
-            "count": count,
-        })
-    return redirect(url_for("user.card_detail", card_id=card_id))
+    return respond(
+        url_for("user.card_detail", card_id=card_id),
+        flash_msg="已收藏" if now_active else "已取消收藏",
+        flash_cat="success" if now_active else "info",
+        action="favorite",
+        state=now_active,
+        count=count,
+    )
 
 
 @user_bp.route("/user/<username>/follow", methods=["POST"])
 @login_required
 def user_follow(username):
-    target = User_query_by_username(username)
+    target = get_user_by_username(username)
     if not target or target.is_profile_banned:
         abort(404)
     now_following = None
@@ -629,7 +618,7 @@ def user_follow(username):
         else:
             flash("已取消关注", "info")
         db.session.commit()
-    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+    if is_xhr():
         # 局部提交：返回新状态供前端切换按钮，不整页刷新
         if now_following is None:
             return jsonify({"ok": False, "error": "不能关注自己"})
@@ -781,27 +770,19 @@ def card_comments_api(card_id):
 
 @user_bp.route("/card/<card_id>/comment", methods=["POST"])
 @login_required
+@block_if_muted(message="你已被禁言，暂时无法评论")
 def card_comment(card_id):
-    card = db.session.get(Card, card_id)
-    if not card:
-        abort(404)
-    if current_user.is_muted:
-        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-            return jsonify({"error": "你已被禁言，暂时无法评论"}), 403
-        flash("你已被禁言，暂时无法评论", "warning")
-        return redirect(url_for("user.card_detail", card_id=card_id))
+    card = db.session.get_or_404(Card, card_id)
     content = (request.form.get("content") or "").strip()
     content, _ = sanitize_stickers(content, max_count=20)
     if not content:
-        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-            return jsonify({"error": "评论内容不能为空"}), 400
-        flash("评论内容不能为空", "warning")
-        return redirect(url_for("user.card_detail", card_id=card_id))
+        return respond(url_for("user.card_detail", card_id=card_id), ok=False, status=400,
+                       flash_msg="评论内容不能为空", flash_cat="warning",
+                       error="评论内容不能为空")
     if len(content) > 500:
-        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-            return jsonify({"error": "评论内容不能超过 500 字"}), 400
-        flash("评论内容不能超过 500 字", "warning")
-        return redirect(url_for("user.card_detail", card_id=card_id))
+        return respond(url_for("user.card_detail", card_id=card_id), ok=False, status=400,
+                       flash_msg="评论内容不能超过 500 字", flash_cat="warning",
+                       error="评论内容不能超过 500 字")
 
     image_url = None
     image_file = request.files.get("image")
@@ -813,7 +794,7 @@ def card_comment(card_id):
         )
         if ext not in {"png", "jpg", "jpeg", "gif", "webp"}:
             err_msg = "仅支持上传 png/jpg/jpeg/gif/webp 格式的图片"
-            if request.headers.get("X-Requested-With") != "XMLHttpRequest":
+            if not is_xhr():
                 flash(err_msg, "warning")
             return jsonify({"error": err_msg}), 400
 
@@ -822,7 +803,7 @@ def card_comment(card_id):
         image_file.seek(0)
         if file_size > 5 * 1024 * 1024:
             err_msg = "图片大小不能超过 5MB"
-            if request.headers.get("X-Requested-With") != "XMLHttpRequest":
+            if not is_xhr():
                 flash(err_msg, "warning")
             return jsonify({"error": err_msg}), 400
 
@@ -838,7 +819,7 @@ def card_comment(card_id):
         except Exception as e:
             current_app.logger.error(f"评论图片保存失败: {e}")
             err_msg = "图片保存失败，请重试"
-            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            if is_xhr():
                 return jsonify({"error": err_msg}), 500
             flash(err_msg, "danger")
             return redirect(url_for("user.card_detail", card_id=card_id))
@@ -880,17 +861,15 @@ def card_comment(card_id):
         )
 
     db.session.commit()
-    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-        return jsonify({"ok": True})
-    flash("评论成功", "success")
-    return redirect(url_for("user.card_detail", card_id=card_id))
+    return respond(url_for("user.card_detail", card_id=card_id),
+                   flash_msg="评论成功", flash_cat="success")
 
 
 @user_bp.route("/card/<card_id>/comment/<int:comment_id>/like", methods=["POST"])
 @login_required
 def card_comment_like(card_id, comment_id):
-    cm = db.session.get(Comment, comment_id)
-    if not cm or cm.card_id != card_id:
+    cm = db.session.get_or_404(Comment, comment_id)
+    if cm.card_id != card_id:
         abort(404)
     is_now_liked, new_count = toggle_relation(
         CommentLike.query.filter_by(
@@ -914,14 +893,11 @@ def card_comment_like(card_id, comment_id):
 @user_bp.route("/card/<card_id>/comment/<int:comment_id>/pin", methods=["POST"])
 @login_required
 def card_comment_pin(card_id, comment_id):
-    cm = db.session.get(Comment, comment_id)
-    if not cm or cm.card_id != card_id:
+    cm = db.session.get_or_404(Comment, comment_id)
+    if cm.card_id != card_id:
         abort(404)
-    card = db.session.get(Card, card_id)
-    if not card:
-        abort(404)
-    if not (card.author_id == current_user.id or current_user.is_super_admin):
-        return jsonify({"error": "无权置顶此评论"}), 403
+    card = db.session.get_or_404(Card, card_id)
+    ensure_owner_or_admin(card.author_id, message="无权置顶此评论")
     cm.is_pinned = not cm.is_pinned
     db.session.commit()
     return jsonify({"ok": True, "is_pinned": cm.is_pinned})
@@ -930,11 +906,10 @@ def card_comment_pin(card_id, comment_id):
 @user_bp.route("/card/<card_id>/comment/<int:comment_id>/delete", methods=["POST"])
 @login_required
 def card_comment_delete(card_id, comment_id):
-    cm = db.session.get(Comment, comment_id)
-    if not cm or cm.card_id != card_id:
+    cm = db.session.get_or_404(Comment, comment_id)
+    if cm.card_id != card_id:
         abort(404)
-    if not (cm.user_id == current_user.id or current_user.is_super_admin):
-        return jsonify({"error": "无权删除此评论"}), 403
+    ensure_owner_or_admin(cm.user_id, message="无权删除此评论")
     db.session.delete(cm)
     db.session.commit()
     return jsonify({"ok": True})
@@ -943,8 +918,8 @@ def card_comment_delete(card_id, comment_id):
 @user_bp.route("/my/card/<card_id>/resubmit", methods=["POST"])
 @login_required
 def card_resubmit(card_id):
-    card = db.session.get(Card, card_id)
-    if not card or card.author_id != current_user.id:
+    card = db.session.get_or_404(Card, card_id)
+    if card.author_id != current_user.id:
         abort(404)
     if card.status != "rejected":
         flash("仅被拒绝的角色卡可以重新提审", "warning")
@@ -952,41 +927,36 @@ def card_resubmit(card_id):
         card.status = "pending"
         db.session.commit()
         flash("已重新提交审核", "success")
-    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-        # 局部提交：返回新状态供前端更新按钮与状态徽章，不整页刷新
-        return jsonify({
-            "ok": True,
-            "action": "resubmit",
-            "status": card.status,
-            "status_html": STATUS_BADGE_HTML.get(card.status, ""),
-        })
-    return redirect(url_for("user.my_cards"))
+    return respond(
+        url_for("user.my_cards"),
+        action="resubmit",
+        status=card.status,
+        status_html=STATUS_BADGE_HTML.get(card.status, ""),
+    )
 
 
 @user_bp.route("/my/card/<card_id>/toggle-hidden", methods=["POST"])
 @login_required
 def card_toggle_hidden(card_id):
-    card = db.session.get(Card, card_id)
-    if not card or card.author_id != current_user.id:
+    card = db.session.get_or_404(Card, card_id)
+    if card.author_id != current_user.id:
         abort(404)
     card.is_hidden = not card.is_hidden
     db.session.commit()
-    flash("已隐藏" if card.is_hidden else "已取消隐藏", "success")
-    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-        # 局部提交：返回新状态供前端切换按钮与「已隐藏」徽章，不整页刷新
-        return jsonify({
-            "ok": True,
-            "action": "hidden",
-            "state": card.is_hidden,
-        })
-    return redirect(url_for("user.my_cards"))
+    return respond(
+        url_for("user.my_cards"),
+        flash_msg="已隐藏" if card.is_hidden else "已取消隐藏",
+        flash_cat="success",
+        action="hidden",
+        state=card.is_hidden,
+    )
 
 
 @user_bp.route("/my/card/<card_id>/edit", methods=["GET", "POST"])
 @login_required
 def card_edit(card_id):
-    card = db.session.get(Card, card_id)
-    if not card or card.author_id != current_user.id:
+    card = db.session.get_or_404(Card, card_id)
+    if card.author_id != current_user.id:
         abort(404)
 
     if request.method == "POST":
@@ -1094,11 +1064,11 @@ def notifications_read_all():
     from ..services.notification_service import mark_all_read
 
     mark_all_read(current_user.id)
-    flash("已全部标记为已读", "success")
-    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-        # 局部提交：返回成功供前端移除按钮与未读红点，不整页刷新
-        return jsonify({"ok": True, "action": "read_all"})
-    return redirect(url_for("user.notifications"))
+    return respond(
+        url_for("user.notifications"),
+        flash_msg="已全部标记为已读", flash_cat="success",
+        action="read_all",
+    )
 
 
 def _paginate_follows(u, kind, page):
@@ -1136,10 +1106,6 @@ def _follow_items(users, include_banned):
     return [
         {"user": user, "is_following": user.id in following_ids} for user in users
     ]
-
-
-def User_query_by_username(username):
-    return get_user_by_username(username)
 
 
 def resolve_report_target(target_type, raw_id):

@@ -15,7 +15,7 @@ from sqlalchemy.orm import aliased, joinedload
 
 from ..extensions import db
 import re
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from ..models import (
     Card,
@@ -32,7 +32,8 @@ from ..models import (
 from ..services.image_service import compress_image
 from ..services.notification_service import notify
 from ..services.sticker_service import sanitize_stickers
-from ..utils import get_user_by_username, toggle_relation
+from ..utils import get_user_by_username, toggle_relation, respond, rate_hit
+from ..decorators import block_if_muted
 
 # 配图：仅支持单图
 TEA_MAX_IMAGES = 1
@@ -111,14 +112,26 @@ def _visible_query(query, viewer):
 
 
 def _too_frequent(user_id):
-    """窗口内发帖/回复数是否超过限制（防刷屏）。"""
-    since = datetime.now() - timedelta(minutes=TEA_RATE_WINDOW_MIN)
-    cnt = TeaPost.query.filter(
-        TeaPost.user_id == user_id,
-        TeaPost.created_at >= since,
-        ~TeaPost.is_deleted,
-    ).count()
-    return cnt >= TEA_RATE_LIMIT
+    """窗口内发帖/回复数是否超过限制（防刷屏）。复用统一进程内限流。"""
+    return rate_hit(
+        "teahouse_post",
+        limit=TEA_RATE_LIMIT,
+        per=TEA_RATE_WINDOW_MIN * 60,
+        key=user_id,
+    )
+
+
+def _require_visible_post(post_id):
+    """校验帖子存在且对当前用户可见（未删除/未隐藏）；否则 404。返回 TeaPost 实例。"""
+    p = db.session.get_or_404(TeaPost, post_id)
+    if p.is_deleted and not current_user.is_super_admin:
+        abort(404)
+    if p.is_hidden and not (
+        current_user.is_authenticated
+        and (current_user.id == p.user_id or current_user.is_super_admin)
+    ):
+        abort(404)
+    return p
 
 
 def _notify_mentions(content, post, actor):
@@ -348,30 +361,22 @@ def topic_detail(topic_id):
 # ---------------- 发帖 ----------------
 @teahouse_bp.route("/post", methods=["POST"])
 @login_required
+@block_if_muted(message="你已被禁言，暂时无法发帖")
 def create_post():
-    is_xhr = request.headers.get("X-Requested-With") == "XMLHttpRequest"
-    if current_user.is_muted:
-        if is_xhr:
-            return jsonify({"ok": False, "error": "你已被禁言，暂时无法发帖"})
-        flash("你已被禁言，暂时无法发帖", "warning")
-        return redirect(url_for("teahouse.index"))
     content = (request.form.get("content") or "").strip()
     content, _ = sanitize_stickers(content, max_count=20)
     if not content:
-        if is_xhr:
-            return jsonify({"ok": False, "error": "帖子内容不能为空"})
-        flash("帖子内容不能为空", "warning")
-        return redirect(url_for("teahouse.index"))
+        return respond(url_for("teahouse.index"), ok=False, status=400,
+                       flash_msg="帖子内容不能为空", flash_cat="warning",
+                       error="帖子内容不能为空")
     if len(content) > TEA_POST_MAX_LEN:
-        if is_xhr:
-            return jsonify({"ok": False, "error": f"帖子内容不能超过 {TEA_POST_MAX_LEN} 字"})
-        flash(f"帖子内容不能超过 {TEA_POST_MAX_LEN} 字", "warning")
-        return redirect(url_for("teahouse.index"))
+        return respond(url_for("teahouse.index"), ok=False, status=400,
+                       flash_msg=f"帖子内容不能超过 {TEA_POST_MAX_LEN} 字", flash_cat="warning",
+                       error=f"帖子内容不能超过 {TEA_POST_MAX_LEN} 字")
     if _too_frequent(current_user.id):
-        if is_xhr:
-            return jsonify({"ok": False, "error": "发帖太频繁了，请稍后再试"})
-        flash("发帖太频繁了，请稍后再试", "warning")
-        return redirect(url_for("teahouse.index"))
+        return respond(url_for("teahouse.index"), ok=False, status=429,
+                       flash_msg="发帖太频繁了，请稍后再试", flash_cat="warning",
+                       error="发帖太频繁了，请稍后再试")
     post = TeaPost(user_id=current_user.id, content=content)
     card = _resolve_card(request.form.get("card_id"), current_user)
     if card:
@@ -385,29 +390,18 @@ def create_post():
     db.session.commit()
     _notify_mentions(content, post, current_user)
 
-    if is_xhr:
-        return jsonify({
-            "ok": True,
-            "action": "post",
-            "redirect_url": url_for("teahouse.post_detail", post_id=post.id),
-        })
-    flash("发布成功", "success")
-    return redirect(url_for("teahouse.post_detail", post_id=post.id))
+    return respond(
+        url_for("teahouse.post_detail", post_id=post.id),
+        flash_msg="发布成功", flash_cat="success",
+        action="post",
+        redirect_url=url_for("teahouse.post_detail", post_id=post.id),
+    )
 
 
 # ---------------- 帖子详情 / 回复 ----------------
 @teahouse_bp.route("/<int:post_id>")
 def post_detail(post_id):
-    p = db.session.get(TeaPost, post_id)
-    if not p:
-        abort(404)
-    if p.is_deleted and not current_user.is_super_admin:
-        abort(404)
-    if p.is_hidden and not (
-        current_user.is_authenticated
-        and (current_user.id == p.user_id or current_user.is_super_admin)
-    ):
-        abort(404)
+    p = _require_visible_post(post_id)
     # 向上追溯祖先链（root …… 直接父帖），用于详情页的“原帖链”
     chain = []
     node = p.parent
@@ -498,36 +492,23 @@ def card_search():
 
 @teahouse_bp.route("/<int:post_id>/reply", methods=["POST"])
 @login_required
+@block_if_muted(message="你已被禁言，暂时无法回复")
 def reply(post_id):
-    p = db.session.get(TeaPost, post_id)
-    if not p:
-        abort(404)
-    if p.is_deleted and not current_user.is_super_admin:
-        abort(404)
-    is_xhr = request.headers.get("X-Requested-With") == "XMLHttpRequest"
-
-    if current_user.is_muted:
-        if is_xhr:
-            return jsonify({"ok": False, "error": "你已被禁言，暂时无法回复"})
-        flash("你已被禁言，暂时无法回复", "warning")
-        return redirect(url_for("teahouse.post_detail", post_id=post_id))
+    p = _require_visible_post(post_id)
     content = (request.form.get("content") or "").strip()
     content, _ = sanitize_stickers(content, max_count=20)
     if not content:
-        if is_xhr:
-            return jsonify({"ok": False, "error": "回复内容不能为空"})
-        flash("回复内容不能为空", "warning")
-        return redirect(url_for("teahouse.post_detail", post_id=post_id))
+        return respond(url_for("teahouse.post_detail", post_id=post_id), ok=False, status=400,
+                       flash_msg="回复内容不能为空", flash_cat="warning",
+                       error="回复内容不能为空")
     if len(content) > TEA_POST_MAX_LEN:
-        if is_xhr:
-            return jsonify({"ok": False, "error": f"回复内容不能超过 {TEA_POST_MAX_LEN} 字"})
-        flash(f"回复内容不能超过 {TEA_POST_MAX_LEN} 字", "warning")
-        return redirect(url_for("teahouse.post_detail", post_id=post_id))
+        return respond(url_for("teahouse.post_detail", post_id=post_id), ok=False, status=400,
+                       flash_msg=f"回复内容不能超过 {TEA_POST_MAX_LEN} 字", flash_cat="warning",
+                       error=f"回复内容不能超过 {TEA_POST_MAX_LEN} 字")
     if _too_frequent(current_user.id):
-        if is_xhr:
-            return jsonify({"ok": False, "error": "回复太频繁了，请稍后再试"})
-        flash("回复太频繁了，请稍后再试", "warning")
-        return redirect(url_for("teahouse.post_detail", post_id=post_id))
+        return respond(url_for("teahouse.post_detail", post_id=post_id), ok=False, status=429,
+                       flash_msg="回复太频繁了，请稍后再试", flash_cat="warning",
+                       error="回复太频繁了，请稍后再试")
 
     reply_post = TeaPost(user_id=current_user.id, parent_id=post_id, content=content)
     card = _resolve_card(request.form.get("card_id"), current_user)
@@ -550,19 +531,17 @@ def reply(post_id):
     # 解析正文 @提及，通知被提及用户
     _notify_mentions(content, reply_post, current_user)
 
-    if is_xhr:
-        # 局部提交：渲染新回复 HTML 并刷新回复数，不整页刷新
-        stats = {reply_post.id: {"like_count": 0, "liked": False, "reply_count": 0}}
-        reply_macro = get_template_attribute("teahouse/_post_item.html", "render_reply")
-        reply_html = reply_macro(reply_post, stats, root_id=post_id)
-        return jsonify({
-            "ok": True,
-            "action": "reply",
-            "reply_html": reply_html,
-            "reply_count": TeaPost.query.filter_by(parent_id=post_id).count(),
-        })
-    flash("回复成功", "success")
-    return redirect(url_for("teahouse.post_detail", post_id=post_id))
+    # 局部提交：渲染新回复 HTML 并刷新回复数，不整页刷新
+    stats = {reply_post.id: {"like_count": 0, "liked": False, "reply_count": 0}}
+    reply_macro = get_template_attribute("teahouse/_post_item.html", "render_reply")
+    reply_html = reply_macro(reply_post, stats, root_id=post_id)
+    return respond(
+        url_for("teahouse.post_detail", post_id=post_id),
+        flash_msg="回复成功", flash_cat="success",
+        action="reply",
+        reply_html=reply_html,
+        reply_count=TeaPost.query.filter_by(parent_id=post_id).count(),
+    )
 
 
 # ---------------- 点赞 ----------------
@@ -610,15 +589,12 @@ def like(post_id):
             synchronize_session=False
         )
     db.session.commit()
-    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-        # 局部提交：返回新状态供前端切换按钮，不整页刷新
-        return jsonify({
-            "ok": True,
-            "action": "like",
-            "state": now_liked,
-            "count": count,
-        })
-    return redirect(request.referrer or url_for("teahouse.post_detail", post_id=post_id))
+    return respond(
+        request.referrer or url_for("teahouse.post_detail", post_id=post_id),
+        action="like",
+        state=now_liked,
+        count=count,
+    )
 
 
 @teahouse_bp.route("/<int:post_id>/favorite", methods=["POST"])
@@ -636,15 +612,12 @@ def favorite(post_id):
         TeaPostFavorite(user_id=current_user.id, post_id=post_id),
         TeaPostFavorite.query.filter_by(post_id=post_id),
     )
-    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-        # 局部提交：返回新状态供前端切换按钮，不整页刷新
-        return jsonify({
-            "ok": True,
-            "action": "favorite",
-            "state": now_fav,
-            "count": count,
-        })
-    return redirect(request.referrer or url_for("teahouse.post_detail", post_id=post_id))
+    return respond(
+        request.referrer or url_for("teahouse.post_detail", post_id=post_id),
+        action="favorite",
+        state=now_fav,
+        count=count,
+    )
 
 
 # ---------------- 编辑 / 删除（软删） ----------------
@@ -697,9 +670,7 @@ def edit_post(post_id):
 @teahouse_bp.route("/<int:post_id>/delete", methods=["POST"])
 @login_required
 def delete_post(post_id):
-    p = db.session.get(TeaPost, post_id)
-    if not p:
-        abort(404)
+    p = _require_visible_post(post_id)
     if not (current_user.id == p.user_id or current_user.is_super_admin):
         abort(403)
     if p.is_deleted:

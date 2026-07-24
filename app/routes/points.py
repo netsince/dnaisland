@@ -21,13 +21,14 @@ from flask_login import current_user, login_required
 
 from ..extensions import db
 from ..models import KeyUsageLog, PointTransaction, RedemptionKey
+from ..utils import rate_hit
 
 points_bp = Blueprint("points", __name__, url_prefix="/points")
 
 # ---------------------------------------------------------------------------
 # 限流状态（进程内）
 # ---------------------------------------------------------------------------
-_REDEEM_STATE = {}  # user_id -> {"reqs":[ts...], "fail_streak":int, "locked_until":float}
+_REDEEM_STATE = {}  # user_id -> {"fail_streak":int, "locked_until":float}
 
 MAX_KEYS_PER_REQUEST = 50
 MAX_REQUESTS_PER_MINUTE = 2
@@ -37,28 +38,29 @@ LOCK_SECONDS = 3600
 
 def _get_state(uid):
     return _REDEEM_STATE.setdefault(
-        uid, {"reqs": [], "fail_streak": 0, "locked_until": 0.0}
+        uid, {"fail_streak": 0, "locked_until": 0.0}
     )
 
 
 def redeem_allowed(uid):
-    """返回 (ok, message)。仅做检查，不修改状态。"""
+    """返回 (ok, message)。仅做检查，不修改状态。
+
+    每分钟限流复用统一的进程内限流 rate_hit；连续失败锁定时长仍由本模块维护。
+    """
     now = time.time()
     st = _get_state(uid)
     if now < st["locked_until"]:
         remain = int(st["locked_until"] - now)
         return False, f"兑换功能已被临时限制，请于 {remain // 60} 分 {remain % 60} 秒后重试"
-    st["reqs"] = [t for t in st["reqs"] if now - t < 60]
-    if len(st["reqs"]) >= MAX_REQUESTS_PER_MINUTE:
+    if rate_hit("redeem", limit=MAX_REQUESTS_PER_MINUTE, per=60, key=uid):
         return False, "操作过于频繁，每分钟最多兑换 2 次"
     return True, ""
 
 
 def record_redeem(uid, had_success):
-    """记录一次兑换请求的请求时间戳与连续失败计数。"""
+    """记录一次兑换的连续失败计数（每分钟限流由 rate_hit 维护）。"""
     now = time.time()
     st = _get_state(uid)
-    st["reqs"].append(now)
     if had_success:
         st["fail_streak"] = 0
     else:
