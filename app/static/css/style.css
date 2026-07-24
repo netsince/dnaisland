@@ -2277,57 +2277,51 @@ main.dna-page-loading {
 }
 
 /* ===== 生图作品详情页 (gd-*) ===== */
-.gd-viewport-wrap { max-width: 880px; margin: 0 auto; padding-inline: 6px; }
-.gd-pure-img-anchor { display: block; background: transparent !important; border-radius: 10px; overflow: hidden; }
-.gd-pure-img-anchor::after { display: none !important; }
-img.gd-standalone-art {
+.gd-detail { max-width: 1080px; margin: 0 auto; padding-inline: 6px; }
+.gd-topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: .6rem; }
+.gd-grid {
+  display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+  gap: 1.5rem; align-items: start;
+}
+.gd-stage { position: sticky; top: 12px; }
+.gd-main-img { background: transparent !important; border-radius: 12px; overflow: hidden; }
+.gd-main-img img.gd-standalone-art {
   width: 100% !important; height: auto !important; object-fit: contain !important;
-  max-height: 82vh !important; display: block; margin: 0 auto 0.85rem auto;
-  border-radius: 10px; background: transparent !important;
+  max-height: 82vh !important; display: block; border-radius: 12px; background: transparent !important;
 }
-.gd-carousel { position: relative; margin-bottom: 0.75rem; }
-.gd-carousel-viewport {
-  display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scroll-behavior: smooth;
-  -webkit-overflow-scrolling: touch; border-radius: 10px; scrollbar-width: none;
+.gd-thumbs { display: flex; gap: 8px; margin-top: 10px; overflow-x: auto; scrollbar-width: thin; padding-bottom: 2px; }
+.gd-thumb {
+  flex: 0 0 auto; width: 62px; height: 62px; padding: 0; cursor: pointer;
+  border-radius: 8px; overflow: hidden; border: 2px solid transparent;
+  background: var(--dna-bg-2); transition: border-color .2s ease;
 }
-.gd-carousel-viewport::-webkit-scrollbar { display: none; }
-.gd-slide { flex: 0 0 100%; width: 100%; scroll-snap-align: center; }
-.gd-slide .gd-pure-img-anchor, .gd-slide .gd-standalone-art { margin-bottom: 0; }
-.gd-car-arrow {
-  position: absolute; top: 50%; transform: translateY(-50%);
-  width: 38px; height: 38px; display: flex; align-items: center; justify-content: center;
-  border: none; border-radius: 50%; background: rgba(0, 0, 0, 0.45); color: #fff;
-  font-size: 1.1rem; cursor: pointer; z-index: 3; transition: background 0.2s ease;
-}
-.gd-car-arrow:hover { background: rgba(0, 0, 0, 0.65); }
-.gd-car-arrow--prev { left: 10px; }
-.gd-car-arrow--next { right: 10px; }
-.gd-car-dots {
-  position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
-  display: flex; gap: 6px; z-index: 3;
-}
-.gd-dot {
-  width: 7px; height: 7px; border-radius: 50%; background: rgba(255, 255, 255, 0.45);
-  cursor: pointer; transition: background 0.2s ease, transform 0.2s ease;
-}
-.gd-dot.is-active { background: #fff; transform: scale(1.25); }
-.gd-car-counter { margin-left: 0.4rem; }
-.gslide-description, .gslide-title, .gdesc-inner, .gslide-desc {
-  display: none !important; background: transparent !important; border: none !important;
-}
-.gd-action-bar {
+.gd-thumb.is-active { border-color: var(--dna-emphasis); }
+.gd-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.gd-info { min-width: 0; }
+.gd-status-row { display: flex; align-items: center; gap: .6rem; font-size: .8rem; color: var(--dna-muted); margin-bottom: 1rem; }
+.gd-counter { margin-left: auto; }
+.gd-prompt-block {
   background: var(--dna-surface); border: 1px solid var(--dna-border);
-  border-radius: 12px; padding: 0.85rem 1.15rem; margin-bottom: 1rem;
+  border-left: 3px solid var(--dna-emphasis); border-radius: 12px;
+  padding: 1rem 1.15rem; margin-bottom: 1rem;
 }
-.gd-info-section {
-  background: var(--dna-surface); border: 1px solid var(--dna-border);
-  border-radius: 14px; padding: 1.15rem 1.35rem; margin-bottom: 1rem;
+.gd-prompt-head {
+  display: flex; align-items: center; justify-content: space-between;
+  font-weight: 600; font-size: .85rem; color: var(--dna-emphasis); margin-bottom: .55rem;
 }
 .gd-prompt-text {
-  background: var(--dna-bg-2); border: 1px solid var(--dna-border); border-radius: 10px;
-  padding: 0.85rem 1rem; font-size: 0.92rem; line-height: 1.6; color: var(--dna-text);
+  padding: 0; background: transparent; border: none;
+  font-size: .92rem; line-height: 1.6; color: var(--dna-text);
   white-space: pre-wrap; word-break: break-word;
 }
+.gd-chips { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1rem; }
+.gd-chip {
+  font-size: .78rem; color: var(--dna-text); background: var(--dna-bg-2);
+  border: 1px solid var(--dna-border); border-radius: 999px; padding: .32rem .75rem;
+}
+.gd-ref-block { margin-bottom: 1rem; }
+.gd-ref-title { font-size: .82rem; font-weight: 600; color: var(--dna-muted); margin-bottom: .5rem; }
+.gd-ref-row { display: flex; gap: .6rem; overflow-x: auto; padding-bottom: 2px; }
 .gd-ref-chip {
   display: inline-block; border-radius: 8px; overflow: hidden;
   border: 1px solid var(--dna-border); background: var(--dna-bg-2); padding: 3px; flex: none;
@@ -2335,5 +2329,32 @@ img.gd-standalone-art {
 .gd-ref-chip img {
   max-height: 95px !important; width: auto !important; max-width: 150px !important;
   object-fit: contain !important; border-radius: 6px; display: block;
+}
+.gd-action-bar--sticky {
+  position: sticky; bottom: 12px; z-index: 5;
+  display: flex; align-items: center; justify-content: flex-end; gap: .5rem;
+  background: var(--dna-surface); border: 1px solid var(--dna-border);
+  border-radius: 12px; padding: .85rem 1.15rem; margin-top: 1.2rem;
+  box-shadow: 0 8px 24px rgba(0,0,0,.25);
+}
+.gd-pure-img-anchor { display: block; background: transparent !important; border-radius: 12px; overflow: hidden; }
+.gd-pure-img-anchor::after { display: none !important; }
+.gslide-description, .gslide-title, .gdesc-inner, .gslide-desc {
+  display: none !important; background: transparent !important; border: none !important;
+}
+@media (max-width: 860px) {
+  .gd-grid { grid-template-columns: 1fr; gap: 1rem; }
+  .gd-stage { position: static; }
+}
+@media (max-width: 576px) {
+  .gd-action-bar--sticky {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
+    justify-content: center; border-radius: 0;
+    border-left: none; border-right: none; border-bottom: none;
+    backdrop-filter: blur(10px);
+    background: color-mix(in srgb, var(--dna-surface-solid) 88%, transparent);
+    box-shadow: 0 -6px 24px rgba(0,0,0,.3);
+  }
+  .gd-detail { padding-bottom: 72px; }
 }
 
