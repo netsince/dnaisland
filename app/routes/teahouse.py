@@ -30,7 +30,7 @@ from ..models import (
     User,
     UserFollow,
 )
-from ..services.image_service import compress_image
+from ..services.image_service import compress_image, raw_bytes_to_webp_data_url
 from ..services.notification_service import notify
 from ..services.sticker_service import sanitize_stickers
 from ..utils import get_user_by_username, rate_hit, respond, toggle_relation
@@ -54,23 +54,23 @@ def _resolve_card(card_id_raw, viewer):
     return Card.visible_to(viewer).filter_by(id=card_id).first()
 
 
-def _attach_images(post, images_raw):
-    """保存配图（仅单图）。images_raw 为 base64 data URL 列表，取第一张有效图并压缩存储。
-    会先清空原图，便于编辑时整体替换。"""
+def _attach_images(post, image_files):
+    """保存配图（仅单图）。image_files 为 FileStorage 列表，取第一张有效图压缩为 WebP data URL 存储。
+    会先清空原图，便于编辑时整体替换。彻底去掉 base64 内联：前端以 multipart 文件上传，服务端转存。"""
     for old in list(post.images):
         db.session.delete(old)
     post.images.clear()
-    for data_url in images_raw:
-        data_url = (data_url or "").strip()
-        if not data_url:
+    for f in image_files:
+        if not f or not getattr(f, "filename", ""):
             continue
         try:
-            compressed = compress_image(
-                data_url, max_edge=TEA_IMAGE_MAX_EDGE, quality=TEA_IMAGE_QUALITY
+            raw = f.read()
+            data_url = raw_bytes_to_webp_data_url(
+                raw, max_edge=TEA_IMAGE_MAX_EDGE, quality=TEA_IMAGE_QUALITY
             )
         except Exception:
             continue
-        post.images.append(TeaPostImage(image_data=compressed))
+        post.images.append(TeaPostImage(image_data=data_url))
         break  # 单图：仅取第一张
     return post
 
@@ -383,9 +383,9 @@ def create_post():
         post.card_id = card.id
     db.session.add(post)
     db.session.flush()  # 先拿到 post.id，再挂配图
-    images_raw = request.form.getlist("images")
-    if images_raw:
-        _attach_images(post, images_raw)
+    images_files = request.files.getlist("images")
+    if images_files:
+        _attach_images(post, images_files)
     _set_single_topic(post, request.form.get("topic"))
     db.session.commit()
     _notify_mentions(content, post, current_user)
@@ -516,9 +516,9 @@ def reply(post_id):
         reply_post.card_id = card.id
     db.session.add(reply_post)
     db.session.flush()  # 先拿到 reply_post.id，再挂配图
-    images_raw = request.form.getlist("images")
-    if images_raw:
-        _attach_images(reply_post, images_raw)
+    images_files = request.files.getlist("images")
+    if images_files:
+        _attach_images(reply_post, images_files)
     _set_single_topic(reply_post, request.form.get("topic"))
     db.session.commit()
     # 通知被回复帖子的作者（非本人）
@@ -648,13 +648,12 @@ def edit_post(post_id):
             else:
                 card = _resolve_card(request.form.get("card_id"), current_user)
                 p.card_id = card.id if card else None
-        # 配图：仅当表单显式提交 images / image_removed 时才调整，未改动则保持原样
-        if "images" in request.form or "image_removed" in request.form:
-            image_removed = request.form.get("image_removed") == "1"
-            new_img = (request.form.get("images") or "").strip()
-            if new_img:
-                _attach_images(p, [new_img])
-            elif image_removed:
+        # 配图：仅当表单显式上传 images 文件或提交 image_removed 时才调整，未改动则保持原样
+        if request.files.get("images") or "image_removed" in request.form:
+            f = request.files.get("images")
+            if f and f.filename:
+                _attach_images(p, [f])
+            elif request.form.get("image_removed") == "1":
                 for old in list(p.images):
                     db.session.delete(old)
                 p.images.clear()

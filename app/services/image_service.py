@@ -45,9 +45,14 @@ def compress_image(data_url: str, max_edge: int = 1024, quality: int = 80) -> st
 
 
 def crop_square_and_compress(data_url: str, size: int = 256, quality: int = 82) -> str:
-    """居中裁剪为正方形并压缩为 WebP，用于头像。"""
+    """居中裁剪为正方形并压缩为 WebP，用于头像。输入为 base64 data URL。"""
     raw = _decode(data_url)
-    img = Image.open(BytesIO(raw)).convert("RGBA")
+    return crop_square_and_compress_bytes(raw, size=size, quality=quality)
+
+
+def crop_square_and_compress_bytes(raw_bytes: bytes, size: int = 256, quality: int = 82) -> str:
+    """从原始图片字节居中裁剪为正方形并压缩为 WebP，用于头像（与 crop_square_and_compress 等价，输入为字节）。"""
+    img = Image.open(BytesIO(raw_bytes)).convert("RGBA")
     w, h = img.size
     side = min(w, h)
     left = (w - side) // 2

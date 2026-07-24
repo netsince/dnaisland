@@ -1078,6 +1078,8 @@ data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded=
     var imgLabel = form.querySelector('.tea-image-picked');
     if (imgHid) imgHid.value = '';
     if (imgRem) imgRem.value = '0';
+    var imgPicker = form.querySelector('[data-image-picker]');
+    if (imgPicker) imgPicker._file = null;   // 打开时清空上一轮残留的配图文件
     if (imgLabel) {
       if (imgEl) {
         imgLabel.classList.remove('d-none');
@@ -1090,6 +1092,30 @@ data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded=
 
     bootstrap.Modal.getOrCreateInstance(document.getElementById('teahouseEditModal')).show();
   });
+
+  // 编辑弹窗：拦截原生提交，改为以 multipart 文件形式上传配图（去掉 base64 内联）
+  (function () {
+    var editForm = document.getElementById('teahouseEditForm');
+    if (!editForm) return;
+    editForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var fd = new FormData(editForm);
+      editForm.querySelectorAll('[data-image-picker]').forEach(function (p) {
+        fd.delete('images');
+        if (p._file) fd.append('images', p._file, p._file.name);
+      });
+      var btn = editForm.querySelector('button[type="submit"]');
+      if (btn) btn.disabled = true;
+      fetch(editForm.action, {
+        method: 'POST',
+        body: fd,
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      })
+      .then(function () { window.location.reload(); })
+      .catch(function () { window.location.reload(); });
+    });
+  })();
+
   document.addEventListener('input', function (e) {
     if (e.target && e.target.id === 'teahouseEditContent') {
       var c = document.getElementById('teahouseEditCount');
@@ -1214,53 +1240,26 @@ data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded=
           if (hid) hid.value = '';
           var rem = picker.querySelector('input[name=image_removed]');
           if (rem) rem.value = '1';
+          picker._file = null;
           var label = picker.querySelector('.tea-image-picked');
           if (label) { label.classList.add('d-none'); label.innerHTML = ''; }
         }
       }
     });
 
-    // 把所选图片压缩 / 缩放到有界 WebP data URL，避免超大 base64 塞进表单字段触发 413。
-    function compressImageFile(file, maxEdge, quality, cb) {
-      var url = URL.createObjectURL(file);
-      var img = new Image();
-      img.onload = function () {
-        URL.revokeObjectURL(url);
-        var w = img.naturalWidth || maxEdge, h = img.naturalHeight || maxEdge;
-        var scale = Math.min(1, maxEdge / Math.max(w, h));
-        var cw = Math.max(1, Math.round(w * scale)), ch = Math.max(1, Math.round(h * scale));
-        var canvas = document.createElement('canvas');
-        canvas.width = cw; canvas.height = ch;
-        canvas.getContext('2d').drawImage(img, 0, 0, cw, ch);
-        try {
-          cb(canvas.toDataURL('image/webp', quality));
-        } catch (err) {
-          // 个别浏览器 toDataURL('image/webp') 不支持时，回退为原始文件 data URL
-          fallbackFile(file, cb);
-        }
-      };
-      img.onerror = function () { URL.revokeObjectURL(url); fallbackFile(file, cb); };
-      img.src = url;
-    }
-    function fallbackFile(file, cb) {
-      var r = new FileReader();
-      r.onload = function () { cb(r.result); };
-      r.onerror = function () { cb(''); };
-      r.readAsDataURL(file);
-    }
-
+    // 选图后只记录原始 File 对象（不再读成 base64），提交时由对应表单以 multipart 文件上传；
+    // 服务端再压缩为 WebP data URL 存库，彻底去掉 base64 内联。
     document.addEventListener('change', function (e) {
       var fileInput = e.target;
       if (!fileInput || fileInput.id !== 'teaImageFileInput') return;
       var file = fileInput.files && fileInput.files[0];
       if (!file || !currentPicker) { fileInput.value = ''; return; }
-      compressImageFile(file, 1280, 0.82, function (dataUrl) {
-        var hid = currentPicker.querySelector('input[name=images]');
-        if (hid) hid.value = dataUrl;
-        var rem = currentPicker.querySelector('input[name=image_removed]');
-        if (rem) rem.value = '0';
-        setPreview(currentPicker, dataUrl);
-      });
+      currentPicker._file = file;
+      var hid = currentPicker.querySelector('input[name=images]');
+      if (hid) hid.value = '';            // 清空旧 data URL 残留
+      var rem = currentPicker.querySelector('input[name=image_removed]');
+      if (rem) rem.value = '0';
+      setPreview(currentPicker, URL.createObjectURL(file));
       fileInput.value = '';
     });
   })();
@@ -1441,6 +1440,17 @@ data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded=
       if (options.clear !== false) textarea.value = '';
     }
 
+    // 重置配图选择器，避免上一轮选择的文件残留（_file / 隐藏字段 / 预览）
+    form.querySelectorAll('[data-image-picker]').forEach(function (p) {
+      p._file = null;
+      var hid = p.querySelector('input[name=images]');
+      if (hid) hid.value = '';
+      var rem = p.querySelector('input[name=image_removed]');
+      if (rem) rem.value = '0';
+      var label = p.querySelector('.tea-image-picked');
+      if (label) { label.classList.add('d-none'); label.innerHTML = ''; }
+    });
+
     if (options.cardId) {
       if (cardIdInput) cardIdInput.value = options.cardId;
       var cardPicked = form.querySelector('.tea-card-picked');
@@ -1516,6 +1526,11 @@ data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded=
 
     // 2. 发送 XHR 请求
     var formData = new FormData(form);
+    // 配图以原始文件（multipart）上传，彻底去掉 base64 内联；移除隐藏 images 字段残留
+    form.querySelectorAll('[data-image-picker]').forEach(function (p) {
+      formData.delete('images');
+      if (p._file) formData.append('images', p._file, p._file.name);
+    });
     fetch(form.action, {
       method: 'POST',
       body: formData,

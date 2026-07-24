@@ -68,7 +68,12 @@ from ..services.card_service import (
     build_export_package,
     load_card_images,
 )
-from ..services.image_service import compress_image, crop_square_and_compress, send_webp
+from ..services.image_service import (
+    compress_image,
+    crop_square_and_compress,
+    crop_square_and_compress_bytes,
+    send_webp,
+)
 
 user_bp = Blueprint("user", __name__)
 
@@ -292,17 +297,16 @@ def profile_edit():
         # 通知偏好：茶馆被点赞时是否通知（可关，防刷屏）
         u.notify_like = "notify_like" in request.form
 
-        # 头像：移除 / 裁剪后上传 / 保留原值
+        # 头像：移除 / 裁剪后上传（原始文件，服务端压缩）/ 保留原值；彻底去掉 base64 内联
+        avatar_file = request.files.get("avatar_file")
         if request.form.get("remove_avatar"):
             u.avatar = None
-        else:
-            avatar_data = (request.form.get("avatar_data") or "").strip()
-            if avatar_data:
-                try:
-                    u.avatar = crop_square_and_compress(avatar_data)
-                except Exception:
-                    flash("头像处理失败，请重试", "warning")
-                    return render_template("user/profile_edit.html", u=u)
+        elif avatar_file and avatar_file.filename:
+            try:
+                u.avatar = crop_square_and_compress_bytes(avatar_file.read())
+            except Exception:
+                flash("头像处理失败，请重试", "warning")
+                return render_template("user/profile_edit.html", u=u)
 
         db.session.commit()
         flash("个人资料已更新", "success")

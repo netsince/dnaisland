@@ -24,7 +24,6 @@
         </div>
         <input class="form-control" type="file" id="avatarFile" accept="image/png,image/jpeg,image/gif,image/webp">
         <div class="form-text">选择图片后会弹出裁剪框，按 1:1 裁剪为正方形头像。</div>
-        <input type="hidden" name="avatar_data" id="avatarData" value="">
         {% if u.avatar %}
         <div class="form-check mt-2">
           <input class="form-check-input" type="checkbox" name="remove_avatar" id="removeAvatar">
@@ -101,7 +100,6 @@
 <script>
   let cropper = null;
   const avatarFile = document.getElementById('avatarFile');
-  const avatarData = document.getElementById('avatarData');
   const preview = document.getElementById('avatarPreview');
   const placeholder = document.getElementById('avatarPlaceholder');
   const cropImg = document.getElementById('cropImage');
@@ -127,14 +125,33 @@
   document.getElementById('cropConfirm').addEventListener('click', () => {
     if (!cropper) return;
     const canvas = cropper.getCroppedCanvas({ width: 512, height: 512 });
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
-    avatarData.value = dataUrl;
-    preview.src = dataUrl;
-    preview.style.display = 'block';
-    if (placeholder) placeholder.style.display = 'none';
+    // 输出为 Blob（而非 base64），提交时以原始文件上传，去掉 base64 内联
+    canvas.toBlob(blob => {
+      window.avatarBlob = blob;
+      const url = URL.createObjectURL(blob);
+      preview.src = url;
+      preview.style.display = 'block';
+      if (placeholder) placeholder.style.display = 'none';
+    }, 'image/jpeg', 0.92);
     cropper.destroy();
     cropper = null;
     cropModal.hide();
+  });
+
+  // 拦截资料表单提交：以 multipart 文件形式上传头像（去掉 base64 内联），其余字段照常提交
+  document.getElementById('profileForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    const fd = new FormData(this);
+    fd.delete('avatar_data');   // 不再以 base64 字段提交
+    fd.delete('avatarFile');    // 移除未裁剪的原始文件，改用裁剪后的 Blob
+    if (window.avatarBlob) fd.append('avatar_file', window.avatarBlob, 'avatar.jpg');
+    fetch(this.action, {
+      method: 'POST',
+      body: fd,
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(function (res) { if (res.redirected) window.location.href = res.url; else window.location.reload(); })
+    .catch(function () { window.location.reload(); });
   });
 </script>
 {% endblock %}
