@@ -1220,21 +1220,47 @@ data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded=
       }
     });
 
+    // 把所选图片压缩 / 缩放到有界 WebP data URL，避免超大 base64 塞进表单字段触发 413。
+    function compressImageFile(file, maxEdge, quality, cb) {
+      var url = URL.createObjectURL(file);
+      var img = new Image();
+      img.onload = function () {
+        URL.revokeObjectURL(url);
+        var w = img.naturalWidth || maxEdge, h = img.naturalHeight || maxEdge;
+        var scale = Math.min(1, maxEdge / Math.max(w, h));
+        var cw = Math.max(1, Math.round(w * scale)), ch = Math.max(1, Math.round(h * scale));
+        var canvas = document.createElement('canvas');
+        canvas.width = cw; canvas.height = ch;
+        canvas.getContext('2d').drawImage(img, 0, 0, cw, ch);
+        try {
+          cb(canvas.toDataURL('image/webp', quality));
+        } catch (err) {
+          // 个别浏览器 toDataURL('image/webp') 不支持时，回退为原始文件 data URL
+          fallbackFile(file, cb);
+        }
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); fallbackFile(file, cb); };
+      img.src = url;
+    }
+    function fallbackFile(file, cb) {
+      var r = new FileReader();
+      r.onload = function () { cb(r.result); };
+      r.onerror = function () { cb(''); };
+      r.readAsDataURL(file);
+    }
+
     document.addEventListener('change', function (e) {
       var fileInput = e.target;
       if (!fileInput || fileInput.id !== 'teaImageFileInput') return;
       var file = fileInput.files && fileInput.files[0];
       if (!file || !currentPicker) { fileInput.value = ''; return; }
-      var reader = new FileReader();
-      reader.onload = function () {
-        var dataUrl = reader.result;
+      compressImageFile(file, 1280, 0.82, function (dataUrl) {
         var hid = currentPicker.querySelector('input[name=images]');
         if (hid) hid.value = dataUrl;
         var rem = currentPicker.querySelector('input[name=image_removed]');
         if (rem) rem.value = '0';
         setPreview(currentPicker, dataUrl);
-      };
-      reader.readAsDataURL(file);
+      });
       fileInput.value = '';
     });
   })();

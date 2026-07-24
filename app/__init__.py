@@ -236,12 +236,20 @@ def create_app(config_object=None):
     @app.errorhandler(403)
     @app.errorhandler(404)
     @app.errorhandler(405)
+    @app.errorhandler(413)
     @app.errorhandler(429)
     def _json_error(error):
         # API/XHR 请求统一返回 JSON；普通请求回退到 Flask 默认错误页
         if getattr(g, "want_json", False):
             code = error.code or 400
-            return jsonify(ok=False, error=getattr(error, "description", "请求错误"), code=code), code
+            msg = getattr(error, "description", "请求错误")
+            # 413 给出更明确的引导，便于定位“上传过大”
+            if code == 413:
+                msg = "上传内容过大，请压缩图片或减小体积后重试"
+            return jsonify(ok=False, error=msg, code=code), code
+        if error.code == 413:
+            flash("上传内容过大，请压缩图片或减小体积后重试", "warning")
+            return redirect(request.referrer or url_for("main.index"))
         return error
 
     @app.errorhandler(500)
