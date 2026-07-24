@@ -1459,6 +1459,24 @@ body.is-mobile-plus-open header {
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
 }
 
+/* 表情包（内联 token 渲染） */
+.dna-sticker {
+  height: 1.6em;
+  width: 1.6em;
+  vertical-align: -0.35em;
+  object-fit: contain;
+  border-radius: 4px;
+  margin: 0 1px;
+}
+.sticker-pick-btn {
+  line-height: 1;
+  border-radius: 8px;
+  background: transparent;
+}
+.sticker-pick-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
 /* Emoji 工具栏与快捷面板 */
 .dna-emoji-toolbar-wrap {
   position: relative;

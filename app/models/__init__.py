@@ -25,6 +25,7 @@ from .teahouse import (
     TeaPostTopic,
     TeaTopic,
 )
+from .sticker import Sticker, StickerSeries
 from .user import User, UserFollow
 from .verification_code import VerificationCode
 
@@ -59,4 +60,6 @@ __all__ = [
     "KeyUsageLog",
     "GenerationModel",
     "GenerationLog",
+    "Sticker",
+    "StickerSeries",
 ]

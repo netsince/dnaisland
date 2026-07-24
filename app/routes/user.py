@@ -47,6 +47,7 @@ from ..models.punishment import (
     PUNISHMENT_TYPES,
 )
 from ..services.notification_service import notify
+from ..services.sticker_service import sanitize_stickers
 
 # 审核状态徽章 HTML（与 macros/cards.html::status_badge 保持一致，供 AJAX 局部更新）
 STATUS_BADGE_HTML = {
@@ -823,6 +824,7 @@ def card_comment(card_id):
         flash("你已被禁言，暂时无法评论", "warning")
         return redirect(url_for("user.card_detail", card_id=card_id))
     content = (request.form.get("content") or "").strip()
+    content, _ = sanitize_stickers(content, max_count=20)
     if not content:
         if request.headers.get("X-Requested-With") == "XMLHttpRequest":
             return jsonify({"error": "评论内容不能为空"}), 400

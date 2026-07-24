@@ -1,0 +1,104 @@
+{% extends "admin/base.html" %}
+
+{% block title %}表情包管理 · DNAISLAND{% endblock %}
+
+{% block admin_content %}
+<h2 class="h4 mb-3">表情包管理</h2>
+
+<div class="row g-4">
+  <div class="col-lg-4">
+    <div class="card mb-4">
+      <div class="card-header">新增系列</div>
+      <div class="card-body">
+        <form method="post" action="{{ url_for('admin.stickers') }}" class="row g-3">
+          <input type="hidden" name="action" value="add_series">
+          <div class="col-12">
+            <label class="form-label">系列名称</label>
+            <input type="text" class="form-control" name="name" placeholder="如 默认" required>
+          </div>
+          <div class="col-12">
+            <label class="form-label">系列标识</label>
+            <input type="text" class="form-control" name="slug" placeholder="如 default" required>
+            <div class="form-text">唯一，用于归类；仅字母数字下划线连字符。</div>
+          </div>
+          <div class="col-12">
+            <label class="form-label">排序</label>
+            <input type="number" class="form-control" name="sort_order" value="0">
+          </div>
+          <div class="col-12">
+            <button type="submit" class="btn btn-primary">添加系列</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">上传表情</div>
+      <div class="card-body">
+        <form method="post" action="{{ url_for('admin.sticker_upload') }}" enctype="multipart/form-data" class="row g-3">
+          <div class="col-12">
+            <label class="form-label">所属系列</label>
+            <select class="form-select" name="series_id" required>
+              {% for s in series %}
+              <option value="{{ s.id }}">{{ s.name }}（{{ s.slug }}）</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="form-label">表情 ID</label>
+            <input type="text" class="form-control" name="code" placeholder="如 doge" required>
+            <div class="form-text">唯一，用户内容中以 [sticker:ID] 引用。</div>
+          </div>
+          <div class="col-12">
+            <label class="form-label">图片</label>
+            <input type="file" class="form-control" name="image" accept="image/png,image/jpeg,image/gif,image/webp" required>
+            <div class="form-text">将压缩为边长 ≤240 的 WebP（保留透明）。</div>
+          </div>
+          <div class="col-12">
+            <label class="form-label">排序</label>
+            <input type="number" class="form-control" name="sort_order" value="0">
+          </div>
+          <div class="col-12">
+            <button type="submit" class="btn btn-success">上传表情</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-8">
+    {% for s in series %}
+    <div class="card mb-4">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span>{{ s.name }} <small class="text-muted">（{{ s.slug }}）</small></span>
+        <form method="post" action="{{ url_for('admin.sticker_series_delete', sid=s.id) }}" class="d-inline"
+              onsubmit="return confirm('删除该系列会同时删除其下所有表情，确认？');">
+          <button class="btn btn-sm btn-outline-danger">删除系列</button>
+        </form>
+      </div>
+      <div class="card-body">
+        {% if s.stickers %}
+        <div class="d-flex flex-wrap gap-3">
+          {% for st in s.stickers|sort(attribute='sort_order') %}
+          <div class="text-center" style="width:72px;">
+            <img src="{{ st.image_data }}" alt="{{ st.code }}" title="{{ st.code }}"
+                 style="width:56px;height:56px;object-fit:contain;">
+            <div class="small text-muted text-truncate" style="max-width:72px;" title="{{ st.code }}">{{ st.code }}</div>
+            <form method="post" action="{{ url_for('admin.sticker_delete', sticker_id=st.id) }}" class="d-inline"
+                  onsubmit="return confirm('确认删除该表情？');">
+              <button class="btn btn-sm btn-link text-danger p-0">删除</button>
+            </form>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-muted">该系列下暂无表情</div>
+        {% endif %}
+      </div>
+    </div>
+    {% else %}
+    <div class="text-muted">暂无表情系列，请先在左侧添加。</div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

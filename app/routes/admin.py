@@ -1,3 +1,4 @@
+import base64
 import json
 import re
 import secrets
@@ -39,6 +40,8 @@ from ..models import (
     RedemptionKey,
     Report,
     SiteConfig,
+    Sticker,
+    StickerSeries,
     TeaPost,
     TeaPostLike,
     TeaPostFavorite,
@@ -57,6 +60,7 @@ from ..models.punishment import (
 from ..services.image_service import compress_image, raw_bytes_to_webp_data_url
 from ..services.notification_service import notify
 from ..services.site_service import get_site_config
+from ..services.sticker_service import invalidate_sticker_cache
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -407,6 +411,107 @@ def image_model_delete(model_id):
     db.session.commit()
     flash("模型已删除", "success")
     return redirect(url_for("admin.image_models"))
+
+
+# ---------------------------------------------------------------------------
+# 表情包管理
+# ---------------------------------------------------------------------------
+@admin_bp.route("/stickers", methods=["GET", "POST"])
+@super_admin_required
+def stickers():
+    if request.method == "POST":
+        action = request.form.get("action")
+        if action == "add_series":
+            name = (request.form.get("name") or "").strip()
+            slug = (request.form.get("slug") or "").strip()
+            if not name or not slug:
+                flash("系列名称与标识均必填", "danger")
+            elif StickerSeries.query.filter_by(slug=slug).first():
+                flash("系列标识已存在", "danger")
+            else:
+                db.session.add(
+                    StickerSeries(
+                        name=name,
+                        slug=slug,
+                        sort_order=request.form.get("sort_order", 0, type=int),
+                    )
+                )
+                db.session.commit()
+                flash("系列已添加", "success")
+        return redirect(url_for("admin.stickers"))
+
+    series = StickerSeries.query.order_by(
+        StickerSeries.sort_order, StickerSeries.id
+    ).all()
+    return render_template("admin/stickers.html", series=series)
+
+
+@admin_bp.route("/stickers/series/<int:sid>/delete", methods=["POST"])
+@super_admin_required
+def sticker_series_delete(sid):
+    s = db.session.get(StickerSeries, sid)
+    if not s:
+        abort(404)
+    db.session.delete(s)  # 级联删除其下表情
+    db.session.commit()
+    invalidate_sticker_cache()
+    flash("系列已删除", "success")
+    return redirect(url_for("admin.stickers"))
+
+
+@admin_bp.route("/stickers/upload", methods=["POST"])
+@super_admin_required
+def sticker_upload():
+    series_id = request.form.get("series_id", type=int)
+    code = (request.form.get("code") or "").strip()
+    f = request.files.get("image")
+    if not series_id or not code or not f or not f.filename:
+        flash("系列、表情ID与图片均必填", "danger")
+        return redirect(url_for("admin.stickers"))
+    if not re.fullmatch(r"[A-Za-z0-9_-]+", code):
+        flash("表情ID仅允许字母、数字、下划线和连字符", "danger")
+        return redirect(url_for("admin.stickers"))
+    if not StickerSeries.query.get(series_id):
+        flash("系列不存在", "danger")
+        return redirect(url_for("admin.stickers"))
+    if Sticker.query.filter_by(code=code).first():
+        flash("表情ID已存在", "danger")
+        return redirect(url_for("admin.stickers"))
+
+    raw = f.read()
+    mimetype = f.mimetype or "image/png"
+    try:
+        data_url = f"data:{mimetype};base64," + base64.b64encode(raw).decode()
+        image_data = compress_image(data_url, max_edge=240, quality=90)
+    except Exception:
+        flash("图片处理失败，请换一张", "danger")
+        return redirect(url_for("admin.stickers"))
+
+    db.session.add(
+        Sticker(
+            code=code,
+            series_id=series_id,
+            image_data=image_data,
+            sort_order=request.form.get("sort_order", 0, type=int),
+        )
+    )
+    db.session.commit()
+    invalidate_sticker_cache()
+    flash("表情已上传", "success")
+    return redirect(url_for("admin.stickers"))
+
+
+@admin_bp.route("/stickers/<int:sticker_id>/delete", methods=["POST"])
+@super_admin_required
+def sticker_delete(sticker_id):
+    st = db.session.get(Sticker, sticker_id)
+    if not st:
+        abort(404)
+    db.session.delete(st)
+    db.session.commit()
+    invalidate_sticker_cache()
+    flash("表情已删除", "success")
+    return redirect(url_for("admin.stickers"))
 
 
 @admin_bp.route("/image-logs")

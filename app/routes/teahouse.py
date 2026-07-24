@@ -20,6 +20,7 @@ from datetime import datetime, timedelta
 from ..models import Card, Notification, TeaPost, TeaPostImage, TeaPostLike, User, UserFollow
 from ..services.image_service import compress_image
 from ..services.notification_service import notify
+from ..services.sticker_service import sanitize_stickers
 
 # 配图：仅支持单图
 TEA_MAX_IMAGES = 1
@@ -227,6 +228,7 @@ def create_post():
         flash("你已被禁言，暂时无法发帖", "warning")
         return redirect(url_for("teahouse.index"))
     content = (request.form.get("content") or "").strip()
+    content, _ = sanitize_stickers(content, max_count=20)
     if not content:
         flash("帖子内容不能为空", "warning")
         return redirect(url_for("teahouse.index"))
@@ -357,6 +359,7 @@ def reply(post_id):
         flash("你已被禁言，暂时无法回复", "warning")
         return redirect(url_for("teahouse.post_detail", post_id=post_id))
     content = (request.form.get("content") or "").strip()
+    content, _ = sanitize_stickers(content, max_count=20)
     if not content:
         if is_xhr:
             return jsonify({"ok": False, "error": "回复内容不能为空"})
@@ -472,6 +475,7 @@ def edit_post(post_id):
     if not p.can_edit(current_user):
         abort(403)
     content = (request.form.get("content") or "").strip()
+    content, _ = sanitize_stickers(content, max_count=20)
     if not content:
         flash("帖子内容不能为空", "warning")
     elif len(content) > TEA_POST_MAX_LEN:

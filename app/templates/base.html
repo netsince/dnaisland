@@ -1189,6 +1189,114 @@ function showToast(message, type) {
     var m = document.getElementById('teaImageZoomModal');
     if (m) bootstrap.Modal.getOrCreateInstance(m).show();
   });
+
+  // 表情包：加载、渲染、面板与插入
+  window.DnaStickers = { loaded: false, series: [], map: {} };
+
+  function loadStickers() {
+    if (window.DnaStickers.loaded) return Promise.resolve();
+    return fetch('/stickers/api').then(function (r) { return r.json(); }).then(function (data) {
+      var series = data.series || [];
+      var map = {};
+      series.forEach(function (s) {
+        s.stickers.forEach(function (st) { map[st.code] = st.image_data; });
+      });
+      window.DnaStickers.series = series;
+      window.DnaStickers.map = map;
+      window.DnaStickers.loaded = true;
+    }).catch(function () { window.DnaStickers.loaded = true; });
+  }
+
+  function renderStickers(text) {
+    if (!text) return text;
+    return text.replace(/\[sticker:([A-Za-z0-9_-]+)\]/g, function (m, code) {
+      var d = window.DnaStickers.map[code];
+      if (!d) return m;  // 未知 token 暂保留，待加载后再次渲染
+      return '<img class="dna-sticker" src="' + d + '" alt="' + code + '" title="' + code + '">';
+    });
+  }
+  window.renderStickers = renderStickers;
+
+  var _stickerTarget = null;
+  function showStickerSeries(s) {
+    var grid = document.getElementById('stickerGrid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    if (!s.stickers.length) {
+      grid.innerHTML = '<div class="text-muted p-2">该系列暂无表情</div>';
+      return;
+    }
+    s.stickers.forEach(function (st) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'btn p-1 sticker-pick-btn';
+      b.title = st.code;
+      b.innerHTML = '<img src="' + st.image_data + '" style="width:48px;height:48px;object-fit:contain;">';
+      b.addEventListener('click', function () { insertStickerToken(st.code); });
+      grid.appendChild(b);
+    });
+  }
+
+  function openStickerPanel(textareaEl) {
+    _stickerTarget = textareaEl;
+    var modal = document.getElementById('stickerPanel');
+    var tabs = document.getElementById('stickerSeriesTabs');
+    if (!modal || !tabs) return;
+    loadStickers().then(function () {
+      tabs.innerHTML = '';
+      var series = window.DnaStickers.series;
+      if (!series.length) {
+        tabs.innerHTML = '';
+        var grid = document.getElementById('stickerGrid');
+        if (grid) grid.innerHTML = '<div class="text-muted p-2">暂无表情包</div>';
+      }
+      series.forEach(function (s, i) {
+        var li = document.createElement('li');
+        li.className = 'nav-item';
+        var a = document.createElement('button');
+        a.type = 'button';
+        a.className = 'nav-link' + (i === 0 ? ' active' : '');
+        a.textContent = s.name;
+        a.addEventListener('click', function () {
+          var siblings = tabs.children;
+          for (var j = 0; j < siblings.length; j++) {
+            siblings[j].firstChild.classList.remove('active');
+          }
+          a.classList.add('active');
+          showStickerSeries(s);
+        });
+        li.appendChild(a);
+        tabs.appendChild(li);
+      });
+      if (series[0]) showStickerSeries(series[0]);
+      bootstrap.Modal.getOrCreateInstance(modal).show();
+    });
+  }
+
+  function insertStickerToken(code) {
+    var ta = _stickerTarget;
+    var token = '[sticker:' + code + ']';
+    if (ta && typeof ta.focus === 'function') {
+      var start = ta.selectionStart || 0;
+      var end = ta.selectionEnd || 0;
+      ta.value = ta.value.slice(0, start) + token + ta.value.slice(end);
+      var pos = start + token.length;
+      ta.setSelectionRange(pos, pos);
+      ta.focus();
+      ta.dispatchEvent(new Event('input'));
+    }
+    var m = document.getElementById('stickerPanel');
+    if (m) { var inst = bootstrap.Modal.getInstance(m); if (inst) inst.hide(); }
+  }
+
+  // 任意 [data-sticker-open] 按钮打开面板，data-sticker-target 指定文本框 id
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest && e.target.closest('[data-sticker-open]');
+    if (!btn) return;
+    var tid = btn.getAttribute('data-sticker-target');
+    var ta = tid ? document.getElementById(tid) : (document.activeElement);
+    openStickerPanel(ta);
+  });
 })();
 </script>
 
@@ -1203,6 +1311,22 @@ function showToast(message, type) {
   <div class="modal-dialog modal-dialog-centered modal-lg">
     <div class="modal-content bg-transparent border-0 shadow-none">
       <img id="teaImageZoomImg" src="" alt="配图" class="img-fluid rounded mx-auto d-block">
+    </div>
+  </div>
+</div>
+
+<!-- 表情包选择面板 -->
+<div class="modal fade" id="stickerPanel" tabindex="-1" aria-labelledby="stickerPanelLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title" id="stickerPanelLabel">表情包</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+      </div>
+      <div class="modal-body">
+        <ul class="nav nav-tabs mb-2" id="stickerSeriesTabs"></ul>
+        <div class="d-flex flex-wrap gap-2 align-content-start" id="stickerGrid" style="max-height:320px;overflow:auto;"></div>
+      </div>
     </div>
   </div>
 </div>

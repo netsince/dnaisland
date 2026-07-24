@@ -4,6 +4,7 @@ from .image_gen import image_gen_bp
 from .main import main_bp
 from .points import points_bp
 from .publish import publish_bp
+from .sticker import sticker_bp
 from .system import system_bp
 from .user import user_bp
 from .teahouse import teahouse_bp
@@ -18,4 +19,5 @@ __all__ = [
     "teahouse_bp",
     "points_bp",
     "image_gen_bp",
+    "sticker_bp",
 ]

@@ -62,6 +62,7 @@ def create_app(config_object=None):
         main_bp,
         points_bp,
         publish_bp,
+        sticker_bp,
         system_bp,
         user_bp,
         teahouse_bp,
@@ -76,6 +77,7 @@ def create_app(config_object=None):
     app.register_blueprint(system_bp)
     app.register_blueprint(points_bp)
     app.register_blueprint(image_gen_bp)
+    app.register_blueprint(sticker_bp)
 
     from .commands import init_commands
 
@@ -84,6 +86,8 @@ def create_app(config_object=None):
     import re as _re
 
     from markupsafe import Markup, escape
+
+    from .services.sticker_service import render_stickers_html
 
     _URL_RE = _re.compile(r"(https?://[^\s<]+)")
 
@@ -97,7 +101,7 @@ def create_app(config_object=None):
             r'<a href="\1" target="_blank" rel="noopener noreferrer">\1</a>',
             escaped,
         )
-        return Markup(linked)
+        return Markup(render_stickers_html(linked))
 
     from urllib.parse import urlparse
 
@@ -128,7 +132,7 @@ def create_app(config_object=None):
                 f'<a href="{leave}" target="_blank" rel="noopener noreferrer">{url}</a>'
             )
 
-        return Markup(_URL_RE.sub(_repl, escaped))
+        return Markup(render_stickers_html(_URL_RE.sub(_repl, escaped)))
 
     @app.context_processor
     def inject_unread():
