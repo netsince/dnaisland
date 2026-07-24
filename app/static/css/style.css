@@ -1288,6 +1288,70 @@ body.is-mobile-plus-open header {
   padding-right: 8px;
   box-shadow: 0 0 0 1px rgba(var(--dna-accent-rgb, 99, 102, 241), 0.5) inset;
 }
+
+/* 置顶评论卡片样式 */
+.dna-comment-item--pinned {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(168, 85, 247, 0.08) 100%);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: 8px;
+  padding-left: 8px;
+  padding-right: 8px;
+  margin-bottom: 8px;
+}
+
+/* 置顶徽章 */
+.dna-comment-pin-badge {
+  font-size: 0.68rem;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  vertical-align: middle;
+}
+
+/* 点赞按钮与动画 */
+.dna-comment-like-btn {
+  cursor: pointer;
+  transition: transform 0.15s ease, color 0.15s ease;
+}
+.dna-comment-like-btn:hover {
+  transform: scale(1.15);
+}
+.dna-comment-like-btn:active {
+  transform: scale(0.9);
+}
+.dna-comment-like-btn.liked {
+  color: #dc3545 !important;
+}
+
+/* 抽屉 Header 排序 Tabs */
+.dna-comment-sort-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 2px 4px;
+  border-radius: 6px;
+}
+.dna-comment-sort-btn {
+  font-size: 0.75rem;
+  padding: 2px 8px;
+  border-radius: 4px;
+  color: var(--dna-muted, #94a3b8);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.dna-comment-sort-btn:hover {
+  color: var(--bs-body-color, #fff);
+}
+.dna-comment-sort-btn.active {
+  background: var(--dna-accent, #6366f1);
+  color: #ffffff;
+  font-weight: 500;
+}
 .dna-comment-item__avatar {
   width: 34px; height: 34px;
   border-radius: 50%;

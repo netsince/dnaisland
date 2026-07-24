@@ -189,7 +189,13 @@
 <aside class="dna-comment-drawer" id="commentDrawer" aria-label="评论区">
   <div class="dna-comment-drawer__handle"></div>
   <div class="dna-comment-drawer__header">
-    <h2 class="h6 mb-0 fw-semibold" id="commentDrawerTitle">评论</h2>
+    <div class="d-flex align-items-center gap-2">
+      <h2 class="h6 mb-0 fw-semibold" id="commentDrawerTitle">评论</h2>
+      <div class="dna-comment-sort-tabs ms-2" id="commentSortTabs">
+        <button type="button" class="dna-comment-sort-btn active" data-sort="latest">最新</button>
+        <button type="button" class="dna-comment-sort-btn" data-sort="hottest">最热</button>
+      </div>
+    </div>
     <button type="button" class="btn btn-link text-muted p-0" id="commentDrawerClose" aria-label="关闭">
       <i class="bi bi-x-lg"></i>
     </button>
@@ -247,12 +253,31 @@
   var postUrl   = trigger.dataset.postUrl;
   var loggedIn  = trigger.dataset.loggedIn === 'true';
   var loginUrl  = trigger.dataset.loginUrl;
+  var cardId    = {{ card.id|tojson }};
+  var currentSort = 'latest';
   var page = 1;
   var loading = false;
   var hasNext = true;
   var totalCommentsCount = 0;
   // 外部带 ?comment=<id> 进入时，自动展开评论区并定位到该评论
   var focusComment = {{ focus_comment or 'null' }};
+
+  var sortTabs = document.getElementById('commentSortTabs');
+  if (sortTabs) {
+    sortTabs.addEventListener('click', function(e) {
+      var btn = e.target.closest('.dna-comment-sort-btn');
+      if (!btn) return;
+      var sort = btn.dataset.sort;
+      if (sort === currentSort) return;
+      currentSort = sort;
+      sortTabs.querySelectorAll('.dna-comment-sort-btn').forEach(function(b) {
+        b.classList.toggle('active', b === btn);
+      });
+      page = 1;
+      body.innerHTML = '<div class="text-center text-muted py-4" id="commentLoading">加载中…</div>';
+      loadPage(1, {});
+    });
+  }
 
   function updateCommentCount(count) {
     totalCommentsCount = Math.max(0, count);
@@ -343,13 +368,29 @@
   }
 
   function renderItem(cm) {
+    var itemClasses = 'dna-comment-item' + (cm.is_pinned ? ' dna-comment-item--pinned' : '');
+    var pinBadge = cm.is_pinned
+      ? '<span class="badge dna-comment-pin-badge ms-1">📌 置顶</span>'
+      : '';
     var authorBadge = cm.is_author
       ? '<span class="badge bg-primary-subtle text-primary border border-primary-subtle ms-1 dna-comment-author-badge">作者</span>'
+      : '';
+    var replyToHtml = cm.reply_to
+      ? '<span class="text-muted small ms-1">回复 <a href="#comment-' + cm.reply_to.id + '">@' + escHtml(cm.reply_to.display_name) + '</a></span>'
       : '';
     var floorHtml = (cm.floor !== undefined && cm.floor !== null)
       ? '<span class="ms-2 opacity-60">#' + cm.floor + '楼</span>'
       : '';
     var timeHtml = '<span class="ms-2 opacity-60">' + formatRelativeTime(cm.created_at) + '</span>';
+
+    var likeBtn = '<button type="button" class="btn btn-link p-0 text-muted small text-decoration-none dna-comment-like-btn ' + (cm.liked ? 'liked text-danger' : '') + '" data-like-url="/card/' + cardId + '/comment/' + cm.id + '/like"><i class="bi bi-heart' + (cm.liked ? '-fill' : '') + '"></i> <span class="like-count">' + (cm.like_count || 0) + '</span></button>';
+
+    var replyBtn = '<button type="button" class="btn btn-link p-0 ms-2 text-muted small text-decoration-none dna-comment-reply-btn" data-reply-id="' + cm.id + '" data-author-name="' + escHtml(cm.author.display_name) + '">回复</button>';
+
+    var pinBtn = cm.can_pin
+      ? '<button type="button" class="btn btn-link p-0 ms-2 text-warning small opacity-75 text-decoration-none dna-comment-pin-btn" data-pin-url="/card/' + cardId + '/comment/' + cm.id + '/pin">' + (cm.is_pinned ? '取消置顶' : '置顶') + '</button>'
+      : '';
+
     var reportHtml = cm.can_report
       ? '<a href="' + cm.report_url + '" class="ms-2 text-muted small opacity-75 text-decoration-none">举报</a>'
       : '';
@@ -357,62 +398,168 @@
       ? '<button type="button" class="btn btn-link p-0 ms-2 text-danger small opacity-75 text-decoration-none dna-comment-del-btn" data-delete-url="' + cm.delete_url + '">删除</button>'
       : '';
 
-    return '<div class="dna-comment-item" data-comment-id="' + cm.id + '">'
+    return '<div class="' + itemClasses + '" data-comment-id="' + cm.id + '" id="comment-' + cm.id + '">'
       + avatarEl(cm.author)
       + '<div class="dna-comment-item__body">'
-      + '<div class="dna-comment-item__meta">'
+      + '<div class="dna-comment-item__meta d-flex align-items-center flex-wrap">'
       + '<a href="/user/' + cm.author.username + '" class="text-decoration-none text-reset fw-medium">' + escHtml(cm.author.display_name) + '</a>'
+      + pinBadge
       + authorBadge
+      + replyToHtml
       + floorHtml
       + timeHtml
+      + '</div>'
+      + '<div class="dna-comment-item__text">' + escHtml(cm.content) + '</div>'
+      + '<div class="dna-comment-item__actions mt-1 d-flex align-items-center">'
+      + likeBtn
+      + replyBtn
+      + pinBtn
       + reportHtml
       + deleteHtml
       + '</div>'
-      + '<div class="dna-comment-item__text">' + escHtml(cm.content) + '</div>'
       + '</div></div>';
   }
 
-  // 事件委托：删除评论
+  // 事件委托：删除、点赞、置顶、回复
   body.addEventListener('click', function(e) {
+    // 1. 删除评论
     var delBtn = e.target.closest('.dna-comment-del-btn');
-    if (!delBtn) return;
-    var deleteUrl = delBtn.dataset.deleteUrl;
-    if (!deleteUrl) return;
+    if (delBtn) {
+      var deleteUrl = delBtn.dataset.deleteUrl;
+      if (!deleteUrl) return;
+      if (!confirm('确定要删除这条评论吗？')) return;
 
-    if (!confirm('确定要删除这条评论吗？')) return;
-
-    fetch(deleteUrl, {
-      method: 'POST',
-      headers: { 'X-Requested-With': 'XMLHttpRequest' },
-      credentials: 'same-origin'
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      if (data.ok) {
-        var itemEl = delBtn.closest('.dna-comment-item');
-        if (itemEl) itemEl.remove();
-        updateCommentCount(totalCommentsCount - 1);
-        if (typeof showToast === 'function') {
-          showToast('评论已删除', 'success');
-        }
-        if (!body.querySelector('.dna-comment-item')) {
-          body.innerHTML = '<div class="text-muted text-center py-4">还没有评论，来抢沙发～</div>';
-        }
-      } else {
-        if (typeof showToast === 'function') {
-          showToast(data.error || '删除失败', 'danger');
+      fetch(deleteUrl, {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin'
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.ok) {
+          var itemEl = delBtn.closest('.dna-comment-item');
+          if (itemEl) itemEl.remove();
+          updateCommentCount(totalCommentsCount - 1);
+          if (typeof showToast === 'function') {
+            showToast('评论已删除', 'success');
+          }
+          if (!body.querySelector('.dna-comment-item')) {
+            body.innerHTML = '<div class="text-muted text-center py-4">还没有评论，来抢沙发～</div>';
+          }
         } else {
-          alert(data.error || '删除失败');
+          if (typeof showToast === 'function') {
+            showToast(data.error || '删除失败', 'danger');
+          } else {
+            alert(data.error || '删除失败');
+          }
         }
+      })
+      .catch(function() {
+        if (typeof showToast === 'function') {
+          showToast('网络错误，请重试', 'danger');
+        } else {
+          alert('网络错误，请重试');
+        }
+      });
+      return;
+    }
+
+    // 2. 点赞评论
+    var likeBtn = e.target.closest('.dna-comment-like-btn');
+    if (likeBtn) {
+      if (likeBtn.dataset.loading === '1') return;
+      var likeUrl = likeBtn.dataset.likeUrl;
+      if (!likeUrl) return;
+
+      likeBtn.dataset.loading = '1';
+      fetch(likeUrl, {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin'
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        likeBtn.dataset.loading = '0';
+        if (data.ok) {
+          var isLiked = !!data.liked;
+          likeBtn.classList.toggle('liked', isLiked);
+          likeBtn.classList.toggle('text-danger', isLiked);
+          var icon = likeBtn.querySelector('i');
+          if (icon) {
+            icon.className = 'bi bi-heart' + (isLiked ? '-fill' : '');
+          }
+          var countSpan = likeBtn.querySelector('.like-count');
+          if (countSpan) {
+            countSpan.textContent = data.count !== undefined ? data.count : 0;
+          }
+        } else {
+          if (typeof showToast === 'function') {
+            showToast(data.error || '操作失败', 'danger');
+          }
+        }
+      })
+      .catch(function() {
+        likeBtn.dataset.loading = '0';
+        if (typeof showToast === 'function') {
+          showToast('网络错误，请重试', 'danger');
+        }
+      });
+      return;
+    }
+
+    // 3. 置顶评论
+    var pinBtn = e.target.closest('.dna-comment-pin-btn');
+    if (pinBtn) {
+      if (pinBtn.dataset.loading === '1') return;
+      var pinUrl = pinBtn.dataset.pinUrl;
+      if (!pinUrl) return;
+
+      pinBtn.dataset.loading = '1';
+      fetch(pinUrl, {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin'
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        pinBtn.dataset.loading = '0';
+        if (data.ok) {
+          if (typeof showToast === 'function') {
+            showToast(data.is_pinned ? '评论已置顶' : '已取消置顶', 'success');
+          }
+          page = 1;
+          body.innerHTML = '<div class="text-center text-muted py-4">加载中…</div>';
+          loadPage(1, {});
+        } else {
+          if (typeof showToast === 'function') {
+            showToast(data.error || '操作失败', 'danger');
+          }
+        }
+      })
+      .catch(function() {
+        pinBtn.dataset.loading = '0';
+        if (typeof showToast === 'function') {
+          showToast('网络错误，请重试', 'danger');
+        }
+      });
+      return;
+    }
+
+    // 4. 回复评论
+    var replyBtn = e.target.closest('.dna-comment-reply-btn');
+    if (replyBtn) {
+      var replyId = replyBtn.dataset.replyId;
+      var authorName = replyBtn.dataset.authorName;
+      var form = document.getElementById('cmForm');
+      var input = document.getElementById('cmInput');
+      if (form && input) {
+        form.dataset.replyToId = replyId;
+        input.value = '@' + authorName + ' ';
+        input.dispatchEvent(new Event('input'));
+        input.focus();
       }
-    })
-    .catch(function() {
-      if (typeof showToast === 'function') {
-        showToast('网络错误，请重试', 'danger');
-      } else {
-        alert('网络错误，请重试');
-      }
-    });
+      return;
+    }
   });
 
   function loadComments() {
@@ -424,7 +571,8 @@
     opts = opts || {};
     if (loading) return;
     loading = true;
-    fetch(apiUrl + '?page=' + p)
+    var sortParam = (currentSort === 'hot' || currentSort === 'hottest') ? 'hottest' : 'latest';
+    fetch(apiUrl + '?page=' + p + '&sort=' + sortParam)
       .then(function(r) { return r.json(); })
       .then(function(data) {
         loading = false;
@@ -610,6 +758,9 @@
       if (!content || input.value.length > 500) return;
       var fd = new FormData();
       fd.append('content', content);
+      if (form.dataset.replyToId) {
+        fd.append('reply_to_id', form.dataset.replyToId);
+      }
       submitBtn.disabled = true;
       fetch(postUrl, {
         method: 'POST',
@@ -622,6 +773,7 @@
         submitBtn.disabled = false;
         if (data.ok) {
           input.value = '';
+          delete form.dataset.replyToId;
           updateCharCount();
           emojiBar.classList.remove('show');
           // 重置并重新加载评论列表
