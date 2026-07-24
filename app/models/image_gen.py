@@ -53,8 +53,8 @@ class GenerationLog(db.Model):
     status = db.Column(
         db.String(10), nullable=False, default="success"
     )  # success / partial / failed
-    images = db.Column(LONGTEXT, nullable=True)  # JSON 数组：base64 data URL 列表
-    reference_images = db.Column(LONGTEXT, nullable=True)  # JSON 数组：参考图的 WebP Data URL 列表
+    images = db.deferred(db.Column(LONGTEXT, nullable=True))  # JSON 数组：base64 data URL 列表
+    reference_images = db.deferred(db.Column(LONGTEXT, nullable=True))  # JSON 数组：参考图的 WebP Data URL 列表
     points_spent = db.Column(
         db.Integer, nullable=False, server_default="0", default=0
     )

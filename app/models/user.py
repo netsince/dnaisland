@@ -17,7 +17,7 @@ class User(db.Model, UserMixin):
     status = db.Column(db.String(20), server_default="active")
     role = db.Column(db.String(20), server_default="user", nullable=False, index=True)
 
-    avatar = db.Column(db.Text, nullable=True)  # 头像（base64 data URL），可空
+    avatar = db.deferred(db.Column(db.Text, nullable=True))  # 头像（base64 data URL），可空
 
     # 点数（积分）余额
     points = db.Column(db.Integer, nullable=False, server_default="0", default=0)

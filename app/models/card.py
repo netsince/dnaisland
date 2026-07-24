@@ -85,7 +85,7 @@ class CardImage(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     card_id = db.Column(db.String(36), db.ForeignKey("cards.id"), nullable=False)
     slot = db.Column(db.String(20), nullable=False)  # square | landscape | portrait
-    data = db.Column(LONGTEXT, nullable=False)  # base64 data URI
+    data = db.deferred(db.Column(LONGTEXT, nullable=False))  # base64 data URI
 
 
 class CardLike(db.Model):

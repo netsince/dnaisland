@@ -78,7 +78,7 @@ class TeaPostImage(db.Model):
     post_id = db.Column(
         db.Integer, db.ForeignKey("teahouse_posts.id"), nullable=False, index=True
     )
-    image_data = db.Column(LONGTEXT, nullable=False)
+    image_data = db.deferred(db.Column(LONGTEXT, nullable=False))
     sort_order = db.Column(db.Integer, default=0, nullable=False)
 
 
