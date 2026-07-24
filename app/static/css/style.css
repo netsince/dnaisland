@@ -1869,6 +1869,39 @@ body.is-mobile-plus-open header {
   background: rgba(255, 255, 255, 0.1);
 }
 
+/* ---------------- 表情包从下往上弹出底栏样式与 +1 超高层级 ---------------- */
+#stickerPanel {
+  z-index: 1070 !important;
+}
+body > .modal-backdrop:last-of-type {
+  z-index: 1065 !important;
+}
+
+#stickerPanel .modal-dialog.modal-dialog-bottom {
+  position: fixed;
+  bottom: 0;
+  left: 0; right: 0;
+  margin: 0 auto;
+  max-width: 600px;
+  width: 100%;
+  transform: translateY(100%);
+  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#stickerPanel.show .modal-dialog.modal-dialog-bottom {
+  transform: translateY(0);
+}
+
+#stickerPanel .modal-content {
+  background: rgba(18, 18, 21, 0.96);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--dna-border-strong, #3f3f46);
+  border-bottom: none;
+  border-radius: 20px 20px 0 0;
+  box-shadow: 0 -16px 40px rgba(0, 0, 0, 0.85);
+}
+
 /* Emoji 工具栏与快捷面板 */
 .dna-emoji-toolbar-wrap {
   position: relative;

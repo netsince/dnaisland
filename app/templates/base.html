@@ -1412,17 +1412,17 @@ data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded=
   </div>
 </div>
 
-<!-- 表情包选择面板 -->
+<!-- 表情包选择面板（从下往上弹出底栏 +1 超高层级） -->
 <div class="modal fade" id="stickerPanel" tabindex="-1" aria-labelledby="stickerPanelLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered modal-lg">
-    <div class="modal-content">
-      <div class="modal-header py-2">
-        <h6 class="modal-title" id="stickerPanelLabel">表情包</h6>
+  <div class="modal-dialog modal-dialog-bottom mb-0">
+    <div class="modal-content border-bottom-0 rounded-bottom-0">
+      <div class="modal-header py-2 border-secondary border-opacity-25">
+        <h6 class="modal-title fw-bold text-white mb-0 d-flex align-items-center gap-1" id="stickerPanelLabel"><i class="bi bi-emoji-smile"></i> 表情包</h6>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
       </div>
-      <div class="modal-body">
-        <ul class="nav nav-tabs mb-2" id="stickerSeriesTabs"></ul>
-        <div class="d-flex flex-wrap gap-2 align-content-start" id="stickerGrid" style="max-height:320px;overflow:auto;"></div>
+      <div class="modal-body p-3">
+        <ul class="nav nav-tabs mb-3 border-secondary border-opacity-25" id="stickerSeriesTabs"></ul>
+        <div class="d-flex flex-wrap gap-2 align-content-start" id="stickerGrid" style="max-height:280px;overflow-y:auto;"></div>
       </div>
     </div>
   </div>

@@ -750,27 +750,14 @@
       + '<div id="cmImagePreviewBox"></div>'
       + '<div class="d-flex align-items-center justify-content-between dna-emoji-toolbar-wrap">'
       + '<div class="d-flex align-items-center gap-2">'
-      + '<button type="button" class="dna-emoji-toggle-btn" id="cmEmojiToggle" title="插入表情">😊</button>'
-      + '<button type="button" class="btn btn-link text-muted p-0 ms-2" id="cmImageBtn" title="插入图片"><i class="bi bi-image"></i></button>'
-      + '<button type="button" class="btn btn-link text-muted p-0 ms-2" id="cmStickerBtn" data-sticker-open data-sticker-target="cmInput">😊 表情包</button>'
+      + '<button type="button" class="btn btn-link text-muted p-0" id="cmStickerBtn" data-sticker-open data-sticker-target="cmInput" title="插入表情包"><i class="bi bi-emoji-smile fs-5"></i></button>'
+      + '<button type="button" class="btn btn-link text-muted p-0 ms-2" id="cmImageBtn" title="插入图片"><i class="bi bi-image fs-5"></i></button>'
       + '<input type="file" id="cmFileInput" accept="image/png,image/jpeg,image/gif,image/webp" class="d-none">'
       + '<span class="small text-muted d-none d-sm-inline opacity-75" style="font-size: 0.75rem;">Ctrl+Enter 发送</span>'
       + '</div>'
       + '<div class="d-flex align-items-center gap-2">'
       + '<span id="cmCharCount" class="small text-muted" style="font-size: 0.78rem;">0/500</span>'
       + '<button class="btn btn-primary btn-sm px-3 flex-shrink-0" id="cmSubmitBtn" type="submit">发布</button>'
-      + '</div>'
-      + '<div class="dna-emoji-bar" id="cmEmojiBar">'
-      + '<button type="button" class="dna-emoji-btn" data-emoji="😊">😊</button>'
-      + '<button type="button" class="dna-emoji-btn" data-emoji="👍">👍</button>'
-      + '<button type="button" class="dna-emoji-btn" data-emoji="❤️">❤️</button>'
-      + '<button type="button" class="dna-emoji-btn" data-emoji="🎉">🎉</button>'
-      + '<button type="button" class="dna-emoji-btn" data-emoji="😭">😭</button>'
-      + '<button type="button" class="dna-emoji-btn" data-emoji="👏">👏</button>'
-      + '<button type="button" class="dna-emoji-btn" data-emoji="🤣">🤣</button>'
-      + '<button type="button" class="dna-emoji-btn" data-emoji="🙏">🙏</button>'
-      + '<button type="button" class="dna-emoji-btn" data-emoji="✨">✨</button>'
-      + '<button type="button" class="dna-emoji-btn" data-emoji="💡">💡</button>'
       + '</div>'
       + '</div>'
       + '</form>';
@@ -779,13 +766,11 @@
     var input = document.getElementById('cmInput');
     var charCountEl = document.getElementById('cmCharCount');
     var submitBtn = document.getElementById('cmSubmitBtn');
-    var emojiToggle = document.getElementById('cmEmojiToggle');
-    var emojiBar = document.getElementById('cmEmojiBar');
     var imageBtn = document.getElementById('cmImageBtn');
     var fileInput = document.getElementById('cmFileInput');
     var previewBox = document.getElementById('cmImagePreviewBox');
 
-    if (!form || !input || !charCountEl || !submitBtn || !emojiToggle || !emojiBar || !imageBtn || !fileInput || !previewBox) return;
+    if (!form || !input || !charCountEl || !submitBtn || !imageBtn || !fileInput || !previewBox) return;
 
     var currentReader = null;
 
@@ -865,38 +850,6 @@
         if (!submitBtn.disabled) {
           form.dispatchEvent(new Event('submit', { cancelable: true }));
         }
-      }
-    });
-
-    // Emoji 展开/收起
-    emojiToggle.addEventListener('click', function(e) {
-      e.stopPropagation();
-      emojiBar.classList.toggle('show');
-    });
-
-    // 点击 Emoji 按钮插入字符
-    emojiBar.addEventListener('click', function(e) {
-      var btn = e.target.closest('.dna-emoji-btn');
-      if (!btn) return;
-      var emoji = btn.dataset.emoji || btn.textContent;
-      var hasSelection = typeof input.selectionStart === 'number' && input.selectionStart !== null;
-      var start = hasSelection ? input.selectionStart : input.value.length;
-      var end = hasSelection ? input.selectionEnd : input.value.length;
-      var val = input.value;
-      input.value = val.substring(0, start) + emoji + val.substring(end);
-      var newPos = start + emoji.length;
-      if (typeof input.setSelectionRange === 'function') {
-        input.setSelectionRange(newPos, newPos);
-      }
-      input.focus();
-      updateCharCount();
-      emojiBar.classList.remove('show');
-    });
-
-    // 点击外部隐藏 Emoji 栏
-    document.addEventListener('click', function(e) {
-      if (!emojiBar.contains(e.target) && e.target !== emojiToggle) {
-        emojiBar.classList.remove('show');
       }
     });
 
