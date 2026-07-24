@@ -250,8 +250,56 @@
   var page = 1;
   var loading = false;
   var hasNext = true;
+  var totalCommentsCount = 0;
   // 外部带 ?comment=<id> 进入时，自动展开评论区并定位到该评论
   var focusComment = {{ focus_comment or 'null' }};
+
+  function updateCommentCount(count) {
+    totalCommentsCount = Math.max(0, count);
+    title.textContent = '评论（' + totalCommentsCount + '）';
+    var triggerSpan = trigger.querySelector('span');
+    if (triggerSpan) {
+      triggerSpan.textContent = '评论（' + totalCommentsCount + '）';
+    }
+  }
+
+  function formatRelativeTime(timeStr) {
+    if (!timeStr) return '';
+    var s = String(timeStr).trim().replace(' ', 'T');
+    var date = new Date(s);
+    if (isNaN(date.getTime())) {
+      return timeStr;
+    }
+    var now = new Date();
+    var diffMs = now.getTime() - date.getTime();
+    if (diffMs < 0) diffMs = 0;
+    var diffSec = Math.floor(diffMs / 1000);
+    var diffMin = Math.floor(diffSec / 60);
+    var diffHour = Math.floor(diffMin / 60);
+
+    var pad = function(n) { return n < 10 ? '0' + n : n; };
+    var hoursStr = pad(date.getHours()) + ':' + pad(date.getMinutes());
+
+    if (diffMin < 1) {
+      return '刚刚';
+    } else if (diffMin < 60) {
+      return diffMin + '分钟前';
+    } else if (diffHour < 24) {
+      return diffHour + '小时前';
+    } else {
+      var yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+      if (date.getFullYear() === yesterday.getFullYear() &&
+          date.getMonth() === yesterday.getMonth() &&
+          date.getDate() === yesterday.getDate()) {
+        return '昨天 ' + hoursStr;
+      } else {
+        var year = date.getFullYear();
+        var month = pad(date.getMonth() + 1);
+        var day = pad(date.getDate());
+        return year + '-' + month + '-' + day + ' ' + hoursStr;
+      }
+    }
+  }
 
   function open() {
     drawer.classList.add('show');
@@ -289,25 +337,83 @@
     return '<div class="dna-comment-item__avatar">' + (author.display_name[0] || '?') + '</div>';
   }
 
+  function escHtml(s) {
+    if (!s) return '';
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
   function renderItem(cm) {
+    var authorBadge = cm.is_author
+      ? '<span class="badge bg-primary-subtle text-primary border border-primary-subtle ms-1 dna-comment-author-badge">作者</span>'
+      : '';
+    var floorHtml = (cm.floor !== undefined && cm.floor !== null)
+      ? '<span class="ms-2 opacity-60">#' + cm.floor + '楼</span>'
+      : '';
+    var timeHtml = '<span class="ms-2 opacity-60">' + formatRelativeTime(cm.created_at) + '</span>';
     var reportHtml = cm.can_report
       ? '<a href="' + cm.report_url + '" class="ms-2 text-muted small opacity-75 text-decoration-none">举报</a>'
       : '';
+    var deleteHtml = cm.can_delete
+      ? '<button type="button" class="btn btn-link p-0 ms-2 text-danger small opacity-75 text-decoration-none dna-comment-del-btn" data-delete-url="' + cm.delete_url + '">删除</button>'
+      : '';
+
     return '<div class="dna-comment-item" data-comment-id="' + cm.id + '">'
       + avatarEl(cm.author)
       + '<div class="dna-comment-item__body">'
       + '<div class="dna-comment-item__meta">'
-      + '<a href="/user/' + cm.author.username + '" class="text-decoration-none text-reset fw-medium">' + cm.author.display_name + '</a>'
-      + '<span class="ms-2 opacity-60">' + cm.created_at + '</span>'
+      + '<a href="/user/' + cm.author.username + '" class="text-decoration-none text-reset fw-medium">' + escHtml(cm.author.display_name) + '</a>'
+      + authorBadge
+      + floorHtml
+      + timeHtml
       + reportHtml
+      + deleteHtml
       + '</div>'
       + '<div class="dna-comment-item__text">' + escHtml(cm.content) + '</div>'
       + '</div></div>';
   }
 
-  function escHtml(s) {
-    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  }
+  // 事件委托：删除评论
+  body.addEventListener('click', function(e) {
+    var delBtn = e.target.closest('.dna-comment-del-btn');
+    if (!delBtn) return;
+    var deleteUrl = delBtn.dataset.deleteUrl;
+    if (!deleteUrl) return;
+
+    if (!confirm('确定要删除这条评论吗？')) return;
+
+    fetch(deleteUrl, {
+      method: 'POST',
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      credentials: 'same-origin'
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.ok) {
+        var itemEl = delBtn.closest('.dna-comment-item');
+        if (itemEl) itemEl.remove();
+        updateCommentCount(totalCommentsCount - 1);
+        if (typeof showToast === 'function') {
+          showToast('评论已删除', 'success');
+        }
+        if (!body.querySelector('.dna-comment-item')) {
+          body.innerHTML = '<div class="text-muted text-center py-4">还没有评论，来抢沙发～</div>';
+        }
+      } else {
+        if (typeof showToast === 'function') {
+          showToast(data.error || '删除失败', 'danger');
+        } else {
+          alert(data.error || '删除失败');
+        }
+      }
+    })
+    .catch(function() {
+      if (typeof showToast === 'function') {
+        showToast('网络错误，请重试', 'danger');
+      } else {
+        alert('网络错误，请重试');
+      }
+    });
+  });
 
   function loadComments() {
     loadPage(page, {});
@@ -324,7 +430,7 @@
         loading = false;
         if (p === 1) {
           body.innerHTML = '';
-          title.textContent = '评论（' + data.total + '）';
+          updateCommentCount(data.total);
         }
         if (data.items.length === 0 && p === 1) {
           body.innerHTML = '<div class="text-muted text-center py-4">还没有评论，来抢沙发～</div>';
@@ -399,29 +505,107 @@
     }
   }
 
-  function buildFooter(total) {
+  function buildFooter() {
     if (!loggedIn) {
       footer.innerHTML = '<div class="text-muted small text-center py-1"><a href="' + loginUrl + '">登录</a> 后参与评论</div>';
       return;
     }
-    footer.innerHTML = '<form id="cmForm" class="d-flex gap-2 align-items-end">'
-      + '<textarea class="form-control" id="cmInput" rows="1" placeholder="说点什么…" style="resize:none;"></textarea>'
-      + '<button class="btn btn-primary btn-sm px-3 flex-shrink-0" type="submit">发布</button>'
+    footer.innerHTML = '<form id="cmForm" class="d-flex flex-column gap-2">'
+      + '<div class="position-relative">'
+      + '<textarea class="form-control" id="cmInput" rows="2" placeholder="说点什么…" style="resize:none;"></textarea>'
+      + '</div>'
+      + '<div class="d-flex align-items-center justify-content-between dna-emoji-toolbar-wrap">'
+      + '<div class="d-flex align-items-center gap-2">'
+      + '<button type="button" class="dna-emoji-toggle-btn" id="cmEmojiToggle" title="插入表情">😊</button>'
+      + '<span class="small text-muted d-none d-sm-inline opacity-75" style="font-size: 0.75rem;">Ctrl+Enter 发送</span>'
+      + '</div>'
+      + '<div class="d-flex align-items-center gap-2">'
+      + '<span id="cmCharCount" class="small text-muted" style="font-size: 0.78rem;">0/500</span>'
+      + '<button class="btn btn-primary btn-sm px-3 flex-shrink-0" id="cmSubmitBtn" type="submit">发布</button>'
+      + '</div>'
+      + '<div class="dna-emoji-bar" id="cmEmojiBar">'
+      + '<button type="button" class="dna-emoji-btn" data-emoji="😊">😊</button>'
+      + '<button type="button" class="dna-emoji-btn" data-emoji="👍">👍</button>'
+      + '<button type="button" class="dna-emoji-btn" data-emoji="❤️">❤️</button>'
+      + '<button type="button" class="dna-emoji-btn" data-emoji="🎉">🎉</button>'
+      + '<button type="button" class="dna-emoji-btn" data-emoji="😭">😭</button>'
+      + '<button type="button" class="dna-emoji-btn" data-emoji="👏">👏</button>'
+      + '<button type="button" class="dna-emoji-btn" data-emoji="🤣">🤣</button>'
+      + '<button type="button" class="dna-emoji-btn" data-emoji="🙏">🙏</button>'
+      + '<button type="button" class="dna-emoji-btn" data-emoji="✨">✨</button>'
+      + '<button type="button" class="dna-emoji-btn" data-emoji="💡">💡</button>'
+      + '</div>'
+      + '</div>'
       + '</form>';
 
     var form = document.getElementById('cmForm');
     var input = document.getElementById('cmInput');
+    var charCountEl = document.getElementById('cmCharCount');
+    var submitBtn = document.getElementById('cmSubmitBtn');
+    var emojiToggle = document.getElementById('cmEmojiToggle');
+    var emojiBar = document.getElementById('cmEmojiBar');
 
-    // 自动展开
-    input.addEventListener('focus', function() { input.rows = 3; });
-    input.addEventListener('blur', function() { if (!input.value) input.rows = 1; });
+    function updateCharCount() {
+      var len = input.value.length;
+      charCountEl.textContent = len + '/500';
+      if (len > 500) {
+        charCountEl.classList.add('text-danger');
+        charCountEl.classList.remove('text-muted');
+        submitBtn.disabled = true;
+      } else {
+        charCountEl.classList.remove('text-danger');
+        charCountEl.classList.add('text-muted');
+        submitBtn.disabled = false;
+      }
+    }
+
+    input.addEventListener('input', updateCharCount);
+
+    // Ctrl+Enter 快捷键发送
+    input.addEventListener('keydown', function(e) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        if (!submitBtn.disabled) {
+          form.dispatchEvent(new Event('submit', { cancelable: true }));
+        }
+      }
+    });
+
+    // Emoji 展开/收起
+    emojiToggle.addEventListener('click', function(e) {
+      e.stopPropagation();
+      emojiBar.classList.toggle('show');
+    });
+
+    // 点击 Emoji 按钮插入字符
+    emojiBar.addEventListener('click', function(e) {
+      var btn = e.target.closest('.dna-emoji-btn');
+      if (!btn) return;
+      var emoji = btn.dataset.emoji || btn.textContent;
+      var start = input.selectionStart || 0;
+      var end = input.selectionEnd || 0;
+      var val = input.value;
+      input.value = val.substring(0, start) + emoji + val.substring(end);
+      input.selectionStart = input.selectionEnd = start + emoji.length;
+      input.focus();
+      updateCharCount();
+      emojiBar.classList.remove('show');
+    });
+
+    // 点击外部隐藏 Emoji 栏
+    document.addEventListener('click', function(e) {
+      if (!emojiBar.contains(e.target) && e.target !== emojiToggle) {
+        emojiBar.classList.remove('show');
+      }
+    });
 
     form.addEventListener('submit', function(e) {
       e.preventDefault();
       var content = input.value.trim();
-      if (!content) return;
+      if (!content || input.value.length > 500) return;
       var fd = new FormData();
       fd.append('content', content);
+      submitBtn.disabled = true;
       fetch(postUrl, {
         method: 'POST',
         headers: { 'X-Requested-With': 'XMLHttpRequest' },
@@ -430,9 +614,11 @@
       })
       .then(function(r) { return r.json(); })
       .then(function(data) {
+        submitBtn.disabled = false;
         if (data.ok) {
           input.value = '';
-          input.rows = 1;
+          updateCharCount();
+          emojiBar.classList.remove('show');
           // 重置并重新加载评论列表
           page = 1; hasNext = true;
           body.innerHTML = '<div class="text-center text-muted py-3">加载中…</div>';
@@ -441,8 +627,13 @@
           showToast(data.error || '发布失败', 'danger');
         }
       })
-      .catch(function() { showToast('网络错误，请重试', 'danger'); });
+      .catch(function() {
+        submitBtn.disabled = false;
+        showToast('网络错误，请重试', 'danger');
+      });
     });
+
+    updateCharCount();
   }
 })();
 </script>
