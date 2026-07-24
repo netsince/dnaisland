@@ -16,16 +16,26 @@ depends_on = None
 def upgrade():
     bind = op.get_bind()
     inspector = inspect(bind)
-    if "tea_post" not in inspector.get_table_names():
+    if "teahouse_posts" not in inspector.get_table_names():
         return
-    cols = [c["name"] for c in inspector.get_columns("tea_post")]
+    cols = [c["name"] for c in inspector.get_columns("teahouse_posts")]
     if "card_id" not in cols:
         op.add_column(
-            "tea_post",
+            "teahouse_posts",
             sa.Column(
                 "card_id",
                 sa.String(length=36),
                 sa.ForeignKey("cards.id"),
+                nullable=True,
+            ),
+        )
+    if "quote_post_id" not in cols:
+        op.add_column(
+            "teahouse_posts",
+            sa.Column(
+                "quote_post_id",
+                sa.Integer(),
+                sa.ForeignKey("teahouse_posts.id"),
                 nullable=True,
             ),
         )
@@ -34,8 +44,10 @@ def upgrade():
 def downgrade():
     bind = op.get_bind()
     inspector = inspect(bind)
-    if "tea_post" not in inspector.get_table_names():
+    if "teahouse_posts" not in inspector.get_table_names():
         return
-    cols = [c["name"] for c in inspector.get_columns("tea_post")]
+    cols = [c["name"] for c in inspector.get_columns("teahouse_posts")]
+    if "quote_post_id" in cols:
+        op.drop_column("teahouse_posts", "quote_post_id")
     if "card_id" in cols:
-        op.drop_column("tea_post", "card_id")
+        op.drop_column("teahouse_posts", "card_id")

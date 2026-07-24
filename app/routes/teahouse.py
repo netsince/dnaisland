@@ -462,12 +462,23 @@ def card_search():
         .limit(12)
         .all()
     )
-    return jsonify(
-        [
-            {"id": c.id, "name": c.name, "intro": (c.intro or "")[:40]}
-            for c in cards
-        ]
-    )
+    items = []
+    for c in cards:
+        cover = c.images[0] if c.images else None
+        image_url = (
+            url_for("user.card_image", card_id=c.id, slot=cover.slot)
+            if cover
+            else None
+        )
+        items.append(
+            {
+                "id": c.id,
+                "name": c.name,
+                "intro": (c.intro or "")[:40],
+                "image": image_url,
+            }
+        )
+    return jsonify(items)
 
 
 @teahouse_bp.route("/<int:post_id>/reply", methods=["POST"])

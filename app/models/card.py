@@ -27,6 +27,7 @@ class Card(db.Model):
     cover_focus = db.Column(db.String(16), nullable=True)
 
     author = db.relationship("User", backref="cards")
+    images = db.relationship("CardImage", backref="card")
 
     @classmethod
     def visible_to(cls, viewer=None):

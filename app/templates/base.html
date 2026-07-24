@@ -939,13 +939,13 @@ function showToast(message, type) {
         <div class="d-flex align-items-center mt-2" data-card-picker>
           <input type="hidden" name="card_id" value="">
           <input type="hidden" name="card_removed" value="0">
-          <button type="button" class="btn btn-sm btn-outline-secondary" data-pick-card>🎴 关联角色卡</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-pick-card><i class="bi bi-person-badge"></i> 关联角色卡</button>
           <span class="tea-card-picked d-none ms-2 small"></span>
         </div>
         <div class="d-flex align-items-center mt-2" data-image-picker>
           <input type="hidden" name="images" value="">
           <input type="hidden" name="image_removed" value="0">
-          <button type="button" class="btn btn-sm btn-outline-secondary" data-pick-image>🖼️ 配图</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-pick-image><i class="bi bi-image"></i> 配图</button>
           <span class="tea-image-picked d-none ms-2 small"></span>
         </div>
       </div>
@@ -1108,7 +1108,11 @@ function showToast(message, type) {
         results.innerHTML = list.map(function (c) {
           var name = (c.name || '').replace(/"/g, '&quot;');
           var intro = (c.intro || '').replace(/</g, '&lt;');
-          return '<button type="button" class="btn btn-sm btn-outline-light text-start tea-card-opt" data-id="' + c.id + '" data-name="' + name + '">🎴 ' + name + '<span class="text-muted ms-1">' + intro + '</span></button>';
+          if (intro.length > 40) intro = intro.slice(0, 40) + '…';
+          var thumb = c.image
+            ? '<img src="' + c.image + '" class="rounded me-2 flex-shrink-0" style="width:38px;height:38px;object-fit:cover;" onerror="this.style.display=\'none\'">'
+            : '<i class="bi bi-person-badge me-2"></i>';
+          return '<button type="button" class="btn btn-sm btn-outline-secondary text-start w-100 tea-card-opt mb-1 d-flex align-items-center py-1" data-id="' + c.id + '" data-name="' + name + '">' + thumb + '<span class="text-truncate"><strong class="d-block text-truncate">' + name + '</strong><small class="text-muted d-block text-truncate">' + intro + '</small></span></button>';
         }).join('');
       };
       xhr.send();
@@ -1132,8 +1136,6 @@ function showToast(message, type) {
 
   // 配图：选择 / 预览 / 移除（单图）
   (function () {
-    var fileInput = document.getElementById('teaImageFileInput');
-    if (!fileInput) return;
     var currentPicker = null;
 
     function setPreview(picker, dataUrl) {
@@ -1146,6 +1148,8 @@ function showToast(message, type) {
     document.addEventListener('click', function (e) {
       var btn = e.target.closest && e.target.closest('[data-pick-image]');
       if (btn) {
+        var fileInput = document.getElementById('teaImageFileInput');
+        if (!fileInput) return;
         currentPicker = btn.closest('[data-image-picker]') || (btn.form || null);
         fileInput.click();
         return;
@@ -1164,7 +1168,9 @@ function showToast(message, type) {
       }
     });
 
-    fileInput.addEventListener('change', function () {
+    document.addEventListener('change', function (e) {
+      var fileInput = e.target;
+      if (!fileInput || fileInput.id !== 'teaImageFileInput') return;
       var file = fileInput.files && fileInput.files[0];
       if (!file || !currentPicker) { fileInput.value = ''; return; }
       var reader = new FileReader();

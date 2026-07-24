@@ -32,25 +32,23 @@
  <form method="post" action="{{ url_for('teahouse.create_post') }}" id="teahousePostForm">
  <textarea class="form-control" name="content" id="postContent" rows="1"
  maxlength="{{ max_len }}" placeholder="有什么想说的？发布到茶馆…"></textarea>
- <div class="d-flex align-items-center mt-2" data-card-picker>
-  <input type="hidden" name="card_id" value="">
-  <button type="button" class="btn btn-sm btn-outline-secondary" data-pick-card>🎴 关联角色卡</button>
-  <span class="tea-card-picked d-none ms-2 small"></span>
- </div>
- <div class="d-flex align-items-center mt-2" data-image-picker>
-  <input type="hidden" name="images" value="">
- <button type="button" class="btn btn-sm btn-outline-secondary" data-pick-image>🖼️ 配图</button>
- <span class="tea-image-picked d-none ms-2 small"></span>
+<div class="d-flex flex-wrap align-items-center gap-2 mt-2">
+  <div class="d-flex align-items-center" data-card-picker>
+    <input type="hidden" name="card_id" value="">
+    <button type="button" class="btn btn-sm btn-outline-secondary" data-pick-card><i class="bi bi-person-badge"></i> 关联角色卡</button>
+    <span class="tea-card-picked d-none ms-2 small text-success"></span>
+  </div>
+  <div class="d-flex align-items-center" data-image-picker>
+    <input type="hidden" name="images" value="">
+    <button type="button" class="btn btn-sm btn-outline-secondary" data-pick-image><i class="bi bi-image"></i> 配图</button>
+    <span class="tea-image-picked d-none ms-2 small text-success"></span>
+  </div>
+  <div class="input-group input-group-sm" style="max-width:200px;">
+    <span class="input-group-text">#</span>
+    <input type="text" class="form-control" name="topic" id="postTopic" maxlength="50" placeholder="话题（可选）">
+  </div>
+  <button type="button" class="btn btn-sm btn-outline-secondary" data-sticker-open data-sticker-target="postContent"><i class="bi bi-emoji-smile"></i> 表情包</button>
 </div>
-<div class="d-flex align-items-center mt-2">
- <div class="input-group input-group-sm" style="max-width:320px;">
-  <span class="input-group-text">#</span>
-  <input type="text" class="form-control" name="topic" id="postTopic" maxlength="50" placeholder="话题（可选，如：日常闲聊）">
- </div>
-</div>
-<div class="d-flex align-items-center mt-2">
-  <button type="button" class="btn btn-sm btn-outline-secondary" data-sticker-open data-sticker-target="postContent">😊 表情包</button>
- </div>
  <div class="d-flex justify-content-between align-items-center mt-2 d-none" id="postActions">
  <small class="text-muted" id="postCounterBox"><span id="counter">0</span> / {{ max_len }}</small>
  <button class="btn btn-primary btn-sm px-3" type="submit">发布</button>
