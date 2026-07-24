@@ -1596,11 +1596,11 @@ data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded=
 <script>
 (function () {
   function initGlobalLightbox() {
-    if (window.GLightbox && document.querySelector('.glightbox')) {
+    if (window.GLightbox && document.querySelector('.tea-glightbox')) {
       if (window.globalLightboxInstance) {
         try { window.globalLightboxInstance.destroy(); } catch (e) {}
       }
-      window.globalLightboxInstance = GLightbox({ selector: '.glightbox', touchNavigation: true, loop: true });
+      window.globalLightboxInstance = GLightbox({ selector: '.tea-glightbox', touchNavigation: true, loop: true });
     }
   }
   document.addEventListener('DOMContentLoaded', initGlobalLightbox);
