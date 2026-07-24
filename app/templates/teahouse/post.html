@@ -40,35 +40,22 @@
       </div>
     {% endif %}
 
-    {# 回复框：紧跟当前帖，不用翻到最底下 #}
+    {# 回复触发卡片 / 按钮 #}
     {% if current_user.is_authenticated and teapost_visible(post) %}
-    <div class="card mb-3 tea-compose tea-compose--reply" id="reply">
-      <div class="card-body">
-        <form method="post" action="{{ url_for('teahouse.reply', post_id=post.id) }}" class="js-reply">
-          <textarea class="tea-compose__input" name="content" id="replyContent" rows="3" maxlength="{{ max_len }}"
-                    placeholder="回复 @{{ post.author.username }}…"></textarea>
-          <div class="tea-compose__bar d-flex flex-wrap align-items-center gap-2 mt-2 pt-2">
-            <div class="tea-compose__field d-flex align-items-center" data-card-picker>
-              <input type="hidden" name="card_id" value="">
-              <span class="tea-card-picked d-none"></span>
-              <button type="button" class="tea-tool" data-pick-card><i class="bi bi-person-badge"></i><span>角色卡</span></button>
-            </div>
-            <div class="tea-compose__field d-flex align-items-center" data-image-picker>
-              <input type="hidden" name="images" value="">
-              <span class="tea-image-picked d-none"></span>
-              <button type="button" class="tea-tool" data-pick-image><i class="bi bi-image"></i><span>配图</span></button>
-            </div>
-            <button type="button" class="tea-tool" data-sticker-open data-sticker-target="replyContent"><i class="bi bi-emoji-smile"></i><span>表情</span></button>
-            <div class="tea-compose__topic">
-              <span class="hash">#</span>
-              <input type="text" name="topic" id="replyTopic" maxlength="50" placeholder="话题">
-            </div>
-            <div class="tea-compose__actions d-flex align-items-center gap-2 ms-auto">
-              <small class="text-muted" id="replyCounterContainer"><span id="replyCounter">0</span> / {{ max_len }}</small>
-              <button class="btn btn-sm tea-compose__publish px-3" type="submit">回复</button>
-            </div>
-          </div>
-        </form>
+    <div class="card mb-3 border-secondary border-opacity-25 shadow-sm" style="cursor: pointer;"
+         data-tea-compose-trigger
+         data-title="回复 @{{ post.author.display_name }}"
+         data-action="{{ url_for('teahouse.reply', post_id=post.id) }}"
+         data-btn-text="回复"
+         data-placeholder="回复 @{{ post.author.username }}…">
+      <div class="card-body p-3 d-flex align-items-center gap-3">
+        {% if current_user.avatar %}
+        <img src="{{ url_for('user.avatar', user_id=current_user.id) }}" alt="头像" class="tea-compose__avatar rounded-circle">
+        {% else %}
+        <div class="tea-compose__avatar-ph rounded-circle bg-secondary text-light d-flex align-items-center justify-content-center">{{ current_user.display_name[:1] }}</div>
+        {% endif %}
+        <span class="text-muted small flex-grow-1">回复 @{{ post.author.username }}…</span>
+        <button type="button" class="btn btn-sm btn-primary px-3 rounded-pill fw-semibold">💬 发表回复</button>
       </div>
     </div>
     {% endif %}

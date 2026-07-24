@@ -958,6 +958,57 @@ function showToast(message, type) {
 </div>
 <!-- 茶馆：删除帖子（软删）隐藏表单，配合 confirm 使用 -->
 <form id="teahouseDeleteForm" method="post" style="display:none"></form>
+
+<!-- 茶馆通用发布/回复抽屉 (Compose Drawer) -->
+<div class="dna-drawer-overlay" id="teaComposeOverlay"></div>
+<div class="dna-compose-drawer" id="teaComposeDrawer">
+  <div class="dna-compose-drawer__handle"></div>
+  <div class="dna-compose-drawer__header">
+    <h5 class="h6 mb-0 fw-bold" id="teaComposeTitle">发布到茶馆</h5>
+    <button type="button" class="btn-close" id="teaComposeCloseBtn" aria-label="关闭"></button>
+  </div>
+  <form id="teaComposeForm" method="post" action="{{ url_for('teahouse.create_post') }}" class="d-flex flex-column h-100 flex-grow-1 min-h-0">
+    <div class="dna-compose-drawer__body">
+      {% if current_user.is_authenticated %}
+      <div class="d-flex align-items-center gap-2 mb-3">
+        {% if current_user.avatar %}
+        <img src="{{ url_for('user.avatar', user_id=current_user.id) }}" alt="头像" class="rounded-circle" style="width:36px;height:36px;object-fit:cover;">
+        {% else %}
+        <div class="rounded-circle bg-secondary text-light d-flex align-items-center justify-content-center" style="width:36px;height:36px;font-weight:600;">{{ current_user.display_name[:1] }}</div>
+        {% endif %}
+        <span class="fw-semibold small">{{ current_user.display_name }}</span>
+      </div>
+      {% endif %}
+      <textarea class="tea-compose__input w-100 mb-3" name="content" id="teaComposeContent" rows="5" maxlength="280" placeholder="分享此刻的想法，发布到茶馆…" required></textarea>
+
+      <!-- 关联角色卡 preview -->
+      <div class="tea-compose__field d-flex align-items-center mb-2" data-card-picker>
+        <input type="hidden" name="card_id" id="teaComposeCardId" value="">
+        <span class="tea-card-picked d-none"></span>
+        <button type="button" class="tea-tool" data-pick-card><i class="bi bi-person-badge"></i><span>关联角色卡</span></button>
+      </div>
+
+      <!-- 配图 preview -->
+      <div class="tea-compose__field d-flex align-items-center mb-3" data-image-picker>
+        <input type="hidden" name="images" id="teaComposeImages" value="">
+        <span class="tea-image-picked d-none"></span>
+        <button type="button" class="tea-tool" data-pick-image><i class="bi bi-image"></i><span>添加配图</span></button>
+      </div>
+
+      <div class="d-flex align-items-center gap-2 mb-2">
+        <button type="button" class="tea-tool" data-sticker-open data-sticker-target="teaComposeContent"><i class="bi bi-emoji-smile"></i><span>表情包</span></button>
+        <div class="tea-compose__topic flex-grow-1">
+          <span class="hash">#</span>
+          <input type="text" name="topic" id="teaComposeTopic" maxlength="50" placeholder="添加话题">
+        </div>
+      </div>
+    </div>
+    <div class="dna-compose-drawer__footer">
+      <small class="text-muted"><span id="teaComposeCounter">0</span> / 280</small>
+      <button type="submit" class="btn btn-primary px-4 btn-sm fw-semibold" id="teaComposeSubmitBtn">发布</button>
+    </div>
+  </form>
+</div>
 <!-- 茶馆：关联角色卡选择弹窗 -->
 <div class="modal fade" id="teahouseCardModal" tabindex="-1" aria-labelledby="teahouseCardModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
@@ -1337,5 +1388,150 @@ function showToast(message, type) {
     </div>
   </div>
 </div>
+<script>
+(function () {
+  var overlay = document.getElementById('teaComposeOverlay');
+  var drawer = document.getElementById('teaComposeDrawer');
+  var closeBtn = document.getElementById('teaComposeCloseBtn');
+  var form = document.getElementById('teaComposeForm');
+  var titleEl = document.getElementById('teaComposeTitle');
+  var textarea = document.getElementById('teaComposeContent');
+  var counter = document.getElementById('teaComposeCounter');
+  var submitBtn = document.getElementById('teaComposeSubmitBtn');
+  var topicInput = document.getElementById('teaComposeTopic');
+  var cardIdInput = document.getElementById('teaComposeCardId');
+  var imagesInput = document.getElementById('teaComposeImages');
+
+  if (!overlay || !drawer || !form) return;
+
+  function openDrawer(options) {
+    options = options || {};
+    if (titleEl) titleEl.textContent = options.title || '发布到茶馆';
+    if (form) form.action = options.action || '/teahouse/post';
+    if (submitBtn) submitBtn.textContent = options.btnText || '发布';
+    if (textarea) {
+      textarea.placeholder = options.placeholder || '分享此刻的想法，发布到茶馆…';
+      if (options.clear !== false) textarea.value = '';
+    }
+    updateCounter();
+    overlay.classList.add('show');
+    drawer.classList.add('show');
+    document.body.style.overflow = 'hidden';
+    setTimeout(function () {
+      if (textarea) textarea.focus();
+    }, 250);
+  }
+
+  function closeDrawer() {
+    overlay.classList.remove('show');
+    drawer.classList.remove('show');
+    document.body.style.overflow = '';
+  }
+
+  window.openTeaComposeDrawer = openDrawer;
+  window.closeTeaComposeDrawer = closeDrawer;
+
+  if (closeBtn) closeBtn.addEventListener('click', closeDrawer);
+  overlay.addEventListener('click', closeDrawer);
+
+  document.addEventListener('click', function (e) {
+    var trigger = e.target.closest && e.target.closest('[data-tea-compose-trigger]');
+    if (trigger) {
+      e.preventDefault();
+      openDrawer({
+        title: trigger.getAttribute('data-title'),
+        action: trigger.getAttribute('data-action'),
+        btnText: trigger.getAttribute('data-btn-text'),
+        placeholder: trigger.getAttribute('data-placeholder')
+      });
+    }
+  });
+
+  function updateCounter() {
+    if (textarea && counter) {
+      counter.textContent = textarea.value.length;
+    }
+  }
+  if (textarea) textarea.addEventListener('input', updateCounter);
+
+  // 提交逻辑：先收起/降下抽屉框，再发 AJAX POST
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var content = textarea.value.trim();
+    if (!content) {
+      if (window.showToast) window.showToast('内容不能为空', 'danger');
+      else alert('内容不能为空');
+      return;
+    }
+
+    submitBtn.disabled = true;
+    var originalBtnText = submitBtn.textContent;
+    submitBtn.textContent = '提交中…';
+
+    // 1. 提交时先平滑收起/降下抽屉框
+    closeDrawer();
+
+    // 2. 发送 XHR 请求
+    var formData = new FormData(form);
+    fetch(form.action, {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    })
+    .then(function (res) { return res.json(); })
+    .then(function (data) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = originalBtnText;
+
+      if (data.ok) {
+        // 清空表单
+        textarea.value = '';
+        if (topicInput) topicInput.value = '';
+        if (cardIdInput) cardIdInput.value = '';
+        if (imagesInput) imagesInput.value = '';
+        var cardPicked = form.querySelector('.tea-card-picked');
+        if (cardPicked) { cardPicked.classList.add('d-none'); cardPicked.innerHTML = ''; }
+        var imagePicked = form.querySelector('.tea-image-picked');
+        if (imagePicked) { imagePicked.classList.add('d-none'); imagePicked.innerHTML = ''; }
+
+        if (data.redirect_url) {
+          // 发帖成功：进行跳转
+          if (window.pjaxNav) window.pjaxNav(data.redirect_url);
+          else window.location.href = data.redirect_url;
+        } else if (data.reply_html) {
+          // 回复成功：动态追加新回复
+          var container = document.getElementById('js-replies');
+          if (container) {
+            var emptyState = document.getElementById('js-replies-empty');
+            if (emptyState) emptyState.remove();
+            var temp = document.createElement('div');
+            temp.innerHTML = data.reply_html;
+            var newEl = temp.firstElementChild;
+            if (newEl) {
+              container.insertBefore(newEl, container.firstChild);
+              newEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }
+          var replyCountEl = document.getElementById('js-reply-count');
+          if (replyCountEl && data.reply_count !== undefined) {
+            replyCountEl.textContent = '回复（' + data.reply_count + '）';
+          }
+          if (window.showToast) window.showToast('回复成功', 'success');
+        }
+      } else {
+        if (window.showToast) window.showToast(data.error || '提交失败', 'danger');
+        else alert(data.error || '提交失败');
+      }
+    })
+    .catch(function () {
+      submitBtn.disabled = false;
+      submitBtn.textContent = originalBtnText;
+      if (window.showToast) window.showToast('网络请求失败，请稍后重试', 'danger');
+    });
+  });
+})();
+</script>
 </body>
 </html>

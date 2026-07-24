@@ -9,11 +9,21 @@
 <div class="row justify-content-center">
  <div class="col-12 col-lg-8">
  <div class="d-flex align-items-center justify-content-between mb-3">
- <h1 class="h4 mb-0 fw-bold">茶馆讨论</h1>
- {% if current_user.is_authenticated %}
- <a href="{{ url_for('teahouse.favorites') }}" class="btn btn-sm btn-outline-warning">★ 我的收藏</a>
- {% endif %}
- </div>
+    <h1 class="h4 mb-0 fw-bold">茶馆讨论</h1>
+    <div class="d-flex align-items-center gap-2">
+      {% if current_user.is_authenticated %}
+      <button type="button" class="btn btn-sm btn-primary px-3 fw-semibold shadow-sm"
+              data-tea-compose-trigger
+              data-title="发布到茶馆"
+              data-action="{{ url_for('teahouse.create_post') }}"
+              data-btn-text="发布"
+              data-placeholder="分享此刻的想法，发布到茶馆…">
+        ＋ 发布动态
+      </button>
+      <a href="{{ url_for('teahouse.favorites') }}" class="btn btn-sm btn-outline-warning">★ 我的收藏</a>
+      {% endif %}
+    </div>
+  </div>
 
  <!-- 移动端单行横向滑动筛选胶囊栏 -->
  <div class="dna-horizontal-tabs mb-3">
@@ -27,45 +37,22 @@
  </div>
 
  {% if current_user.is_authenticated %}
-<div class="tea-compose card mb-3">
- <div class="card-body p-3">
- <form method="post" action="{{ url_for('teahouse.create_post') }}" id="teahousePostForm">
-  <div class="d-flex gap-3">
-    {% if current_user.avatar %}
-    <img src="{{ url_for('user.avatar', user_id=current_user.id) }}" alt="头像" class="tea-compose__avatar rounded-circle">
-    {% else %}
-    <div class="tea-compose__avatar-ph rounded-circle bg-secondary text-light d-flex align-items-center justify-content-center">{{ current_user.display_name[:1] }}</div>
-    {% endif %}
-    <div class="flex-grow-1 min-w-0">
-      <textarea class="tea-compose__input" name="content" id="postContent" rows="1"
-                maxlength="{{ max_len }}" placeholder="分享此刻的想法，发布到茶馆…"></textarea>
-
-      <div class="tea-compose__bar d-flex flex-wrap align-items-center gap-2 mt-2 pt-2">
-        <div class="tea-compose__field d-flex align-items-center" data-card-picker>
-          <input type="hidden" name="card_id" value="">
-          <span class="tea-card-picked d-none"></span>
-          <button type="button" class="tea-tool" data-pick-card><i class="bi bi-person-badge"></i><span>角色卡</span></button>
-        </div>
-        <div class="tea-compose__field d-flex align-items-center" data-image-picker>
-          <input type="hidden" name="images" value="">
-          <span class="tea-image-picked d-none"></span>
-          <button type="button" class="tea-tool" data-pick-image><i class="bi bi-image"></i><span>配图</span></button>
-        </div>
-        <button type="button" class="tea-tool" data-sticker-open data-sticker-target="postContent"><i class="bi bi-emoji-smile"></i><span>表情</span></button>
-        <div class="tea-compose__topic">
-          <span class="hash">#</span>
-          <input type="text" name="topic" id="postTopic" maxlength="50" placeholder="话题">
-        </div>
-        <div class="tea-compose__actions d-flex align-items-center gap-2 ms-auto d-none" id="postActions">
-          <small class="text-muted" id="postCounterBox"><span id="counter">0</span> / {{ max_len }}</small>
-          <button class="btn btn-sm tea-compose__publish px-3" type="submit">发布</button>
-        </div>
-      </div>
-    </div>
+  <div class="card mb-3 border-secondary border-opacity-25 shadow-sm" style="cursor: pointer;"
+       data-tea-compose-trigger
+       data-title="发布到茶馆"
+       data-action="{{ url_for('teahouse.create_post') }}"
+       data-btn-text="发布"
+       data-placeholder="分享此刻的想法，发布到茶馆…">
+   <div class="card-body p-3 d-flex align-items-center gap-3">
+     {% if current_user.avatar %}
+     <img src="{{ url_for('user.avatar', user_id=current_user.id) }}" alt="头像" class="tea-compose__avatar rounded-circle">
+     {% else %}
+     <div class="tea-compose__avatar-ph rounded-circle bg-secondary text-light d-flex align-items-center justify-content-center">{{ current_user.display_name[:1] }}</div>
+     {% endif %}
+     <span class="text-muted small flex-grow-1">分享此刻的想法，发布到茶馆…</span>
+     <span class="btn btn-sm btn-primary px-3 rounded-pill">发布</span>
+   </div>
   </div>
- </form>
- </div>
-</div>
  {% else %}
  <div class="alert alert-secondary py-2 small mb-3">
  请 <a href="{{ url_for('auth.login') }}" class="alert-link">登录</a> 后参与茶馆讨论。

@@ -348,18 +348,27 @@ def topic_detail(topic_id):
 @teahouse_bp.route("/post", methods=["POST"])
 @login_required
 def create_post():
+    is_xhr = request.headers.get("X-Requested-With") == "XMLHttpRequest"
     if current_user.is_muted:
+        if is_xhr:
+            return jsonify({"ok": False, "error": "你已被禁言，暂时无法发帖"})
         flash("你已被禁言，暂时无法发帖", "warning")
         return redirect(url_for("teahouse.index"))
     content = (request.form.get("content") or "").strip()
     content, _ = sanitize_stickers(content, max_count=20)
     if not content:
+        if is_xhr:
+            return jsonify({"ok": False, "error": "帖子内容不能为空"})
         flash("帖子内容不能为空", "warning")
         return redirect(url_for("teahouse.index"))
     if len(content) > TEA_POST_MAX_LEN:
+        if is_xhr:
+            return jsonify({"ok": False, "error": f"帖子内容不能超过 {TEA_POST_MAX_LEN} 字"})
         flash(f"帖子内容不能超过 {TEA_POST_MAX_LEN} 字", "warning")
         return redirect(url_for("teahouse.index"))
     if _too_frequent(current_user.id):
+        if is_xhr:
+            return jsonify({"ok": False, "error": "发帖太频繁了，请稍后再试"})
         flash("发帖太频繁了，请稍后再试", "warning")
         return redirect(url_for("teahouse.index"))
     post = TeaPost(user_id=current_user.id, content=content)
@@ -374,6 +383,13 @@ def create_post():
     _set_single_topic(post, request.form.get("topic"))
     db.session.commit()
     _notify_mentions(content, post, current_user)
+
+    if is_xhr:
+        return jsonify({
+            "ok": True,
+            "action": "post",
+            "redirect_url": url_for("teahouse.post_detail", post_id=post.id),
+        })
     flash("发布成功", "success")
     return redirect(url_for("teahouse.post_detail", post_id=post.id))
 
