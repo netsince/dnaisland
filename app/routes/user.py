@@ -29,6 +29,7 @@ from ..models import (
     CardLike,
     CardTag,
     Comment,
+    CommentLike,
     Notification,
     Punishment,
     Report,
@@ -661,12 +662,55 @@ def card_comments_api(card_id):
         return jsonify({"error": "not found"}), 404
     page = request.args.get("page", 1, type=int)
     per_page = 20
-    q = (
-        Comment.query
-        .filter_by(card_id=card_id, is_hidden=False)
-        .order_by(Comment.created_at.desc(), Comment.id.desc())
+    sort = request.args.get("sort", "latest")
+
+    like_count_sub = (
+        db.session.query(func.count(CommentLike.user_id))
+        .filter(CommentLike.comment_id == Comment.id)
+        .scalar_subquery()
     )
+
+    q = Comment.query.filter_by(card_id=card_id, is_hidden=False)
+    if sort == "hottest":
+        q = q.order_by(
+            Comment.is_pinned.desc(),
+            like_count_sub.desc(),
+            Comment.created_at.desc(),
+            Comment.id.desc(),
+        )
+    else:
+        q = q.order_by(
+            Comment.is_pinned.desc(),
+            Comment.created_at.desc(),
+            Comment.id.desc(),
+        )
+
     pagination = q.paginate(page=page, per_page=per_page, error_out=False)
+
+    comment_ids = [cm.id for cm in pagination.items]
+    like_counts = {}
+    user_liked_ids = set()
+
+    if comment_ids:
+        counts = (
+            db.session.query(CommentLike.comment_id, func.count(CommentLike.user_id))
+            .filter(CommentLike.comment_id.in_(comment_ids))
+            .group_by(CommentLike.comment_id)
+            .all()
+        )
+        like_counts = dict(counts)
+
+        if current_user.is_authenticated:
+            user_likes = (
+                db.session.query(CommentLike.comment_id)
+                .filter(
+                    CommentLike.user_id == current_user.id,
+                    CommentLike.comment_id.in_(comment_ids),
+                )
+                .all()
+            )
+            user_liked_ids = {r[0] for r in user_likes}
+
     items = []
     for idx, cm in enumerate(pagination.items):
         items.append({
@@ -691,7 +735,23 @@ def card_comments_api(card_id):
             ),
             "delete_url": url_for("user.card_comment_delete", card_id=card_id, comment_id=cm.id),
             "floor": pagination.total - ((page - 1) * per_page + idx),
+            "like_count": like_counts.get(cm.id, 0),
+            "liked": cm.id in user_liked_ids,
+            "is_pinned": bool(cm.is_pinned),
+            "can_pin": (
+                current_user.is_authenticated
+                and (card.author_id == current_user.id or current_user.is_super_admin)
+            ),
+            "reply_to": (
+                {
+                    "id": cm.reply_to.id,
+                    "display_name": cm.reply_to.author.display_name,
+                }
+                if cm.reply_to
+                else None
+            ),
         })
+
     # 定位指定评论所在分页：供「从外部带 comment 参数进入」时自动翻到对应评论
     focus_page = None
     focus_id = request.args.get("comment_id", type=int)
@@ -709,6 +769,7 @@ def card_comments_api(card_id):
                 .count()
             )
             focus_page = (newer + same_newer) // per_page + 1
+
     return jsonify({
         "items": items,
         "page": pagination.page,
@@ -741,14 +802,63 @@ def card_comment(card_id):
             return jsonify({"error": "评论内容不能超过 500 字"}), 400
         flash("评论内容不能超过 500 字", "warning")
         return redirect(url_for("user.card_detail", card_id=card_id))
+
+    reply_to_id = request.form.get("reply_to_id", type=int)
+    valid_reply_to_id = None
+    if reply_to_id:
+        parent_cm = db.session.get(Comment, reply_to_id)
+        if parent_cm and parent_cm.card_id == card_id:
+            valid_reply_to_id = parent_cm.id
+
     db.session.add(
-        Comment(card_id=card_id, user_id=current_user.id, content=content)
+        Comment(
+            card_id=card_id,
+            user_id=current_user.id,
+            content=content,
+            reply_to_id=valid_reply_to_id,
+        )
     )
     db.session.commit()
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
         return jsonify({"ok": True})
     flash("评论成功", "success")
     return redirect(url_for("user.card_detail", card_id=card_id))
+
+
+@user_bp.route("/card/<card_id>/comment/<int:comment_id>/like", methods=["POST"])
+@login_required
+def card_comment_like(card_id, comment_id):
+    cm = db.session.get(Comment, comment_id)
+    if not cm or cm.card_id != card_id:
+        abort(404)
+    existing = CommentLike.query.filter_by(
+        user_id=current_user.id, comment_id=comment_id
+    ).first()
+    if existing:
+        db.session.delete(existing)
+        is_now_liked = False
+    else:
+        db.session.add(CommentLike(user_id=current_user.id, comment_id=comment_id))
+        is_now_liked = True
+    db.session.commit()
+    new_count = CommentLike.query.filter_by(comment_id=comment_id).count()
+    return jsonify({"ok": True, "liked": is_now_liked, "count": new_count})
+
+
+@user_bp.route("/card/<card_id>/comment/<int:comment_id>/pin", methods=["POST"])
+@login_required
+def card_comment_pin(card_id, comment_id):
+    cm = db.session.get(Comment, comment_id)
+    if not cm or cm.card_id != card_id:
+        abort(404)
+    card = db.session.get(Card, card_id)
+    if not card:
+        abort(404)
+    if not (card.author_id == current_user.id or current_user.is_super_admin):
+        return jsonify({"error": "无权置顶此评论"}), 403
+    cm.is_pinned = not cm.is_pinned
+    db.session.commit()
+    return jsonify({"ok": True, "is_pinned": cm.is_pinned})
 
 
 @user_bp.route("/card/<card_id>/comment/<int:comment_id>/delete", methods=["POST"])
