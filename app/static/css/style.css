@@ -126,21 +126,32 @@ body {
 .list-group-item-primary { background: rgba(255, 255, 255, 0.06); color: #ffffff; }
 
 /* ---------------- 按钮 ---------------- */
-.btn { border-radius: 10px; font-weight: 600; transition: transform .12s ease, box-shadow .2s ease, filter .2s ease; }
+.btn {
+  border-radius: var(--dna-radius-sm);
+  font-weight: 600;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
 .btn:active { transform: translateY(1px); }
 .btn-primary {
   border: none;
-  background: var(--dna-grad);
-  color: #fff;
-  box-shadow: 0 10px 26px -12px rgba(236, 72, 153, .8);
+  background: #f4f4f5;
+  color: #09090b;
+  box-shadow: none;
 }
-.btn-primary:hover, .btn-primary:focus { filter: brightness(1.08); box-shadow: var(--dna-glow); color: #fff; }
-.btn-outline-primary { border-color: rgba(168,85,247,.55); color: #d8b4fe; }
-.btn-outline-primary:hover { background: rgba(168,85,247,.16); border-color: var(--dna-accent); color: #fff; }
-.btn-outline-secondary { border-color: var(--dna-border-strong); color: var(--dna-muted); }
-.btn-outline-secondary:hover { background: rgba(255,255,255,.08); color: #fff; border-color: var(--dna-border-strong); }
-.btn-outline-light { border-color: var(--dna-border-strong); color: var(--dna-text); }
-.btn-outline-light:hover { background: rgba(255,255,255,.1); color: #fff; }
+.btn-primary:hover, .btn-primary:focus {
+  background: #ffffff;
+  color: #09090b;
+  box-shadow: none;
+}
+.btn-outline-primary {
+  border-color: var(--dna-border-strong);
+  color: var(--dna-text);
+}
+.btn-outline-primary:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: #ffffff;
+  color: #ffffff;
+}
 
 /* ---------------- 徽章 ---------------- */
 .badge { font-weight: 500; letter-spacing: 0.2px; border-radius: 4px; }
@@ -152,17 +163,16 @@ body {
 
 /* ---------------- 表单 ---------------- */
 .form-control, .form-select {
-  background: rgba(10, 9, 18, .6);
-  border: 1px solid var(--dna-border-strong);
+  background: #121215;
+  border: 1px solid var(--dna-border);
   color: var(--dna-text);
-  border-radius: 10px;
+  border-radius: var(--dna-radius-sm);
 }
-.form-control::placeholder { color: rgba(156, 151, 184, .7); }
 .form-control:focus, .form-select:focus {
-  background: rgba(10, 9, 18, .85);
-  border-color: var(--dna-accent);
-  color: #fff;
-  box-shadow: 0 0 0 .2rem rgba(168, 85, 247, .25);
+  background: #121215;
+  border-color: var(--dna-border-strong);
+  color: #ffffff;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1);
 }
 .form-label { color: var(--dna-muted); font-weight: 500; }
 .input-group-text { background: rgba(255,255,255,.05); border-color: var(--dna-border-strong); color: var(--dna-muted); }
