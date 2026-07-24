@@ -250,6 +250,11 @@
 
   loadLogs(1);
 
+  function onLogsPageLoaded() {
+    loadLogs(1);
+  }
+  document.addEventListener('dna:page-loaded', onLogsPageLoaded);
+
   var resizeTimer;
   function onLogsResize() {
     clearTimeout(resizeTimer);
@@ -259,6 +264,7 @@
 
   document.addEventListener('dna:page-unload', function () {
     window.removeEventListener('resize', onLogsResize);
+    document.removeEventListener('dna:page-loaded', onLogsPageLoaded);
   }, { once: true });
 })();
 </script>

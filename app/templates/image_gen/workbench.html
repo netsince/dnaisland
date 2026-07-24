@@ -566,9 +566,12 @@ object-fit:contain;border-radius:10px;border:1px solid #2a2a3a}
  });
  });
 
- initWorkbenchImgFade();
-function onWorkbenchPageLoaded() { initWorkbenchImgFade(); }
-document.addEventListener('dna:page-loaded', onWorkbenchPageLoaded);
+  initWorkbenchImgFade();
+  function onWorkbenchPageLoaded() {
+    loadWorkbenchLogs();
+    initWorkbenchImgFade();
+  }
+  document.addEventListener('dna:page-loaded', onWorkbenchPageLoaded);
 
   function initWorkbenchImgFade(scope) {
   var cards = (scope || document).querySelectorAll('.ig-mcard.dna-img-fade');
