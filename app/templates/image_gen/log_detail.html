@@ -95,7 +95,7 @@
         <a class="btn btn-sm btn-outline-secondary rounded-pill px-3 py-1.5 fs-7 js-dlpng" id="gdDownload" href="{{ first_url }}" data-src="{{ first_url }}" data-name="artwork_{{ log.id }}_1.png" data-log-id="{{ log.id }}">
           <i class="bi bi-download me-1"></i> 下载原图
         </a>
-        <a class="btn btn-sm btn-primary rounded-pill px-3 py-1.5 fs-7" href="{{ url_for('image_gen.workbench') }}?prompt={{ log.prompt|urlencode }}">
+          <a class="btn btn-sm btn-primary rounded-pill px-3 py-1.5 fs-7" href="{{ url_for('image_gen.workbench', prompt=log.prompt, from_log=log.id) }}">
           <i class="bi bi-magic me-1"></i> 同款生成
         </a>
       </div>

@@ -59,12 +59,24 @@ def workbench():
     )
     # 默认选中每图积分最低的可用模型
     default_model = min(models, key=lambda m: m.points_per_image or 0) if models else None
+
+    # 同款生成：预填提示词与参考图（来自某条历史记录的 id）
+    prefill_prompt = (request.args.get("prompt") or "").strip()
+    prefill_refs = []
+    from_log_id = request.args.get("from_log", type=int)
+    if from_log_id:
+        lg = db.session.get(GenerationLog, from_log_id)
+        if lg and lg.user_id == current_user.id:
+            prefill_refs = lg.reference_image_list()
+
     return render_template(
         "image_gen/workbench.html",
         models=models,
         default_model=default_model,
         aspects=VALID_ASPECTS,
         max_refs=MAX_REFERENCES,
+        prefill_prompt=prefill_prompt,
+        prefill_refs=prefill_refs,
     )
 
 

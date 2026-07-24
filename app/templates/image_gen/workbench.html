@@ -18,7 +18,7 @@
  <form method="post" action="{{ url_for('image_gen.generate') }}" enctype="multipart/form-data" class="d-flex flex-column gap-3" style="flex:1;">
  <div>
  <label class="ig-label">提示词</label>
- <textarea name="prompt" class="form-control" style="min-height:130px" placeholder="描述你想生成的画面…使用参考图时可用「图片1」指代">{{ request.form.prompt or '' }}</textarea>
+ <textarea name="prompt" class="form-control" style="min-height:130px" placeholder="描述你想生成的画面…使用参考图时可用「图片1」指代">{{ prefill_prompt or '' }}</textarea>
  </div>
  <div class="ig-row">
  <div>
@@ -122,6 +122,7 @@
  (function () {
  var form = document.querySelector('form[action="{{ url_for('image_gen.generate') }}"]');
  var hidden = form.querySelector('input[name=size]');
+ var prefillRefs = {{ prefill_refs|tojson|safe }};
 
  // 宽高比下拉框
  var btn = document.getElementById('ratioBtn');
@@ -214,6 +215,19 @@
  statusEl.textContent = '已选满 5 张参考图';
  statusEl.className = 'ig-status';
  }
+ });
+ }
+
+ // 同款生成：把来源记录里的参考图（data URL）转成 File 预填进 selectedRefs
+ if (Array.isArray(prefillRefs)) {
+ prefillRefs.forEach(function (dataUrl) {
+ if (!dataUrl || selectedRefs.length >= MAX_REFS) return;
+ fetch(dataUrl).then(function (r) { return r.blob(); }).then(function (b) {
+ var f = new File([b], 'ref' + (selectedRefs.length + 1) + '.webp',
+ { type: b.type || 'image/webp' });
+ selectedRefs.push(f);
+ renderRefs();
+ }).catch(function () {});
  });
  }
 
