@@ -2094,29 +2094,31 @@ main.dna-page-loading {
 
 .tea-card-ref {
   border: 1px solid var(--dna-border);
-  border-radius: 12px;
-  padding: 8px 10px;
-  background: var(--bs-body-bg);
+  border-radius: var(--dna-radius-sm, 6px);
+  padding: 4px 10px;
+  background: var(--dna-surface, #121215);
   transition: background-color .15s ease, border-color .15s ease;
-  max-width: 340px;
+  max-width: 220px;
+  height: 38px;
 }
-.tea-card-ref:hover { background: var(--dna-surface-hover); border-color: var(--dna-border-strong); }
-.tea-card-ref__thumb { width: 42px; height: 42px; }
+.tea-card-ref:hover { background: rgba(255, 255, 255, 0.06); border-color: var(--dna-border-strong); }
+.tea-card-ref__thumb { width: 28px; height: 28px; }
 .tea-card-ref__img,
 .tea-card-ref__ph {
-  width: 42px;
-  height: 42px;
-  border-radius: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
   object-fit: cover;
   background: var(--bs-secondary-bg);
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 600;
+  font-size: 0.75rem;
 }
-.tea-card-ref__body { min-width: 0; }
-.tea-card-ref__name { line-height: 1.2; }
-.tea-card-ref__author { line-height: 1.2; }
+.tea-card-ref__body { min-width: 0; line-height: 1.15; }
+.tea-card-ref__tag { font-size: 0.65rem; margin-bottom: 0; }
+.tea-card-ref__name { font-size: 0.8rem; color: var(--dna-text, #f4f4f5); }
 
 .tea-related-post {
   border: 1px solid var(--dna-border);

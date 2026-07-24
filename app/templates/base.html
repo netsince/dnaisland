@@ -54,6 +54,7 @@ function showToast(message, type) {
  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
  <link rel="stylesheet"
  href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;800&display=swap">
+ <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/glightbox@3.3.0/dist/css/glightbox.min.css">
  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
  <style>
   /* 茶馆长文折叠 */
@@ -1589,6 +1590,21 @@ data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded=
       if (window.showToast) window.showToast('网络请求失败，请稍后重试', 'danger');
     });
   });
+})();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/glightbox@3.3.0/dist/js/glightbox.min.js"></script>
+<script>
+(function () {
+  function initGlobalLightbox() {
+    if (window.GLightbox && document.querySelector('.glightbox')) {
+      if (window.globalLightboxInstance) {
+        try { window.globalLightboxInstance.destroy(); } catch (e) {}
+      }
+      window.globalLightboxInstance = GLightbox({ selector: '.glightbox', touchNavigation: true, loop: true });
+    }
+  }
+  document.addEventListener('DOMContentLoaded', initGlobalLightbox);
+  document.addEventListener('dna:page-loaded', initGlobalLightbox);
 })();
 </script>
 </body>
