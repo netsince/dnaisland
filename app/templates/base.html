@@ -67,7 +67,7 @@ function showToast(message, type) {
  </style>
  {% block head %}{% endblock %}
 </head>
-<body class="d-flex flex-column min-vh-100 {% block body_class %}{% endblock %}">
+<body class="d-flex flex-column min-vh-100 {% block body_class %}{% endblock %}{% if request.endpoint in ['user.card_detail','teahouse.post_detail','image_gen.logs','image_gen.log_detail','user.notifications','teahouse.favorites','main.articles','main.article_detail','user.profile_edit','user.followers','user.following','user.my_punishments','user.my_likes','user.my_favorites','user.my_cards','main.tos','main.privacy'] %} dna-hide-mobile-nav{% endif %}">
  {% block header %}
  <header>
  <nav class="navbar navbar-expand-lg navbar-dark bg-dark">

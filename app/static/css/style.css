@@ -1186,6 +1186,13 @@ body.is-mobile-plus-open #mobilePlusBtn span {
   body {
     padding-bottom: 64px !important;
   }
+  /* 指定页面隐藏移动端贴底导航（五个按钮），并移除为其预留的底部留白 */
+  body.dna-hide-mobile-nav {
+    padding-bottom: 0 !important;
+  }
+  body.dna-hide-mobile-nav .dna-mobile-nav {
+    display: none !important;
+  }
   main.container-fluid {
     padding-inline: 10px !important;
   }
