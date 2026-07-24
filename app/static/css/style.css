@@ -1858,7 +1858,6 @@ main.dna-page-loading {
   background: var(--dna-surface-solid);
   display: flex;
   flex-direction: column;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
   transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -1873,6 +1872,7 @@ main.dna-page-loading {
   }
   .dna-compose-drawer.show {
     transform: translateX(0);
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
   }
 }
 
@@ -1888,6 +1888,7 @@ main.dna-page-loading {
   }
   .dna-compose-drawer.show {
     transform: translateY(0);
+    box-shadow: 0 -16px 48px rgba(0, 0, 0, 0.6);
   }
 }
 
