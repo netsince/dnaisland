@@ -17,7 +17,16 @@ from ..extensions import db
 import re
 from datetime import datetime, timedelta
 
-from ..models import Card, Notification, TeaPost, TeaPostImage, TeaPostLike, User, UserFollow
+from ..models import (
+    Card,
+    Notification,
+    TeaPost,
+    TeaPostFavorite,
+    TeaPostImage,
+    TeaPostLike,
+    User,
+    UserFollow,
+)
 from ..services.image_service import compress_image
 from ..services.notification_service import notify
 from ..services.sticker_service import sanitize_stickers
@@ -134,7 +143,10 @@ def _notify_mentions(content, post, actor):
 def _build_stats(posts):
     """预计算一组帖子的点赞数、本人是否点赞、直接回复数，返回 {post_id: {...}}。"""
     ids = [p.id for p in posts]
-    stats = {pid: {"like_count": 0, "liked": False, "reply_count": 0} for pid in ids}
+    stats = {
+        pid: {"like_count": 0, "liked": False, "reply_count": 0, "favorited": False}
+        for pid in ids
+    }
     if not ids:
         return stats
     if current_user.is_authenticated:
@@ -144,6 +156,12 @@ def _build_stats(posts):
         ).all()
         for l in liked:
             stats[l.post_id]["liked"] = True
+        faved = TeaPostFavorite.query.filter(
+            TeaPostFavorite.user_id == current_user.id,
+            TeaPostFavorite.post_id.in_(ids),
+        ).all()
+        for f in faved:
+            stats[f.post_id]["favorited"] = True
     for pid, cnt in (
         db.session.query(TeaPostLike.post_id, func.count())
         .filter(TeaPostLike.post_id.in_(ids))
@@ -216,6 +234,30 @@ def index():
         pagination=pagination,
         args={"sort": sort},
         sort=sort,
+        max_len=TEA_POST_MAX_LEN,
+    )
+
+
+# ---------------- 我的收藏列表 ----------------
+@teahouse_bp.route("/favorites")
+@login_required
+def favorites():
+    page = request.args.get("page", 1, type=int)
+    sub = db.session.query(TeaPostFavorite.post_id).filter(
+        TeaPostFavorite.user_id == current_user.id
+    )
+    q = TeaPost.query.filter(TeaPost.id.in_(sub))
+    q = _visible_query(q, current_user)
+    q = q.join(TeaPostFavorite, TeaPostFavorite.post_id == TeaPost.id)
+    q = q.order_by(TeaPostFavorite.created_at.desc())
+    pagination = q.paginate(page=page, per_page=20, error_out=False)
+    posts = pagination.items
+    stats = _build_stats(posts)
+    return render_template(
+        "teahouse/favorites.html",
+        posts=posts,
+        stats=stats,
+        pagination=pagination,
         max_len=TEA_POST_MAX_LEN,
     )
 
@@ -461,6 +503,33 @@ def like(post_id):
             "action": "like",
             "state": now_liked,
             "count": TeaPostLike.query.filter_by(post_id=post_id).count(),
+        })
+    return redirect(request.referrer or url_for("teahouse.post_detail", post_id=post_id))
+
+
+@teahouse_bp.route("/<int:post_id>/favorite", methods=["POST"])
+@login_required
+def favorite(post_id):
+    p = db.session.get(TeaPost, post_id)
+    if not p:
+        abort(404)
+    existing = TeaPostFavorite.query.filter_by(
+        user_id=current_user.id, post_id=post_id
+    ).first()
+    if existing:
+        db.session.delete(existing)
+        now_fav = False
+    else:
+        db.session.add(TeaPostFavorite(user_id=current_user.id, post_id=post_id))
+        now_fav = True
+    db.session.commit()
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        # 局部提交：返回新状态供前端切换按钮，不整页刷新
+        return jsonify({
+            "ok": True,
+            "action": "favorite",
+            "state": now_fav,
+            "count": TeaPostFavorite.query.filter_by(post_id=post_id).count(),
         })
     return redirect(request.referrer or url_for("teahouse.post_detail", post_id=post_id))
 

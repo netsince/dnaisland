@@ -8,7 +8,12 @@
 {% block content %}
 <div class="row justify-content-center">
   <div class="col-12 col-lg-8">
-    <a class="btn btn-sm btn-outline-secondary mb-3" href="{{ url_for('teahouse.index') }}">← 返回茶馆</a>
+    <div class="d-flex align-items-center justify-content-between mb-3">
+     <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('teahouse.index') }}">← 返回茶馆</a>
+     {% if current_user.is_authenticated %}
+     <a class="btn btn-sm btn-outline-warning" href="{{ url_for('teahouse.favorites') }}">★ 我的收藏</a>
+     {% endif %}
+    </div>
 
     {# 帖子链：从最顶上的原帖一直追溯到当前帖，每条都可点击跳转 #}
     {% if chain %}

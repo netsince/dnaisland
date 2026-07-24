@@ -10,6 +10,9 @@
  <div class="col-12 col-lg-8">
  <div class="d-flex align-items-center justify-content-between mb-3">
  <h1 class="h4 mb-0 fw-bold">茶馆讨论</h1>
+ {% if current_user.is_authenticated %}
+ <a href="{{ url_for('teahouse.favorites') }}" class="btn btn-sm btn-outline-warning">★ 我的收藏</a>
+ {% endif %}
  </div>
 
  <!-- 移动端单行横向滑动筛选胶囊栏 -->

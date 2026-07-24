@@ -89,6 +89,13 @@
 <span class="js-toggle-count">{{ s.like_count }}</span>
 </button>
 </form>
+<form method="post" action="{{ url_for('teahouse.favorite', post_id=post.id) }}" class="d-inline m-0 p-0 js-toggle" title="收藏">
+<button class="btn btn-sm btn-link p-0 text-decoration-none d-flex align-items-center gap-1 {{ 'text-warning fw-bold' if s.favorited else 'text-muted' }} dna-fav-btn" type="submit"
+        data-on-class="text-warning fw-bold" data-off-class="text-muted"
+        data-on-icon="bi-star-fill" data-off-icon="bi-star">
+<i class="bi bi-star{% if s.favorited %}-fill{% endif %} js-toggle-icon"></i>
+</button>
+</form>
  {% else %}
  <span class="d-flex align-items-center gap-1">
  <i class="bi bi-heart"></i>
@@ -179,6 +186,13 @@
 <button class="btn btn-sm btn-link p-0 text-decoration-none {{ 'text-danger' if s.liked else 'text-muted' }}" type="submit"
         data-on-class="text-danger" data-off-class="text-muted">
 <span class="js-toggle-count">{{ s.like_count }}</span>
+</button>
+</form>
+<form method="post" action="{{ url_for('teahouse.favorite', post_id=post.id) }}" class="d-inline m-0 p-0 js-toggle" title="收藏">
+<button class="btn btn-sm btn-link p-0 text-decoration-none d-flex align-items-center gap-1 {{ 'text-warning' if s.favorited else 'text-muted' }} dna-fav-btn" type="submit"
+        data-on-class="text-warning" data-off-class="text-muted"
+        data-on-icon="bi-star-fill" data-off-icon="bi-star">
+<i class="bi bi-star{% if s.favorited %}-fill{% endif %} js-toggle-icon"></i>
 </button>
 </form>
  {% else %}

@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% from "teahouse/_post_item.html" import render_post with context %}
+{% from "macros/pagination.html" import render_pagination %}
+
+{% block title %}我的收藏 · 茶馆 · DNAISLAND{% endblock %}
+{% block body_class %}dna-hide-header-on-mobile{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+ <div class="col-12 col-lg-8">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+   <h1 class="h4 mb-0 fw-bold">★ 我的收藏</h1>
+   <a href="{{ url_for('teahouse.index') }}" class="btn btn-sm btn-outline-secondary">返回茶馆</a>
+  </div>
+
+  {% if posts %}
+  {% for p in posts %}{{ render_post(p, stats, thread=false) }}{% endfor %}
+  {{ render_pagination(pagination, 'teahouse.favorites', {}) }}
+  {% else %}
+  <div class="text-center text-muted py-5">
+   还没有收藏的帖子。<br>在茶馆里点亮 ⭐ 即可把喜欢的帖子收藏到这里。
+  </div>
+  {% endif %}
+ </div>
+</div>
+{% endblock %}
