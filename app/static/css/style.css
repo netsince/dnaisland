@@ -2410,28 +2410,3 @@ main.dna-page-loading {
 .gd-detail { padding-bottom: 72px; }
 }
 
-/* 全局提交 Loading 蒙层 */
-.dna-loading-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(9, 9, 11, 0.85);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  z-index: 1060;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-}
-.dna-loading-overlay.is-show {
-  opacity: 1;
-}
-.dna-loading-box {
-  background: #121215;
-  border: 1px solid var(--dna-border-strong, #3f3f46);
-  min-width: 240px;
-  max-width: 320px;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
-}
-

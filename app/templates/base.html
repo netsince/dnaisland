@@ -974,17 +974,6 @@ data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded=
 <!-- 茶馆：删除帖子（软删）隐藏表单，配合 confirm 使用 -->
 <form id="teahouseDeleteForm" method="post" style="display:none"></form>
 
-<!-- 茶馆发布全屏 Loading 蒙层 -->
-<div id="teaPublishLoadingOverlay" class="dna-loading-overlay d-none">
-  <div class="dna-loading-box text-center p-4 rounded-4 shadow-lg">
-    <div class="spinner-border text-light mb-3" style="width: 2.5rem; height: 2.5rem;" role="status">
-      <span class="visually-hidden">加载中...</span>
-    </div>
-    <div class="fw-bold text-white fs-6 mb-1" id="teaPublishLoadingTitle">正在发布帖子…</div>
-    <div class="small text-muted">请稍候，正在为您提交数据</div>
-  </div>
-</div>
-
 <!-- 茶馆通用发布/回复抽屉 (Compose Drawer) -->
 <div class="dna-drawer-overlay" id="teaComposeOverlay"></div>
 <div class="dna-compose-drawer" id="teaComposeDrawer">
@@ -1532,20 +1521,18 @@ data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded=
   }
   if (textarea) textarea.addEventListener('input', updateCounter);
 
-  function showPublishLoading(title) {
-    var overlay = document.getElementById('teaPublishLoadingOverlay');
-    var titleEl = document.getElementById('teaPublishLoadingTitle');
-    if (!overlay) return;
-    if (titleEl && title) titleEl.textContent = title;
-    overlay.classList.remove('d-none');
-    requestAnimationFrame(function () { overlay.classList.add('is-show'); });
+  function showPublishLoading() {
+    var loader = document.getElementById('pjaxLoader');
+    if (loader) loader.classList.add('show');
+    var main = document.querySelector('main');
+    if (main) main.classList.add('dna-page-loading');
   }
 
   function hidePublishLoading() {
-    var overlay = document.getElementById('teaPublishLoadingOverlay');
-    if (!overlay) return;
-    overlay.classList.remove('is-show');
-    setTimeout(function () { overlay.classList.add('d-none'); }, 200);
+    var loader = document.getElementById('pjaxLoader');
+    if (loader) loader.classList.remove('show');
+    var main = document.querySelector('main');
+    if (main) main.classList.remove('dna-page-loading');
   }
 
   // 提交逻辑：点击发布 -> 1. 发布页收起 -> 2. 进入 loading 动画 -> 3. 等待发布结果 (成功直接跳转，失败直接弹窗)
