@@ -114,7 +114,7 @@ def send_webp(data_url: str, max_edge: int = 1024, quality: int = 82):
 
     统一替代各路由中重复的 send_file(BytesIO(data_url_to_webp_bytes(...))) 写法。
     """
-    from flask import BytesIO, send_file
+    from flask import send_file
 
     if not data_url:
         return ("", 404)
