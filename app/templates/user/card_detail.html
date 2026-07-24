@@ -221,6 +221,7 @@
       lightboxInstance = GLightbox({ selector: '.glightbox', touchNavigation: true, loop: false });
     }
   }
+  window.initLightbox = initLightbox;
 
   if (document.readyState === 'complete' || document.readyState === 'interactive') {
     setTimeout(initLightbox, 50);
@@ -410,6 +411,7 @@
       + timeHtml
       + '</div>'
       + '<div class="dna-comment-item__text">' + escHtml(cm.content) + '</div>'
+      + (cm.image_url ? '<div class="dna-comment-img-wrap"><a href="/static/' + cm.image_url + '" class="glightbox" data-gallery="comments"><img src="/static/' + cm.image_url + '" class="dna-comment-img" alt="评论图片" loading="lazy"></a></div>' : '')
       + '<div class="dna-comment-item__actions mt-1 d-flex align-items-center">'
       + likeBtn
       + replyBtn
@@ -608,6 +610,9 @@
           }
         }
         if (opts.onDone) opts.onDone();
+        if (typeof window.initLightbox === 'function') {
+          window.initLightbox();
+        }
       })
       .catch(function() {
         loading = false;
@@ -651,6 +656,9 @@
       el.scrollIntoView({ block: 'center' });
       el.classList.add('dna-comment-item--focus');
     }
+    if (typeof window.initLightbox === 'function') {
+      window.initLightbox();
+    }
   }
 
   function buildFooter() {
@@ -662,9 +670,12 @@
       + '<div class="position-relative">'
       + '<textarea class="form-control" id="cmInput" rows="2" placeholder="说点什么…" style="resize:none;"></textarea>'
       + '</div>'
+      + '<div id="cmImagePreviewBox"></div>'
       + '<div class="d-flex align-items-center justify-content-between dna-emoji-toolbar-wrap">'
       + '<div class="d-flex align-items-center gap-2">'
       + '<button type="button" class="dna-emoji-toggle-btn" id="cmEmojiToggle" title="插入表情">😊</button>'
+      + '<button type="button" class="btn btn-link text-muted p-0 ms-2" id="cmImageBtn" title="插入图片"><i class="bi bi-image"></i></button>'
+      + '<input type="file" id="cmFileInput" accept="image/png,image/jpeg,image/gif,image/webp" class="d-none">'
       + '<span class="small text-muted d-none d-sm-inline opacity-75" style="font-size: 0.75rem;">Ctrl+Enter 发送</span>'
       + '</div>'
       + '<div class="d-flex align-items-center gap-2">'
@@ -692,7 +703,52 @@
     var submitBtn = document.getElementById('cmSubmitBtn');
     var emojiToggle = document.getElementById('cmEmojiToggle');
     var emojiBar = document.getElementById('cmEmojiBar');
-    if (!form || !input || !charCountEl || !submitBtn || !emojiToggle || !emojiBar) return;
+    var imageBtn = document.getElementById('cmImageBtn');
+    var fileInput = document.getElementById('cmFileInput');
+    var previewBox = document.getElementById('cmImagePreviewBox');
+
+    if (!form || !input || !charCountEl || !submitBtn || !emojiToggle || !emojiBar || !imageBtn || !fileInput || !previewBox) return;
+
+    function resetImageSelection() {
+      fileInput.value = '';
+      previewBox.innerHTML = '';
+    }
+
+    imageBtn.addEventListener('click', function() {
+      fileInput.click();
+    });
+
+    fileInput.addEventListener('change', function() {
+      if (!fileInput.files || !fileInput.files[0]) {
+        resetImageSelection();
+        return;
+      }
+      var file = fileInput.files[0];
+      if (file.size > 5 * 1024 * 1024) {
+        if (typeof showToast === 'function') {
+          showToast('图片大小不能超过 5MB', 'danger');
+        } else {
+          alert('图片大小不能超过 5MB');
+        }
+        resetImageSelection();
+        return;
+      }
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        previewBox.innerHTML = '<div class="dna-comment-img-preview">'
+          + '<img src="' + e.target.result + '" alt="预览图">'
+          + '<button type="button" class="dna-comment-img-remove" id="cmImageRemoveBtn" title="移除图片">&times;</button>'
+          + '</div>';
+      };
+      reader.readAsDataURL(file);
+    });
+
+    previewBox.addEventListener('click', function(e) {
+      var removeBtn = e.target.closest('#cmImageRemoveBtn, .dna-comment-img-remove');
+      if (removeBtn) {
+        resetImageSelection();
+      }
+    });
 
     function updateCharCount() {
       var len = input.value.length;
@@ -761,6 +817,9 @@
       if (form.dataset.replyToId) {
         fd.append('reply_to_id', form.dataset.replyToId);
       }
+      if (fileInput.files && fileInput.files[0]) {
+        fd.append('image', fileInput.files[0]);
+      }
       submitBtn.disabled = true;
       fetch(postUrl, {
         method: 'POST',
@@ -774,6 +833,7 @@
         if (data.ok) {
           input.value = '';
           delete form.dataset.replyToId;
+          resetImageSelection();
           updateCharCount();
           emojiBar.classList.remove('show');
           // 重置并重新加载评论列表
