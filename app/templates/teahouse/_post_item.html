@@ -24,7 +24,7 @@
 {%- if post.images -%}
 {%- set img = post.images[0] -%}
 <div class="mt-2 mb-2">
-  <a href="{{ img.image_data }}" class="tea-glightbox d-inline-block rounded overflow-hidden" data-gallery="post-{{ post.id }}">
+  <a href="{{ img.image_data }}" class="tea-glightbox d-inline-block rounded overflow-hidden" data-type="image" data-gallery="post-{{ post.id }}">
     <img src="{{ img.image_data }}" class="img-fluid rounded" alt="配图"
          style="max-height:260px;max-width:100%;object-fit:cover;cursor:zoom-in;">
   </a>
