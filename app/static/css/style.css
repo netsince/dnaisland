@@ -5,62 +5,57 @@
    ============================================================ */
 
 :root {
-  /* 品牌色 —— 霓虹紫 / 品红 / 青 */
-  --dna-accent: #a855f7;
-  --dna-accent-rgb: 168, 85, 247;
-  --dna-accent-2: #ec4899;
-  --dna-accent-3: #22d3ee;
-  --dna-grad: linear-gradient(135deg, #a855f7 0%, #ec4899 55%, #f472b6 100%);
-  --dna-grad-soft: linear-gradient(135deg, rgba(168, 85, 247, .18), rgba(236, 72, 153, .12));
+  /* Obsidian Monochrome 变量系统 */
+  --dna-accent: #f4f4f5;
+  --dna-accent-rgb: 244, 244, 245;
+  --dna-accent-2: #e4e4e7;
+  --dna-accent-3: #d4d4d8;
+  --dna-grad: linear-gradient(180deg, #f4f4f5 0%, #e4e4e7 100%);
+  --dna-grad-soft: rgba(255, 255, 255, 0.05);
 
   /* 背景与表面 */
-  --dna-bg: #0b0a14;
-  --dna-bg-2: #120f22;
-  --dna-surface: rgba(28, 24, 48, .72);
-  --dna-surface-solid: #171327;
-  --dna-border: rgba(255, 255, 255, .08);
-  --dna-border-strong: rgba(255, 255, 255, .16);
+  --dna-bg: #09090b;
+  --dna-bg-2: #121215;
+  --dna-surface: #121215;
+  --dna-surface-solid: #121215;
+  --dna-border: #27272a;
+  --dna-border-strong: #3f3f46;
 
   /* 文本 */
-  --dna-text: #ece9f6;
-  --dna-muted: #9c97b8;
+  --dna-text: #f4f4f5;
+  --dna-muted: #a1a1aa;
 
-  --dna-radius: 16px;
-  --dna-radius-sm: 10px;
-  --dna-shadow: 0 18px 48px -20px rgba(0, 0, 0, .8);
-  --dna-glow: 0 0 0 1px rgba(168, 85, 247, .35), 0 12px 32px -12px rgba(168, 85, 247, .55);
+  --dna-radius: 8px;
+  --dna-radius-sm: 6px;
+  --dna-shadow: none;
+  --dna-glow: none;
 
   /* —— 覆盖 Bootstrap 主题变量 —— */
   --bs-body-bg: var(--dna-bg);
   --bs-body-color: var(--dna-text);
   --bs-border-color: var(--dna-border);
-  --bs-primary: #a855f7;
-  --bs-primary-rgb: 168, 85, 247;
-  --bs-link-color: #d8b4fe;
-  --bs-link-hover-color: #f0abfc;
-  --bs-emphasis-color: #fff;
+  --bs-primary: #f4f4f5;
+  --bs-primary-rgb: 244, 244, 245;
+  --bs-link-color: #f4f4f5;
+  --bs-link-hover-color: #ffffff;
+  --bs-emphasis-color: #ffffff;
 }
 
-/* Bootstrap 暗色令牌微调，让 card/dropdown/form 统一底色 */
 [data-bs-theme="dark"] {
   --bs-body-bg: var(--dna-bg);
   --bs-body-color: var(--dna-text);
   --bs-secondary-color: var(--dna-muted);
   --bs-tertiary-bg: var(--dna-surface-solid);
   --bs-border-color: var(--dna-border);
-  --bs-emphasis-color: #fff;
+  --bs-emphasis-color: #ffffff;
 }
 
 /* ---------------- 全局背景 ---------------- */
 body {
   background-color: var(--dna-bg);
   color: var(--dna-text);
-  background-image:
-    radial-gradient(60vw 60vw at 12% -10%, rgba(168, 85, 247, .22), transparent 60%),
-    radial-gradient(55vw 55vw at 100% 0%, rgba(34, 211, 238, .16), transparent 55%),
-    radial-gradient(50vw 50vw at 80% 110%, rgba(236, 72, 153, .16), transparent 55%);
-  background-attachment: fixed;
-  font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, "Segoe UI", sans-serif;
+  background-image: none; /* 彻底移除原刺眼大面积径向渐变 */
+  font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
