@@ -103,22 +103,27 @@ body {
   border: 1px solid var(--dna-border);
   border-radius: var(--dna-radius);
   background: var(--dna-surface);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  box-shadow: var(--dna-shadow);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
   color: var(--dna-text);
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.card:hover {
+  border-color: var(--dna-border-strong);
 }
 .card-header {
-  background: rgba(255, 255, 255, .03);
+  background: rgba(255, 255, 255, 0.02);
   border-bottom: 1px solid var(--dna-border);
-  color: #fff;
+  color: #ffffff;
+  font-weight: 600;
 }
 .list-group-item {
   background: var(--dna-surface);
   border-color: var(--dna-border);
   color: var(--dna-text);
 }
-.list-group-item-primary { background: var(--dna-grad-soft); color: #fff; }
+.list-group-item-primary { background: rgba(255, 255, 255, 0.06); color: #ffffff; }
 
 /* ---------------- 按钮 ---------------- */
 .btn { border-radius: 10px; font-weight: 600; transition: transform .12s ease, box-shadow .2s ease, filter .2s ease; }
@@ -138,8 +143,12 @@ body {
 .btn-outline-light:hover { background: rgba(255,255,255,.1); color: #fff; }
 
 /* ---------------- 徽章 ---------------- */
-.badge { font-weight: 600; letter-spacing: .2px; }
-.text-bg-primary, .badge.bg-primary { background: var(--dna-grad) !important; color: #fff !important; }
+.badge { font-weight: 500; letter-spacing: 0.2px; border-radius: 4px; }
+.text-bg-primary, .badge.bg-primary {
+  background: #18181b !important;
+  color: #a1a1aa !important;
+  border: 1px solid var(--dna-border);
+}
 
 /* ---------------- 表单 ---------------- */
 .form-control, .form-select {
