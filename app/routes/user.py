@@ -727,9 +727,15 @@ def card_comments_api(card_id):
                 "username": cm.author.username,
                 "display_name": cm.author.display_name,
                 "avatar": cm.author.avatar or "",
+            } if cm.author else {
+                "id": cm.user_id,
+                "username": "deleted",
+                "display_name": "已注销用户",
+                "avatar": "",
             },
             "can_report": (
                 current_user.is_authenticated
+                and cm.author is not None
                 and cm.author.id != current_user.id
             ),
             "report_url": url_for("user.report", type="comment", id=cm.id),
