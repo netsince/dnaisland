@@ -1,4 +1,5 @@
 import json
+import re
 import secrets
 import string
 
@@ -40,6 +41,11 @@ from ..models import (
     SiteConfig,
     TeaPost,
     TeaPostLike,
+    TeaPostFavorite,
+    TeaPostTopic,
+    TeaPostImage,
+    TeaPoll,
+    TeaPollVote,
     User,
 )
 from ..models.punishment import (
@@ -886,7 +892,7 @@ def report_action(report_id):
     elif action == "delete_teapost" and r.target_type == "teapost":
         tp = db.session.get(TeaPost, int(r.target_id))
         if tp:
-            db.session.delete(tp)
+            _cascade_delete_teapost(tp)
     else:
         flash("无效的处理操作", "warning")
         return redirect(url_for("admin.report_detail", report_id=report_id))
@@ -1141,29 +1147,106 @@ def tea_post_reject(post_id):
     return redirect(url_for("admin.tea_moderation"))
 
 
+def _cascade_delete_teapost(post):
+    """递归硬删帖子及其全部子孙回复，并清理点赞/收藏/话题/配图/投票/通知等关联数据，
+    避免产生孤儿外键记录。
+
+    自引用外键要求先删子后删父，因此使用递归：先处理所有子回复，再清理当前帖关联。
+    """
+    children = TeaPost.query.filter_by(parent_id=post.id).all()
+    for child in children:
+        _cascade_delete_teapost(child)
+
+    pid = post.id
+    # 投票：先删用户投票记录，再删投票聚合表与本投票
+    poll = TeaPoll.query.filter_by(post_id=pid).first()
+    if poll:
+        TeaPollVote.query.filter_by(poll_id=poll.id).delete(synchronize_session=False)
+        db.session.delete(poll)
+    TeaPostImage.query.filter_by(post_id=pid).delete(synchronize_session=False)
+    TeaPostLike.query.filter_by(post_id=pid).delete(synchronize_session=False)
+    TeaPostFavorite.query.filter_by(post_id=pid).delete(synchronize_session=False)
+    TeaPostTopic.query.filter_by(post_id=pid).delete(synchronize_session=False)
+    # 指向该帖的相关通知（点赞/提及/回复等外部链接含 /teahouse/<id>）
+    # 用正则精确匹配，避免误删 /teahouse/12 这类长 id 中前缀 /teahouse/1 的通知
+    pattern = re.compile(rf"/teahouse/{pid}(?!\d)")
+    for n in Notification.query.filter(
+        Notification.message.like(f"%teahouse/{pid}%")
+    ).all():
+        if pattern.search(n.message):
+            db.session.delete(n)
+    db.session.delete(post)
+
+
 # ---------------- 茶馆帖子管理（总列表，独立于审核） ----------------
 @admin_bp.route("/teahouse")
 @super_admin_required
 def tea_posts():
     q = request.args.get("q", "").strip()
     author = request.args.get("author", "").strip()
+    deleted = request.args.get("deleted", "").strip()
     query = TeaPost.query
     if q:
         query = query.filter(TeaPost.content.like(f"%{q}%"))
     if author:
         query = query.join(User).filter(User.username.like(f"%{author}%"))
+    if deleted == "1":
+        query = query.filter(TeaPost.is_deleted.is_(True))
+    elif deleted == "0":
+        query = query.filter(TeaPost.is_deleted.is_(False))
     page = request.args.get("page", 1, type=int)
     pagination = query.order_by(TeaPost.created_at.desc()).paginate(
         page=page, per_page=20, error_out=False
     )
-    items = [{"post": p} for p in pagination.items]
+
+    # 批量统计每帖的点赞/收藏/回复数及配图/投票/话题标记，便于后台可视化这些数据
+    ids = [p.id for p in pagination.items]
+    like_counts = dict(
+        db.session.query(TeaPostLike.post_id, db.func.count())
+        .filter(TeaPostLike.post_id.in_(ids))
+        .group_by(TeaPostLike.post_id)
+        .all()
+    )
+    fav_counts = dict(
+        db.session.query(TeaPostFavorite.post_id, db.func.count())
+        .filter(TeaPostFavorite.post_id.in_(ids))
+        .group_by(TeaPostFavorite.post_id)
+        .all()
+    )
+    reply_counts = dict(
+        db.session.query(TeaPost.parent_id, db.func.count())
+        .filter(TeaPost.parent_id.in_(ids))
+        .group_by(TeaPost.parent_id)
+        .all()
+    )
+    topic_counts = dict(
+        db.session.query(TeaPostTopic.post_id, db.func.count())
+        .filter(TeaPostTopic.post_id.in_(ids))
+        .group_by(TeaPostTopic.post_id)
+        .all()
+    )
+    items = []
+    for p in pagination.items:
+        items.append(
+            {
+                "post": p,
+                "likes": like_counts.get(p.id, 0),
+                "favs": fav_counts.get(p.id, 0),
+                "replies": reply_counts.get(p.id, 0),
+                "topics": topic_counts.get(p.id, 0),
+                "has_image": len(p.images) > 0,
+                "has_poll": p.poll is not None,
+            }
+        )
+
     return render_template(
         "teahouse/admin_posts.html",
         items=items,
         pagination=pagination,
-        args={"q": q, "author": author},
+        args={"q": q, "author": author, "deleted": deleted},
         q=q,
         author=author,
+        deleted=deleted,
     )
 
 
@@ -1185,9 +1268,25 @@ def tea_post_delete(post_id):
     p = db.session.get(TeaPost, post_id)
     if not p:
         abort(404)
-    db.session.delete(p)
+    _cascade_delete_teapost(p)
     db.session.commit()
-    flash("茶馆帖子已删除", "success")
+    flash("茶馆帖子及其全部回复、点赞、收藏、投票等关联数据已删除", "success")
+    return redirect(url_for("admin.tea_posts"))
+
+
+@admin_bp.route("/teahouse/<int:post_id>/restore", methods=["POST"])
+@super_admin_required
+def tea_post_restore(post_id):
+    p = db.session.get(TeaPost, post_id)
+    if not p:
+        abort(404)
+    if not p.is_deleted:
+        flash("该帖子未被删除", "warning")
+        return redirect(url_for("admin.tea_posts"))
+    p.is_deleted = False
+    p.deleted_at = None
+    db.session.commit()
+    flash("已恢复该帖子", "success")
     return redirect(url_for("admin.tea_posts"))
 
 

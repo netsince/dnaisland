@@ -13,17 +13,26 @@
     <input class="form-control form-control-sm" type="text" name="author" value="{{ author }}" placeholder="作者用户名">
   </div>
   <div class="col-auto">
+    <select class="form-select form-select-sm" name="deleted" onchange="this.form.submit()">
+      <option value="" {% if deleted == '' %}selected{% endif %}>全部状态</option>
+      <option value="0" {% if deleted == '0' %}selected{% endif %}>仅未删除</option>
+      <option value="1" {% if deleted == '1' %}selected{% endif %}>仅已软删</option>
+    </select>
+  </div>
+  <div class="col-auto">
     <button class="btn btn-sm btn-primary" type="submit">筛选</button>
   </div>
 </form>
 
 {% if items %}
   {% for it in items %}
-  <div class="card mb-2">
+  <div class="card mb-2 {% if it.post.is_deleted %}border-secondary opacity-75{% endif %}">
     <div class="card-body py-2">
       <div class="d-flex justify-content-between small text-muted mb-1">
         <span>
           @{{ it.post.author.username }}（{{ it.post.author.nickname }}）
+          {% if it.post.is_deleted %}· <span class="text-secondary">已软删</span>{% endif %}
+          {% if it.post.edited_at %}· <span class="text-info">已编辑</span>{% endif %}
           {% if it.post.is_hidden %}· <span class="text-danger">已隐藏</span>{% endif %}
           {% if not it.post.moderated %}· <span class="text-warning">待审核</span>{% endif %}
           {% if it.post.parent_id %}· <span>回帖</span>{% endif %}
@@ -31,13 +40,26 @@
         <span>{{ it.post.created_at.strftime('%Y-%m-%d %H:%M') if it.post.created_at else '' }}</span>
       </div>
       <div class="border rounded p-2 mb-2 small" style="white-space:pre-wrap;word-break:break-word;">{{ it.post.content | teahouse_linkify }}</div>
+      <div class="small text-muted mb-2">
+        <span class="me-3">👍 点赞 {{ it.likes }}</span>
+        <span class="me-3">⭐ 收藏 {{ it.favs }}</span>
+        <span class="me-3">💬 回复 {{ it.replies }}</span>
+        <span class="me-3">🏷️ 话题 {{ it.topics }}</span>
+        {% if it.has_image %}<span class="me-3">🖼️ 配图</span>{% endif %}
+        {% if it.has_poll %}<span class="me-3">🗳️ 投票</span>{% endif %}
+      </div>
       <div class="d-flex flex-wrap gap-2">
         <a class="btn btn-sm btn-outline-info" href="{{ url_for('teahouse.post_detail', post_id=it.post.id) }}" target="_blank">查看</a>
         <form method="post" action="{{ url_for('admin.tea_post_hide', post_id=it.post.id) }}">
           <button class="btn btn-sm btn-outline-warning">{% if it.post.is_hidden %}取消隐藏{% else %}隐藏{% endif %}</button>
         </form>
-        <form method="post" action="{{ url_for('admin.tea_post_delete', post_id=it.post.id) }}" onsubmit="return confirm('确认删除该茶馆帖子？');">
-          <button class="btn btn-sm btn-outline-danger">删除</button>
+        {% if it.post.is_deleted %}
+        <form method="post" action="{{ url_for('admin.tea_post_restore', post_id=it.post.id) }}" onsubmit="return confirm('确认恢复该帖子？');">
+          <button class="btn btn-sm btn-outline-success">恢复</button>
+        </form>
+        {% endif %}
+        <form method="post" action="{{ url_for('admin.tea_post_delete', post_id=it.post.id) }}" onsubmit="return confirm('确认彻底删除该茶馆帖子及其全部回复、点赞、收藏、投票等关联数据？此操作不可恢复！');">
+          <button class="btn btn-sm btn-outline-danger">{% if it.post.is_deleted %}彻底删除{% else %}删除{% endif %}</button>
         </form>
       </div>
     </div>

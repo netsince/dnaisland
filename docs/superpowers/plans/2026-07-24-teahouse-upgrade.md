@@ -4,6 +4,22 @@
 
 **目标：** 为 DNAISLAND 茶馆模块实现关联角色卡、配图压缩、话题标签系统、收藏与引用发帖、投票功能以及茶馆热搜榜 6 大核心功能。
 
+> **已先行完成的基础能力（A 部分 · 可用性地基）：** 在 P1 六大功能之前，已落地了一批不依赖新模型的基础优化：
+> 1. 帖子编辑（作者/超管 15 分钟窗口，带 `edited_at` 标记）
+> 2. 软删除（作者/超管自删，带 `is_deleted`/`deleted_at`，前台仅作者与超管可见占位）
+> 3. 发帖频率限制（1 分钟内最多 5 条）
+> 4. 长文折叠（前端 `js-post-body.is-folded` 渐隐遮罩 + 展开）
+> 5. @ 提及通知（`_notify_mentions` 解析 @用户名，同帖去重、不通知自己）
+> 6. 点赞通知（受 `user.notify_like` 开关控制，取赞同步清理未读通知防刷屏）
+>
+> 对应迁移：`migrations/versions/m9n0o1p2q3r4_teahouse_edit_delete_notify.py`
+>
+> **后台管理能力强化（与本次升级同步完成）：**
+> - `admin.tea_post_delete` 改为级联硬删：递归清理子孙回复，并清理点赞（`TeaPostLike`）、收藏（`TeaPostFavorite`）、话题关联（`TeaPostTopic`）、配图（`TeaPostImage`）、投票与投票记录（`TeaPoll`/`TeaPollVote`）及相关通知，消除孤儿外键。`admin.report_action` 的 `delete_teapost` 分支同步使用级联。
+> - `admin.tea_posts` 列表支持「仅已软删」筛选；每条展示点赞/收藏/回复/话题计数及配图/投票标记；软删帖显示「已软删」标记与恢复入口。
+> - 新增 `admin.tea_post_restore` 路由：取消软删（`is_deleted=False`、`deleted_at=None`）。
+> - 「已编辑」状态在列表中以 `edited_at` 标记展示，后台可见。
+
 **架构：** 扩展 `app/models/teahouse.py` 数据库模型；在 `app/routes/teahouse.py` 中完善后端接口；结合 `app/services/image_service.py` 压图逻辑；在 `app/templates/teahouse/` 模板与 `style.css` 中升级 UI 与前端交互。
 
 **技术栈：** Python 3, Flask, SQLAlchemy, Pillow (PIL), Bootstrap 5, Vanilla JS, HTML5
