@@ -1,8 +1,9 @@
+import base64
+from io import BytesIO
+
 from flask import Blueprint, abort, jsonify, render_template, request, send_file, url_for
 from flask_login import current_user
 from sqlalchemy import case, func, or_
-from io import BytesIO
-import base64
 
 from ..extensions import db
 from ..models import Article, Card, CardLike, CardTag, Punishment, User
@@ -272,7 +273,6 @@ def search_suggest():
     q = (request.args.get("q") or "").strip()
     if len(q) < 1:
         return jsonify({"cards": [], "users": []})
-    like = f"%{q}%"
 
     cards = (
         _card_search_query(q, "relevance")

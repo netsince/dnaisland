@@ -1,3 +1,6 @@
+import re
+from datetime import datetime
+
 from flask import (
     Blueprint,
     abort,
@@ -13,10 +16,8 @@ from flask_login import current_user, login_required
 from sqlalchemy import func, or_
 from sqlalchemy.orm import aliased, joinedload
 
+from ..decorators import block_if_muted
 from ..extensions import db
-import re
-from datetime import datetime
-
 from ..models import (
     Card,
     Notification,
@@ -32,8 +33,7 @@ from ..models import (
 from ..services.image_service import compress_image
 from ..services.notification_service import notify
 from ..services.sticker_service import sanitize_stickers
-from ..utils import get_user_by_username, toggle_relation, respond, rate_hit
-from ..decorators import block_if_muted
+from ..utils import get_user_by_username, rate_hit, respond, toggle_relation
 
 # 配图：仅支持单图
 TEA_MAX_IMAGES = 1
@@ -176,8 +176,8 @@ def _build_stats(posts):
             TeaPostLike.user_id == current_user.id,
             TeaPostLike.post_id.in_(ids),
         ).all()
-        for l in liked:
-            stats[l.post_id]["liked"] = True
+        for like in liked:
+            stats[like.post_id]["liked"] = True
         faved = TeaPostFavorite.query.filter(
             TeaPostFavorite.user_id == current_user.id,
             TeaPostFavorite.post_id.in_(ids),

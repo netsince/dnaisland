@@ -1,8 +1,6 @@
 from datetime import datetime
-import pytest
-from sqlalchemy.ext.compiler import compiles
-from sqlalchemy.dialects.mysql import LONGTEXT
 
+import pytest
 from app import create_app, db
 from app.config import Config
 from app.models import (
@@ -18,6 +16,8 @@ from app.models import (
     TeaTopic,
     User,
 )
+from sqlalchemy.dialects.mysql import LONGTEXT
+from sqlalchemy.ext.compiler import compiles
 
 
 @compiles(LONGTEXT, "sqlite")
@@ -91,7 +91,7 @@ def test_teahouse_models_create_and_relations(app):
         topic = TeaTopic(name="AI讨论", post_count=1)
         db.session.add(topic)
         db.session.commit()
-        
+
         post_topic = TeaPostTopic(post_id=orig_post.id, topic_id=topic.id)
         db.session.add(post_topic)
         db.session.commit()

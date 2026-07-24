@@ -4,6 +4,7 @@
 扣费：完成后按实产张数 × 模型每图积分扣减（写入 PointTransaction）。
 """
 
+import contextlib
 import json
 
 from flask import (
@@ -22,12 +23,11 @@ from ..extensions import db
 from ..models import GenerationLog, GenerationModel, PointTransaction
 from ..services.image_gen_service import generate_images
 from ..services.image_service import (
-    send_webp,
-    data_url_to_webp_bytes,
     raw_bytes_to_webp_data_url,
+    send_webp,
 )
 from ..services.site_service import get_site_config
-from ..utils import is_xhr, ensure_owner_or_admin
+from ..utils import ensure_owner_or_admin, is_xhr
 
 image_gen_bp = Blueprint("image_gen", __name__, url_prefix="/image-gen")
 
@@ -144,10 +144,8 @@ def generate():
             data = f.read()
             if data:
                 references.append((f.filename, data, f.mimetype or "image/png"))
-                try:
+                with contextlib.suppress(Exception):
                     ref_b64_list.append(raw_bytes_to_webp_data_url(data))
-                except Exception:
-                    pass
     ref_count = len(references)
     if ref_count:
         labels = "、".join(f"图片{i + 1}" for i in range(ref_count))
@@ -255,6 +253,7 @@ def generate():
 
 from sqlalchemy.orm import defer
 
+
 @image_gen_bp.route("/api/logs")
 @login_required
 def api_logs():
@@ -270,31 +269,31 @@ def api_logs():
         .paginate(page=page, per_page=per_page, error_out=False)
     )
     items = []
-    for l in pagination.items:
-        img_count = (l.count or 1) if l.status != "failed" else 0
-        ref_count = l.references_count or 0
+    for item in pagination.items:
+        img_count = (item.count or 1) if item.status != "failed" else 0
+        ref_count = item.references_count or 0
         if img_count > 0:
             items.append({
-                "id": l.id,
+                "id": item.id,
                 "first_image": url_for(
-                    "image_gen.output_image", log_id=l.id, idx=0
+                    "image_gen.output_image", log_id=item.id, idx=0
                 ),
                 "images": [
-                    url_for("image_gen.output_image", log_id=l.id, idx=i)
+                    url_for("image_gen.output_image", log_id=item.id, idx=i)
                     for i in range(img_count)
                 ],
                 "references": [
-                    url_for("image_gen.reference_image", log_id=l.id, idx=i)
+                    url_for("image_gen.reference_image", log_id=item.id, idx=i)
                     for i in range(ref_count)
                 ],
-                "prompt": l.prompt,
-                "model_name": l.model_name,
-                "size": l.size or "auto",
-                "count": l.count,
-                "points_spent": l.points_spent,
-                "status": l.status,
-                "created_at": l.created_at.strftime("%Y-%m-%d %H:%M"),
-                "detail_url": url_for("image_gen.log_detail", log_id=l.id),
+                "prompt": item.prompt,
+                "model_name": item.model_name,
+                "size": item.size or "auto",
+                "count": item.count,
+                "points_spent": item.points_spent,
+                "status": item.status,
+                "created_at": item.created_at.strftime("%Y-%m-%d %H:%M"),
+                "detail_url": url_for("image_gen.log_detail", log_id=item.id),
             })
     return jsonify({
         "ok": True,

@@ -15,7 +15,7 @@ from flask import url_for
 
 
 def describe_report_target(target_type: str, raw_id: str):
-    from ..models import Card, Comment, TeaPost, User
+    from ..models import Card, Comment, TeaPost
 
     target_type = (target_type or "").strip()
     if not raw_id:

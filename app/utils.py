@@ -78,7 +78,7 @@ def ensure_owner_or_admin(owner_id, message="无权访问该资源"):
         abort(403, description=message)
 
 
-_RATE_LIMITS = {}  # "scope:key" -> [timestamp, ...]
+_RATE_LIMITS: dict[str, list[float]] = {}  # "scope:key" -> [timestamp, ...]
 
 
 def rate_hit(scope, limit=5, per=60, key=None):

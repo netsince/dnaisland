@@ -3,8 +3,8 @@ import json
 import os
 import re
 import uuid
-
 from datetime import datetime
+
 from flask import (
     Blueprint,
     Response,
@@ -16,12 +16,12 @@ from flask import (
     redirect,
     render_template,
     request,
-    send_file,
     url_for,
 )
 from flask_login import current_user, login_required
 from sqlalchemy import func
 
+from ..decorators import block_if_muted
 from ..extensions import db
 from ..models import (
     Card,
@@ -48,8 +48,14 @@ from ..models.punishment import (
 from ..services.notification_service import notify, notify_super_admins
 from ..services.report_service import describe_report_target
 from ..services.sticker_service import sanitize_stickers
-from ..utils import get_user_by_username, status_counts, toggle_relation, is_xhr, respond, ensure_owner_or_admin
-from ..decorators import block_if_muted
+from ..utils import (
+    ensure_owner_or_admin,
+    get_user_by_username,
+    is_xhr,
+    respond,
+    status_counts,
+    toggle_relation,
+)
 
 # 审核状态徽章 HTML（与 macros/cards.html::status_badge 保持一致，供 AJAX 局部更新）
 STATUS_BADGE_HTML = {
@@ -57,12 +63,12 @@ STATUS_BADGE_HTML = {
     "rejected": '<span class="badge bg-danger">已拒绝</span>',
     "pending": '<span class="badge bg-warning text-dark">审核中</span>',
 }
-from ..services.image_service import compress_image, crop_square_and_compress, send_webp
 from ..services.card_service import (
     attach_covers,
     build_export_package,
     load_card_images,
 )
+from ..services.image_service import compress_image, crop_square_and_compress, send_webp
 
 user_bp = Blueprint("user", __name__)
 
@@ -308,7 +314,6 @@ def profile_edit():
 @user_bp.route("/my/punishments")
 @login_required
 def my_punishments():
-    from ..models import User as _User
 
     items = (
         Punishment.query.filter_by(user_id=current_user.id)
@@ -328,7 +333,6 @@ def my_punishments():
 @user_bp.route("/my/punishments/<int:punishment_id>/appeal", methods=["POST"])
 @login_required
 def punish_appeal(punishment_id):
-    from ..models import User as _User
 
     p = db.get_or_404(Punishment, punishment_id)
     if p.user_id != current_user.id:
@@ -356,6 +360,7 @@ def punish_appeal(punishment_id):
 @user_bp.route("/card/<card_id>")
 def card_detail(card_id):
     card = db.get_or_404(Card, card_id)
+    author = card.author
 
     is_owner = current_user.is_authenticated and current_user.id == card.author_id
     is_admin = current_user.is_authenticated and current_user.is_super_admin
@@ -560,7 +565,7 @@ def my_likes():
 @user_bp.route("/card/<card_id>/like", methods=["POST"])
 @login_required
 def card_like(card_id):
-    card = db.get_or_404(Card, card_id)
+    db.get_or_404(Card, card_id)
     now_active, count = toggle_relation(
         CardLike.query.filter_by(user_id=current_user.id, card_id=card_id).first(),
         CardLike(user_id=current_user.id, card_id=card_id),
@@ -579,7 +584,7 @@ def card_like(card_id):
 @user_bp.route("/card/<card_id>/favorite", methods=["POST"])
 @login_required
 def card_favorite(card_id):
-    card = db.get_or_404(Card, card_id)
+    db.get_or_404(Card, card_id)
     now_active, count = toggle_relation(
         CardFavorite.query.filter_by(user_id=current_user.id, card_id=card_id).first(),
         CardFavorite(user_id=current_user.id, card_id=card_id),

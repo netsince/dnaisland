@@ -14,6 +14,7 @@ from .points import KeyUsageLog, PointTransaction, RedemptionKey
 from .punishment import Punishment
 from .report import Report
 from .site import Article, SiteConfig
+from .sticker import Sticker, StickerSeries
 from .teahouse import (
     TeaPoll,
     TeaPollOption,
@@ -25,7 +26,6 @@ from .teahouse import (
     TeaPostTopic,
     TeaTopic,
 )
-from .sticker import Sticker, StickerSeries
 from .user import User, UserFollow
 from .verification_code import VerificationCode
 

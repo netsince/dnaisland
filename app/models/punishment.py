@@ -1,6 +1,5 @@
 from ..extensions import db
 
-
 # 处罚类型常量（可叠加）
 PUNISHMENT_TYPES = {
     "mute": "禁言",

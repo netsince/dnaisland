@@ -37,7 +37,7 @@ def compress_image(data_url: str, max_edge: int = 1024, quality: int = 80) -> st
     if max(w, h) > max_edge:
         scale = max_edge / max(w, h)
         img = img.resize(
-            (max(1, int(w * scale)), max(1, int(h * scale))), Image.LANCZOS
+            (max(1, int(w * scale)), max(1, int(h * scale))), Image.Resampling.LANCZOS
         )
     out = BytesIO()
     img.save(out, format="WEBP", quality=quality)
@@ -53,7 +53,7 @@ def crop_square_and_compress(data_url: str, size: int = 256, quality: int = 82) 
     left = (w - side) // 2
     top = (h - side) // 2
     img = img.crop((left, top, left + side, top + side))
-    img = img.resize((size, size), Image.LANCZOS)
+    img = img.resize((size, size), Image.Resampling.LANCZOS)
     out = BytesIO()
     img.save(out, format="WEBP", quality=quality)
     return _encode(out.getvalue(), mime="image/webp")
@@ -66,7 +66,7 @@ def raw_bytes_to_webp_data_url(raw_bytes: bytes, max_edge: int = 1024, quality: 
     if max(w, h) > max_edge:
         scale = max_edge / max(w, h)
         img = img.resize(
-            (max(1, int(w * scale)), max(1, int(h * scale))), Image.LANCZOS
+            (max(1, int(w * scale)), max(1, int(h * scale))), Image.Resampling.LANCZOS
         )
     out = BytesIO()
     img.save(out, format="WEBP", quality=quality)
@@ -100,7 +100,7 @@ def data_url_to_webp_bytes(data_url: str, max_edge: int = 1024, quality: int = 8
         if max(w, h) > max_edge:
             scale = max_edge / max(w, h)
             img = img.resize(
-                (max(1, int(w * scale)), max(1, int(h * scale))), Image.LANCZOS
+                (max(1, int(w * scale)), max(1, int(h * scale))), Image.Resampling.LANCZOS
             )
         out = BytesIO()
         img.save(out, format="WEBP", quality=quality)

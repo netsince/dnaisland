@@ -1,6 +1,6 @@
 from functools import wraps
 
-from flask import jsonify, redirect, request, url_for, flash
+from flask import flash, jsonify, redirect, request, url_for
 from flask_login import current_user
 
 from .utils import is_xhr
@@ -12,7 +12,7 @@ def super_admin_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         if not current_user.is_authenticated:
-            from flask import redirect, url_for, flash
+            from flask import flash, redirect, url_for
 
             flash("请先登录", "warning")
             return redirect(url_for("auth.login"))

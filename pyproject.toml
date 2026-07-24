@@ -59,6 +59,9 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 # 测试文件允许未使用的 fixture/导入
 "tests/*" = ["F401", "F811"]
+# 路由/脚本中为避免循环导入，刻意把部分 import 放在文件中部
+"app/routes/*.py" = ["E402"]
+"scripts/*" = ["E402"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -70,4 +73,10 @@ python_version = "3.13"
 ignore_missing_imports = true
 warn_unused_ignores = false
 exclude = ["migrations", ".venv"]
+
+# Flask-SQLAlchemy 在运行时动态生成 `db.Model` 基类，mypy 静态无法识别，
+# 属已知误报；模型文件仅用其声明表结构，故在此关闭 name-defined 以消噪。
+[[tool.mypy.overrides]]
+module = "app.models.*"
+disable_error_code = ["name-defined"]
 

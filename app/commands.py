@@ -1,7 +1,7 @@
 import click
 
 from .extensions import bcrypt, db
-from .models import SiteConfig, User
+from .models import User
 from .services.site_service import get_site_config
 
 

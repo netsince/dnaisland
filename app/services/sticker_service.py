@@ -44,8 +44,7 @@ def render_stickers_html(text):
         if not data:
             return ""
         return (
-            '<img class="dna-sticker" src="%s" alt="%s" title="%s">'
-            % (data, code, code)
+            f'<img class="dna-sticker" src="{data}" alt="{code}" title="{code}">'
         )
 
     return _STICKER_TOKEN_RE.sub(_repl, text)

@@ -1,7 +1,17 @@
 import os
 
 from dotenv import load_dotenv
-from flask import Flask, current_app, g, jsonify, redirect, request, url_for
+from flask import (
+    Flask,
+    current_app,
+    flash,
+    g,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
 from flask_login import current_user, logout_user
 from markupsafe import Markup
 
@@ -64,8 +74,8 @@ def create_app(config_object=None):
         publish_bp,
         sticker_bp,
         system_bp,
-        user_bp,
         teahouse_bp,
+        user_bp,
     )
 
     app.register_blueprint(main_bp)
@@ -85,7 +95,7 @@ def create_app(config_object=None):
 
     import re as _re
 
-    from markupsafe import Markup, escape
+    from markupsafe import escape
 
     from .services.sticker_service import render_stickers_html
 

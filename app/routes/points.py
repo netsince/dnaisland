@@ -10,12 +10,12 @@ import time
 
 from flask import (
     Blueprint,
+    flash,
+    redirect,
     render_template,
     request,
-    redirect,
-    url_for,
-    flash,
     session,
+    url_for,
 )
 from flask_login import current_user, login_required
 
@@ -28,7 +28,7 @@ points_bp = Blueprint("points", __name__, url_prefix="/points")
 # ---------------------------------------------------------------------------
 # 限流状态（进程内）
 # ---------------------------------------------------------------------------
-_REDEEM_STATE = {}  # user_id -> {"fail_streak":int, "locked_until":float}
+_REDEEM_STATE: dict[int, dict[str, float]] = {}  # user_id -> {"fail_streak":int, "locked_until":float}
 
 MAX_KEYS_PER_REQUEST = 50
 MAX_REQUESTS_PER_MINUTE = 2

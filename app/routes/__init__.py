@@ -6,8 +6,8 @@ from .points import points_bp
 from .publish import publish_bp
 from .sticker import sticker_bp
 from .system import system_bp
-from .user import user_bp
 from .teahouse import teahouse_bp
+from .user import user_bp
 
 __all__ = [
     "auth_bp",

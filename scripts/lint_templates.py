@@ -18,8 +18,8 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
-from jinja2 import nodes
 from app import create_app
+from jinja2 import nodes
 
 # Jinja2 内建名字（可被当作函数调用，且无需注册）
 JINJA_BUILTINS = {

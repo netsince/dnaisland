@@ -1,12 +1,12 @@
-from datetime import datetime, timedelta, timezone
-import pytest
-from sqlalchemy.ext.compiler import compiles
-from sqlalchemy.dialects.mysql import LONGTEXT
+from datetime import UTC, datetime, timedelta, timezone
 
+import pytest
 from app import create_app, db
 from app.config import Config
 from app.models.card import Card, Comment, CommentLike
 from app.models.user import User
+from sqlalchemy.dialects.mysql import LONGTEXT
+from sqlalchemy.ext.compiler import compiles
 
 
 @compiles(LONGTEXT, "sqlite")
@@ -257,7 +257,7 @@ def test_card_comments_api_latest_hottest_and_pin_priority(client, app):
         db.session.add(card)
         db.session.commit()
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         # cm1: 最早发布，0 赞，未置顶
         cm1 = Comment(card_id=card_id, user_id=author.id, content="cm1 earliest", created_at=now - timedelta(minutes=10))
         # cm2: 中间发布，有 2 个点赞，未置顶

@@ -2,20 +2,17 @@ import base64
 import json
 import re
 import secrets
-import string
-
-from datetime import date, datetime
+from datetime import datetime
 
 from flask import (
     Blueprint,
+    Response,
     abort,
     flash,
     redirect,
     render_template,
     request,
     url_for,
-    Response,
-    session,
 )
 from flask_login import current_user
 from sqlalchemy import func
@@ -26,9 +23,7 @@ from ..models import (
     Article,
     Card,
     CardDialogueStyle,
-    CardFavorite,
     CardImage,
-    CardLike,
     CardTag,
     Comment,
     GenerationLog,
@@ -39,16 +34,15 @@ from ..models import (
     Punishment,
     RedemptionKey,
     Report,
-    SiteConfig,
     Sticker,
     StickerSeries,
-    TeaPost,
-    TeaPostLike,
-    TeaPostFavorite,
-    TeaPostTopic,
-    TeaPostImage,
     TeaPoll,
     TeaPollVote,
+    TeaPost,
+    TeaPostFavorite,
+    TeaPostImage,
+    TeaPostLike,
+    TeaPostTopic,
     User,
 )
 from ..models.punishment import (
@@ -287,14 +281,14 @@ def keys_list():
         page=usage_page, per_page=30, error_out=False
     )
     usage_logs = usage.items
-    user_ids = [l.user_id for l in usage_logs if l.user_id]
+    user_ids = [log.user_id for log in usage_logs if log.user_id]
     users_map = (
         {u.id: u.username for u in User.query.filter(User.id.in_(user_ids)).all()}
         if user_ids
         else {}
     )
-    for l in usage_logs:
-        l.username = users_map.get(l.user_id, f"UID{l.user_id}") if l.user_id else "—"
+    for log in usage_logs:
+        log.username = users_map.get(log.user_id, f"UID{log.user_id}") if log.user_id else "—"
 
     return render_template(
         "admin/keys.html",
@@ -528,14 +522,14 @@ def image_logs():
         GenerationLog.created_at.desc()
     ).paginate(page=page, per_page=20, error_out=False)
     logs = pagination.items
-    user_ids = [l.user_id for l in logs]
+    user_ids = [log.user_id for log in logs]
     users_map = (
         {u.id: u.nickname for u in User.query.filter(User.id.in_(user_ids)).all()}
         if user_ids
         else {}
     )
-    for l in logs:
-        l.nickname = users_map.get(l.user_id, f"UID{l.user_id}")
+    for log in logs:
+        log.nickname = users_map.get(log.user_id, f"UID{log.user_id}")
     return render_template(
         "admin/image_logs.html", pagination=pagination, logs=logs
     )
@@ -658,7 +652,7 @@ def punish_appeal_resolve(punishment_id):
         db.session.commit()
         notify(
             p.user_id,
-            f"你的申诉未通过。"
+            "你的申诉未通过。"
             + (f"管理员回复：{reply}" if reply else ""),
             type_="punish",
         )
@@ -1347,7 +1341,7 @@ def system_config():
         labels = request.form.getlist("hero_button_label")
         urls = request.form.getlist("hero_button_url")
         buttons = []
-        for lab, u in zip(labels, urls):
+        for lab, u in zip(labels, urls, strict=False):
             lab = (lab or "").strip()
             u = (u or "").strip()
             if lab:

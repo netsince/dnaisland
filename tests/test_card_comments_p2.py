@@ -1,14 +1,14 @@
 import io
 import os
-import pytest
-from sqlalchemy.ext.compiler import compiles
-from sqlalchemy.dialects.mysql import LONGTEXT
 
+import pytest
 from app import create_app, db
 from app.config import Config
 from app.models.card import Card, Comment
 from app.models.notification import Notification
 from app.models.user import User
+from sqlalchemy.dialects.mysql import LONGTEXT
+from sqlalchemy.ext.compiler import compiles
 
 
 @compiles(LONGTEXT, "sqlite")
@@ -117,7 +117,7 @@ def test_comment_reply_notification(app, client):
     # u3 回复 u2 的评论 -> 应给 u2 生成 reply 通知
     client.post("/auth/login", data={"identifier": "user3", "password": "pass123"})
     res = client.post(
-        f"/card/card-2/comment",
+        "/card/card-2/comment",
         data={"content": "这是回复内容", "reply_to_id": cm_id},
     )
     assert res.status_code in (200, 302)

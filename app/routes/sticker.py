@@ -1,7 +1,7 @@
 """表情包公开 API：供前端面板与评论渲染使用。"""
 from flask import Blueprint, jsonify
 
-from ..models import Sticker, StickerSeries
+from ..models import StickerSeries
 
 sticker_bp = Blueprint("sticker", __name__, url_prefix="/stickers")
 

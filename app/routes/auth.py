@@ -1,4 +1,3 @@
-import datetime
 
 from email_validator import EmailNotValidError, validate_email
 from flask import (
@@ -15,7 +14,7 @@ from flask_login import current_user, login_required, login_user, logout_user
 from sqlalchemy import or_
 
 from ..extensions import db, login_manager
-from ..models import User, VerificationCode
+from ..models import User
 from ..services.email import send_verification_email
 from ..services.site_service import check_email_allowed
 from ..services.verification_code_service import (

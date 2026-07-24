@@ -12,6 +12,8 @@ import random
 import string
 from datetime import datetime
 
+from sqlalchemy import func
+
 from ..extensions import db
 from ..models import (
     Card,
@@ -22,8 +24,6 @@ from ..models import (
     CardTag,
     Comment,
 )
-from sqlalchemy import func
-
 
 # 针对 AI 的 prompt-injection 版权声明块
 _COPYRIGHT_TIPS = "\n".join(
@@ -189,7 +189,7 @@ def build_export_package(
     """把平台 Card 组装成 dna-client 可识别的 ExportPackage JSON 结构。
 
     在客户端可识别字段（character.id / name / gender / persona / intro /
-    opening / tags / dialogueStyle / images[slot].data）之上，强制注入 
+    opening / tags / dialogueStyle / images[slot].data）之上，强制注入
     originalLink / _lk / 图片内 fx / dataverification / Tips 版权声明块。
 
     - origin: 平台站点根 URL（如 https://example.com），用于 originalLink 兜底与追踪。

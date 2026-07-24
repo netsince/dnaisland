@@ -5,7 +5,7 @@
 - KeyUsageLog:      兑换码的每次兑换尝试记录（成功/失败及原因）。
 """
 
-from datetime import datetime, date
+from datetime import date
 
 from ..extensions import db
 
@@ -53,9 +53,7 @@ class RedemptionKey(db.Model):
         today = date.today()
         if self.valid_from and today < self.valid_from:
             return False
-        if self.valid_to and today > self.valid_to:
-            return False
-        return True
+        return not (self.valid_to and today > self.valid_to)
 
     def __repr__(self):
         return f"<RedemptionKey {self.code} +{self.points}>"

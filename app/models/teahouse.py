@@ -4,7 +4,6 @@ from sqlalchemy.dialects.mysql import LONGTEXT
 
 from ..extensions import db
 
-
 # 发帖后允许编辑的时间窗口（分钟）
 TEA_EDIT_WINDOW = timedelta(minutes=15)
 
@@ -46,9 +45,7 @@ class TeaPost(db.Model):
             return False
         if self.is_deleted or self.is_hidden:
             return False
-        if (datetime.utcnow() - self.created_at) > TEA_EDIT_WINDOW:
-            return False
-        return True
+        return not ((datetime.utcnow() - self.created_at) > TEA_EDIT_WINDOW)
     # 父帖（被回复的那条）；replies 反向得到直接子回复
     parent = db.relationship(
         "TeaPost", remote_side=[id], foreign_keys=[parent_id], backref="replies"

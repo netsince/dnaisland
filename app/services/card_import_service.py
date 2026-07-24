@@ -12,7 +12,7 @@ def parse_export_package(json_str: str) -> dict:
     try:
         data = json.loads(json_str)
     except json.JSONDecodeError:
-        raise ValueError("JSON 格式无效，无法解析")
+        raise ValueError("JSON 格式无效，无法解析") from None
 
     if not isinstance(data, dict):
         raise ValueError("无效的导出文件格式")
@@ -62,10 +62,7 @@ def parse_export_package(json_str: str) -> dict:
                 )
 
     tags = character.get("tags") or []
-    if isinstance(tags, list):
-        tags = [str(t) for t in tags]
-    else:
-        tags = []
+    tags = [str(t) for t in tags] if isinstance(tags, list) else []
 
     # 注意：不读取 JSON 中的 id，平台始终自动分配新 id
     return {
