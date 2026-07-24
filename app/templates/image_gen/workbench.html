@@ -429,7 +429,10 @@ object-fit:contain;border-radius:10px;border:1px solid #2a2a3a}
  var container = document.createElement('div');
  container.className = 'ig-mitem';
  var a = document.createElement('a');
- a.className = 'ig-mcard dna-img-fade';
+ a.className = 'ig-mcard dna-img-fade dna-img-skeleton';
+ if (l.size && l.size !== 'auto') {
+ a.setAttribute('data-aspect', l.size);
+ }
  a.href = l.detail_url;
  var firstImg = l.first_image || (l.images && l.images[0]);
  a.innerHTML = '<img src="' + firstImg + '" alt="生成图" class="dna-img-fade__img" loading="lazy" decoding="async">' +
@@ -557,23 +560,23 @@ object-fit:contain;border-radius:10px;border:1px solid #2a2a3a}
 function onWorkbenchPageLoaded() { initWorkbenchImgFade(); }
 document.addEventListener('dna:page-loaded', onWorkbenchPageLoaded);
 
- function initWorkbenchImgFade(scope) {
- var cards = (scope || document).querySelectorAll('.ig-mcard.dna-img-fade');
- cards.forEach(function (card) {
- var img = card.querySelector('img');
- if (!img) return;
- if (img.complete) {
- card.classList.add('is-loaded');
- } else {
- img.addEventListener('load', function () {
- card.classList.add('is-loaded');
- });
- img.addEventListener('error', function () {
- card.classList.add('is-loaded');
- });
- }
- });
- }
+  function initWorkbenchImgFade(scope) {
+  var cards = (scope || document).querySelectorAll('.ig-mcard.dna-img-fade');
+  cards.forEach(function (card) {
+  var img = card.querySelector('img');
+  if (!img) return;
+  function markLoaded() {
+    card.classList.remove('dna-img-skeleton');
+    card.classList.add('is-loaded');
+  }
+  if (img.complete) {
+  markLoaded();
+  } else {
+  img.addEventListener('load', markLoaded);
+  img.addEventListener('error', markLoaded);
+  }
+  });
+  }
 
 // 离开页面（Pjax 软导航替换 main 之前）清理挂在 document/window 上的全局监听器，避免多次进入后累积重复触发。
 document.addEventListener('dna:page-unload', function () {

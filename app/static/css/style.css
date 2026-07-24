@@ -56,6 +56,33 @@
   --bs-emphasis-color: #ffffff;
 }
 
+/* ---------------- 生图卡片宽高比预占位与骨架屏 ---------------- */
+.ig-mcard[data-aspect="1:1"], .mg-item[data-aspect="1:1"] { aspect-ratio: 1 / 1; }
+.ig-mcard[data-aspect="3:2"], .mg-item[data-aspect="3:2"] { aspect-ratio: 3 / 2; }
+.ig-mcard[data-aspect="2:3"], .mg-item[data-aspect="2:3"] { aspect-ratio: 2 / 3; }
+.ig-mcard[data-aspect="4:3"], .mg-item[data-aspect="4:3"] { aspect-ratio: 4 / 3; }
+.ig-mcard[data-aspect="3:4"], .mg-item[data-aspect="3:4"] { aspect-ratio: 3 / 4; }
+.ig-mcard[data-aspect="16:9"], .mg-item[data-aspect="16:9"] { aspect-ratio: 16 / 9; }
+.ig-mcard[data-aspect="9:16"], .mg-item[data-aspect="9:16"] { aspect-ratio: 9 / 16; }
+
+.dna-img-skeleton {
+  background: linear-gradient(90deg, var(--dna-surface-solid, #121215) 25%, var(--dna-border, #27272a) 50%, var(--dna-surface-solid, #121215) 75%);
+  background-size: 200% 100%;
+  animation: dnaSkeletonPulse 1.8s infinite ease-in-out;
+}
+@keyframes dnaSkeletonPulse {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.dna-img-fade__img {
+  opacity: 0;
+  transition: opacity 0.35s ease-in-out;
+}
+.dna-img-fade.is-loaded .dna-img-fade__img {
+  opacity: 1;
+}
+
 /* ---------------- 全局背景 ---------------- */
 body {
   background-color: var(--dna-bg);

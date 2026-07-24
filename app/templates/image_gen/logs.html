@@ -135,12 +135,16 @@
 
     row.querySelectorAll('.mg-item img').forEach(function (img) {
       var p = img.closest('.mg-item');
+      if (!p) return;
+      function markLoaded() {
+        p.classList.remove('dna-img-skeleton');
+        p.classList.add('is-loaded');
+      }
       if (img.complete) {
-        if (p) p.classList.add('is-loaded');
+        markLoaded();
       } else {
-        img.addEventListener('load', function () {
-          if (p) p.classList.add('is-loaded');
-        });
+        img.addEventListener('load', markLoaded);
+        img.addEventListener('error', markLoaded);
       }
     });
   }
@@ -210,7 +214,10 @@
           var firstImage = l.first_image;
           if (!firstImage) return;
           var item = document.createElement('div');
-          item.className = 'mg-item dna-img-fade';
+          item.className = 'mg-item dna-img-fade dna-img-skeleton';
+          if (l.size && l.size !== 'auto') {
+            item.setAttribute('data-aspect', l.size);
+          }
           var stClass = l.status === 'success' ? 'ok' : (l.status === 'partial' ? 'part' : 'fail');
           var stText = l.status === 'success' ? '成功' : (l.status === 'partial' ? '部分' : '失败');
           item.innerHTML = '<a href="/image-gen/logs/' + l.id + '" style="display:block">' +
