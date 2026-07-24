@@ -575,48 +575,48 @@ body, .navbar, .footer, .card, .dna-tile, .dna-hero,
    霓虹深色调平滑切换为清爽浅色调，同时保持品牌渐变与质感。
    ============================================================ */
 [data-bs-theme="light"] {
-  /* 品牌色保持霓虹质感（略提亮以适配浅底） */
-  --dna-accent: #9333ea;
-  --dna-accent-rgb: 147, 51, 234;
-  --dna-accent-2: #db2777;
-  --dna-accent-3: #0891b2;
-  --dna-grad: linear-gradient(135deg, #9333ea 0%, #db2777 55%, #ec4899 100%);
-  --dna-grad-soft: linear-gradient(135deg, rgba(147, 51, 234, .14), rgba(219, 39, 119, .1));
+  /* 品牌色 —— 极简黑白灰 (浅色模式) */
+  --dna-accent: #09090b;
+  --dna-accent-rgb: 9, 9, 11;
+  --dna-accent-2: #18181b;
+  --dna-accent-3: #27272a;
+  --dna-grad: linear-gradient(180deg, #09090b 0%, #18181b 100%);
+  --dna-grad-soft: rgba(0, 0, 0, 0.04);
 
   /* 背景与表面 */
-  --dna-bg: #f6f4fb;
-  --dna-bg-2: #ece7f6;
-  --dna-surface: rgba(255, 255, 255, .82);
+  --dna-bg: #ffffff;
+  --dna-bg-2: #fafafa;
+  --dna-surface: #f4f4f5;
   --dna-surface-solid: #ffffff;
-  --dna-border: rgba(28, 22, 54, .1);
-  --dna-border-strong: rgba(28, 22, 54, .16);
+  --dna-border: #e4e4e7;
+  --dna-border-strong: #d4d4d8;
 
   /* 文本 */
-  --dna-text: #211c33;
-  --dna-muted: #6a6385;
+  --dna-text: #09090b;
+  --dna-muted: #71717a;
 
-  --dna-shadow: 0 18px 48px -24px rgba(40, 20, 80, .28);
-  --dna-glow: 0 0 0 1px rgba(147, 51, 234, .3), 0 12px 30px -12px rgba(147, 51, 234, .4);
+  --dna-radius: 8px;
+  --dna-radius-sm: 6px;
+  --dna-shadow: none;
+  --dna-glow: none;
 
   /* —— 覆盖 Bootstrap 主题变量 —— */
   --bs-body-bg: var(--dna-bg);
   --bs-body-color: var(--dna-text);
   --bs-border-color: var(--dna-border);
-  --bs-primary: #9333ea;
-  --bs-primary-rgb: 147, 51, 234;
-  --bs-link-color: #7e22ce;
-  --bs-link-hover-color: #9333ea;
-  --bs-emphasis-color: #1a1526;
+  --bs-primary: #09090b;
+  --bs-primary-rgb: 9, 9, 11;
+  --bs-link-color: #09090b;
+  --bs-link-hover-color: #18181b;
+  --bs-emphasis-color: #000000;
 }
 
 [data-bs-theme="light"] body {
   color: var(--dna-text);
-  background-image:
-    radial-gradient(60vw 60vw at 12% -10%, rgba(147, 51, 234, .12), transparent 60%),
-    radial-gradient(55vw 55vw at 100% 0%, rgba(8, 145, 178, .1), transparent 55%),
-    radial-gradient(50vw 50vw at 80% 110%, rgba(219, 39, 119, .1), transparent 55%);
+  background-color: var(--dna-bg);
+  background-image: none;
 }
-[data-bs-theme="light"] ::selection { background: rgba(147, 51, 234, .25); color: #1a1526; }
+[data-bs-theme="light"] ::selection { background: rgba(0, 0, 0, 0.15); color: #000000; }
 
 /* 导航栏 */
 [data-bs-theme="light"] .navbar.bg-dark {
@@ -1051,17 +1051,17 @@ body.is-mobile-plus-open header {
   border-radius: 20px;
   font-size: 0.84rem;
   font-weight: 500;
-  color: var(--dna-muted, #94a3b8);
-  background: var(--dna-surface, #1e1b30);
-  border: 1px solid var(--dna-border, rgba(255,255,255,0.08));
+  color: var(--dna-muted);
+  background: var(--dna-surface);
+  border: 1px solid var(--dna-border);
   text-decoration: none !important;
   transition: all 0.18s ease;
 }
 .dna-tab-pill:hover,
 .dna-tab-pill.active {
-  color: #fff;
-  background: var(--dna-accent, #a855f7);
-  border-color: var(--dna-accent, #a855f7);
+  color: var(--bs-body-bg) !important;
+  background: var(--bs-body-color) !important;
+  border-color: var(--bs-body-color) !important;
 }
 
 /* 红心 Pulse 弹跳动画 */
