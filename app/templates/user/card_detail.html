@@ -880,11 +880,13 @@
           delete form.dataset.replyToId;
           resetImageSelection();
           updateCharCount();
-          emojiBar.classList.remove('show');
           // 重置并重新加载评论列表
           page = 1; hasNext = true;
           body.innerHTML = '<div class="text-center text-muted py-3">加载中…</div>';
           loadComments();
+          if (typeof showToast === 'function') {
+            showToast('评论发布成功', 'success');
+          }
         } else {
           if (typeof showToast === 'function') {
             showToast(data.error || '发布失败', 'danger');
