@@ -24,7 +24,50 @@ prod = [
     "gunicorn>=23.0.0 ; sys_platform != 'win32'",
     "waitress>=3.0.0 ; sys_platform == 'win32'",
 ]
+# 开发期检查工具： ruff（lint+格式化）、mypy（类型检查）、pytest（测试）
+# 安装： uv sync --extra dev   或   pip install ".[dev]"
+dev = [
+    "ruff>=0.14.0",
+    "mypy>=1.15.0",
+    "pytest>=8.0.0",
+]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+
+# ---------------- ruff：一站式 lint + 格式化 ----------------
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+src = ["app", "tests", "scripts", "migrations"]
+exclude = [
+    ".venv",
+    ".git",
+    "__pycache__",
+    "migrations",          # 自动生成的迁移脚本，不纳入 lint
+    "*.pyc",
+]
+
+[tool.ruff.lint]
+# 启用的规则集（E 错误、F 未定义名、W 警告、I import 排序、UP 现代化写法、B 混淆写法、C4 简洁写法）
+select = ["E", "F", "W", "I", "UP", "B", "C4", "SIM"]
+ignore = [
+    "E501",                # 行长度交给格式化器处理
+    "B008",                # Flask 路由装饰器常触发（如 @app.route(...)）
+]
+
+[tool.ruff.lint.per-file-ignores]
+# 测试文件允许未使用的 fixture/导入
+"tests/*" = ["F401", "F811"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+# ---------------- mypy：静态类型检查 ----------------
+[tool.mypy]
+python_version = "3.13"
+ignore_missing_imports = true
+warn_unused_ignores = false
+exclude = ["migrations", ".venv"]
 
