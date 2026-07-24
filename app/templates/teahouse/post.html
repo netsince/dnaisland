@@ -10,9 +10,6 @@
   <div class="col-12 col-lg-8">
     <div class="d-flex align-items-center justify-content-between mb-3">
      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('teahouse.index') }}">← 返回茶馆</a>
-     {% if current_user.is_authenticated %}
-     <a class="btn btn-sm btn-outline-warning" href="{{ url_for('teahouse.favorites') }}">★ 我的收藏</a>
-     {% endif %}
     </div>
 
     {# 帖子链：从最顶上的原帖一直追溯到当前帖，每条都可点击跳转 #}
@@ -40,24 +37,16 @@
       </div>
     {% endif %}
 
-    {# 回复触发卡片 / 按钮 #}
+    {# 回复触发：仅保留小型“发表回复”按钮（点击打开回复抽屉），移除原卡片式触发器 #}
     {% if current_user.is_authenticated and teapost_visible(post) %}
-    <div class="card mb-3 border-secondary border-opacity-25 shadow-sm" style="cursor: pointer;"
-         data-tea-compose-trigger
-         data-title="回复 @{{ post.author.display_name }}"
-         data-action="{{ url_for('teahouse.reply', post_id=post.id) }}"
-         data-btn-text="回复"
-         data-placeholder="回复 @{{ post.author.username }}…">
-      <div class="card-body p-3 d-flex align-items-center gap-3">
-        {% if current_user.avatar %}
-        <img src="{{ url_for('user.avatar', user_id=current_user.id) }}" alt="头像" class="tea-compose__avatar rounded-circle">
-        {% else %}
-        <div class="tea-compose__avatar-ph rounded-circle bg-secondary text-light d-flex align-items-center justify-content-center">{{ current_user.display_name[:1] }}</div>
-        {% endif %}
-        <span class="text-muted small flex-grow-1">回复 @{{ post.author.username }}…</span>
-        <button type="button" class="btn btn-sm btn-primary px-3 rounded-pill fw-semibold">💬 发表回复</button>
-      </div>
-    </div>
+    <button type="button" class="btn btn-sm btn-primary rounded-pill px-2 mb-3"
+            data-tea-compose-trigger
+            data-title="回复 @{{ post.author.display_name }}"
+            data-action="{{ url_for('teahouse.reply', post_id=post.id) }}"
+            data-btn-text="回复"
+            data-placeholder="回复 @{{ post.author.username }}…">
+      💬 发表回复
+    </button>
     {% endif %}
 
     {# 回帖列表（扁平）+ 排序切换：只列当前帖自己的回帖 #}
