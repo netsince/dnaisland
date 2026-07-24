@@ -24,6 +24,7 @@ from ..extensions import db
 from ..models import GenerationLog, GenerationModel, PointTransaction
 from ..services.image_gen_service import generate_images
 from ..services.image_service import (
+    data_url_to_bytes_and_mime,
     data_url_to_webp_bytes,
     raw_bytes_to_webp_data_url,
 )
@@ -39,13 +40,12 @@ ASPECT_TO_SIZE = {
     "1:1": "1024x1024",
     "3:2": "1536x1024",
     "2:3": "1024x1536",
-    "4:3": "1360x1024",
-    "3:4": "1024x1360",
-    "16:9": "1824x1024",
-    "9:16": "1024x1824",
-    "auto": None,
+    "4:3": "1408x1024",
+    "3:4": "1024x1408",
+    "16:9": "1792x1024",
+    "9:16": "1024x1792",
 }
-VALID_ASPECTS = list(ASPECT_TO_SIZE.keys())
+VALID_ASPECTS = tuple(["auto"] + list(ASPECT_TO_SIZE.keys()))
 MAX_REFERENCES = 5
 MAX_COUNT = 2
 
@@ -78,14 +78,16 @@ def workbench():
 
 
 def _serve_webp_from_data_url(data_url):
-    """把某条生图记录的 base64 Data URL 转 WEBP 后以图片形式发送。"""
+    """把某条生图记录的 base64 Data URL 转为二进制发送（带 HTTP 强缓存）。"""
     if not data_url:
         abort(404)
     try:
-        webp = data_url_to_webp_bytes(data_url)
+        raw, mime = data_url_to_bytes_and_mime(data_url)
     except Exception:
         abort(404)
-    return send_file(BytesIO(webp), mimetype="image/webp")
+    resp = send_file(BytesIO(raw), mimetype=mime, max_age=86400)
+    resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    return resp
 
 
 @image_gen_bp.route("/output/<int:log_id>/<int:idx>")
