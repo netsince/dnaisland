@@ -87,7 +87,7 @@
               </button>
             </form>
             {% endif %}
-            <button class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1 rounded-pill dna-action-secondary" id="exportClipboardBtn"
+            <button class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1 rounded-pill dna-action-secondary js-export-card"
                     data-export-url="{{ url_for('user.card_export', card_id=card.id) }}" style="padding:5px 12px;">
               <i class="bi bi-clipboard"></i>
               <span>复制卡片</span>
@@ -106,6 +106,39 @@
               <i class="bi bi-chat-square"></i>
               <span><span class="dna-act-label">评论（</span><span class="js-toggle-count">{{ comment_count }}</span><span class="dna-act-label">）</span></span>
             </button>
+
+            {# 移动端“更多”菜单：将桌面端被收起的 关注/复制/举报 收拢于此，避免手机无法交互 #}
+            <div class="dropdown dropup d-lg-none" style="flex:1 1 0;">
+              <button class="btn btn-sm btn-outline-secondary d-flex align-items-center justify-content-center gap-1 rounded-pill w-100" type="button" data-bs-toggle="dropdown" aria-expanded="false" style="padding-left:0;padding-right:0;">
+                <i class="bi bi-three-dots"></i><span>更多</span>
+              </button>
+              <ul class="dropdown-menu dropdown-menu-end" style="min-width:13rem;">
+                {% if not is_owner and author %}
+                <li>
+                  <form method="post" action="{{ url_for('user.user_follow', username=author.username) }}" class="js-toggle m-0">
+                    <button type="submit" class="dropdown-item d-flex align-items-center gap-2"
+                            data-on-icon="bi-person-dash" data-off-icon="bi-person-plus"
+                            data-label-on="取消关注" data-label-off="关注作者">
+                      <i class="bi bi-person-{% if following %}dash{% else %}plus{% endif %} js-toggle-icon"></i>
+                      <span class="js-toggle-label">{{ '取消关注' if following else '关注作者' }}</span>
+                    </button>
+                  </form>
+                </li>
+                {% endif %}
+                <li>
+                  <button type="button" class="dropdown-item d-flex align-items-center gap-2 js-export-card"
+                          data-export-url="{{ url_for('user.card_export', card_id=card.id) }}">
+                    <i class="bi bi-clipboard"></i><span>复制卡片</span>
+                  </button>
+                </li>
+                <li>
+                  <a class="dropdown-item d-flex align-items-center gap-2" href="{{ url_for('user.report', type='card', id=card.id) }}">
+                    <i class="bi bi-flag"></i><span>举报</span>
+                  </a>
+                </li>
+              </ul>
+            </div>
+
             <a class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1 rounded-pill dna-action-secondary"
                href="{{ url_for('user.report', type='card', id=card.id) }}" style="padding:5px 12px;">
               <i class="bi bi-flag"></i>
@@ -871,8 +904,8 @@
 </script>
 <script>
  (function () {
- const btn = document.getElementById('exportClipboardBtn');
- if (!btn) return;
+ const buttons = document.querySelectorAll('.js-export-card');
+ buttons.forEach(function (btn) {
  btn.addEventListener('click', async function () {
  const original = btn.textContent;
  try {
@@ -911,6 +944,7 @@
  } finally {
  setTimeout(function () { btn.textContent = original; }, 1500);
  }
+ });
  });
  })();
 </script>
