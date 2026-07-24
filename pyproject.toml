@@ -24,3 +24,7 @@ prod = [
     "gunicorn>=23.0.0 ; sys_platform != 'win32'",
     "waitress>=3.0.0 ; sys_platform == 'win32'",
 ]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+
