@@ -34,6 +34,11 @@
   <button type="button" class="btn btn-sm btn-outline-secondary" data-pick-card>🎴 关联角色卡</button>
   <span class="tea-card-picked d-none ms-2 small"></span>
  </div>
+ <div class="d-flex align-items-center mt-2" data-image-picker>
+  <input type="hidden" name="images" value="">
+  <button type="button" class="btn btn-sm btn-outline-secondary" data-pick-image>🖼️ 配图</button>
+  <span class="tea-image-picked d-none ms-2 small"></span>
+ </div>
  <div class="d-flex justify-content-between align-items-center mt-2 d-none" id="postActions">
  <small class="text-muted" id="postCounterBox"><span id="counter">0</span> / {{ max_len }}</small>
  <button class="btn btn-primary btn-sm px-3" type="submit">发布</button>

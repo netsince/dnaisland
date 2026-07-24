@@ -934,6 +934,19 @@ function showToast(message, type) {
       <div class="modal-body">
         <textarea name="content" id="teahouseEditContent" class="form-control" rows="5" maxlength="280" required></textarea>
         <div class="form-text"><span id="teahouseEditCount">0</span>/280 · 仅发布后 15 分钟内可编辑</div>
+
+        <div class="d-flex align-items-center mt-2" data-card-picker>
+          <input type="hidden" name="card_id" value="">
+          <input type="hidden" name="card_removed" value="0">
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-pick-card>🎴 关联角色卡</button>
+          <span class="tea-card-picked d-none ms-2 small"></span>
+        </div>
+        <div class="d-flex align-items-center mt-2" data-image-picker>
+          <input type="hidden" name="images" value="">
+          <input type="hidden" name="image_removed" value="0">
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-pick-image>🖼️ 配图</button>
+          <span class="tea-image-picked d-none ms-2 small"></span>
+        </div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
@@ -971,7 +984,7 @@ function showToast(message, type) {
     btn.textContent = folded ? '展开全文' : '收起';
   });
 
-  // 编辑弹窗：填充内容并设置提交地址
+  // 编辑弹窗：填充内容并设置提交地址；预填关联卡与配图
   document.addEventListener('click', function (e) {
     var btn = e.target.closest && e.target.closest('.js-post-edit');
     if (!btn) return;
@@ -985,6 +998,43 @@ function showToast(message, type) {
     form.action = '/teahouse/' + id + '/edit';
     ta.value = content;
     if (counter) counter.textContent = content.length;
+
+    // 关联角色卡：从按钮 data 属性预填
+    var cardCard = btn.closest('.card');
+    var cardHid = form.querySelector('input[name=card_id]');
+    var cardRem = form.querySelector('input[name=card_removed]');
+    var cardLabel = form.querySelector('.tea-card-picked');
+    if (cardHid) cardHid.value = btn.getAttribute('data-card-id') || '';
+    if (cardRem) cardRem.value = '0';
+    if (cardLabel) {
+      var cid = btn.getAttribute('data-card-id') || '';
+      var cname = btn.getAttribute('data-card-name') || '';
+      if (cid) {
+        cardLabel.classList.remove('d-none');
+        cardLabel.innerHTML = '已关联：<strong>' + cname + '</strong> <button type="button" class="btn btn-link btn-sm p-0 ms-1 align-baseline" data-clear-card>✕</button>';
+      } else {
+        cardLabel.classList.add('d-none');
+        cardLabel.innerHTML = '';
+      }
+    }
+
+    // 配图：从帖子卡片 DOM 中读取当前配图（保持原样，除非用户替换/移除）
+    var imgEl = cardCard && cardCard.querySelector('img.tea-post-img');
+    var imgHid = form.querySelector('input[name=images]');
+    var imgRem = form.querySelector('input[name=image_removed]');
+    var imgLabel = form.querySelector('.tea-image-picked');
+    if (imgHid) imgHid.value = '';
+    if (imgRem) imgRem.value = '0';
+    if (imgLabel) {
+      if (imgEl) {
+        imgLabel.classList.remove('d-none');
+        imgLabel.innerHTML = '<img src="' + imgEl.src + '" class="img-thumbnail" style="height:48px;width:48px;object-fit:cover;"> <button type="button" class="btn btn-link btn-sm p-0 ms-1 align-baseline" data-clear-image>✕</button>';
+      } else {
+        imgLabel.classList.add('d-none');
+        imgLabel.innerHTML = '';
+      }
+    }
+
     bootstrap.Modal.getOrCreateInstance(document.getElementById('teahouseEditModal')).show();
   });
   document.addEventListener('input', function (e) {
@@ -1032,6 +1082,8 @@ function showToast(message, type) {
         if (picker) {
           var hid = picker.querySelector('input[name=card_id]');
           if (hid) hid.value = '';
+          var rem = picker.querySelector('input[name=card_removed]');
+          if (rem) rem.value = '1';
           var label = picker.querySelector('.tea-card-picked');
           if (label) { label.classList.add('d-none'); label.textContent = ''; }
         }
@@ -1066,6 +1118,8 @@ function showToast(message, type) {
       if (!opt || !currentPicker) return;
       var hid = currentPicker.querySelector('input[name=card_id]');
       if (hid) hid.value = opt.dataset.id;
+      var rem = currentPicker.querySelector('input[name=card_removed]');
+      if (rem) rem.value = '0';
       var label = currentPicker.querySelector('.tea-card-picked');
       if (label) {
         label.classList.remove('d-none');
@@ -1074,12 +1128,83 @@ function showToast(message, type) {
       bootstrap.Modal.getInstance(modal).hide();
     });
   })();
+
+  // 配图：选择 / 预览 / 移除（单图）
+  (function () {
+    var fileInput = document.getElementById('teaImageFileInput');
+    if (!fileInput) return;
+    var currentPicker = null;
+
+    function setPreview(picker, dataUrl) {
+      var label = picker.querySelector('.tea-image-picked');
+      if (!label) return;
+      label.classList.remove('d-none');
+      label.innerHTML = '<img src="' + dataUrl + '" class="img-thumbnail" style="height:48px;width:48px;object-fit:cover;"> <button type="button" class="btn btn-link btn-sm p-0 ms-1 align-baseline" data-clear-image>✕</button>';
+    }
+
+    document.addEventListener('click', function (e) {
+      var btn = e.target.closest && e.target.closest('[data-pick-image]');
+      if (btn) {
+        currentPicker = btn.closest('[data-image-picker]') || (btn.form || null);
+        fileInput.click();
+        return;
+      }
+      var clearBtn = e.target.closest && e.target.closest('[data-clear-image]');
+      if (clearBtn) {
+        var picker = clearBtn.closest('[data-image-picker]');
+        if (picker) {
+          var hid = picker.querySelector('input[name=images]');
+          if (hid) hid.value = '';
+          var rem = picker.querySelector('input[name=image_removed]');
+          if (rem) rem.value = '1';
+          var label = picker.querySelector('.tea-image-picked');
+          if (label) { label.classList.add('d-none'); label.innerHTML = ''; }
+        }
+      }
+    });
+
+    fileInput.addEventListener('change', function () {
+      var file = fileInput.files && fileInput.files[0];
+      if (!file || !currentPicker) { fileInput.value = ''; return; }
+      var reader = new FileReader();
+      reader.onload = function () {
+        var dataUrl = reader.result;
+        var hid = currentPicker.querySelector('input[name=images]');
+        if (hid) hid.value = dataUrl;
+        var rem = currentPicker.querySelector('input[name=image_removed]');
+        if (rem) rem.value = '0';
+        setPreview(currentPicker, dataUrl);
+      };
+      reader.readAsDataURL(file);
+      fileInput.value = '';
+    });
+  })();
+
+  // 配图点击放大
+  document.addEventListener('click', function (e) {
+    var img = e.target.closest && e.target.closest('img.tea-post-img');
+    if (!img) return;
+    var zoomImg = document.getElementById('teaImageZoomImg');
+    if (zoomImg) zoomImg.src = img.src;
+    var m = document.getElementById('teaImageZoomModal');
+    if (m) bootstrap.Modal.getOrCreateInstance(m).show();
+  });
 })();
 </script>
 
 <!-- 全局 AJAX Pjax 切换 Loading 遮罩与脉冲动画 -->
 <div class="dna-pjax-loader" id="pjaxLoader">
   <div class="ldr"></div>
+</div>
+
+<!-- 茶馆：配图放大查看 -->
+<input type="file" id="teaImageFileInput" accept="image/*" class="d-none">
+<div class="modal fade" id="teaImageZoomModal" tabindex="-1" aria-labelledby="teaImageZoomModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content bg-transparent border-0 shadow-none">
+      <img id="teaImageZoomImg" src="" alt="配图" class="img-fluid rounded mx-auto d-block">
+    </div>
+  </div>
 </div>
 </body>
 </html>

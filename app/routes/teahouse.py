@@ -17,8 +17,14 @@ from ..extensions import db
 import re
 from datetime import datetime, timedelta
 
-from ..models import Card, Notification, TeaPost, TeaPostLike, User, UserFollow
+from ..models import Card, Notification, TeaPost, TeaPostImage, TeaPostLike, User, UserFollow
+from ..services.image_service import compress_image
 from ..services.notification_service import notify
+
+# 配图：仅支持单图
+TEA_MAX_IMAGES = 1
+TEA_IMAGE_MAX_EDGE = 1280
+TEA_IMAGE_QUALITY = 82
 
 
 def _resolve_card(card_id_raw, viewer):
@@ -32,6 +38,28 @@ def _resolve_card(card_id_raw, viewer):
     if not card_id:
         return None
     return Card.visible_to(viewer).filter_by(id=card_id).first()
+
+
+def _attach_images(post, images_raw):
+    """保存配图（仅单图）。images_raw 为 base64 data URL 列表，取第一张有效图并压缩存储。
+    会先清空原图，便于编辑时整体替换。"""
+    for old in list(post.images):
+        db.session.delete(old)
+    post.images.clear()
+    for data_url in images_raw:
+        data_url = (data_url or "").strip()
+        if not data_url:
+            continue
+        try:
+            compressed = compress_image(
+                data_url, max_edge=TEA_IMAGE_MAX_EDGE, quality=TEA_IMAGE_QUALITY
+            )
+        except Exception:
+            continue
+        post.images.append(TeaPostImage(image_data=compressed))
+        break  # 单图：仅取第一张
+    return post
+
 
 teahouse_bp = Blueprint("teahouse", __name__, url_prefix="/teahouse")
 
@@ -60,7 +88,10 @@ def _visible_query(query, viewer):
         return query.filter(
             or_(TeaPost.is_hidden.is_(False), TeaPost.user_id == viewer.id),
             TeaPost.is_deleted.is_(False),
-        ).options(joinedload(TeaPost.card).joinedload(Card.images))
+        ).options(
+            joinedload(TeaPost.card).joinedload(Card.images),
+            joinedload(TeaPost.images),
+        )
     return query.filter(
         TeaPost.is_hidden.is_(False), TeaPost.is_deleted.is_(False)
     ).options(joinedload(TeaPost.card).joinedload(Card.images))
@@ -210,6 +241,10 @@ def create_post():
     if card:
         post.card_id = card.id
     db.session.add(post)
+    db.session.flush()  # 先拿到 post.id，再挂配图
+    images_raw = request.form.getlist("images")
+    if images_raw:
+        _attach_images(post, images_raw)
     db.session.commit()
     _notify_mentions(content, post, current_user)
     flash("发布成功", "success")
@@ -343,6 +378,10 @@ def reply(post_id):
     if card:
         reply_post.card_id = card.id
     db.session.add(reply_post)
+    db.session.flush()  # 先拿到 reply_post.id，再挂配图
+    images_raw = request.form.getlist("images")
+    if images_raw:
+        _attach_images(reply_post, images_raw)
     db.session.commit()
     # 通知被回复帖子的作者（非本人）
     if p.user_id != current_user.id:
@@ -442,8 +481,22 @@ def edit_post(post_id):
         p.edited_at = datetime.utcnow()
         # 编辑窗口内允许改/清除关联角色卡（仅当表单显式提交 card_id 时，避免编辑内容时误清）
         if "card_id" in request.form:
-            card = _resolve_card(request.form.get("card_id"), current_user)
-            p.card_id = card.id if card else None
+            card_removed = request.form.get("card_removed") == "1"
+            if card_removed:
+                p.card_id = None
+            else:
+                card = _resolve_card(request.form.get("card_id"), current_user)
+                p.card_id = card.id if card else None
+        # 配图：仅当表单显式提交 images / image_removed 时才调整，未改动则保持原样
+        if "images" in request.form or "image_removed" in request.form:
+            image_removed = request.form.get("image_removed") == "1"
+            new_img = (request.form.get("images") or "").strip()
+            if new_img:
+                _attach_images(p, [new_img])
+            elif image_removed:
+                for old in list(p.images):
+                    db.session.delete(old)
+                p.images.clear()
         db.session.commit()
         _notify_mentions(content, p, current_user)
         flash("已更新", "success")
