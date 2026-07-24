@@ -74,29 +74,16 @@ function showToast(message, type) {
  <div class="container-fluid">
  <a class="navbar-brand" href="{{ url_for('main.index') }}">DNAISLAND</a>
  <!-- 手机端顶部工具组（搜索 + 深浅色切换 + 消息通知） -->
- <div class="d-flex align-items-center ms-auto d-lg-none gap-2 me-1">
- <button class="btn btn-link nav-link p-1 text-muted d-flex align-items-center" id="globalSearchTriggerMobile" type="button" aria-label="展开搜索" title="搜索">
- <i class="bi bi-search fs-5"></i>
- </button>
- <button type="button" class="btn btn-link nav-link p-1" id="themeToggleMobile" aria-label="切换深浅色主题" title="切换深浅色">
- <span class="theme-icon icon-sun" aria-hidden="true">
- <i class="bi bi-sun fs-5"></i>
- </span>
- <span class="theme-icon icon-moon" aria-hidden="true">
- <i class="bi bi-moon-stars fs-5"></i>
- </span>
- </button>
- {% if current_user.is_authenticated %}
- <a class="nav-link p-1 text-muted position-relative d-flex align-items-center" href="{{ url_for('user.notifications') }}" aria-label="通知" title="通知">
- <i class="bi bi-bell fs-5"></i>
- {% if unread_notifications %}
- <span class="position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle">
- <span class="visually-hidden">未读通知</span>
- </span>
- {% endif %}
- </a>
- {% endif %}
- </div>
+<div class="d-flex align-items-center ms-auto d-lg-none gap-2 me-1">
+<button class="btn btn-link nav-link p-1 text-muted d-flex align-items-center" id="globalSearchTriggerMobile" type="button" aria-label="展开搜索" title="搜索">
+<i class="bi bi-search fs-5"></i>
+</button>
+{% if current_user.is_authenticated %}
+<button class="btn btn-link nav-link p-1" type="button" data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-label="功能菜单" title="功能菜单">
+<i class="bi bi-list fs-5"></i>
+</button>
+{% endif %}
+</div>
  <div class="collapse navbar-collapse" id="mainNav">
  <ul class="navbar-nav me-auto mb-2 mb-lg-0">
  <li class="nav-item">
@@ -132,43 +119,19 @@ function showToast(message, type) {
  <i class="bi bi-search"></i>
  </button>
  </li>
- <li class="nav-item d-flex align-items-center">
- <button type="button" class="btn btn-link nav-link px-2" id="themeToggle"
- aria-label="切换深浅色主题" title="切换深浅色">
- <span class="theme-icon icon-sun" aria-hidden="true">
- <i class="bi bi-sun"></i>
- </span>
- <span class="theme-icon icon-moon" aria-hidden="true">
- <i class="bi bi-moon-stars"></i>
- </span>
- </button>
- </li>
- {% if current_user.is_authenticated %}
- <li class="nav-item">
- <a class="nav-link position-relative" href="{{ url_for('user.notifications') }}">
- 通知
- {% if unread_notifications %}
- <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
- {{ unread_notifications }}
- </span>
- {% endif %}
- </a>
- </li>
- <li class="nav-item dropdown">
- <a class="nav-link dropdown-toggle" href="#" id="userMenu" role="button"
- data-bs-toggle="dropdown" aria-expanded="false">
- {{ current_user.nickname }}
- </a>
- <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenu">
- <li><a class="dropdown-item" href="{{ url_for('user.profile', username=current_user.username) }}">我的主页</a></li>
- <li><a class="dropdown-item" href="{{ url_for('user.my_cards') }}">我的发布</a></li>
- <li><a class="dropdown-item" href="{{ url_for('user.my_punishments') }}">我的处罚</a></li>
- <li><a class="dropdown-item" href="{{ url_for('points.detail') }}">点数</a></li>
- <li><hr class="dropdown-divider"></li>
- <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}">退出</a></li>
- </ul>
- </li>
- {% else %}
+<li class="nav-item d-lg-none">
+<button class="btn btn-link nav-link px-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-label="功能菜单" title="功能菜单">
+<i class="bi bi-list"></i>
+</button>
+</li>
+{% if current_user.is_authenticated %}
+<li class="nav-item">
+<a class="nav-link" href="#" id="userMenu" role="button"
+data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded="false">
+{{ current_user.nickname }}
+</a>
+</li>
+{% else %}
  <li class="nav-item">
  <a class="nav-link" href="{{ url_for('auth.login') }}">登录</a>
  </li>
@@ -411,32 +374,42 @@ function showToast(message, type) {
  });
  })();
  </script>
- <!-- 主题切换：同步导航栏配色类并持久化用户选择 -->
- <script>
- (function () {
- var KEY = 'dna_theme';
- var root = document.documentElement;
- var nav = document.querySelector('.navbar');
- function apply(t) {
- root.setAttribute('data-bs-theme', t);
- if (nav) {
- nav.classList.toggle('navbar-dark', t === 'dark');
- nav.classList.toggle('navbar-light', t === 'light');
- }
- }
- // 与 head 中的初始化保持一致，并同步导航栏的 Bootstrap 配色类
- apply(root.getAttribute('data-bs-theme') || 'dark');
- var btn = document.getElementById('themeToggle');
- var btnMobile = document.getElementById('themeToggleMobile');
- function toggleTheme() {
- var next = root.getAttribute('data-bs-theme') === 'light' ? 'dark' : 'light';
- apply(next);
- try { localStorage.setItem(KEY, next); } catch (e) {}
- }
- if (btn) btn.addEventListener('click', toggleTheme);
- if (btnMobile) btnMobile.addEventListener('click', toggleTheme);
- })();
- </script>
+<!-- 主题切换：同步导航栏配色类并持久化用户选择 -->
+<script>
+(function () {
+  var KEY = 'dna_theme';
+  var root = document.documentElement;
+  var nav = document.querySelector('.navbar');
+  function apply(t) {
+    root.setAttribute('data-bs-theme', t);
+    if (nav) {
+      nav.classList.toggle('navbar-dark', t === 'dark');
+      nav.classList.toggle('navbar-light', t === 'light');
+    }
+  }
+  // 与 head 中的初始化保持一致，并同步导航栏的 Bootstrap 配色类
+  apply(root.getAttribute('data-bs-theme') || 'dark');
+  function toggleTheme(e) {
+    if (e) e.preventDefault();
+    var next = root.getAttribute('data-bs-theme') === 'light' ? 'dark' : 'light';
+    apply(next);
+    try { localStorage.setItem(KEY, next); } catch (e) {}
+  }
+  // 主题切换按钮位于侧边栏内（脚本之后才解析），用事件委托确保绑定生效
+  document.addEventListener('click', function (e) {
+    if (e.target.closest && e.target.closest('#themeToggle')) toggleTheme(e);
+  });
+  // 侧边栏内导航链接：点击后先收起侧边栏，再由全局 SPA 引擎接管切页。
+  // 不在此处 preventDefault，避免拦截 SPA 的文档级 click 处理；仅隐藏侧边栏。
+  document.addEventListener('click', function (e) {
+    var link = e.target.closest && e.target.closest('#globalToolsOffcanvas a[href]:not([href="#"])');
+    if (!link) return;
+    var el = document.getElementById('globalToolsOffcanvas');
+    var oc = el && bootstrap.Offcanvas.getOrCreateInstance(el);
+    if (oc) oc.hide();
+  });
+})();
+</script>
  <!-- 文章封面渐显：图片加载完成后从黑色模糊占位平滑过渡到清晰图 -->
  <script>
  (function () {
@@ -832,8 +805,36 @@ function showToast(message, type) {
     });
   })();
  </script>
- <!-- 移动端贴底 Tab 导航 -->
- <nav class="dna-mobile-nav">
+<!-- 全局功能侧边栏：从右侧滑出，顶栏汉堡/用户名打开 -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="globalToolsOffcanvas" aria-labelledby="globalToolsOffcanvasLabel">
+ <div class="offcanvas-header border-bottom">
+ <h5 class="offcanvas-title h6 mb-0 fw-semibold" id="globalToolsOffcanvasLabel">功能菜单</h5>
+ <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="关闭"></button>
+ </div>
+ <div class="offcanvas-body p-3">
+<div class="list-group list-group-flush">
+<a href="{{ url_for('user.profile', username=current_user.username) }}" class="list-group-item list-group-item-action py-2 border-0 rounded-2">我的主页</a>
+<a href="{{ url_for('user.notifications') }}" class="list-group-item list-group-item-action py-2 border-0 rounded-2">通知{% if unread_notifications %} <span class="badge rounded-pill bg-danger ms-1">{{ unread_notifications }}</span>{% endif %}</a>
+<a href="{{ url_for('user.my_cards') }}" class="list-group-item list-group-item-action py-2 border-0 rounded-2">我的发布</a>
+<a href="{{ url_for('user.my_favorites') }}" class="list-group-item list-group-item-action py-2 border-0 rounded-2">我的收藏</a>
+<a href="{{ url_for('user.my_likes') }}" class="list-group-item list-group-item-action py-2 border-0 rounded-2">我点赞的</a>
+<a href="{{ url_for('points.detail') }}" class="list-group-item list-group-item-action py-2 border-0 rounded-2">点数</a>
+</div>
+<hr class="my-3">
+<div class="list-group list-group-flush">
+<a href="{{ url_for('main.articles') }}" class="list-group-item list-group-item-action py-2 border-0 rounded-2">官方公告</a>
+<a href="{{ url_for('user.my_punishments') }}" class="list-group-item list-group-item-action py-2 border-0 rounded-2">我的处罚</a>
+</div>
+<hr class="my-3">
+<div class="list-group list-group-flush">
+<a href="#" id="themeToggle" data-bs-dismiss="offcanvas" class="list-group-item list-group-item-action py-2 border-0 rounded-2"><i class="bi bi-circle-half me-1"></i> 切换深色 / 浅色</a>
+<a href="{{ url_for('auth.logout') }}" class="list-group-item list-group-item-action text-danger py-2 border-0 rounded-2">退出登录</a>
+</div>
+ </div>
+</div>
+
+<!-- 移动端贴底 Tab 导航 -->
+<nav class="dna-mobile-nav">
  <a href="{{ url_for('main.index') }}" class="dna-mobile-nav__item {% if request.endpoint == 'main.index' %}active{% endif %}">
  <i class="bi bi-house"></i>
  <span>首页</span>

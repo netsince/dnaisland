@@ -44,20 +44,9 @@
 </ul>
 {% else %}
 
-<div class="mb-3 d-flex align-items-center justify-content-between gap-2">
-  <button type="button" class="btn btn-sm btn-outline-secondary" onclick="history.back()">
-    <i class="bi bi-arrow-left"></i> {{ _('返回') }}
-  </button>
-  {% if is_self %}
-  <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="offcanvas" data-bs-target="#userToolsOffcanvas">
-    <i class="bi bi-list"></i> 功能菜单
-  </button>
-  {% endif %}
-</div>
-
 <div class="row g-3 g-lg-4">
  <!-- 左侧资料列 -->
- <div class="col-12 col-lg-4 col-xl-3">
+ <div class="col-12 col-lg-4 col-xl-3 order-lg-2">
  <div class="card dna-profile-card">
  <div class="card-body p-4">
  <div class="d-flex flex-column gap-3">
@@ -125,7 +114,7 @@
  </div>
 
  <!-- 右侧内容列 -->
- <div class="col-12 col-lg-8 col-xl-9">
+ <div class="col-12 col-lg-8 col-xl-9 order-lg-1">
  {% if punishments %}
  <div class="alert alert-danger">
  <strong>{{ '你' if is_self else '该用户' }}当前受到的处罚：</strong>
@@ -233,62 +222,7 @@
 </div>
 {% endif %}
 
-{% if is_self %}
-<!-- 个人功能菜单 侧滑抽屉 -->
-<div class="offcanvas offcanvas-start dna-tools-offcanvas" tabindex="-1" id="userToolsOffcanvas" aria-labelledby="userToolsOffcanvasLabel">
- <div class="offcanvas-header border-bottom border-secondary border-opacity-25 py-3">
- <h5 class="offcanvas-title h6 mb-0 fw-semibold" id="userToolsOffcanvasLabel">功能菜单</h5>
- <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="关闭"></button>
- </div>
- <div class="offcanvas-body p-3">
- {# 1. 资产类目 #}
- <div class="text-muted small mb-2 px-2 fw-semibold">资产</div>
- <div class="list-group list-group-flush mb-2">
- <a href="{{ url_for('points.detail') }}" class="list-group-item list-group-item-action py-2 border-0 rounded-2">
- <span>我的点数</span>
- </a>
- </div>
 
- <hr class="border-secondary border-opacity-25 my-3">
-
- {# 2. 互动与内容类目 #}
- <div class="text-muted small mb-2 px-2 fw-semibold">互动与内容</div>
- <div class="list-group list-group-flush mb-2">
- <a href="{{ url_for('user.my_favorites') }}" class="list-group-item list-group-item-action py-2 border-0 rounded-2 mb-1">
- <span>我的收藏</span>
- </a>
- <a href="{{ url_for('user.my_likes') }}" class="list-group-item list-group-item-action py-2 border-0 rounded-2 mb-1">
- <span>我点赞的</span>
- </a>
- <a href="{{ url_for('user.my_cards') }}" class="list-group-item list-group-item-action py-2 border-0 rounded-2">
- <span>我的发布</span>
- </a>
- </div>
-
- <hr class="border-secondary border-opacity-25 my-3">
-
- {# 3. 平台与记录类目 #}
- <div class="text-muted small mb-2 px-2 fw-semibold">平台与记录</div>
- <div class="list-group list-group-flush mb-2">
- <a href="{{ url_for('main.articles') }}" class="list-group-item list-group-item-action py-2 border-0 rounded-2 mb-1">
- <span>官方公告</span>
- </a>
- <a href="{{ url_for('user.my_punishments') }}" class="list-group-item list-group-item-action py-2 border-0 rounded-2">
- <span>我的处罚</span>
- </a>
- </div>
-
- <hr class="border-secondary border-opacity-25 my-3">
-
- {# 4. 账号操作类目 #}
- <div class="list-group list-group-flush">
- <a href="{{ url_for('auth.logout') }}" class="list-group-item list-group-item-action text-danger py-2 border-0 rounded-2">
- <span>退出登录</span>
- </a>
- </div>
- </div>
-</div>
-{% endif %}
 {% endblock %}
 
 {% block scripts %}
