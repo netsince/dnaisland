@@ -27,7 +27,7 @@
     <!-- 左：主图 + 缩略图墙（桌面 sticky） -->
     <div class="gd-stage">
       <div class="gd-main-img">
-        <a class="glightbox gd-pure-img-anchor" id="gdMainLink" href="{{ first_url }}" data-type="image" data-gallery="gendetail">
+        <a class="gd-pure-img-anchor" id="gdMainLink" href="{{ first_url }}" data-type="image">
           <img id="gdMainImg" src="{{ first_url }}" class="gd-standalone-art" alt="生成作品" loading="lazy" decoding="async">
         </a>
       </div>
@@ -40,6 +40,12 @@
         {% endfor %}
       </div>
       {% endif %}
+      <!-- 隐藏成品画廊：放大查看器左右切换用，与参考图分离 -->
+      <div id="gdArtGallery" style="display:none">
+        {% for img in imgs %}
+        <a class="gd-art-glb" href="{{ url_for('image_gen.output_image', log_id=log.id, idx=loop.index0) }}" data-type="image"></a>
+        {% endfor %}
+      </div>
     </div>
 
     <!-- 右：信息流 -->
@@ -109,39 +115,44 @@
 <script src="https://cdn.jsdelivr.net/npm/glightbox@3.3.0/dist/js/glightbox.min.js"></script>
 <script>
 (function () {
-  var lightboxInstance = null;
-  function initLightbox() {
-    if (window.GLightbox && document.querySelector('.glightbox')) {
-      if (lightboxInstance) { try { lightboxInstance.destroy(); } catch (e) {} }
-      lightboxInstance = GLightbox({ selector: '.glightbox', touchNavigation: true, loop: true });
-    }
+  var artLightbox = null;
+  var refLightbox = null;
+  function initLightboxes() {
+    if (!window.GLightbox) return;
+    if (artLightbox) { try { artLightbox.destroy(); } catch (e) {} }
+    artLightbox = GLightbox({ selector: '.gd-art-glb', touchNavigation: true, loop: true });
+    if (refLightbox) { try { refLightbox.destroy(); } catch (e) {} }
+    refLightbox = GLightbox({ selector: '.glightbox', touchNavigation: true, loop: true });
   }
   if (document.readyState === 'complete' || document.readyState === 'interactive') {
-    setTimeout(initLightbox, 50);
+    setTimeout(initLightboxes, 50);
   } else {
-    document.addEventListener('DOMContentLoaded', initLightbox);
+    document.addEventListener('DOMContentLoaded', initLightboxes);
   }
-  function onLightboxPageLoaded() { setTimeout(initLightbox, 50); }
+  function onLightboxPageLoaded() { setTimeout(initLightboxes, 50); }
   document.addEventListener('dna:page-loaded', onLightboxPageLoaded);
   document.addEventListener('dna:page-unload', function () {
     document.removeEventListener('dna:page-loaded', onLightboxPageLoaded);
   }, { once: true });
 
-  // 缩略图墙切换主图
+  // 缩略图墙切换主图（页面内预览）
   var mainImg = document.getElementById('gdMainImg');
   var mainLink = document.getElementById('gdMainLink');
   var thumbs = document.querySelectorAll('.gd-thumb');
   var counter = document.getElementById('gdCounter');
   var download = document.getElementById('gdDownload');
+  var currentIndex = 0;
 
   function selectThumb(btn) {
+    var i = parseInt(btn.getAttribute('data-i'), 10) || 0;
     var full = btn.getAttribute('data-full');
+    currentIndex = i;
     if (mainImg) mainImg.src = full;
     if (mainLink) mainLink.setAttribute('href', full);
-    for (var i = 0; i < thumbs.length; i++) {
-      thumbs[i].classList.toggle('is-active', thumbs[i] === btn);
+    for (var k = 0; k < thumbs.length; k++) {
+      thumbs[k].classList.toggle('is-active', thumbs[k] === btn);
     }
-    if (counter) counter.textContent = (parseInt(btn.getAttribute('data-i'), 10) + 1) + ' / ' + thumbs.length;
+    if (counter) counter.textContent = (i + 1) + ' / ' + thumbs.length;
     if (download) {
       download.setAttribute('href', full);
       download.setAttribute('data-src', full);
@@ -150,6 +161,14 @@
   }
   for (var t = 0; t < thumbs.length; t++) {
     (function (btn) { btn.addEventListener('click', function () { selectThumb(btn); }); })(thumbs[t]);
+  }
+
+  // 点击成品主图：打开独立成品画廊，从当前张开始，可左右切换
+  if (mainLink) {
+    mainLink.addEventListener('click', function (e) {
+      e.preventDefault();
+      if (artLightbox) artLightbox.open(currentIndex);
+    });
   }
 
   // 复制 Prompt
