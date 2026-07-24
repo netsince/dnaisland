@@ -1000,7 +1000,6 @@ data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded=
       <div class="tea-compose__field d-flex align-items-center mb-2" data-card-picker>
         <input type="hidden" name="card_id" id="teaComposeCardId" value="">
         <span class="tea-card-picked d-none"></span>
-        <button type="button" class="tea-tool" data-pick-card><i class="bi bi-person-badge"></i><span>关联角色卡</span></button>
       </div>
 
       <!-- 配图 preview -->
@@ -1513,6 +1512,28 @@ data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded=
       });
     }
   });
+
+  // 自动读取 URL 中的 card_id 与 card_name 参数（从角色卡页面点击“引用到茶馆”自动弹出发布框并带入引用）
+  function checkAutoCardReference() {
+    try {
+      var params = new URLSearchParams(window.location.search);
+      var cardId = params.get('card_id');
+      var cardName = params.get('card_name') || '角色卡';
+      if (cardId) {
+        openDrawer({
+          cardId: cardId,
+          cardName: cardName
+        });
+        // 清理地址栏 query 参数，保持 URL 洁净
+        if (window.history && window.history.replaceState) {
+          var cleanUrl = window.location.pathname;
+          window.history.replaceState(null, '', cleanUrl);
+        }
+      }
+    } catch (err) {}
+  }
+  checkAutoCardReference();
+  document.addEventListener('dna:page-loaded', checkAutoCardReference);
 
   function updateCounter() {
     if (textarea && counter) {

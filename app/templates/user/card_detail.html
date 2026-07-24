@@ -91,6 +91,10 @@
       <i class="bi bi-clipboard"></i>
       <span>复制卡片</span>
     </button>
+    <a href="{{ url_for('teahouse.index', card_id=card.id, card_name=card.name) }}" class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1 rounded-pill" style="padding:5px 12px;" title="引用此角色卡发布到茶馆">
+      <i class="bi bi-chat-quote"></i>
+      <span>引用到茶馆</span>
+    </a>
     <button type="button" class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1 rounded-pill"
             id="commentDrawerTrigger"
             data-api-url="{{ url_for('user.card_comments_api', card_id=card.id) }}"
