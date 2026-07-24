@@ -88,49 +88,20 @@
       <div class="sub">点击任意图片可查看详情，包含完整的生成提示词与参数</div>
     </div>
     <div class="d-flex align-items-center gap-2">
-      {% if pagination %}<span class="pill">共 {{ pagination.total }} 条</span>{% endif %}
+      <span class="pill d-none" id="mgTotalPill"></span>
       <a class="btn btn-sm btn-primary" href="{{ url_for('image_gen.workbench') }}">去生图</a>
     </div>
   </div>
 
-  {% if logs %}
-  <!-- 真正按从左到右横向填充的瀑布流容器 -->
   <div class="mg-masonry-row" id="mgMasonryRow">
     <div class="mg-col"></div>
     <div class="mg-col"></div>
     <div class="mg-col"></div>
   </div>
 
-  <!-- 原始列表模版片段（隐藏），供 JS 动态依时间从左到右分发进列 -->
-  <div id="mgRawItems" style="display:none;">
-    {% for l in logs %}
-    {% set first_image = url_for('image_gen.output_image', log_id=l.id, idx=0) if l.image_list() else None %}
-    {% if first_image %}
-    <div class="mg-item dna-img-fade">
-      <a href="{{ url_for('image_gen.log_detail', log_id=l.id) }}" style="display:block">
-        <img src="{{ first_image }}" alt="生成图" class="dna-img-fade__img" loading="lazy" decoding="async">
-      </a>
-      <div class="mg-meta">
-        <div class="row1">
-          <span class="title">{{ l.model_name }}
-            {% if l.status == 'success' %}<span class="mg-status ok">成功</span>
-            {% elif l.status == 'partial' %}<span class="mg-status part">部分</span>
-            {% elif l.status == 'failed' %}<span class="mg-status fail">失败</span>{% endif %}
-          </span>
-        </div>
-        <div class="info">{{ l.size or 'auto' }} · {{ l.count }} 张请求 · 消耗 {{ l.points_spent }} 点</div>
-        <div class="info">{{ l.created_at.strftime('%Y-%m-%d %H:%M') }}
-          <a class="mg-detail" href="{{ url_for('image_gen.log_detail', log_id=l.id) }}">详情 →</a></div>
-      </div>
-    </div>
-    {% endif %}
-    {% endfor %}
-  </div>
-
-  {{ render_pagination(pagination, 'image_gen.logs', {}) }}
-  {% else %}
-  <div class="mg-empty"><span class="big">🖼️</span>还没有生图记录，去工作台创作第一张吧。</div>
-  {% endif %}
+  <div id="mgRawItems" style="display:none;"></div>
+  <div id="mgEmpty" class="mg-empty d-none"><span class="big">🖼️</span>还没有生图记录，去工作台创作第一张吧。</div>
+  <div id="mgPagination" class="mt-4 d-flex justify-content-center"></div>
 </div>
 {% endblock %}
 
@@ -139,28 +110,29 @@
 (function () {
   var row = document.getElementById('mgMasonryRow');
   var rawContainer = document.getElementById('mgRawItems');
+  var totalPill = document.getElementById('mgTotalPill');
+  var emptyEl = document.getElementById('mgEmpty');
+  var pagContainer = document.getElementById('mgPagination');
   if (!row || !rawContainer) return;
+
+  var currentPage = 1;
 
   function renderHorizontalMasonry() {
     var cols = row.querySelectorAll('.mg-col');
     if (!cols.length) return;
     
-    // 清空列
     cols.forEach(function (c) { c.innerHTML = ''; });
 
-    // 计算当前显示列数（响应式）
     var visibleCols = 3;
     if (window.innerWidth <= 576) visibleCols = 1;
     else if (window.innerWidth <= 992) visibleCols = 2;
 
     var items = Array.from(rawContainer.children);
-    // 按时间顺序（1, 2, 3...）依次向各列轮询分发，实现真正的横向从左到右瀑布流
     items.forEach(function (item, idx) {
       var colIdx = idx % visibleCols;
       cols[colIdx].appendChild(item.cloneNode(true));
     });
 
-    // 重新绑定图片的 is-loaded 淡入效果
     row.querySelectorAll('.mg-item img').forEach(function (img) {
       var p = img.closest('.mg-item');
       if (img.complete) {
@@ -173,23 +145,67 @@
     });
   }
 
-  renderHorizontalMasonry();
+  function renderPaginationControls(data) {
+    if (!pagContainer || !data || data.pages <= 1) {
+      if (pagContainer) pagContainer.innerHTML = '';
+      return;
+    }
+    var html = '<nav><ul class="pagination pagination-sm mb-0">';
+    
+    // Prev
+    if (data.has_prev) {
+      html += '<li class="page-item"><button class="page-link" data-page="' + (data.page - 1) + '">« 上一页</button></li>';
+    } else {
+      html += '<li class="page-item disabled"><span class="page-link">« 上一页</span></li>';
+    }
 
-  // 视口尺寸变化时自适应重新分列
-  var resizeTimer;
-  function onLogsResize() {
-    clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(renderHorizontalMasonry, 100);
+    // Pages
+    for (var p = 1; p <= data.pages; p++) {
+      if (p === data.page) {
+        html += '<li class="page-item active"><span class="page-link">' + p + '</span></li>';
+      } else {
+        html += '<li class="page-item"><button class="page-link" data-page="' + p + '">' + p + '</button></li>';
+      }
+    }
+
+    // Next
+    if (data.has_next) {
+      html += '<li class="page-item"><button class="page-link" data-page="' + (data.page + 1) + '">下一页 »</button></li>';
+    } else {
+      html += '<li class="page-item disabled"><span class="page-link">下一页 »</span></li>';
+    }
+
+    html += '</ul></nav>';
+    pagContainer.innerHTML = html;
+
+    pagContainer.querySelectorAll('button[data-page]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var page = parseInt(btn.getAttribute('data-page'), 10);
+        if (page) loadLogs(page);
+      });
+    });
   }
-  window.addEventListener('resize', onLogsResize);
 
-  // 流式生成完后刷新拉取逻辑
-  function loadLogsFlow() {
-    fetch('/image-gen/api/logs', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+  function loadLogs(page) {
+    page = page || 1;
+    currentPage = page;
+    fetch('/image-gen/api/logs?page=' + page, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
       .then(function (r) { return r.json(); })
       .then(function (res) {
-        if (!res.ok || !res.items || !res.items.length) return;
+        if (!res.ok) return;
+        if (totalPill) {
+          totalPill.textContent = '共 ' + res.total + ' 条';
+          totalPill.classList.remove('d-none');
+        }
         rawContainer.innerHTML = '';
+        if (!res.items || !res.items.length) {
+          if (emptyEl) emptyEl.classList.remove('d-none');
+          if (row) row.innerHTML = '';
+          if (pagContainer) pagContainer.innerHTML = '';
+          return;
+        }
+        if (emptyEl) emptyEl.classList.add('d-none');
+
         res.items.forEach(function (l) {
           var firstImage = l.first_image;
           if (!firstImage) return;
@@ -207,16 +223,21 @@
           rawContainer.appendChild(item);
         });
         renderHorizontalMasonry();
+        renderPaginationControls(res);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       })
       .catch(function (e) { console.error(e); });
   }
 
-  if (sessionStorage.getItem('ig_just_generated')) {
-    sessionStorage.removeItem('ig_just_generated');
-    setTimeout(loadLogsFlow, 200);
-  }
+  loadLogs(1);
 
-  // 离开页面时移除全局 resize 监听器，避免多次进入后累积重复重排。
+  var resizeTimer;
+  function onLogsResize() {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(renderHorizontalMasonry, 100);
+  }
+  window.addEventListener('resize', onLogsResize);
+
   document.addEventListener('dna:page-unload', function () {
     window.removeEventListener('resize', onLogsResize);
   }, { once: true });

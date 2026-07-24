@@ -58,20 +58,12 @@ def workbench():
         .order_by(GenerationModel.display_name)
         .all()
     )
-    page = request.args.get("page", 1, type=int)
-    pagination = (
-        GenerationLog.query.filter_by(user_id=current_user.id)
-        .order_by(GenerationLog.created_at.desc())
-        .paginate(page=page, per_page=12, error_out=False)
-    )
     # 默认选中每图积分最低的可用模型
     default_model = min(models, key=lambda m: m.points_per_image or 0) if models else None
     return render_template(
         "image_gen/workbench.html",
         models=models,
         default_model=default_model,
-        recent=pagination.items,
-        pagination=pagination,
         aspects=VALID_ASPECTS,
         max_refs=MAX_REFERENCES,
     )
@@ -276,20 +268,31 @@ def generate():
 @login_required
 def api_logs():
     page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", 12, type=int)
     pagination = (
         GenerationLog.query.filter_by(user_id=current_user.id)
         .order_by(GenerationLog.created_at.desc())
-        .paginate(page=page, per_page=12, error_out=False)
+        .paginate(page=page, per_page=per_page, error_out=False)
     )
     items = []
     for l in pagination.items:
         imgs = l.image_list()
+        refs = l.reference_image_list()
         if imgs:
             items.append({
                 "id": l.id,
                 "first_image": url_for(
                     "image_gen.output_image", log_id=l.id, idx=0
                 ),
+                "images": [
+                    url_for("image_gen.output_image", log_id=l.id, idx=i)
+                    for i in range(len(imgs))
+                ],
+                "references": [
+                    url_for("image_gen.reference_image", log_id=l.id, idx=i)
+                    for i in range(len(refs))
+                ],
+                "prompt": l.prompt,
                 "model_name": l.model_name,
                 "size": l.size or "auto",
                 "count": l.count,
@@ -314,15 +317,7 @@ def api_logs():
 def logs():
     if request.headers.get("X-Requested-With") == "XMLHttpRequest" and request.args.get("json"):
         return api_logs()
-    page = request.args.get("page", 1, type=int)
-    pagination = (
-        GenerationLog.query.filter_by(user_id=current_user.id)
-        .order_by(GenerationLog.created_at.desc())
-        .paginate(page=page, per_page=12, error_out=False)
-    )
-    return render_template(
-        "image_gen/logs.html", pagination=pagination, logs=pagination.items
-    )
+    return render_template("image_gen/logs.html")
 
 
 @image_gen_bp.route("/logs/<int:log_id>")
