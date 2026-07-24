@@ -1,3 +1,5 @@
+import io
+import os
 import pytest
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.dialects.mysql import LONGTEXT
@@ -174,3 +176,87 @@ def test_card_comment_author_notification(app, client):
         ).all()
         # 仍然只有之前访客发评论产生的那 1 条
         assert len(author_card_comments) == 1
+
+
+def test_comment_image_upload(app, client):
+    """测试评论图片上传：合法图片保存与路径记录，非法后缀/超大文件校验，以及 API 返回 image_url。"""
+    with app.app_context():
+        user = User(username="img_user", nickname="图片测试员", email="img@example.com")
+        user.set_password("pass123")
+        db.session.add(user)
+        db.session.commit()
+
+        card = Card(id="card-img", author_id=user.id, name="带图角色卡", persona="Persona")
+        db.session.add(card)
+        db.session.commit()
+
+    client.post("/auth/login", data={"identifier": "img_user", "password": "pass123"})
+
+    # 1. 测试非法扩展名 (.txt / .exe)
+    res_txt = client.post(
+        "/card/card-img/comment",
+        data={
+            "content": "非法后缀评论",
+            "image": (io.BytesIO(b"text content"), "test.txt"),
+        },
+        content_type="multipart/form-data",
+    )
+    assert res_txt.status_code == 400
+    assert res_txt.json["error"] == "仅支持上传 png/jpg/jpeg/gif/webp 格式的图片"
+
+    res_exe = client.post(
+        "/card/card-img/comment",
+        data={
+            "content": "非法 exe 评论",
+            "image": (io.BytesIO(b"exe content"), "test.exe"),
+        },
+        content_type="multipart/form-data",
+    )
+    assert res_exe.status_code == 400
+    assert res_exe.json["error"] == "仅支持上传 png/jpg/jpeg/gif/webp 格式的图片"
+
+    # 2. 测试超大文件 (> 5MB)
+    big_data = b"0" * (5 * 1024 * 1024 + 1)
+    res_big = client.post(
+        "/card/card-img/comment",
+        data={
+            "content": "超大图片评论",
+            "image": (io.BytesIO(big_data), "big.png"),
+        },
+        content_type="multipart/form-data",
+    )
+    assert res_big.status_code == 400
+    assert res_big.json["error"] == "图片大小不能超过 5MB"
+
+    # 3. 测试正常上传合法图片 (.png)
+    png_data = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01"
+    res_ok = client.post(
+        "/card/card-img/comment",
+        data={
+            "content": "合法带图评论",
+            "image": (io.BytesIO(png_data), "sample.png"),
+        },
+        content_type="multipart/form-data",
+    )
+    assert res_ok.status_code in (200, 302)
+
+    with app.app_context():
+        cm = Comment.query.filter_by(card_id="card-img", content="合法带图评论").first()
+        assert cm is not None
+        assert cm.image_url is not None
+        assert cm.image_url.startswith("uploads/comments/")
+        assert cm.image_url.endswith(".png")
+
+        # 验证文件是否实际落地保存
+        saved_file_path = os.path.join(app.root_path, "static", cm.image_url)
+        assert os.path.exists(saved_file_path)
+
+    # 4. 测试 card_comments_api 中精准包含 image_url
+    res_api = client.get("/api/card/card-img/comments")
+    assert res_api.status_code == 200
+    api_data = res_api.json
+    assert len(api_data["items"]) > 0
+    item = api_data["items"][0]
+    assert "image_url" in item
+    assert item["image_url"] == cm.image_url
+

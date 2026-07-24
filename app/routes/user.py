@@ -1,6 +1,8 @@
 import html
 import json
+import os
 import re
+import uuid
 from io import BytesIO
 
 from datetime import datetime
@@ -8,6 +10,7 @@ from flask import (
     Blueprint,
     Response,
     abort,
+    current_app,
     flash,
     jsonify,
     make_response,
@@ -721,6 +724,7 @@ def card_comments_api(card_id):
         items.append({
             "id": cm.id,
             "content": cm.content,
+            "image_url": cm.image_url,
             "created_at": cm.created_at.strftime("%Y-%m-%d %H:%M") if cm.created_at else "",
             "author": {
                 "id": cm.author.id,
@@ -814,6 +818,41 @@ def card_comment(card_id):
         flash("评论内容不能超过 500 字", "warning")
         return redirect(url_for("user.card_detail", card_id=card_id))
 
+    image_url = None
+    image_file = request.files.get("image")
+    if image_file and image_file.filename:
+        ext = (
+            image_file.filename.rsplit(".", 1)[-1].lower()
+            if "." in image_file.filename
+            else ""
+        )
+        if ext not in {"png", "jpg", "jpeg", "gif", "webp"}:
+            err_msg = "仅支持上传 png/jpg/jpeg/gif/webp 格式的图片"
+            if request.headers.get("X-Requested-With") != "XMLHttpRequest":
+                flash(err_msg, "warning")
+            return jsonify({"error": err_msg}), 400
+
+        image_file.seek(0, os.SEEK_END)
+        file_size = image_file.tell()
+        image_file.seek(0)
+        if file_size > 5 * 1024 * 1024:
+            err_msg = "图片大小不能超过 5MB"
+            if request.headers.get("X-Requested-With") != "XMLHttpRequest":
+                flash(err_msg, "warning")
+            return jsonify({"error": err_msg}), 400
+
+        ym_dir = datetime.now().strftime("%Y%m")
+        target_dir = os.path.join(
+            current_app.root_path, "static", "uploads", "comments", ym_dir
+        )
+        os.makedirs(target_dir, exist_ok=True)
+
+        filename_uuid = f"{uuid.uuid4().hex}.{ext}"
+        save_path = os.path.join(target_dir, filename_uuid)
+        image_file.save(save_path)
+
+        image_url = f"uploads/comments/{ym_dir}/{filename_uuid}"
+
     reply_to_id = request.form.get("reply_to_id", type=int)
     valid_reply_to_id = None
     parent_cm = None
@@ -830,6 +869,7 @@ def card_comment(card_id):
             user_id=current_user.id,
             content=content,
             reply_to_id=valid_reply_to_id,
+            image_url=image_url,
         )
     )
     if parent_cm and parent_cm.user_id != current_user.id:
