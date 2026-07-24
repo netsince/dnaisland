@@ -1,7 +1,17 @@
-{% macro render_post(post, stats, thread=false, top=false, focus=false, root_id=None, depth=0) %}
+{% macro render_post(post, stats, thread=false, top=false, focus=false, root_id=None) %}
 {% set s = stats.get(post.id, {'like_count': 0, 'liked': false, 'reply_count': 0}) %}
 {% set visible = teapost_visible(post) %}
-<div class="card dna-post-card mb-2 {% if depth > 0 %}ms-3 border-start{% endif %} {% if top or focus %}border-primary{% endif %}{% if focus %} id="focus"{% endif %}"
+{%- set is_owner = current_user.is_authenticated and current_user.id == post.user_id -%}
+{%- set can_see_deleted = current_user.is_authenticated and (current_user.id == post.user_id or current_user.is_super_admin) -%}
+{%- if post.is_deleted and not can_see_deleted -%}
+{%- elif post.is_deleted -%}
+<div class="card dna-post-card mb-2">
+  <div class="card-body p-3 py-2">
+    <div class="text-muted small fst-italic">作者已删除该帖</div>
+  </div>
+</div>
+{%- else -%}
+<div class="card dna-post-card mb-2 {% if top or focus %}border-primary{% endif %}{% if focus %} id="focus"{% endif %}"
  {% if not top and not focus %}style="cursor:pointer;"
  onclick="if(event.target.closest('a,button,form'))return; window.location.href='{{ url_for('teahouse.post_detail', post_id=post.id) }}'"{% endif %}>
  <div class="card-body p-3 py-2">
@@ -20,6 +30,7 @@
  <span class="text-muted small">@{{ post.author.username }}</span>
  {% if top %}<span class="badge bg-primary-subtle text-primary small">原帖</span>{% endif %}
  <span class="text-muted small ms-auto">{{ post.created_at.strftime('%Y-%m-%d %H:%M') if post.created_at else '' }}</span>
+ {% if post.edited_at %}<span class="text-muted small">· 已编辑</span>{% endif %}
  </div>
 
  {% if post.is_hidden and not visible %}
@@ -29,7 +40,8 @@
  {% endif %}
 
  {% if visible %}
- <div style="white-space:pre-wrap; word-break:break-word;">{{ post.content | teahouse_linkify }}</div>
+ <div class="js-post-body{% if post.content|length > 200 %} is-folded{% endif %}" style="white-space:pre-wrap; word-break:break-word;">{{ post.content | teahouse_linkify }}</div>
+ {% if post.content|length > 200 %}<button type="button" class="btn btn-sm btn-link text-decoration-none text-muted p-0 mt-1 js-post-fold">展开全文</button>{% endif %}
  {% else %}
  <div class="text-muted small fst-italic">内容已隐藏</div>
  {% endif %}
@@ -58,24 +70,43 @@
  <i class="bi bi-share"></i>
  <span>分享</span>
  </button>
+ {% if current_user.is_authenticated and (is_owner or current_user.is_super_admin) %}
+ <span class="d-flex gap-2 align-items-center ms-1">
+ {% if post.can_edit(current_user) %}
+ <button type="button" class="btn btn-sm btn-link text-decoration-none text-muted p-0 js-post-edit" data-post-id="{{ post.id }}" data-content="{{ post.content }}">编辑</button>
+ {% endif %}
+ <button type="button" class="btn btn-sm btn-link text-decoration-none text-danger p-0 js-post-delete" data-post-id="{{ post.id }}">删除</button>
+ </span>
+ {% endif %}
  {% if current_user.is_authenticated %}
  <a class="text-decoration-none text-muted small ms-auto opacity-75" href="{{ url_for('user.report', type='teapost', id=post.id) }}">举报</a>
  {% endif %}
  </div>
 
- {% if thread and depth < 5 and post.replies %}
+ {% if thread and post.replies %}
  {% for child in post.replies %}
- {{ render_post(child, stats, thread=true, depth=depth + 1) }}
+ {{ render_post(child, stats, thread=true) }}
  {% endfor %}
  {% endif %}
  </div>
 </div>
+{%- endif -%}
 {% endmacro %}
 
 
 {% macro render_reply(post, stats, root_id, focus=false) %}
 {% set s = stats.get(post.id, {'like_count': 0, 'liked': false, 'reply_count': 0}) %}
 {% set visible = teapost_visible(post) %}
+{%- set is_owner = current_user.is_authenticated and current_user.id == post.user_id -%}
+{%- set can_see_deleted = current_user.is_authenticated and (current_user.id == post.user_id or current_user.is_super_admin) -%}
+{%- if post.is_deleted and not can_see_deleted -%}
+{%- elif post.is_deleted -%}
+<div class="card mb-2">
+  <div class="card-body py-3">
+    <div class="text-muted small fst-italic">作者已删除该帖</div>
+  </div>
+</div>
+{%- else -%}
 <div class="card mb-2 {% if focus %}border-primary{% endif %}{% if focus %} id="focus"{% endif %}" style="cursor:pointer;"
  onclick="if(event.target.closest('a,button,form'))return; window.location.href='{{ url_for('teahouse.post_detail', post_id=post.id) }}'">
  <div class="card-body py-3">
@@ -93,6 +124,7 @@
  <a class="text-decoration-none text-reset fw-semibold" href="{{ url_for('user.profile', username=post.author.username) }}">{{ post.author.display_name }}</a>
  <span class="text-muted small">@{{ post.author.username }}</span>
  <span class="text-muted small ms-auto">{{ post.created_at.strftime('%Y-%m-%d %H:%M') if post.created_at else '' }}</span>
+ {% if post.edited_at %}<span class="text-muted small">· 已编辑</span>{% endif %}
  </div>
 
  {% if post.is_hidden and not visible %}
@@ -102,7 +134,8 @@
  {% endif %}
 
  {% if visible %}
- <div style="white-space:pre-wrap; word-break:break-word;">{{ post.content | teahouse_linkify }}</div>
+ <div class="js-post-body{% if post.content|length > 200 %} is-folded{% endif %}" style="white-space:pre-wrap; word-break:break-word;">{{ post.content | teahouse_linkify }}</div>
+ {% if post.content|length > 200 %}<button type="button" class="btn btn-sm btn-link text-decoration-none text-muted p-0 mt-1 js-post-fold">展开全文</button>{% endif %}
  {% else %}
  <div class="text-muted small fst-italic">内容已隐藏</div>
  {% endif %}
@@ -120,10 +153,19 @@
  <span> {{ s.like_count }}</span>
  {% endif %}
  <a class="text-decoration-none text-reset" href="{{ url_for('teahouse.post_detail', post_id=post.id) }}#reply">↩ 回复</a>
+ {% if current_user.is_authenticated and (is_owner or current_user.is_super_admin) %}
+ <span class="d-flex gap-2 align-items-center ms-1">
+ {% if post.can_edit(current_user) %}
+ <button type="button" class="btn btn-sm btn-link text-decoration-none text-muted p-0 js-post-edit" data-post-id="{{ post.id }}" data-content="{{ post.content }}">编辑</button>
+ {% endif %}
+ <button type="button" class="btn btn-sm btn-link text-decoration-none text-danger p-0 js-post-delete" data-post-id="{{ post.id }}">删除</button>
+ </span>
+ {% endif %}
  {% if current_user.is_authenticated %}
  <a class="text-decoration-none text-reset ms-auto" href="{{ url_for('user.report', type='teapost', id=post.id) }}">举报</a>
  {% endif %}
  </div>
  </div>
 </div>
+{%- endif -%}
 {% endmacro %}

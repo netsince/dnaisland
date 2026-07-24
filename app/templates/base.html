@@ -55,6 +55,16 @@ function showToast(message, type) {
  <link rel="stylesheet"
  href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;800&display=swap">
  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+ <style>
+  /* 茶馆长文折叠 */
+  .js-post-body.is-folded { max-height: 9em; overflow: hidden; position: relative; }
+  .js-post-body.is-folded::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 2.5em;
+    background: linear-gradient(transparent, var(--bs-body-bg));
+  }
+  .js-post-fold { font-size: .85rem; }
+  .dna-post-edited { opacity: .7; }
+ </style>
  {% block head %}{% endblock %}
 </head>
 <body class="d-flex flex-column min-vh-100 {% block body_class %}{% endblock %}">
@@ -912,6 +922,77 @@ function showToast(message, type) {
  });
  })();
  </script>
+
+<!-- 茶馆：编辑帖子弹窗（仅发布后 15 分钟内可编辑） -->
+<div class="modal fade" id="teahouseEditModal" tabindex="-1" aria-labelledby="teahouseEditModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <form id="teahouseEditForm" method="post" class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="teahouseEditModalLabel">编辑帖子</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+      </div>
+      <div class="modal-body">
+        <textarea name="content" id="teahouseEditContent" class="form-control" rows="5" maxlength="280" required></textarea>
+        <div class="form-text"><span id="teahouseEditCount">0</span>/280 · 仅发布后 15 分钟内可编辑</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+        <button type="submit" class="btn btn-primary">保存</button>
+      </div>
+    </form>
+  </div>
+</div>
+<!-- 茶馆：删除帖子（软删）隐藏表单，配合 confirm 使用 -->
+<form id="teahouseDeleteForm" method="post" style="display:none"></form>
+<script>
+(function () {
+  // 长文折叠 / 展开
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest && e.target.closest('.js-post-fold');
+    if (!btn) return;
+    var body = btn.parentElement.querySelector('.js-post-body');
+    if (!body) return;
+    var folded = body.classList.toggle('is-folded');
+    btn.textContent = folded ? '展开全文' : '收起';
+  });
+
+  // 编辑弹窗：填充内容并设置提交地址
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest && e.target.closest('.js-post-edit');
+    if (!btn) return;
+    e.preventDefault();
+    var id = btn.getAttribute('data-post-id');
+    var content = btn.getAttribute('data-content') || '';
+    var form = document.getElementById('teahouseEditForm');
+    var ta = document.getElementById('teahouseEditContent');
+    var counter = document.getElementById('teahouseEditCount');
+    if (!form || !ta) return;
+    form.action = '/teahouse/' + id + '/edit';
+    ta.value = content;
+    if (counter) counter.textContent = content.length;
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('teahouseEditModal')).show();
+  });
+  document.addEventListener('input', function (e) {
+    if (e.target && e.target.id === 'teahouseEditContent') {
+      var c = document.getElementById('teahouseEditCount');
+      if (c) c.textContent = e.target.value.length;
+    }
+  });
+
+  // 删除（软删）：二次确认后提交隐藏表单
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest && e.target.closest('.js-post-delete');
+    if (!btn) return;
+    e.preventDefault();
+    var id = btn.getAttribute('data-post-id');
+    if (!window.confirm('确定删除该帖吗？删除后仅你自己与管理员可见，且无法恢复。')) return;
+    var form = document.getElementById('teahouseDeleteForm');
+    if (!form) return;
+    form.action = '/teahouse/' + id + '/delete';
+    form.submit();
+  });
+})();
+</script>
 
 <!-- 全局 AJAX Pjax 切换 Loading 遮罩与脉冲动画 -->
 <div class="dna-pjax-loader" id="pjaxLoader">

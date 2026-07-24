@@ -14,16 +14,24 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import aliased
 
 from ..extensions import db
-from ..models import TeaPost, TeaPostLike, User, UserFollow
+import re
+from datetime import datetime, timedelta
+
+from ..models import Notification, TeaPost, TeaPostLike, User, UserFollow
 from ..services.notification_service import notify
 
 teahouse_bp = Blueprint("teahouse", __name__, url_prefix="/teahouse")
 
 TEA_POST_MAX_LEN = 280
+# 发帖 / 回复频率限制：窗口内（分钟）最多 N 条
+TEA_RATE_WINDOW_MIN = 1
+TEA_RATE_LIMIT = 5
+# @提及匹配：@用户名（字母数字下划线）
+TEA_MENTION_RE = re.compile(r"@([A-Za-z0-9_]+)")
 
 
 def _visible_query(query, viewer):
-    """对 viewer 可见的帖子：未隐藏，或本人/超级管理员可见自己被隐藏的帖子。
+    """对 viewer 可见的帖子：未隐藏、未删除，或本人/超级管理员可见自己被隐藏的帖子。
 
     非超级管理员额外隐藏「已删除」（admin_del）作者的帖子；但保留「已注销」
     （user_del）与「纪念」（mourning）作者的帖子（其作者名显示对应占位昵称）。
@@ -35,9 +43,43 @@ def _visible_query(query, viewer):
     )
     if viewer.is_authenticated:
         return query.filter(
-            or_(TeaPost.is_hidden.is_(False), TeaPost.user_id == viewer.id)
+            or_(TeaPost.is_hidden.is_(False), TeaPost.user_id == viewer.id),
+            TeaPost.is_deleted.is_(False),
         )
-    return query.filter(TeaPost.is_hidden.is_(False))
+    return query.filter(TeaPost.is_hidden.is_(False), TeaPost.is_deleted.is_(False))
+
+
+def _too_frequent(user_id):
+    """窗口内发帖/回复数是否超过限制（防刷屏）。"""
+    since = datetime.now() - timedelta(minutes=TEA_RATE_WINDOW_MIN)
+    cnt = TeaPost.query.filter(
+        TeaPost.user_id == user_id,
+        TeaPost.created_at >= since,
+        ~TeaPost.is_deleted,
+    ).count()
+    return cnt >= TEA_RATE_LIMIT
+
+
+def _notify_mentions(content, post, actor):
+    """解析正文中的 @用户名，向被提及且非作者的用户发通知（同一帖去重）。"""
+    url = url_for("teahouse.post_detail", post_id=post.id, _external=True)
+    seen = set()
+    for m in TEA_MENTION_RE.finditer(content or ""):
+        name = m.group(1)
+        if name in seen:
+            continue
+        seen.add(name)
+        u = User.query.filter_by(username=name).first()
+        if not u or u.id == actor.id:
+            continue
+        exists = (
+            Notification.query.filter_by(user_id=u.id, type="mention", is_read=False)
+            .filter(Notification.message.contains(f"/teahouse/{post.id}"))
+            .first()
+        )
+        if exists:
+            continue
+        notify(u.id, f"{actor.nickname} 在茶馆提到了你：{url}", type_="mention")
 
 
 def _build_stats(posts):
@@ -143,8 +185,13 @@ def create_post():
     if len(content) > TEA_POST_MAX_LEN:
         flash(f"帖子内容不能超过 {TEA_POST_MAX_LEN} 字", "warning")
         return redirect(url_for("teahouse.index"))
-    db.session.add(TeaPost(user_id=current_user.id, content=content))
+    if _too_frequent(current_user.id):
+        flash("发帖太频繁了，请稍后再试", "warning")
+        return redirect(url_for("teahouse.index"))
+    post = TeaPost(user_id=current_user.id, content=content)
+    db.session.add(post)
     db.session.commit()
+    _notify_mentions(content, post, current_user)
     flash("发布成功", "success")
     return redirect(url_for("teahouse.index"))
 
@@ -154,6 +201,11 @@ def create_post():
 def post_detail(post_id):
     p = db.session.get(TeaPost, post_id)
     if not p:
+        abort(404)
+    if p.is_deleted and not (
+        current_user.is_authenticated
+        and (current_user.id == p.user_id or current_user.is_super_admin)
+    ):
         abort(404)
     if p.is_hidden and not (
         current_user.is_authenticated
@@ -238,6 +290,11 @@ def reply(post_id):
             return jsonify({"ok": False, "error": f"回复内容不能超过 {TEA_POST_MAX_LEN} 字"})
         flash(f"回复内容不能超过 {TEA_POST_MAX_LEN} 字", "warning")
         return redirect(url_for("teahouse.post_detail", post_id=post_id))
+    if _too_frequent(current_user.id):
+        if is_xhr:
+            return jsonify({"ok": False, "error": "回复太频繁了，请稍后再试"})
+        flash("回复太频繁了，请稍后再试", "warning")
+        return redirect(url_for("teahouse.post_detail", post_id=post_id))
 
     reply_post = TeaPost(user_id=current_user.id, parent_id=post_id, content=content)
     db.session.add(reply_post)
@@ -249,6 +306,8 @@ def reply(post_id):
             f"{current_user.nickname} 回复了你在茶馆的帖子：{content[:30]}",
             type_="teahouse",
         )
+    # 解析正文 @提及，通知被提及用户
+    _notify_mentions(content, reply_post, current_user)
 
     if is_xhr:
         # 局部提交：渲染新回复 HTML 并刷新回复数，不整页刷新
@@ -278,10 +337,35 @@ def like(post_id):
     if existing:
         db.session.delete(existing)
         now_liked = False
+        # 聚合：取消点赞时移除该用户对此帖的未读点赞通知，避免重复刷屏
+        Notification.query.filter_by(
+            user_id=p.user_id, type="like", is_read=False
+        ).filter(Notification.message.contains(f"/teahouse/{p.id}")).delete(
+            synchronize_session=False
+        )
     else:
         db.session.add(TeaPostLike(user_id=current_user.id, post_id=post_id))
-        # 点赞不再额外通知，避免刷屏
         now_liked = True
+        # 点赞通知：被点赞者开启偏好、且非本人（可聚合：同帖不重复）
+        if p.user_id != current_user.id:
+            author = p.author
+            if author and author.notify_like:
+                dup = (
+                    Notification.query.filter_by(
+                        user_id=p.user_id, type="like", is_read=False
+                    )
+                    .filter(Notification.message.contains(f"/teahouse/{p.id}"))
+                    .first()
+                )
+                if not dup:
+                    url = url_for(
+                        "teahouse.post_detail", post_id=p.id, _external=True
+                    )
+                    notify(
+                        p.user_id,
+                        f"{current_user.nickname} 赞了你在茶馆的帖子：{url}",
+                        type_="like",
+                    )
     db.session.commit()
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
         # 局部提交：返回新状态供前端切换按钮，不整页刷新
@@ -292,6 +376,48 @@ def like(post_id):
             "count": TeaPostLike.query.filter_by(post_id=post_id).count(),
         })
     return redirect(request.referrer or url_for("teahouse.post_detail", post_id=post_id))
+
+
+# ---------------- 编辑 / 删除（软删） ----------------
+@teahouse_bp.route("/<int:post_id>/edit", methods=["POST"])
+@login_required
+def edit_post(post_id):
+    p = db.session.get(TeaPost, post_id)
+    if not p:
+        abort(404)
+    if not p.can_edit(current_user):
+        abort(403)
+    content = (request.form.get("content") or "").strip()
+    if not content:
+        flash("帖子内容不能为空", "warning")
+    elif len(content) > TEA_POST_MAX_LEN:
+        flash(f"帖子内容不能超过 {TEA_POST_MAX_LEN} 字", "warning")
+    else:
+        p.content = content
+        p.edited_at = datetime.utcnow()
+        db.session.commit()
+        _notify_mentions(content, p, current_user)
+        flash("已更新", "success")
+    return redirect(request.referrer or url_for("teahouse.post_detail", post_id=post_id))
+
+
+@teahouse_bp.route("/<int:post_id>/delete", methods=["POST"])
+@login_required
+def delete_post(post_id):
+    p = db.session.get(TeaPost, post_id)
+    if not p:
+        abort(404)
+    if not (current_user.id == p.user_id or current_user.is_super_admin):
+        abort(403)
+    if p.is_deleted:
+        abort(404)
+    p.is_deleted = True
+    p.deleted_at = datetime.utcnow()
+    db.session.commit()
+    flash("已删除", "success")
+    if p.parent_id is None:
+        return redirect(url_for("teahouse.index"))
+    return redirect(url_for("teahouse.post_detail", post_id=p.parent_id))
 
 
 # ---------------- 外链中转（离开本站确认页） ----------------

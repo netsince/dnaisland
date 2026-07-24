@@ -59,6 +59,13 @@
         <input class="form-control" type="url" name="website" value="{{ u.website or '' }}" maxlength="200" placeholder="https://example.com">
       </div>
 
+      <div class="mb-3">
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" name="notify_like" id="notifyLike" {% if u.notify_like %}checked{% endif %}>
+          <label class="form-check-label" for="notifyLike">有人赞我的茶馆帖子时通知我（取消勾选可关闭，避免被点赞刷屏打扰）</label>
+        </div>
+      </div>
+
       <div class="d-flex gap-2">
         <button class="btn btn-primary" type="submit">保存</button>
         <a class="btn btn-outline-secondary" href="{{ url_for('user.profile', username=u.username) }}">取消</a>

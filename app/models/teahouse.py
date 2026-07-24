@@ -1,6 +1,12 @@
+from datetime import datetime, timedelta
+
 from sqlalchemy.dialects.mysql import LONGTEXT
 
 from ..extensions import db
+
+
+# 发帖后允许编辑的时间窗口（分钟）
+TEA_EDIT_WINDOW = timedelta(minutes=15)
 
 
 class TeaPost(db.Model):
@@ -25,7 +31,24 @@ class TeaPost(db.Model):
     moderated = db.Column(db.Boolean, server_default="0", nullable=False, index=True)
     created_at = db.Column(db.DateTime, server_default=db.func.now())
 
+    # 编辑 / 软删除（删除走软删，作者与管理员仍可看到）
+    edited_at = db.Column(db.DateTime, nullable=True)
+    is_deleted = db.Column(db.Boolean, server_default="0", nullable=False, index=True)
+    deleted_at = db.Column(db.DateTime, nullable=True)
+
     author = db.relationship("User", backref="teaposts")
+
+    def can_edit(self, user) -> bool:
+        """当前用户能否编辑此帖：作者/超管、未隐藏未删、且在编辑窗口内。"""
+        if not user or not getattr(user, "is_authenticated", False):
+            return False
+        if user.id != self.user_id and not user.is_super_admin:
+            return False
+        if self.is_deleted or self.is_hidden:
+            return False
+        if (datetime.utcnow() - self.created_at) > TEA_EDIT_WINDOW:
+            return False
+        return True
     # 父帖（被回复的那条）；replies 反向得到直接子回复
     parent = db.relationship(
         "TeaPost", remote_side=[id], foreign_keys=[parent_id], backref="replies"

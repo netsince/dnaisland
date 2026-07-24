@@ -30,6 +30,9 @@ class User(db.Model, UserMixin):
     verified = db.Column(db.Boolean, server_default="0", nullable=False, index=True)
     verified_label = db.Column(db.String(50), nullable=True)  # 认证说明，如「官方」「知名创作者」
 
+    # 通知偏好
+    notify_like = db.Column(db.Boolean, server_default="1", nullable=False)  # 茶馆被点赞时通知（可关，防刷屏）
+
     @property
     def is_super_admin(self) -> bool:
         return self.role == "super_admin"

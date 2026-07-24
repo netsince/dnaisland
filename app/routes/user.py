@@ -287,6 +287,9 @@ def profile_edit():
         else:
             u.birthday = None
 
+        # 通知偏好：茶馆被点赞时是否通知（可关，防刷屏）
+        u.notify_like = "notify_like" in request.form
+
         # 头像：移除 / 裁剪后上传 / 保留原值
         if request.form.get("remove_avatar"):
             u.avatar = None
