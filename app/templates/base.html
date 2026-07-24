@@ -1296,32 +1296,69 @@ data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded=
     if (m) bootstrap.Modal.getOrCreateInstance(m).show();
   });
 
-  // 表情包：加载、渲染、面板与插入
-  window.DnaStickers = { loaded: false, series: [], map: {} };
+  // 表情包：自动预加载、延迟占位与动态替换
+  window.DnaStickers = { loaded: false, series: [], map: {}, loadingPromise: null };
+
+  function updateDOMStickers() {
+    try {
+      document.querySelectorAll('.dna-sticker-placeholder').forEach(function (span) {
+        var code = span.getAttribute('data-sticker-code');
+        var d = window.DnaStickers.map[code];
+        if (d) {
+          var img = document.createElement('img');
+          img.className = 'dna-sticker';
+          img.src = d;
+          img.alt = code;
+          img.title = code;
+          if (span.parentNode) span.parentNode.replaceChild(img, span);
+        }
+      });
+    } catch (e) {}
+  }
+  window.updateDOMStickers = updateDOMStickers;
 
   function loadStickers() {
     if (window.DnaStickers.loaded) return Promise.resolve();
-    return fetch('/stickers/api').then(function (r) { return r.json(); }).then(function (data) {
-      var series = data.series || [];
-      var map = {};
-      series.forEach(function (s) {
-        s.stickers.forEach(function (st) { map[st.code] = st.image_data; });
+    if (window.DnaStickers.loadingPromise) return window.DnaStickers.loadingPromise;
+    window.DnaStickers.loadingPromise = fetch('/stickers/api')
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var series = data.series || [];
+        var map = {};
+        series.forEach(function (s) {
+          if (s.stickers) {
+            s.stickers.forEach(function (st) { map[st.code] = st.image_data; });
+          }
+        });
+        window.DnaStickers.series = series;
+        window.DnaStickers.map = map;
+        window.DnaStickers.loaded = true;
+        updateDOMStickers();
+      })
+      .catch(function () {
+        window.DnaStickers.loaded = true;
       });
-      window.DnaStickers.series = series;
-      window.DnaStickers.map = map;
-      window.DnaStickers.loaded = true;
-    }).catch(function () { window.DnaStickers.loaded = true; });
+    return window.DnaStickers.loadingPromise;
   }
+  window.loadStickers = loadStickers;
 
   function renderStickers(text) {
     if (!text) return text;
     return text.replace(/\[sticker:([A-Za-z0-9_-]+)\]/g, function (m, code) {
       var d = window.DnaStickers.map[code];
-      if (!d) return m;  // 未知 token 暂保留，待加载后再次渲染
+      if (!d) {
+        return '<span class="dna-sticker-placeholder" data-sticker-code="' + code + '">' + m + '</span>';
+      }
       return '<img class="dna-sticker" src="' + d + '" alt="' + code + '" title="' + code + '">';
     });
   }
   window.renderStickers = renderStickers;
+
+  document.addEventListener('DOMContentLoaded', loadStickers);
+  document.addEventListener('dna:page-loaded', function () {
+    loadStickers().then(updateDOMStickers);
+  });
+  loadStickers();
 
   var _stickerTarget = null;
   function showStickerSeries(s) {

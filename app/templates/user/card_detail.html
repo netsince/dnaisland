@@ -686,6 +686,9 @@
         if (typeof window.initLightbox === 'function') {
           window.initLightbox();
         }
+        if (typeof window.updateDOMStickers === 'function') {
+          window.updateDOMStickers();
+        }
       })
       .catch(function() {
         loading = false;
