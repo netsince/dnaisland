@@ -24,6 +24,8 @@ from ..models import (
     TeaPostFavorite,
     TeaPostImage,
     TeaPostLike,
+    TeaPostTopic,
+    TeaTopic,
     User,
     UserFollow,
 )
@@ -144,7 +146,13 @@ def _build_stats(posts):
     """预计算一组帖子的点赞数、本人是否点赞、直接回复数，返回 {post_id: {...}}。"""
     ids = [p.id for p in posts]
     stats = {
-        pid: {"like_count": 0, "liked": False, "reply_count": 0, "favorited": False}
+        pid: {
+            "like_count": 0,
+            "liked": False,
+            "reply_count": 0,
+            "favorited": False,
+            "topics": [],
+        }
         for pid in ids
     }
     if not ids:
@@ -176,7 +184,49 @@ def _build_stats(posts):
         .all()
     ):
         stats[pid]["reply_count"] = cnt
+    rows = (
+        db.session.query(TeaPostTopic.post_id, TeaTopic.id, TeaTopic.name)
+        .join(TeaTopic, TeaTopic.id == TeaPostTopic.topic_id)
+        .filter(TeaPostTopic.post_id.in_(ids))
+        .all()
+    )
+    for pid, tid, tname in rows:
+        stats[pid]["topics"].append({"id": tid, "name": tname})
     return stats
+
+
+def _dec_topic_count(topic_id):
+    if topic_id is None:
+        return
+    t = db.session.get(TeaTopic, topic_id)
+    if t:
+        t.post_count = max((t.post_count or 1) - 1, 0)
+
+
+def _set_single_topic(post, topic_raw):
+    """解析自由输入的话题（仅 1 个），查找/创建 TeaTopic 并维护关联与计数。"""
+    name = (topic_raw or "").strip().strip("#").strip()
+    if len(name) > 50:
+        name = name[:50]
+    existing = TeaPostTopic.query.filter_by(post_id=post.id).first()
+    old_topic_id = existing.topic_id if existing else None
+    if not name:
+        if existing:
+            db.session.delete(existing)
+            _dec_topic_count(old_topic_id)
+        return
+    topic = TeaTopic.query.filter_by(name=name).first()
+    if not topic:
+        topic = TeaTopic(name=name, post_count=0)
+        db.session.add(topic)
+        db.session.flush()
+    if existing:
+        if existing.topic_id == topic.id:
+            return
+        db.session.delete(existing)
+        _dec_topic_count(old_topic_id)
+    db.session.add(TeaPostTopic(post_id=post.id, topic_id=topic.id))
+    topic.post_count = (topic.post_count or 0) + 1
 
 
 # ---------------- 推荐流（首页） ----------------
@@ -262,6 +312,38 @@ def favorites():
     )
 
 
+@teahouse_bp.route("/topic/<int:topic_id>")
+def topic_detail(topic_id):
+    topic = db.session.get(TeaTopic, topic_id)
+    if not topic:
+        abort(404)
+    page = request.args.get("page", 1, type=int)
+    # 取带该话题的帖子的「根帖」集合（回复归并到其根帖）
+    topic_post_ids = (
+        db.session.query(TeaPostTopic.post_id).filter_by(topic_id=topic_id).subquery()
+    )
+    roots = (
+        db.session.query(func.coalesce(TeaPost.parent_id, TeaPost.id).label("root_id"))
+        .join(topic_post_ids, TeaPost.id == topic_post_ids.c.post_id)
+        .distinct()
+        .subquery()
+    )
+    q = TeaPost.query.filter(TeaPost.id.in_(db.session.query(roots.c.root_id)))
+    q = _visible_query(q, current_user)
+    q = q.order_by(TeaPost.created_at.desc())
+    pagination = q.paginate(page=page, per_page=20, error_out=False)
+    posts = pagination.items
+    stats = _build_stats(posts)
+    return render_template(
+        "teahouse/topic.html",
+        topic=topic,
+        posts=posts,
+        stats=stats,
+        pagination=pagination,
+        max_len=TEA_POST_MAX_LEN,
+    )
+
+
 # ---------------- 发帖 ----------------
 @teahouse_bp.route("/post", methods=["POST"])
 @login_required
@@ -289,6 +371,7 @@ def create_post():
     images_raw = request.form.getlist("images")
     if images_raw:
         _attach_images(post, images_raw)
+    _set_single_topic(post, request.form.get("topic"))
     db.session.commit()
     _notify_mentions(content, post, current_user)
     flash("发布成功", "success")
@@ -427,6 +510,7 @@ def reply(post_id):
     images_raw = request.form.getlist("images")
     if images_raw:
         _attach_images(reply_post, images_raw)
+    _set_single_topic(reply_post, request.form.get("topic"))
     db.session.commit()
     # 通知被回复帖子的作者（非本人）
     if p.user_id != current_user.id:
@@ -570,6 +654,9 @@ def edit_post(post_id):
                 for old in list(p.images):
                     db.session.delete(old)
                 p.images.clear()
+        # 话题：仅当表单显式提交 topic 字段时才调整
+        if "topic" in request.form:
+            _set_single_topic(p, request.form.get("topic"))
         db.session.commit()
         _notify_mentions(content, p, current_user)
         flash("已更新", "success")
@@ -586,6 +673,9 @@ def delete_post(post_id):
         abort(403)
     if p.is_deleted:
         abort(404)
+    # 软删前递减该帖话题的计数（话题聚合页由可见性过滤，这里只修正粗略计数）
+    for tp in TeaPostTopic.query.filter_by(post_id=p.id).all():
+        _dec_topic_count(tp.topic_id)
     p.is_deleted = True
     p.deleted_at = datetime.utcnow()
     db.session.commit()

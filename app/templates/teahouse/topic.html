@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% from "teahouse/_post_item.html" import render_post with context %}
+{% from "macros/pagination.html" import render_pagination %}
+
+{% block title %}#{{ topic.name }} · 茶馆 · DNAISLAND{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+ <div class="col-12 col-lg-8">
+  <div class="dna-post-create-card card border-0 shadow-sm mb-3">
+   <div class="card-body py-3">
+    <div class="d-flex align-items-center justify-content-between">
+     <div>
+      <h1 class="h4 mb-1 fw-bold"><span class="text-warning">#</span>{{ topic.name }}</h1>
+      <small class="text-muted">共 {{ pagination.total }} 条相关讨论</small>
+     </div>
+     <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('teahouse.index') }}">← 返回茶馆</a>
+    </div>
+   </div>
+  </div>
+
+  {% if posts %}
+  {% for p in posts %}{{ render_post(p, stats, thread=false) }}{% endfor %}
+  {{ render_pagination(pagination, 'teahouse.topic_detail', {'topic_id': topic.id}) }}
+  {% else %}
+  <div class="text-center text-muted py-5">这个话题下还没有帖子。</div>
+  {% endif %}
+ </div>
+</div>
+{% endblock %}

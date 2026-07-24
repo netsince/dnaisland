@@ -24,8 +24,20 @@
 {% endmacro %}
 
 
+{% macro render_topics(post, stats) %}
+{% set s_topics = stats.get(post.id, {}).get('topics', []) %}
+{% if s_topics %}
+<div class="d-flex flex-wrap gap-1 mb-2">
+ {% for t in s_topics %}
+ <a class="badge rounded-pill text-bg-light text-decoration-none border" href="{{ url_for('teahouse.topic_detail', topic_id=t.id) }}">#{{ t.name }}</a>
+ {% endfor %}
+</div>
+{% endif %}
+{% endmacro %}
+
+
 {% macro render_post(post, stats, thread=false, top=false, focus=false, root_id=None) %}
-{% set s = stats.get(post.id, {'like_count': 0, 'liked': false, 'reply_count': 0}) %}
+{% set s = stats.get(post.id, {'like_count': 0, 'liked': false, 'reply_count': 0, 'favorited': false, 'topics': []}) %}
 {% set visible = teapost_visible(post) %}
 {%- set is_owner = current_user.is_authenticated and current_user.id == post.user_id -%}
 {%- set can_see_deleted = current_user.is_authenticated and (current_user.id == post.user_id or current_user.is_super_admin) -%}
@@ -74,6 +86,7 @@
  {% endif %}
 
  {{ render_images(post) }}
+ {{ render_topics(post, stats) }}
 
  <div class="d-flex flex-wrap gap-3 mt-2 small text-muted align-items-center pt-2 border-top border-secondary border-opacity-10">
  <a class="btn btn-sm btn-link text-decoration-none text-muted p-0 d-flex align-items-center gap-1" href="{{ url_for('teahouse.post_detail', post_id=post.id) }}">
@@ -131,7 +144,7 @@
 
 
 {% macro render_reply(post, stats, root_id, focus=false) %}
-{% set s = stats.get(post.id, {'like_count': 0, 'liked': false, 'reply_count': 0}) %}
+{% set s = stats.get(post.id, {'like_count': 0, 'liked': false, 'reply_count': 0, 'favorited': false, 'topics': []}) %}
 {% set visible = teapost_visible(post) %}
 {%- set is_owner = current_user.is_authenticated and current_user.id == post.user_id -%}
 {%- set can_see_deleted = current_user.is_authenticated and (current_user.id == post.user_id or current_user.is_super_admin) -%}
@@ -178,6 +191,7 @@
  {% endif %}
 
  {{ render_images(post) }}
+ {{ render_topics(post, stats) }}
 
  <div class="d-flex flex-wrap gap-3 mt-2 small text-muted align-items-center">
  <a class="text-decoration-none text-reset" href="{{ url_for('teahouse.post_detail', post_id=post.id) }}"> {{ s.reply_count }} 回复</a>
