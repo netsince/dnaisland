@@ -664,11 +664,11 @@ def card_comments_api(card_id):
     q = (
         Comment.query
         .filter_by(card_id=card_id, is_hidden=False)
-        .order_by(Comment.created_at.desc())
+        .order_by(Comment.created_at.desc(), Comment.id.desc())
     )
     pagination = q.paginate(page=page, per_page=per_page, error_out=False)
     items = []
-    for cm in pagination.items:
+    for idx, cm in enumerate(pagination.items):
         items.append({
             "id": cm.id,
             "content": cm.content,
@@ -684,6 +684,13 @@ def card_comments_api(card_id):
                 and cm.author.id != current_user.id
             ),
             "report_url": url_for("user.report", type="comment", id=cm.id),
+            "is_author": (cm.user_id == card.author_id),
+            "can_delete": (
+                current_user.is_authenticated
+                and (cm.user_id == current_user.id or current_user.is_super_admin)
+            ),
+            "delete_url": url_for("user.card_comment_delete", card_id=card_id, comment_id=cm.id),
+            "floor": pagination.total - ((page - 1) * per_page + idx),
         })
     # 定位指定评论所在分页：供「从外部带 comment 参数进入」时自动翻到对应评论
     focus_page = None
@@ -728,15 +735,33 @@ def card_comment(card_id):
         if request.headers.get("X-Requested-With") == "XMLHttpRequest":
             return jsonify({"error": "评论内容不能为空"}), 400
         flash("评论内容不能为空", "warning")
-    else:
-        db.session.add(
-            Comment(card_id=card_id, user_id=current_user.id, content=content)
-        )
-        db.session.commit()
+        return redirect(url_for("user.card_detail", card_id=card_id))
+    if len(content) > 500:
         if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-            return jsonify({"ok": True})
-        flash("评论成功", "success")
+            return jsonify({"error": "评论内容不能超过 500 字"}), 400
+        flash("评论内容不能超过 500 字", "warning")
+        return redirect(url_for("user.card_detail", card_id=card_id))
+    db.session.add(
+        Comment(card_id=card_id, user_id=current_user.id, content=content)
+    )
+    db.session.commit()
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return jsonify({"ok": True})
+    flash("评论成功", "success")
     return redirect(url_for("user.card_detail", card_id=card_id))
+
+
+@user_bp.route("/card/<card_id>/comment/<int:comment_id>/delete", methods=["POST"])
+@login_required
+def card_comment_delete(card_id, comment_id):
+    cm = db.session.get(Comment, comment_id)
+    if not cm or cm.card_id != card_id:
+        abort(404)
+    if not (cm.user_id == current_user.id or current_user.is_super_admin):
+        return jsonify({"error": "无权删除此评论"}), 403
+    db.session.delete(cm)
+    db.session.commit()
+    return jsonify({"ok": True})
 
 
 @user_bp.route("/my/card/<card_id>/resubmit", methods=["POST"])
