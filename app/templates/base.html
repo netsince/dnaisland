@@ -867,18 +867,35 @@ data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded=
 
  <!-- 移动端底栏 + 号弹出的全屏高斯模糊蒙层与 2 大选项按钮 -->
  <div class="dna-mobile-plus-overlay" id="mobilePlusOverlay">
- <div class="dna-mobile-plus-popup" id="mobilePlusPopup">
- <div class="d-flex flex-column gap-3 p-3">
- <a href="{{ url_for('publish.start') }}" class="btn btn-lg btn-primary d-flex align-items-center justify-content-center gap-2 py-3 shadow-lg rounded-3">
- <i class="bi bi-file-earmark-plus fs-5"></i>
- <span class="fw-bold">发布角色卡</span>
- </a>
- <a href="{{ url_for('image_gen.workbench') }}" class="btn btn-lg btn-outline-primary d-flex align-items-center justify-content-center gap-2 py-3 shadow-lg rounded-3">
- <i class="bi bi-image fs-5"></i>
- <span class="fw-bold">AI 生图工作台</span>
- </a>
- </div>
- </div>
+   <div class="dna-mobile-plus-popup" id="mobilePlusPopup">
+     <div class="dna-plus-menu-card p-3 rounded-4">
+       <div class="dna-plus-menu-header mb-2.5 px-1 d-flex align-items-center justify-content-between">
+         <span class="small fw-semibold text-muted"><i class="bi bi-grid-fill me-1.5 opacity-75"></i>快捷创作选单</span>
+       </div>
+       <div class="d-flex flex-column gap-2.5">
+         <a href="{{ url_for('publish.start') }}" class="dna-plus-action-btn d-flex align-items-center gap-3 p-3 rounded-3 text-decoration-none">
+           <div class="dna-plus-icon-box flex-shrink-0 d-flex align-items-center justify-content-center rounded-3">
+             <i class="bi bi-person-vcard fs-4"></i>
+           </div>
+           <div class="dna-plus-text-box min-w-0 flex-grow-1">
+             <div class="fw-bold text-light fs-6">发布角色卡</div>
+             <div class="small text-muted text-truncate mt-0.5">创建并分享全新 AI 角色属性卡</div>
+           </div>
+           <i class="bi bi-chevron-right text-muted fs-6"></i>
+         </a>
+         <a href="{{ url_for('image_gen.workbench') }}" class="dna-plus-action-btn d-flex align-items-center gap-3 p-3 rounded-3 text-decoration-none">
+           <div class="dna-plus-icon-box flex-shrink-0 d-flex align-items-center justify-content-center rounded-3">
+             <i class="bi bi-sparkles fs-4"></i>
+           </div>
+           <div class="dna-plus-text-box min-w-0 flex-grow-1">
+             <div class="fw-bold text-light fs-6">AI 生图工作台</div>
+             <div class="small text-muted text-truncate mt-0.5">文生图、图生图与灵感画廊创作</div>
+           </div>
+           <i class="bi bi-chevron-right text-muted fs-6"></i>
+         </a>
+       </div>
+     </div>
+   </div>
  </div>
 
  <script>
