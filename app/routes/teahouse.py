@@ -412,7 +412,6 @@ def create_post():
         flash_msg="发布成功",
         flash_cat="success",
         action="post",
-        redirect_url=url_for("teahouse.post_detail", post_id=post.id),
     )
 
 

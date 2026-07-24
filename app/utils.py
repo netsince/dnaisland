@@ -63,10 +63,12 @@ def is_xhr() -> bool:
 def respond(redirect_url, *, ok=True, flash_msg=None, flash_cat="info", status=200, **json_payload):
     """统一响应：JSON 请求返回 JSON；普通表单请求 flash 后跳转。
 
-    json_payload 原样放进 JSON 体（自带 ok 字段），用于携带 action/state/count 等字段。
+    json_payload 原样放进 JSON 体（自带 ok 与 redirect_url 字段），用于携带 action/state/count 等字段。
     """
     if is_xhr():
-        return jsonify(ok=ok, **json_payload), status
+        payload = {"ok": ok, "redirect_url": redirect_url}
+        payload.update(json_payload)
+        return jsonify(payload), status
     if flash_msg:
         flash(flash_msg, flash_cat)
     return redirect(redirect_url)
