@@ -248,14 +248,7 @@ a { color: var(--dna-link); }
   mask-image: radial-gradient(80% 80% at 50% 0%, var(--dna-overlay-dark), transparent);
   pointer-events: none;
 }
-.dna-hero__eyebrow {
-  display: inline-flex; align-items: center; gap: .4rem;
-  font-size: .8rem; letter-spacing: 2px; text-transform: uppercase;
-  color: var(--dna-accent-3);
-  border: 1px solid var(--dna-border-strong);
-  padding: .28rem .7rem; border-radius: 999px;
-  background: rgba(255,255,255,.04);
-}
+
 .dna-hero__title {
   font-weight: 800;
   line-height: 1.1;
