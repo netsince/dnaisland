@@ -51,7 +51,7 @@ def _resolve_card(card_id_raw, viewer):
     card_id = str(card_id_raw).strip()
     if not card_id:
         return None
-    return Card.visible_to(viewer).filter_by(id=card_id).first()
+    return Card.visible_to(viewer).filter(Card.id == card_id).first()
 
 
 def _attach_images(post, image_files):
