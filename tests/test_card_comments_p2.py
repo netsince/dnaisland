@@ -228,41 +228,35 @@ def test_comment_image_upload(app, client):
     assert res_big.status_code == 400
     assert res_big.json["error"] == "图片大小不能超过 5MB"
 
-    saved_file_path = None
-    try:
-        # 3. 测试正常上传合法图片 (.png)
-        png_data = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01"
-        res_ok = client.post(
-            "/card/card-img/comment",
-            data={
-                "content": "合法带图评论",
-                "image": (io.BytesIO(png_data), "sample.png"),
-            },
-            content_type="multipart/form-data",
-        )
-        assert res_ok.status_code in (200, 302)
+    # 3. 测试正常上传合法图片（生成一张真实可用的 PNG，避免 PIL 解码失败）
+    from PIL import Image as _PILImage
+    _buf = io.BytesIO()
+    _PILImage.new("RGB", (4, 4), (200, 30, 30)).save(_buf, format="PNG")
+    png_data = _buf.getvalue()
+    res_ok = client.post(
+        "/card/card-img/comment",
+        data={
+            "content": "合法带图评论",
+            "image": (io.BytesIO(png_data), "sample.png"),
+        },
+        content_type="multipart/form-data",
+    )
+    assert res_ok.status_code in (200, 302)
 
-        with app.app_context():
-            cm = Comment.query.filter_by(card_id="card-img", content="合法带图评论").first()
-            assert cm is not None
-            assert cm.image_url is not None
-            assert cm.image_url.startswith("uploads/comments/")
-            assert cm.image_url.endswith(".png")
+    with app.app_context():
+        cm = Comment.query.filter_by(card_id="card-img", content="合法带图评论").first()
+        assert cm is not None
+        # 现以 WebP base64 data URL 形式存于数据库，而非落地文件
+        assert cm.image_data is not None
+        assert cm.image_data.startswith("data:image/webp;base64,")
 
-            # 验证文件是否实际落地保存
-            saved_file_path = os.path.join(app.root_path, "static", cm.image_url)
-            assert os.path.exists(saved_file_path)
-
-        # 4. 测试 card_comments_api 中精准包含 image_url
-        res_api = client.get("/api/card/card-img/comments")
-        assert res_api.status_code == 200
-        api_data = res_api.json
-        assert len(api_data["items"]) > 0
-        item = api_data["items"][0]
-        assert "image_url" in item
-        assert item["image_url"] == cm.image_url
-    finally:
-        if saved_file_path and os.path.exists(saved_file_path):
-            os.remove(saved_file_path)
+    # 4. 测试 card_comments_api 中精准包含 image_data
+    res_api = client.get("/api/card/card-img/comments")
+    assert res_api.status_code == 200
+    api_data = res_api.json
+    assert len(api_data["items"]) > 0
+    item = api_data["items"][0]
+    assert "image_data" in item
+    assert item["image_data"] == cm.image_data
 
 

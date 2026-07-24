@@ -2,7 +2,6 @@ import html
 import json
 import os
 import re
-import uuid
 from datetime import datetime
 
 from flask import (
@@ -47,6 +46,7 @@ from ..models.punishment import (
 )
 from ..services.notification_service import notify, notify_super_admins
 from ..services.report_service import describe_report_target
+from ..services.image_service import raw_bytes_to_webp_data_url
 from ..services.sticker_service import sanitize_stickers
 from ..utils import (
     ensure_owner_or_admin,
@@ -702,7 +702,7 @@ def card_comments_api(card_id):
         items.append({
             "id": cm.id,
             "content": cm.content,
-            "image_url": cm.image_url,
+            "image_data": cm.image_data,
             "created_at": cm.created_at.strftime("%Y-%m-%d %H:%M") if cm.created_at else "",
             "author": {
                 "id": cm.author.id,
@@ -789,7 +789,7 @@ def card_comment(card_id):
                        flash_msg="评论内容不能超过 500 字", flash_cat="warning",
                        error="评论内容不能超过 500 字")
 
-    image_url = None
+    image_data = None
     image_file = request.files.get("image")
     if image_file and image_file.filename:
         ext = (
@@ -812,24 +812,17 @@ def card_comment(card_id):
                 flash(err_msg, "warning")
             return jsonify({"error": err_msg}), 400
 
-        ym_dir = datetime.now().strftime("%Y%m")
-        target_dir = os.path.join(
-            current_app.root_path, "static", "uploads", "comments", ym_dir
-        )
-        filename_uuid = f"{uuid.uuid4().hex}.{ext}"
-        save_path = os.path.join(target_dir, filename_uuid)
+        raw = image_file.read()
         try:
-            os.makedirs(target_dir, exist_ok=True)
-            image_file.save(save_path)
+            # 压缩为 WebP 后以 base64 data URL 直接存入数据库（与其它图片上传保持一致），不再落地目录
+            image_data = raw_bytes_to_webp_data_url(raw, max_edge=1280, quality=80)
         except Exception as e:
-            current_app.logger.error(f"评论图片保存失败: {e}")
-            err_msg = "图片保存失败，请重试"
+            current_app.logger.error(f"评论图片转 WebP 失败: {e}")
+            err_msg = "图片处理失败，请重试"
             if is_xhr():
                 return jsonify({"error": err_msg}), 500
             flash(err_msg, "danger")
             return redirect(url_for("user.card_detail", card_id=card_id))
-
-        image_url = f"uploads/comments/{ym_dir}/{filename_uuid}"
 
     reply_to_id = request.form.get("reply_to_id", type=int)
     valid_reply_to_id = None
@@ -847,7 +840,7 @@ def card_comment(card_id):
             user_id=current_user.id,
             content=content,
             reply_to_id=valid_reply_to_id,
-            image_url=image_url,
+            image_data=image_data,
         )
     )
     if parent_cm and parent_cm.user_id != current_user.id:

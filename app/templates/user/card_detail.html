@@ -454,7 +454,7 @@
       + timeHtml
       + '</div>'
       + '<div class="dna-comment-item__text">' + renderStickers(escHtml(cm.content)) + '</div>'
-      + (cm.image_url ? '<div class="dna-comment-img-wrap"><a href="/static/' + cm.image_url + '" class="glightbox" data-gallery="comments"><img src="/static/' + cm.image_url + '" class="dna-comment-img" alt="评论图片" loading="lazy"></a></div>' : '')
+      + (function () { var u = cm.image_data; if (!u) return ''; var s = u.indexOf('data:') === 0 ? u : '/static/' + u; return '<div class="dna-comment-img-wrap"><a href="' + s + '" class="glightbox" data-gallery="comments"><img src="' + s + '" class="dna-comment-img" alt="评论图片" loading="lazy"></a></div>'; })()
       + '<div class="dna-comment-item__actions mt-1 d-flex align-items-center">'
       + likeBtn
       + replyBtn
