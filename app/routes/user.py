@@ -36,6 +36,7 @@ from ..models import (
     Notification,
     Punishment,
     Report,
+    TeaPost,
     User,
     UserFollow,
 )
@@ -434,6 +435,17 @@ def card_detail(card_id):
         ).first()
         is not None
     )
+    # 反向聚合：关联此角色卡的茶馆帖子（仅公开可见的）
+    linked_posts = (
+        TeaPost.query.filter(
+            TeaPost.card_id == card.id,
+            TeaPost.is_deleted.is_(False),
+            TeaPost.is_hidden.is_(False),
+        )
+        .order_by(TeaPost.created_at.desc())
+        .limit(20)
+        .all()
+    )
     return render_template(
         "user/card_detail.html",
         card=card,
@@ -447,6 +459,7 @@ def card_detail(card_id):
         favorite_count=favorite_count,
         comment_count=len(visible_comments),
         comments=visible_comments,
+        linked_posts=linked_posts,
         liked=liked,
         favorited=favorited,
         following=following,

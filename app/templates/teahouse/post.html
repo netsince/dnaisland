@@ -42,6 +42,11 @@
         <form method="post" action="{{ url_for('teahouse.reply', post_id=post.id) }}" class="js-reply">
           <textarea class="form-control" name="content" id="replyContent" rows="3" maxlength="{{ max_len }}"
                     placeholder="回复 @{{ post.author.username }}…"></textarea>
+          <div class="d-flex align-items-center mt-2" data-card-picker>
+            <input type="hidden" name="card_id" value="">
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-pick-card>🎴 关联角色卡</button>
+            <span class="tea-card-picked d-none ms-2 small"></span>
+          </div>
           <div class="d-flex justify-content-between align-items-center mt-2">
             <small class="text-muted" id="replyCounterContainer"><span id="replyCounter">0</span> / {{ max_len }}</small>
             <button class="btn btn-primary btn-sm" type="submit">回复</button>

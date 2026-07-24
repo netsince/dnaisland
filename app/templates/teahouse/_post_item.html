@@ -1,3 +1,18 @@
+{% macro render_card_chip(post) %}
+{%- if post.card -%}
+{%- set _cavatar = post.card.images | selectattr('slot', 'equalto', 'square') | first -%}
+<div class="d-inline-flex align-items-center gap-2 border rounded-pill px-2 py-1 mb-2 small bg-body-secondary">
+  <i class="bi bi-person-badge"></i>
+  <span class="text-muted">关联角色卡</span>
+  <a href="{{ url_for('user.card_detail', card_id=post.card.id) }}" class="d-flex align-items-center gap-2 text-decoration-none text-reset">
+    {% if _cavatar %}<img src="{{ _cavatar.data }}" alt="" class="rounded-circle" style="width:24px;height:24px;object-fit:cover;">{% endif %}
+    <strong>{{ post.card.name }}</strong>
+  </a>
+</div>
+{%- endif -%}
+{% endmacro %}
+
+
 {% macro render_post(post, stats, thread=false, top=false, focus=false, root_id=None) %}
 {% set s = stats.get(post.id, {'like_count': 0, 'liked': false, 'reply_count': 0}) %}
 {% set visible = teapost_visible(post) %}
@@ -30,10 +45,11 @@
  <span class="text-muted small">@{{ post.author.username }}</span>
  {% if top %}<span class="badge bg-primary-subtle text-primary small">原帖</span>{% endif %}
  <span class="text-muted small ms-auto">{{ post.created_at.strftime('%Y-%m-%d %H:%M') if post.created_at else '' }}</span>
- {% if post.edited_at %}<span class="text-muted small">· 已编辑</span>{% endif %}
- </div>
+  {% if post.edited_at %}<span class="text-muted small">· 已编辑</span>{% endif %}
+  </div>
+  {{ render_card_chip(post) }}
 
- {% if post.is_hidden and not visible %}
+  {% if post.is_hidden and not visible %}
  <div class="alert alert-warning py-1 small mb-2">该帖因违反社区规范已被隐藏</div>
  {% elif post.is_hidden %}
  <div class="alert alert-warning py-1 small mb-2">该帖因违反社区规范已被隐藏（仅你可见）</div>
@@ -124,10 +140,11 @@
  <a class="text-decoration-none text-reset fw-semibold" href="{{ url_for('user.profile', username=post.author.username) }}">{{ post.author.display_name }}</a>
  <span class="text-muted small">@{{ post.author.username }}</span>
  <span class="text-muted small ms-auto">{{ post.created_at.strftime('%Y-%m-%d %H:%M') if post.created_at else '' }}</span>
- {% if post.edited_at %}<span class="text-muted small">· 已编辑</span>{% endif %}
- </div>
+  {% if post.edited_at %}<span class="text-muted small">· 已编辑</span>{% endif %}
+  </div>
+  {{ render_card_chip(post) }}
 
- {% if post.is_hidden and not visible %}
+  {% if post.is_hidden and not visible %}
  <div class="alert alert-warning py-1 small mb-2">该帖因违反社区规范已被隐藏</div>
  {% elif post.is_hidden %}
  <div class="alert alert-warning py-1 small mb-2">该帖因违反社区规范已被隐藏（仅你可见）</div>

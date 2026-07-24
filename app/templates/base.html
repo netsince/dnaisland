@@ -944,6 +944,21 @@ function showToast(message, type) {
 </div>
 <!-- 茶馆：删除帖子（软删）隐藏表单，配合 confirm 使用 -->
 <form id="teahouseDeleteForm" method="post" style="display:none"></form>
+<!-- 茶馆：关联角色卡选择弹窗 -->
+<div class="modal fade" id="teahouseCardModal" tabindex="-1" aria-labelledby="teahouseCardModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title" id="teahouseCardModalLabel">关联角色卡</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+      </div>
+      <div class="modal-body">
+        <input type="text" id="teaCardSearchInput" class="form-control form-control-sm mb-2" placeholder="搜索角色卡名称…">
+        <div id="teaCardSearchResults" class="d-flex flex-column gap-1"></div>
+      </div>
+    </div>
+  </div>
+</div>
 <script>
 (function () {
   // 长文折叠 / 展开
@@ -991,6 +1006,74 @@ function showToast(message, type) {
     form.action = '/teahouse/' + id + '/delete';
     form.submit();
   });
+
+  // 关联角色卡：搜索 + 选择 + 清除
+  (function () {
+    var modal = document.getElementById('teahouseCardModal');
+    if (!modal) return;
+    var input = document.getElementById('teaCardSearchInput');
+    var results = document.getElementById('teaCardSearchResults');
+    var currentPicker = null;
+    var xhr = null;
+
+    document.addEventListener('click', function (e) {
+      var btn = e.target.closest && e.target.closest('[data-pick-card]');
+      if (btn) {
+        currentPicker = btn.closest('[data-card-picker]') || (btn.form || null);
+        results.innerHTML = '';
+        input.value = '';
+        bootstrap.Modal.getOrCreateInstance(modal).show();
+        setTimeout(function () { input.focus(); }, 50);
+        return;
+      }
+      var clearBtn = e.target.closest && e.target.closest('[data-clear-card]');
+      if (clearBtn) {
+        var picker = clearBtn.closest('[data-card-picker]');
+        if (picker) {
+          var hid = picker.querySelector('input[name=card_id]');
+          if (hid) hid.value = '';
+          var label = picker.querySelector('.tea-card-picked');
+          if (label) { label.classList.add('d-none'); label.textContent = ''; }
+        }
+      }
+    });
+
+    input.addEventListener('input', function () {
+      var q = input.value.trim();
+      if (!q) { results.innerHTML = ''; return; }
+      if (xhr) xhr.abort();
+      xhr = new XMLHttpRequest();
+      xhr.open('GET', '/teahouse/card-search?q=' + encodeURIComponent(q), true);
+      xhr.onload = function () {
+        if (xhr.status !== 200) return;
+        var list = [];
+        try { list = JSON.parse(xhr.responseText) || []; } catch (err) { list = []; }
+        if (!list.length) {
+          results.innerHTML = '<div class="text-muted small">没有找到匹配的角色卡</div>';
+          return;
+        }
+        results.innerHTML = list.map(function (c) {
+          var name = (c.name || '').replace(/"/g, '&quot;');
+          var intro = (c.intro || '').replace(/</g, '&lt;');
+          return '<button type="button" class="btn btn-sm btn-outline-light text-start tea-card-opt" data-id="' + c.id + '" data-name="' + name + '">🎴 ' + name + '<span class="text-muted ms-1">' + intro + '</span></button>';
+        }).join('');
+      };
+      xhr.send();
+    });
+
+    results.addEventListener('click', function (e) {
+      var opt = e.target.closest && e.target.closest('.tea-card-opt');
+      if (!opt || !currentPicker) return;
+      var hid = currentPicker.querySelector('input[name=card_id]');
+      if (hid) hid.value = opt.dataset.id;
+      var label = currentPicker.querySelector('.tea-card-picked');
+      if (label) {
+        label.classList.remove('d-none');
+        label.innerHTML = '已关联：<strong>' + opt.dataset.name + '</strong> <button type="button" class="btn btn-link btn-sm p-0 ms-1 align-baseline" data-clear-card>✕</button>';
+      }
+      bootstrap.Modal.getInstance(modal).hide();
+    });
+  })();
 })();
 </script>
 

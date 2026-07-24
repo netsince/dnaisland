@@ -11,14 +11,27 @@ from flask import (
 )
 from flask_login import current_user, login_required
 from sqlalchemy import func, or_
-from sqlalchemy.orm import aliased
+from sqlalchemy.orm import aliased, joinedload
 
 from ..extensions import db
 import re
 from datetime import datetime, timedelta
 
-from ..models import Notification, TeaPost, TeaPostLike, User, UserFollow
+from ..models import Card, Notification, TeaPost, TeaPostLike, User, UserFollow
 from ..services.notification_service import notify
+
+
+def _resolve_card(card_id_raw, viewer):
+    """校验 card_id 是否属于「已通过且对 viewer 可见」的角色卡；非法时返回 None。
+
+    关联范围：所有已通过可见卡（含 viewer 本人已通过但因被处罚而他人不可见的卡）。
+    """
+    if not card_id_raw:
+        return None
+    card_id = str(card_id_raw).strip()
+    if not card_id:
+        return None
+    return Card.visible_to(viewer).filter_by(id=card_id).first()
 
 teahouse_bp = Blueprint("teahouse", __name__, url_prefix="/teahouse")
 
@@ -37,7 +50,9 @@ def _visible_query(query, viewer):
     （user_del）与「纪念」（mourning）作者的帖子（其作者名显示对应占位昵称）。
     """
     if viewer.is_authenticated and viewer.is_super_admin:
-        return query
+        return query.options(
+            joinedload(TeaPost.card).joinedload(Card.images)
+        )
     query = query.join(User, TeaPost.user_id == User.id).filter(
         User.status != "admin_del"
     )
@@ -45,8 +60,10 @@ def _visible_query(query, viewer):
         return query.filter(
             or_(TeaPost.is_hidden.is_(False), TeaPost.user_id == viewer.id),
             TeaPost.is_deleted.is_(False),
-        )
-    return query.filter(TeaPost.is_hidden.is_(False), TeaPost.is_deleted.is_(False))
+        ).options(joinedload(TeaPost.card).joinedload(Card.images))
+    return query.filter(
+        TeaPost.is_hidden.is_(False), TeaPost.is_deleted.is_(False)
+    ).options(joinedload(TeaPost.card).joinedload(Card.images))
 
 
 def _too_frequent(user_id):
@@ -189,6 +206,9 @@ def create_post():
         flash("发帖太频繁了，请稍后再试", "warning")
         return redirect(url_for("teahouse.index"))
     post = TeaPost(user_id=current_user.id, content=content)
+    card = _resolve_card(request.form.get("card_id"), current_user)
+    if card:
+        post.card_id = card.id
     db.session.add(post)
     db.session.commit()
     _notify_mentions(content, post, current_user)
@@ -266,6 +286,28 @@ def post_detail(post_id):
     )
 
 
+@teahouse_bp.route("/card-search")
+@login_required
+def card_search():
+    """发帖时搜索可关联的角色卡（所有已通过且对当前用户可见的卡）。"""
+    q = (request.args.get("q") or "").strip()
+    if not q:
+        return jsonify([])
+    cards = (
+        Card.visible_to(current_user)
+        .filter(Card.name.like(f"%{q}%"))
+        .order_by(Card.view_count.desc())
+        .limit(12)
+        .all()
+    )
+    return jsonify(
+        [
+            {"id": c.id, "name": c.name, "intro": (c.intro or "")[:40]}
+            for c in cards
+        ]
+    )
+
+
 @teahouse_bp.route("/<int:post_id>/reply", methods=["POST"])
 @login_required
 def reply(post_id):
@@ -297,6 +339,9 @@ def reply(post_id):
         return redirect(url_for("teahouse.post_detail", post_id=post_id))
 
     reply_post = TeaPost(user_id=current_user.id, parent_id=post_id, content=content)
+    card = _resolve_card(request.form.get("card_id"), current_user)
+    if card:
+        reply_post.card_id = card.id
     db.session.add(reply_post)
     db.session.commit()
     # 通知被回复帖子的作者（非本人）
@@ -395,6 +440,10 @@ def edit_post(post_id):
     else:
         p.content = content
         p.edited_at = datetime.utcnow()
+        # 编辑窗口内允许改/清除关联角色卡（仅当表单显式提交 card_id 时，避免编辑内容时误清）
+        if "card_id" in request.form:
+            card = _resolve_card(request.form.get("card_id"), current_user)
+            p.card_id = card.id if card else None
         db.session.commit()
         _notify_mentions(content, p, current_user)
         flash("已更新", "success")

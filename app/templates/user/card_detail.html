@@ -156,6 +156,23 @@
   </div>
   {% endif %}
 
+  {% if linked_posts %}
+  <section class="mb-4">
+    <h2 class="h6 fw-semibold text-muted mb-2">茶馆动态（关联此卡）</h2>
+    <div class="d-flex flex-column gap-2">
+      {% for lp in linked_posts %}
+      <a href="{{ url_for('teahouse.post_detail', post_id=lp.id) }}" class="text-decoration-none text-reset">
+        <div class="border rounded p-2 small">
+          <div class="text-muted mb-1">@{{ lp.author.display_name }} · {{ lp.created_at.strftime('%Y-%m-%d') }}{% if lp.edited_at %} · 已编辑{% endif %}</div>
+          <div style="white-space:pre-wrap;word-break:break-word;">{{ lp.content[:120] }}{% if lp.content|length > 120 %}…{% endif %}</div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+    <hr class="border-secondary border-opacity-25 mb-4 mt-4">
+  </section>
+  {% endif %}
+
   {% if is_owner or is_admin %}
   <div class="d-flex flex-wrap gap-2">
     {% if is_owner %}
