@@ -248,7 +248,7 @@
   var body    = document.getElementById('commentDrawerBody');
   var footer  = document.getElementById('commentDrawerFooter');
   var title   = document.getElementById('commentDrawerTitle');
-  if (!trigger || !drawer || !overlay || !body || !footer) return;
+  if (!trigger || !drawer || !overlay || !body || !footer || !title) return;
 
   var apiUrl    = trigger.dataset.apiUrl;
   var postUrl   = trigger.dataset.postUrl;
@@ -709,7 +709,14 @@
 
     if (!form || !input || !charCountEl || !submitBtn || !emojiToggle || !emojiBar || !imageBtn || !fileInput || !previewBox) return;
 
+    var currentReader = null;
+
     function resetImageSelection() {
+      if (currentReader) {
+        currentReader.onload = null;
+        currentReader.abort();
+        currentReader = null;
+      }
       fileInput.value = '';
       previewBox.innerHTML = '';
     }
@@ -719,6 +726,11 @@
     });
 
     fileInput.addEventListener('change', function() {
+      if (currentReader) {
+        currentReader.onload = null;
+        currentReader.abort();
+        currentReader = null;
+      }
       if (!fileInput.files || !fileInput.files[0]) {
         resetImageSelection();
         return;
@@ -734,7 +746,9 @@
         return;
       }
       var reader = new FileReader();
+      currentReader = reader;
       reader.onload = function(e) {
+        currentReader = null;
         previewBox.innerHTML = '<div class="dna-comment-img-preview">'
           + '<img src="' + e.target.result + '" alt="预览图">'
           + '<button type="button" class="dna-comment-img-remove" id="cmImageRemoveBtn" title="移除图片">&times;</button>'
@@ -841,12 +855,20 @@
           body.innerHTML = '<div class="text-center text-muted py-3">加载中…</div>';
           loadComments();
         } else {
-          showToast(data.error || '发布失败', 'danger');
+          if (typeof showToast === 'function') {
+            showToast(data.error || '发布失败', 'danger');
+          } else {
+            alert(data.error || '发布失败');
+          }
         }
       })
       .catch(function() {
         submitBtn.disabled = false;
-        showToast('网络错误，请重试', 'danger');
+        if (typeof showToast === 'function') {
+          showToast('网络错误，请重试', 'danger');
+        } else {
+          alert('网络错误，请重试');
+        }
       });
     });
 
