@@ -1,9 +1,10 @@
 {% macro render_card_chip(post) %}
 {%- if post.card -%}
+{%- set cover_img = post.card.images[0] if post.card.images else None -%}
 <a href="{{ url_for('user.card_detail', card_id=post.card.id) }}" class="tea-card-ref d-flex align-items-center gap-2 mb-2 text-decoration-none">
   <div class="tea-card-ref__thumb flex-shrink-0">
-    {% if post.card.images %}
-    <img src="{{ url_for('user.card_image', card_id=post.card.id, slot='square') }}" alt="" class="tea-card-ref__img">
+    {% if cover_img %}
+    <img src="{{ url_for('user.card_image', card_id=post.card.id, slot=cover_img.slot) }}" alt="" class="tea-card-ref__img">
     {% else %}
     <div class="tea-card-ref__ph">{{ post.card.name[:1] }}</div>
     {% endif %}

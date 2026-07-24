@@ -1440,6 +1440,20 @@ data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded=
       textarea.placeholder = options.placeholder || '分享此刻的想法，发布到茶馆…';
       if (options.clear !== false) textarea.value = '';
     }
+
+    if (options.cardId) {
+      if (cardIdInput) cardIdInput.value = options.cardId;
+      var cardPicked = form.querySelector('.tea-card-picked');
+      if (cardPicked) {
+        cardPicked.classList.remove('d-none');
+        cardPicked.innerHTML = '已关联：<strong>' + (options.cardName || '角色卡') + '</strong> <button type="button" class="btn btn-link btn-sm p-0 ms-1 align-baseline" data-clear-card>✕</button>';
+      }
+    } else if (options.clear !== false) {
+      if (cardIdInput) cardIdInput.value = '';
+      var cardPicked = form.querySelector('.tea-card-picked');
+      if (cardPicked) { cardPicked.classList.add('d-none'); cardPicked.innerHTML = ''; }
+    }
+
     updateCounter();
     overlay.classList.add('show');
     drawer.classList.add('show');
@@ -1469,7 +1483,9 @@ data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded=
         title: trigger.getAttribute('data-title'),
         action: trigger.getAttribute('data-action'),
         btnText: trigger.getAttribute('data-btn-text'),
-        placeholder: trigger.getAttribute('data-placeholder')
+        placeholder: trigger.getAttribute('data-placeholder'),
+        cardId: trigger.getAttribute('data-card-id'),
+        cardName: trigger.getAttribute('data-card-name')
       });
     }
   });

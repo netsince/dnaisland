@@ -1,4 +1,4 @@
-from sqlalchemy import or_
+from sqlalchemy import and_, or_
 from sqlalchemy.dialects.mysql import LONGTEXT
 
 from ..extensions import db
@@ -31,21 +31,18 @@ class Card(db.Model):
 
     @classmethod
     def visible_to(cls, viewer=None):
-        """信息层面的可见性过滤：返回对 viewer 可见的「已通过且未隐藏」角色卡查询。
+        """信息层面的可见性过滤：返回对 viewer 可见的角色卡查询。
 
-        自动排除处于 hide_cards 处罚下作者的卡片；viewer 为作者本人或超级管理员时不过滤。
-        单卡详情访问的权限（如 card_detail 的 404 拦截）仍由路由单独把关，本方法仅用于列表检索。
+        - 作者本人：可查看/关联自己所有的卡（包含 pending 待审核卡）
+        - 超级管理员：可查看所有未硬删除的卡
+        - 普通访客/其他用户：仅可查看 status == 'approved' 且未隐藏、未处罚作者的卡
         """
         from .punishment import Punishment
         from .user import User
 
-        q = (
-            cls.query.join(User, cls.author_id == User.id)
-            .filter(
-                cls.status == "approved",
-                cls.is_hidden.is_(False),
-                User.status != "admin_del",
-            )
+        q = cls.query.join(User, cls.author_id == User.id).filter(
+            cls.is_hidden.is_(False),
+            User.status != "admin_del",
         )
         hidden_ids = (
             db.session.query(Punishment.user_id)
@@ -55,11 +52,17 @@ class Card(db.Model):
         if viewer is not None and getattr(viewer, "is_authenticated", False):
             if viewer.is_super_admin:
                 return q
-            # 排除他人中被屏蔽作者的卡；本人自己的卡（即便被处罚）仍可见
-            q = q.filter(or_(cls.author_id == viewer.id, cls.author_id.notin_(hidden_ids)))
-        else:
-            q = q.filter(cls.author_id.notin_(hidden_ids))
-        return q
+            # 本人可访问自己的卡（含 pending 状态与被处罚时期）；他人卡必须为 approved 且作者未处于屏蔽名单
+            return q.filter(
+                or_(
+                    cls.author_id == viewer.id,
+                    and_(
+                        cls.status == "approved",
+                        cls.author_id.notin_(hidden_ids),
+                    ),
+                )
+            )
+        return q.filter(cls.status == "approved", cls.author_id.notin_(hidden_ids))
 
     @property
     def is_public(self):
