@@ -1,9 +1,16 @@
 from datetime import datetime, timedelta, timezone
 import pytest
+from sqlalchemy.ext.compiler import compiles
+from sqlalchemy.dialects.mysql import LONGTEXT
+
 from app import create_app, db
 from app.config import Config
 from app.models.card import Card, Comment
 from app.models.user import User
+
+@compiles(LONGTEXT, "sqlite")
+def compile_longtext_sqlite(type_, compiler, **kw):
+    return "TEXT"
 
 
 class TestConfig(Config):
@@ -13,13 +20,15 @@ class TestConfig(Config):
 
 
 @pytest.fixture
-def app():
+def app(monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
     app = create_app(TestConfig)
     with app.app_context():
         db.create_all()
         yield app
         db.session.remove()
         db.drop_all()
+
 
 
 @pytest.fixture
