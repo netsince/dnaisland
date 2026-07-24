@@ -5,6 +5,7 @@
 """
 
 import contextlib
+from datetime import timedelta
 import json
 
 from flask import (
@@ -304,7 +305,7 @@ def api_logs():
                 "count": item.count,
                 "points_spent": item.points_spent,
                 "status": item.status,
-                "created_at": item.created_at.strftime("%Y-%m-%d %H:%M"),
+                "created_at": (item.created_at + timedelta(hours=8)).strftime("%Y-%m-%d %H:%M") if item.created_at else "",
                 "detail_url": url_for("image_gen.log_detail", log_id=item.id),
             })
     return jsonify({

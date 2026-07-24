@@ -97,7 +97,17 @@ def create_app(config_object=None):
 
     from markupsafe import escape
 
-    from .services.sticker_service import render_stickers_html
+    from datetime import datetime, timedelta
+
+    @app.template_filter("cst")
+    def cst_filter(dt, fmt="%Y-%m-%d %H:%M"):
+        """将数据库中的 UTC datetime 加 8 小时转换为北京时间 (UTC+8) 格式化输出。"""
+        if not dt:
+            return ""
+        if isinstance(dt, datetime):
+            cst_dt = dt + timedelta(hours=8)
+            return cst_dt.strftime(fmt)
+        return str(dt)
 
     _URL_RE = _re.compile(r"(https?://[^\s<]+)")
 

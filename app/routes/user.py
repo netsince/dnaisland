@@ -2,7 +2,7 @@ import html
 import json
 import os
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from flask import (
     Blueprint,
@@ -709,7 +709,7 @@ def card_comments_api(card_id):
             "id": cm.id,
             "content": cm.content,
             "image_data": cm.image_data,
-            "created_at": cm.created_at.strftime("%Y-%m-%d %H:%M") if cm.created_at else "",
+            "created_at": (cm.created_at + timedelta(hours=8)).strftime("%Y-%m-%d %H:%M") if cm.created_at else "",
             "author": {
                 "id": cm.author.id,
                 "username": cm.author.username,
