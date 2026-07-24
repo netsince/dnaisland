@@ -1,19 +1,21 @@
 {% macro render_card_chip(post) %}
 {%- if post.card -%}
 {%- set cover_img = post.card.images[0] if post.card.images else None -%}
-<a href="{{ url_for('user.card_detail', card_id=post.card.id) }}" class="tea-card-ref d-inline-flex align-items-center gap-2 text-decoration-none me-2 mb-1">
-  <div class="tea-card-ref__thumb flex-shrink-0">
-    {% if cover_img %}
-    <img src="{{ url_for('user.card_image', card_id=post.card.id, slot=cover_img.slot) }}" alt="" class="tea-card-ref__img">
-    {% else %}
-    <div class="tea-card-ref__ph">{{ post.card.name[:1] }}</div>
-    {% endif %}
-  </div>
-  <div class="tea-card-ref__body min-w-0">
-    <div class="tea-card-ref__tag text-muted"><i class="bi bi-person-badge me-1"></i>关联角色卡</div>
-    <div class="tea-card-ref__name fw-semibold text-truncate">{{ post.card.name }}</div>
-  </div>
-</a>
+<div class="mb-2">
+  <a href="{{ url_for('user.card_detail', card_id=post.card.id) }}" class="tea-card-ref d-inline-flex align-items-center gap-2 text-decoration-none">
+    <div class="tea-card-ref__thumb flex-shrink-0">
+      {% if cover_img %}
+      <img src="{{ url_for('user.card_image', card_id=post.card.id, slot=cover_img.slot) }}" alt="" class="tea-card-ref__img">
+      {% else %}
+      <div class="tea-card-ref__ph">{{ post.card.name[:1] }}</div>
+      {% endif %}
+    </div>
+    <div class="tea-card-ref__body min-w-0">
+      <div class="tea-card-ref__tag text-muted"><i class="bi bi-person-badge me-1"></i>关联角色卡</div>
+      <div class="tea-card-ref__name fw-semibold text-truncate">{{ post.card.name }}</div>
+    </div>
+  </a>
+</div>
 {%- endif -%}
 {% endmacro %}
 
@@ -21,10 +23,10 @@
 {% macro render_images(post) %}
 {%- if post.images -%}
 {%- set img = post.images[0] -%}
-<div class="d-inline-block mb-1">
-  <a href="{{ img.image_data }}" class="glightbox d-block rounded overflow-hidden" data-gallery="post-{{ post.id }}">
+<div class="mt-2 mb-2">
+  <a href="{{ img.image_data }}" class="glightbox d-inline-block rounded overflow-hidden" data-gallery="post-{{ post.id }}">
     <img src="{{ img.image_data }}" class="img-fluid rounded tea-post-img" alt="配图"
-         style="max-height:220px;max-width:320px;object-fit:cover;cursor:zoom-in;">
+         style="max-height:260px;max-width:100%;object-fit:cover;cursor:zoom-in;">
   </a>
 </div>
 {%- endif -%}
@@ -81,17 +83,12 @@
  <div class="js-post-body{% if post.content|length > 200 %} is-folded{% endif %}" style="white-space:pre-wrap; word-break:break-word;">{{ post.content | teahouse_linkify }}</div>
  {% if post.content|length > 200 %}<button type="button" class="btn btn-sm btn-link text-decoration-none text-muted p-0 mt-1 js-post-fold">展开全文</button>{% endif %}
 
- {% if post.card or post.images %}
- <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
-   {{ render_card_chip(post) }}
-   {{ render_images(post) }}
- </div>
- {% endif %}
+ {{ render_images(post) }}
+ {{ render_card_chip(post) }}
+ {{ render_topics(post, stats) }}
  {% else %}
  <div class="text-muted small fst-italic">内容已隐藏</div>
  {% endif %}
-
- {{ render_topics(post, stats) }}
 
  <div class="d-flex flex-wrap gap-3 mt-2 small text-muted align-items-center pt-2 border-top border-secondary border-opacity-10">
  <a class="btn btn-sm btn-link text-decoration-none text-muted p-0 d-flex align-items-center gap-1" href="{{ url_for('teahouse.post_detail', post_id=post.id) }}">
@@ -183,17 +180,12 @@
  <div class="js-post-body{% if post.content|length > 200 %} is-folded{% endif %}" style="white-space:pre-wrap; word-break:break-word;">{{ post.content | teahouse_linkify }}</div>
  {% if post.content|length > 200 %}<button type="button" class="btn btn-sm btn-link text-decoration-none text-muted p-0 mt-1 js-post-fold">展开全文</button>{% endif %}
 
- {% if post.card or post.images %}
- <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
-   {{ render_card_chip(post) }}
-   {{ render_images(post) }}
- </div>
- {% endif %}
+ {{ render_images(post) }}
+ {{ render_card_chip(post) }}
+ {{ render_topics(post, stats) }}
  {% else %}
  <div class="text-muted small fst-italic">内容已隐藏</div>
  {% endif %}
-
- {{ render_topics(post, stats) }}
 
  <div class="d-flex flex-wrap gap-3 mt-2 small text-muted align-items-center">
  <a class="text-decoration-none text-reset" href="{{ url_for('teahouse.post_detail', post_id=post.id) }}"> {{ s.reply_count }} 回复</a>
