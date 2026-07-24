@@ -2,11 +2,14 @@
 {% from "macros/highlight.html" import hl %}
 
 {# 审核状态徽章 #}
-{% macro status_badge(status, is_hidden=False) %}
- {%- if status == 'approved' -%}<span class="badge bg-success">已通过</span>
- {%- elif status == 'rejected' -%}<span class="badge bg-danger">已拒绝</span>
- {%- else -%}<span class="badge bg-warning text-dark">审核中</span>{%- endif -%}
- {%- if is_hidden %} <span class="badge bg-secondary">已隐藏</span>{% endif -%}
+{% macro status_badge(status, is_hidden=False, privileged=False) %}
+ {# 前台只向作者/管理员展示审核状态（已通过是默认态，普通访客无需看到） #}
+ {%- if privileged -%}
+   {%- if status == 'approved' -%}<span class="badge bg-success">已通过</span>
+   {%- elif status == 'rejected' -%}<span class="badge bg-danger">已拒绝</span>
+   {%- else -%}<span class="badge bg-warning text-dark">审核中</span>{%- endif -%}
+   {%- if is_hidden %} <span class="badge bg-secondary">已隐藏</span>{% endif -%}
+ {%- endif -%}
 {% endmacro %}
 
 {# 单张角色卡瓦片。
@@ -21,7 +24,7 @@
  <div class="dna-tile__ph">{{ card.name[:1] if card.name else '?' }}</div>
  {% endif %}
  {% if show_status %}
- <div class="dna-tile__status">{{ status_badge(card.status, card.is_hidden) }}</div>
+ <div class="dna-tile__status">{{ status_badge(card.status, card.is_hidden, privileged=True) }}</div>
  {% endif %}
  </div>
  <div class="dna-tile__body">

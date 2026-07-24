@@ -543,6 +543,7 @@ def my_favorites():
         pagination=pagination,
         args={},
         title="我的收藏",
+        show_status=current_user.is_super_admin,
     )
 
 
@@ -563,6 +564,7 @@ def my_likes():
         pagination=pagination,
         args={},
         title="我点赞的",
+        show_status=current_user.is_super_admin,
     )
 
 

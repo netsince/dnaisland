@@ -23,210 +23,170 @@
 </div>
 {% endif %}
 
-<div class="row justify-content-center">
-  <div class="col-12 col-lg-9">
-  <a class="btn btn-sm btn-outline-secondary mb-3 mt-3 d-inline-flex align-items-center gap-1" href="javascript:history.back()">
+<div class="container-lg dna-card-layout">
+  <a class="btn btn-sm btn-outline-secondary mb-3 d-inline-flex align-items-center gap-1 dna-card-back" href="javascript:history.back()">
     <i class="bi bi-arrow-left"></i> 返回
   </a>
 
-  {# 信息头 #}
-  <div class="d-flex gap-3 align-items-end mb-3 {% if images.landscape %}mt-n5{% endif %}">
-    {% if images.square %}
-    <img src="{{ url_for('user.card_image', card_id=card.id, slot='square') }}" alt="{{ card.name }} 头像" class="dna-avatar flex-shrink-0"
-         style="width:100px;height:100px;border:3px solid var(--bs-body-bg);">
-    {% else %}
-    <div class="dna-avatar-ph flex-shrink-0" style="width:100px;height:100px;font-size:2.5rem;border:3px solid var(--bs-body-bg);">{{ card.name[:1] }}</div>
-    {% endif %}
-    <div class="flex-grow-1 pb-1">
-      <h1 class="h4 mb-1 fw-bold">{{ card.name }}</h1>
-      <div class="text-muted small d-flex flex-wrap gap-2 align-items-center">
-        {% if card.gender %}<span>{{ card.gender }}</span>{% endif %}
-        {% if author %}
-        <span>·</span>
-        <a href="{{ url_for('user.profile', username=author.username) }}" class="text-decoration-none text-muted">{{ author.display_name }}{{ badge(author) }}</a>
-        {% endif %}
-        <span>· {{ card.view_count }} 次浏览</span>
-        {% if card.created_at %}<span>· {{ card.created_at.strftime('%Y-%m-%d') }}</span>{% endif %}
+  <div class="row g-4 align-items-start">
+    {# 左侧资料栏（桌面 sticky） #}
+    <aside class="col-12 col-lg-4 col-xl-3">
+      <div class="dna-card-rail">
+        <div class="dna-card-profile">
+          <div class="dna-card-profile__head">
+            {% if images.square %}
+            <img src="{{ url_for('user.card_image', card_id=card.id, slot='square') }}" alt="{{ card.name }} 头像" class="dna-avatar">
+            {% else %}
+            <div class="dna-avatar-ph">{{ card.name[:1] }}</div>
+            {% endif %}
+            <div class="flex-grow-1 pb-1">
+              <h1 class="h4 mb-1 fw-bold">{{ card.name }}</h1>
+              <div class="text-muted small d-flex flex-wrap gap-2 align-items-center">
+                {% if card.gender %}<span>{{ card.gender }}</span>{% endif %}
+                {% if author %}
+                <span>·</span>
+                <a href="{{ url_for('user.profile', username=author.username) }}" class="text-decoration-none text-muted">{{ author.display_name }}{{ badge(author) }}</a>
+                {% endif %}
+                <span>· {{ card.view_count }} 次浏览</span>
+                {% if card.created_at %}<span>· {{ card.created_at.strftime('%Y-%m-%d') }}</span>{% endif %}
+              </div>
+            </div>
+          </div>
+
+          <div class="dna-card-profile__tags">
+            {{ status_badge(card.status, card.is_hidden, privileged=(is_owner or is_admin)) }}
+            {% for t in tags %}<span class="dna-chip">#{{ t }}</span>{% endfor %}
+          </div>
+
+          {# 操作按钮栏（桌面在资料卡内；移动端固定到底部） #}
+          <div class="dna-card-actions">
+            <form method="post" action="{{ url_for('user.card_like', card_id=card.id) }}" class="d-inline m-0 js-toggle">
+              <button class="btn btn-sm d-flex align-items-center gap-1 rounded-pill {{ 'btn-danger' if liked else 'btn-outline-secondary' }}" style="padding:5px 12px;"
+                      data-on-class="btn-danger" data-off-class="btn-outline-secondary"
+                      data-on-icon="bi-heart-fill" data-off-icon="bi-heart">
+                <i class="bi bi-heart{% if liked %}-fill{% endif %} js-toggle-icon"></i>
+                <span class="js-toggle-count">{{ like_count }}</span>
+              </button>
+            </form>
+            <form method="post" action="{{ url_for('user.card_favorite', card_id=card.id) }}" class="d-inline m-0 js-toggle">
+              <button class="btn btn-sm d-flex align-items-center gap-1 rounded-pill {{ 'btn-warning' if favorited else 'btn-outline-secondary' }}" style="padding:5px 12px;"
+                      data-on-class="btn-warning" data-off-class="btn-outline-secondary"
+                      data-on-icon="bi-bookmark-fill" data-off-icon="bi-bookmark">
+                <i class="bi bi-bookmark{% if favorited %}-fill{% endif %} js-toggle-icon"></i>
+                <span class="js-toggle-count">{{ favorite_count }}</span>
+              </button>
+            </form>
+            {% if not is_owner and author %}
+            <form method="post" action="{{ url_for('user.user_follow', username=author.username) }}" class="d-inline m-0 js-toggle dna-action-secondary">
+              <button class="btn btn-sm d-flex align-items-center gap-1 rounded-pill {{ 'btn-outline-secondary' if following else 'btn-outline-primary' }}" style="padding:5px 12px;"
+                      data-on-class="btn-outline-secondary" data-off-class="btn-outline-primary"
+                      data-on-icon="bi-person-dash" data-off-icon="bi-person-plus"
+                      data-label-on="取消关注" data-label-off="关注作者">
+                <i class="bi bi-person-{% if following %}dash{% else %}plus{% endif %} js-toggle-icon"></i>
+                <span class="js-toggle-label">{{ '取消关注' if following else '关注作者' }}</span>
+              </button>
+            </form>
+            {% endif %}
+            <button class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1 rounded-pill dna-action-secondary" id="exportClipboardBtn"
+                    data-export-url="{{ url_for('user.card_export', card_id=card.id) }}" style="padding:5px 12px;">
+              <i class="bi bi-clipboard"></i>
+              <span>复制卡片</span>
+            </button>
+            <a href="{{ url_for('teahouse.index', card_id=card.id, card_name=card.name) }}" class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1 rounded-pill" style="padding:5px 12px;" title="引用此角色卡发布到茶馆">
+              <i class="bi bi-chat-quote"></i>
+              <span>引用<span class="dna-act-sub">到茶馆</span></span>
+            </a>
+            <button type="button" class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1 rounded-pill"
+                    id="commentDrawerTrigger"
+                    data-api-url="{{ url_for('user.card_comments_api', card_id=card.id) }}"
+                    data-post-url="{{ url_for('user.card_comment', card_id=card.id) }}"
+                    data-logged-in="{{ 'true' if current_user.is_authenticated else 'false' }}"
+                    data-login-url="{{ url_for('auth.login') }}"
+                    style="padding:5px 12px;">
+              <i class="bi bi-chat-square"></i>
+              <span><span class="dna-act-label">评论（</span><span class="js-toggle-count">{{ comment_count }}</span><span class="dna-act-label">）</span></span>
+            </button>
+            <a class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1 rounded-pill dna-action-secondary"
+               href="{{ url_for('user.report', type='card', id=card.id) }}" style="padding:5px 12px;">
+              <i class="bi bi-flag"></i>
+              <span>举报</span>
+            </a>
+          </div>
+
+          {% if is_owner or is_admin %}
+          <div class="dna-card-owner d-flex flex-wrap gap-2">
+            {% if is_owner %}
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('user.card_edit', card_id=card.id) }}">编辑</a>
+            <form method="post" action="{{ url_for('user.card_toggle_hidden', card_id=card.id) }}" class="d-inline js-toggle"
+                  data-confirm="确认{{ '取消隐藏' if card.is_hidden else '隐藏' }}该角色卡？"
+                  data-on-class="btn-outline-secondary" data-off-class="btn-outline-warning"
+                  data-label-on="取消隐藏" data-label-off="隐藏">
+              <button class="btn btn-sm btn-outline-{{ 'secondary' if card.is_hidden else 'warning' }}">
+                <span class="js-toggle-label">{{ '取消隐藏' if card.is_hidden else '隐藏' }}</span>
+              </button>
+            </form>
+            {% if card.status == 'rejected' %}
+            <form method="post" action="{{ url_for('user.card_resubmit', card_id=card.id) }}" class="d-inline js-toggle">
+              <button class="btn btn-sm btn-outline-success">重新提审</button>
+            </form>
+            {% endif %}
+            {% endif %}
+            {% if is_admin %}
+            <a class="btn btn-sm btn-outline-dark" href="{{ url_for('admin.cards') }}">前往后台审核</a>
+            {% endif %}
+          </div>
+          {% endif %}
+        </div>
       </div>
-    </div>
-  </div>
+    </aside>
 
-  {# 状态徽章 + 标签 #}
-  <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
-    {{ status_badge(card.status, card.is_hidden) }}
-    {% for t in tags %}<span class="dna-chip">#{{ t }}</span>{% endfor %}
-  </div>
+    {# 右侧主内容 #}
+    <div class="col-12 col-lg-8 col-xl-9">
+      <div class="dna-card-main">
 
-  {# 操作按钮栏：图标胶囊 #}
-  <div class="d-flex flex-wrap gap-2 align-items-center mb-4">
-    <form method="post" action="{{ url_for('user.card_like', card_id=card.id) }}" class="d-inline m-0 js-toggle">
-      <button class="btn btn-sm d-flex align-items-center gap-1 rounded-pill {{ 'btn-danger' if liked else 'btn-outline-secondary' }}" style="padding:5px 12px;"
-              data-on-class="btn-danger" data-off-class="btn-outline-secondary"
-              data-on-icon="bi-heart-fill" data-off-icon="bi-heart">
-        <i class="bi bi-heart{% if liked %}-fill{% endif %} js-toggle-icon"></i>
-        <span class="js-toggle-count">{{ like_count }}</span>
-      </button>
-    </form>
-    <form method="post" action="{{ url_for('user.card_favorite', card_id=card.id) }}" class="d-inline m-0 js-toggle">
-      <button class="btn btn-sm d-flex align-items-center gap-1 rounded-pill {{ 'btn-warning' if favorited else 'btn-outline-secondary' }}" style="padding:5px 12px;"
-              data-on-class="btn-warning" data-off-class="btn-outline-secondary"
-              data-on-icon="bi-bookmark-fill" data-off-icon="bi-bookmark">
-        <i class="bi bi-bookmark{% if favorited %}-fill{% endif %} js-toggle-icon"></i>
-        <span class="js-toggle-count">{{ favorite_count }}</span>
-      </button>
-    </form>
-    {% if not is_owner and author %}
-    <form method="post" action="{{ url_for('user.user_follow', username=author.username) }}" class="d-inline m-0 js-toggle">
-      <button class="btn btn-sm d-flex align-items-center gap-1 rounded-pill {{ 'btn-outline-secondary' if following else 'btn-outline-primary' }}" style="padding:5px 12px;"
-              data-on-class="btn-outline-secondary" data-off-class="btn-outline-primary"
-              data-on-icon="bi-person-dash" data-off-icon="bi-person-plus"
-              data-label-on="取消关注" data-label-off="关注作者">
-        <i class="bi bi-person-{% if following %}dash{% else %}plus{% endif %} js-toggle-icon"></i>
-        <span class="js-toggle-label">{{ '取消关注' if following else '关注作者' }}</span>
-      </button>
-    </form>
-    {% endif %}
-    <button class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1 rounded-pill" id="exportClipboardBtn"
-            data-export-url="{{ url_for('user.card_export', card_id=card.id) }}" style="padding:5px 12px;">
-      <i class="bi bi-clipboard"></i>
-      <span>复制卡片</span>
-    </button>
-    <a href="{{ url_for('teahouse.index', card_id=card.id, card_name=card.name) }}" class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1 rounded-pill" style="padding:5px 12px;" title="引用此角色卡发布到茶馆">
-      <i class="bi bi-chat-quote"></i>
-      <span>引用到茶馆</span>
-    </a>
-    <button type="button" class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1 rounded-pill"
-            id="commentDrawerTrigger"
-            data-api-url="{{ url_for('user.card_comments_api', card_id=card.id) }}"
-            data-post-url="{{ url_for('user.card_comment', card_id=card.id) }}"
-            data-logged-in="{{ 'true' if current_user.is_authenticated else 'false' }}"
-            data-login-url="{{ url_for('auth.login') }}"
-            style="padding:5px 12px;">
-      <i class="bi bi-chat-square"></i>
-      <span>评论（{{ comment_count }}）</span>
-    </button>
-    <a class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1 rounded-pill ms-auto opacity-75"
-       href="{{ url_for('user.report', type='card', id=card.id) }}" style="padding:5px 12px;">
-      <i class="bi bi-flag"></i>
-      <span>举报</span>
-    </a>
-  </div>
+        {% if card.intro %}
+        <section class="dna-card-section">
+          <h2 class="dna-card-section__title"><i class="bi bi-card-text me-1"></i>简介</h2>
+          <div class="dna-card-section__body">{{ card.intro }}</div>
+        </section>
+        {% endif %}
 
-  {# 反向聚合：用这张卡发的茶馆帖 #}
-  <section class="tea-related mb-4">
-    <h2 class="h6 fw-semibold text-muted mb-2"><i class="bi bi-chat-square me-1"></i>用这张卡发的茶馆帖</h2>
-    {% set _linked = linked_posts | selectattr('parent_id', 'none') | list %}
-    {% if _linked %}
-    <div class="d-flex flex-column gap-2">
-      {% for p in _linked %}
-      <a href="{{ url_for('teahouse.post_detail', post_id=p.id) }}" class="tea-related-post text-decoration-none">
-        <div class="d-flex gap-2 align-items-center">
-          <div class="tea-related-post__avatar flex-shrink-0">
-            {% if p.author.avatar %}<img src="{{ url_for('user.avatar', user_id=p.author.id) }}" class="rounded-circle" style="width:34px;height:34px;object-fit:cover;">{% else %}<div class="rounded-circle bg-secondary text-light d-flex align-items-center justify-content-center" style="width:34px;height:34px;font-size:.9rem;">{{ p.author.display_name[:1] }}</div>{% endif %}
+        {% if card.persona %}
+        <section class="dna-card-section">
+          <h2 class="dna-card-section__title"><i class="bi bi-person-badge me-1"></i>人格设定</h2>
+          <div class="dna-card-section__body">{{ card.persona }}</div>
+        </section>
+        {% endif %}
+
+        {% if card.opening %}
+        <section class="dna-card-section">
+          <h2 class="dna-card-section__title"><i class="bi bi-chat-dots me-1"></i>开场白</h2>
+          <div class="dna-card-section__body fst-italic">{{ card.opening }}</div>
+        </section>
+        {% endif %}
+
+        {% if dialogue %}
+        <section class="dna-card-section">
+          <h2 class="dna-card-section__title"><i class="bi bi-chat-left-text me-1"></i>对话示例</h2>
+          <div class="dna-chat">
+            {% for turn in dialogue %}
+              {% if turn.user %}<div class="dna-chat__msg dna-chat__msg--user"><div class="dna-chat__bubble">{{ turn.user }}</div></div>{% endif %}
+              {% if turn.assistant %}<div class="dna-chat__msg dna-chat__msg--bot"><div class="dna-chat__avatar">{{ card.name[:1] }}</div><div class="dna-chat__bubble">{{ turn.assistant }}</div></div>{% endif %}
+            {% endfor %}
           </div>
-          <div class="tea-related-post__body min-w-0">
-            <div class="tea-related-post__meta small text-muted">{{ p.author.display_name }} · {{ p.created_at.strftime('%Y-%m-%d') if p.created_at else '' }}</div>
-            <div class="tea-related-post__text text-reset">{{ p.content[:80] }}{% if p.content|length > 80 %}…{% endif %}</div>
-          </div>
-        </div>
-      </a>
-      {% endfor %}
-    </div>
-    {% else %}
-    <p class="text-muted small mb-0">还没有人用这张卡发过茶馆帖。</p>
-    {% endif %}
-  </section>
+        </section>
+        {% endif %}
 
-  <hr class="border-secondary border-opacity-25 mb-4">
-
-  {% if card.intro %}
-  <section class="mb-4">
-    <h2 class="h6 fw-semibold text-muted mb-2">简介</h2>
-    <div style="white-space:pre-wrap;line-height:1.7;">{{ card.intro }}</div>
-  </section>
-  <hr class="border-secondary border-opacity-25 mb-4">
-  {% endif %}
-
-  {% if card.persona %}
-  <section class="mb-4">
-    <h2 class="h6 fw-semibold text-muted mb-2">人格设定</h2>
-    <div style="white-space:pre-wrap;line-height:1.7;">{{ card.persona }}</div>
-  </section>
-  <hr class="border-secondary border-opacity-25 mb-4">
-  {% endif %}
-
-  {% if card.opening %}
-  <section class="mb-4">
-    <h2 class="h6 fw-semibold text-muted mb-2">开场白</h2>
-    <div class="fst-italic" style="white-space:pre-wrap;line-height:1.7;">{{ card.opening }}</div>
-  </section>
-  <hr class="border-secondary border-opacity-25 mb-4">
-  {% endif %}
-
-  {% if dialogue %}
-  <section class="mb-4">
-    <h2 class="h6 fw-semibold text-muted mb-2">对话示例</h2>
-    {% for turn in dialogue %}
-    <div class="mb-3">
-      {% if turn.user %}<div class="mb-1"><span class="dna-chip">用户</span> <span class="ms-1">{{ turn.user }}</span></div>{% endif %}
-      {% if turn.assistant %}<div class="text-secondary"><strong class="text-light">{{ card.name }}：</strong>{{ turn.assistant }}</div>{% endif %}
-    </div>
-    {% endfor %}
-  </section>
-  <hr class="border-secondary border-opacity-25 mb-4">
-  {% endif %}
-
-  {% if card.original_link %}
-  <div class="mb-4">
-    <a class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1 rounded-pill"
-       href="{{ card.original_link }}" target="_blank" rel="noopener">
-      <i class="bi bi-box-arrow-up-right"></i> 原始链接
-    </a>
-  </div>
-  {% endif %}
-
-  {% if linked_posts %}
-  <section class="mb-4">
-    <h2 class="h6 fw-semibold text-muted mb-2">茶馆动态（关联此卡）</h2>
-    <div class="d-flex flex-column gap-2">
-      {% for lp in linked_posts %}
-      <a href="{{ url_for('teahouse.post_detail', post_id=lp.id) }}" class="text-decoration-none text-reset">
-        <div class="border rounded p-2 small">
-          <div class="text-muted mb-1">@{{ lp.author.display_name }} · {{ lp.created_at.strftime('%Y-%m-%d') }}{% if lp.edited_at %} · 已编辑{% endif %}</div>
-          <div style="white-space:pre-wrap;word-break:break-word;">{{ lp.content[:120] }}{% if lp.content|length > 120 %}…{% endif %}</div>
-        </div>
-      </a>
-      {% endfor %}
-    </div>
-    <hr class="border-secondary border-opacity-25 mb-4 mt-4">
-  </section>
-  {% endif %}
-
-  {% if is_owner or is_admin %}
-  <div class="d-flex flex-wrap gap-2">
-    {% if is_owner %}
-    <a class="btn btn-sm btn-outline-primary" href="{{ url_for('user.card_edit', card_id=card.id) }}">编辑</a>
-    <form method="post" action="{{ url_for('user.card_toggle_hidden', card_id=card.id) }}" class="d-inline js-toggle"
-          data-confirm="确认{{ '取消隐藏' if card.is_hidden else '隐藏' }}该角色卡？"
-          data-on-class="btn-outline-secondary" data-off-class="btn-outline-warning"
-          data-label-on="取消隐藏" data-label-off="隐藏">
-      <button class="btn btn-sm btn-outline-{{ 'secondary' if card.is_hidden else 'warning' }}">
-        <span class="js-toggle-label">{{ '取消隐藏' if card.is_hidden else '隐藏' }}</span>
-      </button>
-    </form>
-    {% if card.status == 'rejected' %}
-    <form method="post" action="{{ url_for('user.card_resubmit', card_id=card.id) }}" class="d-inline js-toggle">
-      <button class="btn btn-sm btn-outline-success">重新提审</button>
-    </form>
-    {% endif %}
-    {% endif %}
-    {% if is_admin %}
-    <a class="btn btn-sm btn-outline-dark" href="{{ url_for('admin.cards') }}">前往后台审核</a>
-    {% endif %}
-  </div>
-  {% endif %}
-  </div>
-</div>
+        {% if card.original_link %}
+        <a class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1 rounded-pill"
+           href="{{ card.original_link }}" target="_blank" rel="noopener">
+          <i class="bi bi-box-arrow-up-right"></i> 原始链接
+        </a>
+        {% endif %}
+      </div><!-- /.dna-card-main -->
+    </div><!-- /.col main -->
+  </div><!-- /.row -->
+</div><!-- /.container-lg -->
 
 <!-- 评论遮罩 -->
 <div class="dna-comment-overlay" id="commentOverlay"></div>
@@ -330,9 +290,9 @@
   function updateCommentCount(count) {
     totalCommentsCount = Math.max(0, count);
     title.textContent = '评论（' + totalCommentsCount + '）';
-    var triggerSpan = trigger.querySelector('span');
-    if (triggerSpan) {
-      triggerSpan.textContent = '评论（' + totalCommentsCount + '）';
+    var countSpan = trigger.querySelector('.js-toggle-count');
+    if (countSpan) {
+      countSpan.textContent = totalCommentsCount;
     }
   }
 

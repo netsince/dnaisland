@@ -44,7 +44,7 @@
  <span class="badge bg-secondary ms-1 js-hidden-badge {% if not card.is_hidden %}d-none{% endif %}">已隐藏</span>
  <div class="text-muted small mt-1">{{ card.gender or '未知' }} · {{ card.created_at.strftime('%Y-%m-%d') if card.created_at else '' }}</div>
  </div>
- <div class="text-nowrap js-status-badge">{{ status_badge(card.status) }}</div>
+ <div class="text-nowrap js-status-badge">{{ status_badge(card.status, privileged=True) }}</div>
  </div>
  <div class="mt-2 d-flex flex-wrap gap-2">
  <a class="btn btn-sm btn-outline-primary" href="{{ url_for('user.card_edit', card_id=card.id) }}">编辑</a>
