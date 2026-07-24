@@ -125,6 +125,7 @@ def _post_search_query(q):
     return TeaPost.query.filter(
         TeaPost.parent_id.is_(None),
         TeaPost.is_hidden.is_(False),
+        TeaPost.is_deleted.is_(False),
         TeaPost.content.ilike(f"%{q}%")
     ).order_by(TeaPost.created_at.desc())
 

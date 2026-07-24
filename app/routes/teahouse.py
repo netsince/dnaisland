@@ -375,7 +375,7 @@ def create_post():
     db.session.commit()
     _notify_mentions(content, post, current_user)
     flash("发布成功", "success")
-    return redirect(url_for("teahouse.index"))
+    return redirect(url_for("teahouse.post_detail", post_id=post.id))
 
 
 # ---------------- 帖子详情 / 回复 ----------------
@@ -384,10 +384,7 @@ def post_detail(post_id):
     p = db.session.get(TeaPost, post_id)
     if not p:
         abort(404)
-    if p.is_deleted and not (
-        current_user.is_authenticated
-        and (current_user.id == p.user_id or current_user.is_super_admin)
-    ):
+    if p.is_deleted and not current_user.is_super_admin:
         abort(404)
     if p.is_hidden and not (
         current_user.is_authenticated
@@ -398,7 +395,8 @@ def post_detail(post_id):
     chain = []
     node = p.parent
     while node is not None:
-        chain.append(node)
+        if not node.is_deleted:
+            chain.append(node)
         node = node.parent
     chain.reverse()  # 顺序：[最顶原帖, ..., 直接父帖]
     root = chain[0] if chain else p
@@ -487,6 +485,8 @@ def reply(post_id):
     p = db.session.get(TeaPost, post_id)
     if not p:
         abort(404)
+    if p.is_deleted and not current_user.is_super_admin:
+        abort(404)
     is_xhr = request.headers.get("X-Requested-With") == "XMLHttpRequest"
 
     if current_user.is_muted:
@@ -555,6 +555,8 @@ def like(post_id):
     p = db.session.get(TeaPost, post_id)
     if not p:
         abort(404)
+    if p.is_deleted and not current_user.is_super_admin:
+        abort(404)
     existing = TeaPostLike.query.filter_by(
         user_id=current_user.id, post_id=post_id
     ).first()
@@ -608,6 +610,8 @@ def favorite(post_id):
     p = db.session.get(TeaPost, post_id)
     if not p:
         abort(404)
+    if p.is_deleted and not current_user.is_super_admin:
+        abort(404)
     existing = TeaPostFavorite.query.filter_by(
         user_id=current_user.id, post_id=post_id
     ).first()
@@ -635,6 +639,8 @@ def favorite(post_id):
 def edit_post(post_id):
     p = db.session.get(TeaPost, post_id)
     if not p:
+        abort(404)
+    if p.is_deleted and not current_user.is_super_admin:
         abort(404)
     if not p.can_edit(current_user):
         abort(403)

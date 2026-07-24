@@ -40,14 +40,7 @@
 {% set s = stats.get(post.id, {'like_count': 0, 'liked': false, 'reply_count': 0, 'favorited': false, 'topics': []}) %}
 {% set visible = teapost_visible(post) %}
 {%- set is_owner = current_user.is_authenticated and current_user.id == post.user_id -%}
-{%- set can_see_deleted = current_user.is_authenticated and (current_user.id == post.user_id or current_user.is_super_admin) -%}
-{%- if post.is_deleted and not can_see_deleted -%}
-{%- elif post.is_deleted -%}
-<div class="card dna-post-card mb-2">
-  <div class="card-body p-3 py-2">
-    <div class="text-muted small fst-italic">作者已删除该帖</div>
-  </div>
-</div>
+{%- if post.is_deleted -%}
 {%- else -%}
 <div class="card dna-post-card mb-2 {% if top or focus %}border-primary{% endif %}{% if focus %} id="focus"{% endif %}"
  {% if not top and not focus %}style="cursor:pointer;"
@@ -147,14 +140,7 @@
 {% set s = stats.get(post.id, {'like_count': 0, 'liked': false, 'reply_count': 0, 'favorited': false, 'topics': []}) %}
 {% set visible = teapost_visible(post) %}
 {%- set is_owner = current_user.is_authenticated and current_user.id == post.user_id -%}
-{%- set can_see_deleted = current_user.is_authenticated and (current_user.id == post.user_id or current_user.is_super_admin) -%}
-{%- if post.is_deleted and not can_see_deleted -%}
-{%- elif post.is_deleted -%}
-<div class="card mb-2">
-  <div class="card-body py-3">
-    <div class="text-muted small fst-italic">作者已删除该帖</div>
-  </div>
-</div>
+{%- if post.is_deleted -%}
 {%- else -%}
 <div class="card mb-2 {% if focus %}border-primary{% endif %}{% if focus %} id="focus"{% endif %}" style="cursor:pointer;"
  onclick="if(event.target.closest('a,button,form'))return; window.location.href='{{ url_for('teahouse.post_detail', post_id=post.id) }}'">
