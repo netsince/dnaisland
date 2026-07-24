@@ -264,21 +264,27 @@ def generate():
         ACTIVE_GENERATION_TASKS.discard(current_user.id)
 
 
+from sqlalchemy.orm import defer
+
 @image_gen_bp.route("/api/logs")
 @login_required
 def api_logs():
     page = request.args.get("page", 1, type=int)
     per_page = request.args.get("per_page", 12, type=int)
     pagination = (
-        GenerationLog.query.filter_by(user_id=current_user.id)
+        GenerationLog.query.options(
+            defer(GenerationLog.images),
+            defer(GenerationLog.reference_images),
+        )
+        .filter_by(user_id=current_user.id)
         .order_by(GenerationLog.created_at.desc())
         .paginate(page=page, per_page=per_page, error_out=False)
     )
     items = []
     for l in pagination.items:
-        imgs = l.image_list()
-        refs = l.reference_image_list()
-        if imgs:
+        img_count = (l.count or 1) if l.status != "failed" else 0
+        ref_count = l.references_count or 0
+        if img_count > 0:
             items.append({
                 "id": l.id,
                 "first_image": url_for(
@@ -286,11 +292,11 @@ def api_logs():
                 ),
                 "images": [
                     url_for("image_gen.output_image", log_id=l.id, idx=i)
-                    for i in range(len(imgs))
+                    for i in range(img_count)
                 ],
                 "references": [
                     url_for("image_gen.reference_image", log_id=l.id, idx=i)
-                    for i in range(len(refs))
+                    for i in range(ref_count)
                 ],
                 "prompt": l.prompt,
                 "model_name": l.model_name,
