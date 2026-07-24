@@ -60,6 +60,28 @@ def _banned_author_ids():
     ).distinct()
 
 
+def _calc_card_hot_score_expr():
+    """计算角色卡的重力时间衰减热度得分 (Hacker News Gravity Model).
+
+    公式：Hot Score = (Views + Likes*5 + 1) / (AgeInHours + 2)^1.5
+    """
+    from sqlalchemy import literal_column
+    like_sub = (
+        db.session.query(func.count(CardLike.card_id))
+        .filter(CardLike.card_id == Card.id)
+        .correlate(Card)
+        .scalar_subquery()
+    )
+    interactions = (func.coalesce(Card.view_count, 0) * 1.0) + (func.coalesce(like_sub, 0) * 5.0)
+
+    if db.engine.name == "sqlite":
+        age_hours = (func.julianday("now") - func.julianday(Card.created_at)) * 24.0
+    else:
+        age_hours = func.timestampdiff(literal_column("HOUR"), Card.created_at, func.now())
+
+    return (interactions + 1.0) / func.pow(age_hours + 2.0, 1.5)
+
+
 def _card_search_query(q, sort, tag=None):
     """构造角色卡检索查询（已包含信息层可见性过滤与相关度排序）。"""
     like = f"%{q}%"
@@ -79,7 +101,7 @@ def _card_search_query(q, sort, tag=None):
     base = base.filter(*filters).distinct()
 
     if sort == "hot":
-        order = [Card.view_count.desc(), Card.created_at.desc()]
+        order = [_calc_card_hot_score_expr().desc(), Card.created_at.desc()]
     elif sort == "new":
         order = [Card.created_at.desc()]
     else:  # relevance
@@ -217,7 +239,7 @@ def explore():
         q = q.join(CardTag, CardTag.card_id == Card.id).filter(CardTag.tag == tag)
 
     if sort == "hot":
-        q = q.order_by(Card.view_count.desc(), Card.created_at.desc())
+        q = q.order_by(_calc_card_hot_score_expr().desc(), Card.created_at.desc())
     elif sort == "new":
         q = q.order_by(Card.created_at.desc())
     else:  # likes：相关子查询计数，避免 group by 触发 only_full_group_by 问题

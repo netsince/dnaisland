@@ -41,6 +41,36 @@ TEA_IMAGE_MAX_EDGE = 1280
 TEA_IMAGE_QUALITY = 82
 
 
+def _calc_teahouse_hot_score_expr():
+    """计算茶馆帖子的重力时间衰减热度得分 (Hacker News Gravity Model).
+
+    公式：Hot Score = (Likes + Replies*1.5 + 1) / (AgeInHours + 2)^1.5
+    保证最新发布的内容能在热度列表有一席之地，同时老热帖随着时间推移热度自然衰减。
+    """
+    from sqlalchemy import literal_column
+    child = aliased(TeaPost)
+    like_sub = (
+        db.session.query(func.count(TeaPostLike.post_id))
+        .filter(TeaPostLike.post_id == TeaPost.id)
+        .correlate(TeaPost)
+        .scalar_subquery()
+    )
+    reply_sub = (
+        db.session.query(func.count(child.id))
+        .filter(child.parent_id == TeaPost.id)
+        .correlate(TeaPost)
+        .scalar_subquery()
+    )
+    interactions = (func.coalesce(like_sub, 0) * 1.0) + (func.coalesce(reply_sub, 0) * 1.5)
+
+    if db.engine.name == "sqlite":
+        age_hours = (func.julianday("now") - func.julianday(TeaPost.created_at)) * 24.0
+    else:
+        age_hours = func.timestampdiff(literal_column("HOUR"), TeaPost.created_at, func.now())
+
+    return (interactions + 1.0) / func.pow(age_hours + 2.0, 1.5)
+
+
 def _resolve_card(card_id_raw, viewer):
     """校验 card_id 是否属于「已通过且对 viewer 可见」的角色卡；非法时返回 None。
 
@@ -270,21 +300,8 @@ def index():
         # 随机看：MySQL 用 RAND()；翻页会重新随机
         q = q.order_by(db.func.rand())
     elif sort == "hot":
-        # 最热：按（点赞数 + 直接回复数）降序，再按时间兜底
-        child = aliased(TeaPost)
-        like_sub = (
-            db.session.query(func.count(TeaPostLike.post_id))
-            .filter(TeaPostLike.post_id == TeaPost.id)
-            .correlate(TeaPost)
-            .scalar_subquery()
-        )
-        reply_sub = (
-            db.session.query(func.count(child.id))
-            .filter(child.parent_id == TeaPost.id)
-            .correlate(TeaPost)
-            .scalar_subquery()
-        )
-        hot_score = func.coalesce(like_sub, 0) + func.coalesce(reply_sub, 0)
+        # 最热：按 Hacker News 重力时间衰减公式计算热度分降序，时间兜底
+        hot_score = _calc_teahouse_hot_score_expr()
         q = q.order_by(hot_score.desc(), TeaPost.created_at.desc())
     else:  # new
         q = q.order_by(TeaPost.created_at.desc())
@@ -418,20 +435,7 @@ def post_detail(post_id):
     rq = TeaPost.query.filter(TeaPost.parent_id == p.id)
     rq = _visible_query(rq, current_user)
     if sort == "hot":
-        child = aliased(TeaPost)
-        like_sub = (
-            db.session.query(func.count(TeaPostLike.post_id))
-            .filter(TeaPostLike.post_id == TeaPost.id)
-            .correlate(TeaPost)
-            .scalar_subquery()
-        )
-        reply_sub = (
-            db.session.query(func.count(child.id))
-            .filter(child.parent_id == TeaPost.id)
-            .correlate(TeaPost)
-            .scalar_subquery()
-        )
-        hot_score = func.coalesce(like_sub, 0) + func.coalesce(reply_sub, 0)
+        hot_score = _calc_teahouse_hot_score_expr()
         rq = rq.order_by(hot_score.desc(), TeaPost.created_at.desc())
     else:
         rq = rq.order_by(TeaPost.created_at.desc())
