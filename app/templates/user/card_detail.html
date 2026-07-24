@@ -87,12 +87,12 @@
               </button>
             </form>
             {% endif %}
-            <button class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1 rounded-pill dna-action-secondary js-export-card"
+            <button class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1 rounded-pill js-export-card"
                     data-export-url="{{ url_for('user.card_export', card_id=card.id) }}" style="padding:5px 12px;">
               <i class="bi bi-clipboard"></i>
-              <span>复制卡片</span>
+              <span>复制<span class="dna-act-sub">卡片</span></span>
             </button>
-            <a href="{{ url_for('teahouse.index', card_id=card.id, card_name=card.name) }}" class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1 rounded-pill" style="padding:5px 12px;" title="引用此角色卡发布到茶馆">
+            <a href="{{ url_for('teahouse.index', card_id=card.id, card_name=card.name) }}" class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1 rounded-pill dna-action-secondary" style="padding:5px 12px;" title="引用此角色卡发布到茶馆">
               <i class="bi bi-chat-quote"></i>
               <span>引用<span class="dna-act-sub">到茶馆</span></span>
             </a>
@@ -107,37 +107,10 @@
               <span><span class="dna-act-label">评论（</span><span class="js-toggle-count">{{ comment_count }}</span><span class="dna-act-label">）</span></span>
             </button>
 
-            {# 移动端“更多”菜单：将桌面端被收起的 关注/复制/举报 收拢于此，避免手机无法交互 #}
-            <div class="dropdown dropup d-lg-none" style="flex:1 1 0;">
-              <button class="btn btn-sm btn-outline-secondary d-flex align-items-center justify-content-center gap-1 rounded-pill w-100" type="button" data-bs-toggle="dropdown" aria-expanded="false" style="padding-left:0;padding-right:0;">
-                <i class="bi bi-three-dots"></i><span>更多</span>
-              </button>
-              <ul class="dropdown-menu dropdown-menu-end" style="min-width:13rem;">
-                {% if not is_owner and author %}
-                <li>
-                  <form method="post" action="{{ url_for('user.user_follow', username=author.username) }}" class="js-toggle m-0">
-                    <button type="submit" class="dropdown-item d-flex align-items-center gap-2"
-                            data-on-icon="bi-person-dash" data-off-icon="bi-person-plus"
-                            data-label-on="取消关注" data-label-off="关注作者">
-                      <i class="bi bi-person-{% if following %}dash{% else %}plus{% endif %} js-toggle-icon"></i>
-                      <span class="js-toggle-label">{{ '取消关注' if following else '关注作者' }}</span>
-                    </button>
-                  </form>
-                </li>
-                {% endif %}
-                <li>
-                  <button type="button" class="dropdown-item d-flex align-items-center gap-2 js-export-card"
-                          data-export-url="{{ url_for('user.card_export', card_id=card.id) }}">
-                    <i class="bi bi-clipboard"></i><span>复制卡片</span>
-                  </button>
-                </li>
-                <li>
-                  <a class="dropdown-item d-flex align-items-center gap-2" href="{{ url_for('user.report', type='card', id=card.id) }}">
-                    <i class="bi bi-flag"></i><span>举报</span>
-                  </a>
-                </li>
-              </ul>
-            </div>
+            {# 移动端“更多”触发：打开从底部弹出的操作抽屉（复用评论抽屉样式） #}
+            <button type="button" class="btn btn-sm btn-outline-secondary d-flex align-items-center justify-content-center gap-1 rounded-pill d-lg-none" id="moreActionsTrigger" style="flex:1 1 0; padding-left:0;padding-right:0;">
+              <i class="bi bi-three-dots"></i><span>更多</span>
+            </button>
 
             <a class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1 rounded-pill dna-action-secondary"
                href="{{ url_for('user.report', type='card', id=card.id) }}" style="padding:5px 12px;">
@@ -243,6 +216,36 @@
     <div class="text-center text-muted py-4" id="commentLoading">加载中…</div>
   </div>
   <div class="dna-comment-drawer__footer" id="commentDrawerFooter"></div>
+</aside>
+
+<!-- 更多操作抽屉：移动端从底部弹出（复用评论抽屉样式） -->
+<div class="dna-comment-overlay" id="moreSheetOverlay"></div>
+<aside class="dna-comment-drawer d-lg-none" id="moreActionsSheet" aria-label="更多操作">
+  <div class="dna-comment-drawer__handle"></div>
+  <div class="dna-comment-drawer__header">
+    <h2 class="h6 mb-0 fw-semibold">更多操作</h2>
+    <button type="button" class="btn btn-link text-muted p-0" id="moreSheetClose" aria-label="关闭"><i class="bi bi-x-lg"></i></button>
+  </div>
+  <div class="dna-comment-drawer__body">
+    <div class="d-flex flex-column gap-2">
+      <a href="{{ url_for('teahouse.index', card_id=card.id, card_name=card.name) }}" class="btn btn-outline-primary d-flex align-items-center gap-2 justify-content-start w-100">
+        <i class="bi bi-chat-quote"></i><span>引用到茶馆</span>
+      </a>
+      {% if not is_owner and author %}
+      <form method="post" action="{{ url_for('user.user_follow', username=author.username) }}" class="js-toggle m-0">
+        <button type="submit" class="btn btn-outline-primary d-flex align-items-center gap-2 justify-content-start w-100"
+                data-on-icon="bi-person-dash" data-off-icon="bi-person-plus"
+                data-label-on="取消关注" data-label-off="关注作者">
+          <i class="bi bi-person-{% if following %}dash{% else %}plus{% endif %} js-toggle-icon"></i>
+          <span class="js-toggle-label">{{ '取消关注' if following else '关注作者' }}</span>
+        </button>
+      </form>
+      {% endif %}
+      <a href="{{ url_for('user.report', type='card', id=card.id) }}" class="btn btn-outline-secondary d-flex align-items-center gap-2 justify-content-start w-100">
+        <i class="bi bi-flag"></i><span>举报</span>
+      </a>
+    </div>
+  </div>
 </aside>
 
 {% endblock %}
@@ -947,5 +950,33 @@
  });
  });
  })();
+</script>
+<script>
+/* 移动端“更多操作”底部抽屉：复用评论抽屉的打开/关闭逻辑 */
+(function () {
+  var trigger = document.getElementById('moreActionsTrigger');
+  var sheet   = document.getElementById('moreActionsSheet');
+  var overlay = document.getElementById('moreSheetOverlay');
+  var closeBtn = document.getElementById('moreSheetClose');
+  if (!trigger || !sheet || !overlay || !closeBtn) return;
+
+  function openSheet() {
+    sheet.classList.add('show');
+    overlay.classList.add('show');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeSheet() {
+    sheet.classList.remove('show');
+    overlay.classList.remove('show');
+    document.body.style.overflow = '';
+  }
+
+  trigger.addEventListener('click', openSheet);
+  overlay.addEventListener('click', closeSheet);
+  closeBtn.addEventListener('click', closeSheet);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && sheet.classList.contains('show')) closeSheet();
+  });
+})();
 </script>
 {% endblock %}

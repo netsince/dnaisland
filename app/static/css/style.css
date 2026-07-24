@@ -1618,6 +1618,12 @@ body.is-mobile-plus-open header {
   }
 }
 
+/* 更多操作抽屉：内容较短，按内容自适应高度而非占满 80vh */
+#moreActionsSheet {
+  height: auto;
+  max-height: 85vh;
+}
+
 /* 抽屉顶部拖拽把手（仅移动端显示） */
 .dna-comment-drawer__handle {
   display: none;
