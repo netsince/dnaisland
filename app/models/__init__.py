@@ -8,15 +8,25 @@ from .card import (
     Comment,
     CommentLike,
 )
+from .image_gen import GenerationLog, GenerationModel
 from .notification import Notification
+from .points import KeyUsageLog, PointTransaction, RedemptionKey
 from .punishment import Punishment
 from .report import Report
 from .site import Article, SiteConfig
-from .teahouse import TeaPost, TeaPostLike
+from .teahouse import (
+    TeaPoll,
+    TeaPollOption,
+    TeaPollVote,
+    TeaPost,
+    TeaPostFavorite,
+    TeaPostImage,
+    TeaPostLike,
+    TeaPostTopic,
+    TeaTopic,
+)
 from .user import User, UserFollow
 from .verification_code import VerificationCode
-from .points import KeyUsageLog, PointTransaction, RedemptionKey
-from .image_gen import GenerationLog, GenerationModel
 
 __all__ = [
     "User",
@@ -36,6 +46,13 @@ __all__ = [
     "Article",
     "TeaPost",
     "TeaPostLike",
+    "TeaPostImage",
+    "TeaTopic",
+    "TeaPostTopic",
+    "TeaPostFavorite",
+    "TeaPoll",
+    "TeaPollOption",
+    "TeaPollVote",
     "VerificationCode",
     "PointTransaction",
     "RedemptionKey",
