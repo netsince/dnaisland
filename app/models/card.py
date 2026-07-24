@@ -103,6 +103,14 @@ class CardFavorite(db.Model):
     created_at = db.Column(db.DateTime, server_default=db.func.now())
 
 
+class CommentLike(db.Model):
+    __tablename__ = "comment_likes"
+
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), primary_key=True)
+    comment_id = db.Column(db.Integer, db.ForeignKey("comments.id"), primary_key=True)
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
+
+
 class Comment(db.Model):
     __tablename__ = "comments"
 
@@ -114,4 +122,9 @@ class Comment(db.Model):
     # 评论审核（先发后审）：is_hidden=被拒绝隐藏；moderated=是否已进入审核流程处理过
     is_hidden = db.Column(db.Boolean, server_default="0", nullable=False, index=True)
     moderated = db.Column(db.Boolean, server_default="0", nullable=False, index=True)
+    is_pinned = db.Column(db.Boolean, server_default="0", nullable=False, index=True)
+    reply_to_id = db.Column(db.Integer, db.ForeignKey("comments.id"), nullable=True)
+
     author = db.relationship("User", backref="comments")
+    reply_to = db.relationship("Comment", remote_side=[id], backref="replies")
+

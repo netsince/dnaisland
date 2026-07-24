@@ -6,6 +6,7 @@ from .card import (
     CardLike,
     CardTag,
     Comment,
+    CommentLike,
 )
 from .notification import Notification
 from .punishment import Punishment
@@ -27,6 +28,7 @@ __all__ = [
     "CardLike",
     "CardFavorite",
     "Comment",
+    "CommentLike",
     "Notification",
     "Punishment",
     "Report",
