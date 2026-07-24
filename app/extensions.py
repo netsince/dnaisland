@@ -11,4 +11,5 @@ bcrypt = Bcrypt()
 mail = Mail()
 
 login_manager.login_view = "auth.login"
+login_manager.login_message = "请先登录后再访问该页面。"
 login_manager.login_message_category = "info"
