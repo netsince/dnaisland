@@ -74,16 +74,14 @@ function showToast(message, type) {
  <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
  <div class="container-fluid">
  <a class="navbar-brand" href="{{ url_for('main.index') }}">DNAISLAND</a>
- <!-- 手机端顶部工具组（搜索 + 深浅色切换 + 消息通知） -->
+ <!-- 手机端顶部工具组（搜索 + 菜单） -->
 <div class="d-flex align-items-center ms-auto d-lg-none gap-2 me-1">
 <button class="btn btn-link nav-link p-1 text-muted d-flex align-items-center" id="globalSearchTriggerMobile" type="button" aria-label="展开搜索" title="搜索">
 <i class="bi bi-search fs-5"></i>
 </button>
-{% if current_user.is_authenticated %}
 <button class="btn btn-link nav-link p-1" type="button" data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-label="功能菜单" title="功能菜单">
 <i class="bi bi-list fs-5"></i>
 </button>
-{% endif %}
 </div>
  <div class="collapse navbar-collapse" id="mainNav">
  <ul class="navbar-nav me-auto mb-2 mb-lg-0">
@@ -133,13 +131,16 @@ data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded=
 </a>
 </li>
 {% else %}
- <li class="nav-item">
- <a class="nav-link" href="{{ url_for('auth.login') }}">登录</a>
- </li>
- <li class="nav-item">
- <a class="nav-link" href="{{ url_for('auth.register') }}">注册</a>
- </li>
- {% endif %}
+<li class="nav-item">
+<a class="nav-link" href="{{ url_for('auth.register') }}">注册</a>
+</li>
+<li class="nav-item">
+<a class="nav-link" href="{{ url_for('auth.login') }}">登录</a>
+</li>
+<li class="nav-item">
+<a class="nav-link" href="#" role="button" data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas">更多</a>
+</li>
+{% endif %}
  </ul>
  </div>
  </div>
@@ -813,6 +814,7 @@ data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded=
  <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="关闭"></button>
  </div>
  <div class="offcanvas-body p-3">
+{% if current_user.is_authenticated %}
 <div class="list-group list-group-flush">
 <a href="{{ url_for('user.profile', username=current_user.username) }}" class="list-group-item list-group-item-action py-2 border-0 rounded-2">我的主页</a>
 <a href="{{ url_for('user.notifications') }}" class="list-group-item list-group-item-action py-2 border-0 rounded-2">通知{% if unread_notifications %} <span class="badge rounded-pill bg-danger ms-1">{{ unread_notifications }}</span>{% endif %}</a>
@@ -831,6 +833,13 @@ data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded=
 <a href="#" id="themeToggle" data-bs-dismiss="offcanvas" class="list-group-item list-group-item-action py-2 border-0 rounded-2"><i class="bi bi-circle-half me-1"></i> 切换深色 / 浅色</a>
 <a href="{{ url_for('auth.logout') }}" class="list-group-item list-group-item-action text-danger py-2 border-0 rounded-2">退出登录</a>
 </div>
+{% else %}
+<div class="list-group list-group-flush">
+<a href="{{ url_for('auth.register') }}" class="list-group-item list-group-item-action py-2 border-0 rounded-2">注册</a>
+<a href="{{ url_for('auth.login') }}" class="list-group-item list-group-item-action py-2 border-0 rounded-2">登录</a>
+<a href="#" id="themeToggle" data-bs-dismiss="offcanvas" class="list-group-item list-group-item-action py-2 border-0 rounded-2"><i class="bi bi-circle-half me-1"></i> 切换深色 / 浅色</a>
+</div>
+{% endif %}
  </div>
 </div>
 
