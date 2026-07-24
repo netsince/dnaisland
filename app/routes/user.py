@@ -657,6 +657,8 @@ def user_follow(username):
 @user_bp.route("/api/card/<card_id>/comments", methods=["GET"])
 def card_comments_api(card_id):
     """返回角色卡评论 JSON，供前端抽屉 AJAX 分页加载。"""
+    from sqlalchemy.orm import joinedload
+
     card = db.session.get(Card, card_id)
     if not card:
         return jsonify({"error": "not found"}), 404
@@ -670,7 +672,10 @@ def card_comments_api(card_id):
         .scalar_subquery()
     )
 
-    q = Comment.query.filter_by(card_id=card_id, is_hidden=False)
+    q = Comment.query.options(
+        joinedload(Comment.author),
+        joinedload(Comment.reply_to).joinedload(Comment.author),
+    ).filter_by(card_id=card_id, is_hidden=False)
     if sort == "hottest":
         q = q.order_by(
             Comment.is_pinned.desc(),
@@ -745,7 +750,7 @@ def card_comments_api(card_id):
             "reply_to": (
                 {
                     "id": cm.reply_to.id,
-                    "display_name": cm.reply_to.author.display_name,
+                    "display_name": cm.reply_to.author.display_name if (cm.reply_to and cm.reply_to.author) else "未知用户",
                 }
                 if cm.reply_to
                 else None
