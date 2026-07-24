@@ -135,7 +135,7 @@ class Comment(db.Model):
     card_id = db.Column(db.String(36), db.ForeignKey("cards.id"), nullable=False, index=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     content = db.Column(db.Text, nullable=False)
-    image_data = db.Column(db.Text, nullable=True)  # 评论图片（WebP base64 data URL），可空
+    image_data = db.deferred(db.Column(LONGTEXT, nullable=True))  # 评论图片（WebP base64 data URL），可空
     created_at = db.Column(db.DateTime, server_default=db.func.now())
     # 评论审核（先发后审）：is_hidden=被拒绝隐藏；moderated=是否已进入审核流程处理过
     is_hidden = db.Column(db.Boolean, server_default="0", nullable=False, index=True)
