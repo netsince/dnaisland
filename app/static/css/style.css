@@ -1322,7 +1322,7 @@ body.is-mobile-plus-open #mobilePlusBtn span {
   color: var(--bs-emphasis-color);
 }
 
-/* 移动端底栏 + 号弹出无边框高对比度创作按钮 */
+/* 移动端底栏 + 号弹出弹性错落动画 */
 .dna-mobile-plus-overlay {
   display: none;
   position: fixed;
