@@ -69,7 +69,7 @@
  <a class="text-decoration-none text-reset fw-semibold" href="{{ url_for('user.profile', username=post.author.username) }}">{{ post.author.display_name }}</a>
  <span class="text-muted small">@{{ post.author.username }}</span>
  {% if top %}<span class="badge bg-primary-subtle text-primary small">原帖</span>{% endif %}
- <span class="text-muted small ms-auto">{{ post.created_at.strftime('%Y-%m-%d %H:%M') if post.created_at else '' }}</span>
+ <span class="text-muted small ms-auto">{{ post.created_at|cst }}</span>
   {% if post.edited_at %}<span class="text-muted small">· 已编辑</span>{% endif %}
   </div>
 
@@ -167,7 +167,7 @@
  {% endif %}
  <a class="text-decoration-none text-reset fw-semibold" href="{{ url_for('user.profile', username=post.author.username) }}">{{ post.author.display_name }}</a>
  <span class="text-muted small">@{{ post.author.username }}</span>
- <span class="text-muted small ms-auto">{{ post.created_at.strftime('%Y-%m-%d %H:%M') if post.created_at else '' }}</span>
+ <span class="text-muted small ms-auto">{{ post.created_at|cst }}</span>
   {% if post.edited_at %}<span class="text-muted small">· 已编辑</span>{% endif %}
   </div>
   {% if post.is_hidden and not visible %}

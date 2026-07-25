@@ -19,7 +19,7 @@
     <a class="btn btn-sm btn-link text-muted text-decoration-none px-0 py-0 fs-7" href="{{ url_for('image_gen.logs') }}">
       <i class="bi bi-arrow-left me-1"></i> 返回记录
     </a>
-    <div class="text-muted fs-7">{{ log.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
+    <div class="text-muted fs-7">{{ log.created_at|cst }}</div>
   </div>
 
   {% if imgs %}

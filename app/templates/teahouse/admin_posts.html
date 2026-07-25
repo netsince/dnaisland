@@ -37,7 +37,7 @@
           {% if not it.post.moderated %}· <span class="text-warning">待审核</span>{% endif %}
           {% if it.post.parent_id %}· <span>回帖</span>{% endif %}
         </span>
-        <span>{{ it.post.created_at.strftime('%Y-%m-%d %H:%M') if it.post.created_at else '' }}</span>
+        <span>{{ it.post.created_at|cst }}</span>
       </div>
       <div class="border rounded p-2 mb-2 small" style="white-space:pre-wrap;word-break:break-word;">{{ it.post.content | teahouse_linkify }}</div>
       <div class="small text-muted mb-2">

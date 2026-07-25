@@ -23,7 +23,7 @@
             {% endif %}
           </div>
           <p class="text-muted small mb-1">
-            施加时间：{{ p.created_at.strftime('%Y-%m-%d %H:%M') if p.created_at else '—' }}
+            施加时间：{{ p.created_at|cst or '—' }}
           </p>
           {% if p.reason %}
           <p class="mb-1"><span class="text-muted">处罚理由：</span>{{ p.reason }}</p>

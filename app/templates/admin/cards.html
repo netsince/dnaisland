@@ -57,7 +57,7 @@
           {% elif card.status == 'rejected' %}<span class="badge bg-danger">rejected</span>
           {% else %}<span class="badge bg-warning text-dark">pending</span>{% endif %}
         </td>
-        <td>{{ card.created_at.strftime('%Y-%m-%d %H:%M') if card.created_at else '' }}</td>
+        <td>{{ card.created_at|cst }}</td>
         <td>
           <a class="btn btn-sm btn-outline-primary" href="{{ url_for('admin.card_edit', card_id=card.id) }}">编辑</a>
           <form method="post" action="{{ url_for('admin.card_delete', card_id=card.id) }}" class="d-inline"

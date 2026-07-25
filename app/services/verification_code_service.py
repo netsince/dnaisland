@@ -16,7 +16,7 @@ def create_code(email: str, purpose: str = "register") -> str:
         email=email,
         code=code,
         purpose=purpose,
-        expires_at=datetime.datetime.now()
+        expires_at=datetime.datetime.utcnow()
         + datetime.timedelta(minutes=CODE_TTL_MINUTES),
     )
     db.session.add(record)
@@ -33,7 +33,7 @@ def can_resend(email: str, purpose: str = "register") -> bool:
     )
     if latest is None:
         return True
-    delta = datetime.datetime.now() - latest.created_at
+    delta = datetime.datetime.utcnow() - latest.created_at
     return delta.total_seconds() >= RESEND_INTERVAL_SECONDS
 
 
@@ -46,7 +46,7 @@ def verify_code(email: str, code: str, purpose: str = "register") -> bool:
     )
     if record is None:
         return False
-    if record.expires_at < datetime.datetime.now():
+    if record.expires_at < datetime.datetime.utcnow():
         db.session.delete(record)
         db.session.commit()
         return False

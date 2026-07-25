@@ -134,7 +134,7 @@
     <tbody>
       {% for l in usage %}
       <tr>
-        <td>{{ l.created_at.strftime('%Y-%m-%d %H:%M') if l.created_at else '' }}</td>
+        <td>{{ l.created_at|cst }}</td>
         <td><code>{{ l.code }}</code></td>
         <td><a href="{{ url_for('user.profile', username=l.username) }}">{{ l.username }}</a></td>
         <td class="{{ 'text-success' if l.status == 'success' else 'text-danger' }}">

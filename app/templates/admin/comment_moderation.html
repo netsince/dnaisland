@@ -23,7 +23,7 @@
  <div class="small text-muted mb-1">
  <a class="text-decoration-none" href="{{ url_for('user.profile', username=c.author.username) if c.author else '#' }}">{{ c.author.nickname if c.author else c.user_id }}</a>
  {% if it.card %}· 评论于 <a class="text-decoration-none" href="{{ url_for('user.card_detail', card_id=it.card.id) }}">{{ it.card.name }}</a>{% endif %}
- · {{ c.created_at.strftime('%Y-%m-%d %H:%M') if c.created_at else '' }}
+ · {{ c.created_at|cst }}
  </div>
  <div style="white-space:pre-wrap;">{{ c.content }}</div>
  </div>

@@ -18,7 +18,7 @@
         <div>
           <strong>{{ punishment_types[p.type] }}</strong>
           {% if p.reason %}<span class="text-muted small"> · {{ p.reason }}</span>{% endif %}
-          <div class="small text-muted">施加于 {{ p.created_at.strftime('%Y-%m-%d %H:%M') if p.created_at else '—' }}</div>
+          <div class="small text-muted">施加于 {{ p.created_at|cst or '—' }}</div>
         </div>
         <form method="post" action="{{ url_for('admin.punish_revoke', punishment_id=p.id) }}"
               onsubmit="return confirm('确认解除该处罚？');">

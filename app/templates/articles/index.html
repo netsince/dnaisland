@@ -43,7 +43,7 @@
  {% if a.summary %}<p class="card-text text-muted small">{{ a.summary }}</p>{% endif %}
  <div class="mt-auto small text-muted">
  {{ a.author.nickname if (a.show_author and a.author) else '匿名管理员' }}
- · {{ a.created_at.strftime('%Y-%m-%d') if a.created_at else '' }}
+ · {{ a.created_at|cst('%Y-%m-%d') }}
  </div>
  </div>
  </div>

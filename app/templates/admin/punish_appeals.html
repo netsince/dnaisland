@@ -22,7 +22,7 @@
         <span class="badge bg-danger">生效中</span>
       </div>
       <p class="text-muted small mb-1">
-        处罚施加于：{{ p.created_at.strftime('%Y-%m-%d %H:%M') if p.created_at else '—' }}
+        处罚施加于：{{ p.created_at|cst or '—' }}
         {% if p.reason %} · 理由：{{ p.reason }}{% endif %}
       </p>
       <p class="mb-2"><span class="text-muted">用户申诉理由：</span>{{ p.appeal_reason }}</p>

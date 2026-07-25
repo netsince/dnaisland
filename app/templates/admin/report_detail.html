@@ -22,7 +22,7 @@
       </div>
       <div class="col-6"><span class="text-muted">举报人：</span>{{ report.reporter.nickname if report.reporter else report.reporter_id }}</div>
       <div class="col-6"><span class="text-muted">原因：</span>{{ report.reason }}</div>
-      <div class="col-12"><span class="text-muted">提交时间：</span>{{ report.created_at.strftime('%Y-%m-%d %H:%M') if report.created_at else '' }}</div>
+      <div class="col-12"><span class="text-muted">提交时间：</span>{{ report.created_at|cst }}</div>
       {% if report.detail %}
       <div class="col-12"><span class="text-muted">补充说明：</span><br>{{ report.detail }}</div>
       {% endif %}

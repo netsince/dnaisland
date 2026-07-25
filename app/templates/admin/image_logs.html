@@ -29,7 +29,7 @@
             {{ '成功' if l.status == 'success' else ('部分' if l.status == 'partial' else '失败') }}
           </span>
         </td>
-        <td class="small text-muted">{{ l.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+        <td class="small text-muted">{{ l.created_at|cst }}</td>
         <td>
           <a class="btn btn-sm btn-outline-info" href="{{ url_for('image_gen.log_detail', log_id=l.id) }}">查看</a>
         </td>

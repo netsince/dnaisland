@@ -30,7 +30,7 @@
             {% if not n.is_read %}<span class="dna-unread-dot mt-1 flex-shrink-0" title="未读消息"></span>{% endif %}
             <div style="white-space:pre-wrap; word-break:break-word;" class="dna-notification-msg">{{ n.message | linkify }}</div>
           </div>
-          <small class="text-muted text-nowrap flex-shrink-0 ms-2" style="font-size:0.78rem;">{{ n.created_at.strftime('%Y-%m-%d %H:%M') if n.created_at else '' }}</small>
+          <small class="text-muted text-nowrap flex-shrink-0 ms-2" style="font-size:0.78rem;">{{ n.created_at|cst }}</small>
         </div>
       </div>
       {% else %}

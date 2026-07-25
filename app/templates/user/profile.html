@@ -38,7 +38,7 @@
  {% for p in punishments %}
  <li class="list-group-item d-flex justify-content-between align-items-center">
  <span>{{ p.type_label }}</span>
- <span class="text-muted small">{{ p.created_at.strftime('%Y-%m-%d') if p.created_at else '' }}</span>
+ <span class="text-muted small">{{ p.created_at|cst('%Y-%m-%d') }}</span>
  </li>
  {% endfor %}
 </ul>
@@ -102,7 +102,7 @@
  {% if u.location %}<li>城市：{{ u.location }}</li>{% endif %}
  {% if u.website %}<li>链接：<a href="{{ u.website }}" target="_blank" rel="noopener">{{ u.website }}</a></li>{% endif %}
  {% if u.birthday %}<li>生日：{{ u.birthday.strftime('%Y-%m-%d') }}</li>{% endif %}
- <li>加入：{{ u.created_at.strftime('%Y-%m-%d') if u.created_at else '—' }}</li>
+ <li>加入：{{ u.created_at|cst('%Y-%m-%d') or '—' }}</li>
  </ul>
  </div>
  {% endif %}
@@ -159,7 +159,7 @@
  <div class="card mb-2">
  <div class="card-body py-2">
  <div class="small text-muted mb-1">
- {{ p.created_at.strftime('%Y-%m-%d %H:%M') if p.created_at else '' }}
+ {{ p.created_at|cst }}
  {% if p.is_hidden %}· <span class="text-danger">已隐藏</span>{% endif %}
  {% if not p.moderated %}· <span class="text-warning">待审核</span>{% endif %}
  </div>
@@ -179,7 +179,7 @@
 <div class="card mb-2">
 <div class="card-body py-2">
 <div class="small text-muted mb-1">
-  {{ p.created_at.strftime('%Y-%m-%d %H:%M') if p.created_at else '' }}
+  {{ p.created_at|cst }}
   {% if p.is_hidden %}· <span class="text-danger">已隐藏</span>{% endif %}
   {% if not p.moderated %}· <span class="text-warning">待审核</span>{% endif %}
 </div>
@@ -199,7 +199,7 @@
 {% for c in comments %}
 <div class="card">
   <div class="card-body py-2">
-    <div class="small text-muted mb-1">{{ c.created_at.strftime('%Y-%m-%d %H:%M') if c.created_at else '' }}</div>
+    <div class="small text-muted mb-1">{{ c.created_at|cst }}</div>
     {% set card = comment_cards.get(c.card_id) %}
     {% if card %}
     <a class="d-flex align-items-center gap-2 mb-2 text-decoration-none text-reset" href="{{ url_for('user.card_detail', card_id=card.id) }}?comment={{ c.id }}">

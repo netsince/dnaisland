@@ -128,7 +128,7 @@
  </a>
  <span class="text-muted small">@{{ p.author.username }}</span>
  </div>
- <small class="text-muted">{{ p.created_at.strftime('%Y-%m-%d %H:%M') if p.created_at else '' }}</small>
+ <small class="text-muted">{{ p.created_at|cst }}</small>
  </div>
  <div class="text-light mb-2" style="white-space: pre-wrap; word-break: break-word;">
  {{ hl(p.content, q) }}
@@ -192,7 +192,7 @@
  </a>
  <span class="text-muted small">@{{ p.author.username }}</span>
  </div>
- <small class="text-muted">{{ p.created_at.strftime('%Y-%m-%d %H:%M') if p.created_at else '' }}</small>
+ <small class="text-muted">{{ p.created_at|cst }}</small>
  </div>
  <div class="text-light mb-2" style="white-space: pre-wrap; word-break: break-word;">
  {{ hl(p.content, q) }}
