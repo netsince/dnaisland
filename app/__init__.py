@@ -94,10 +94,9 @@ def create_app(config_object=None):
     init_commands(app)
 
     import re as _re
+    from datetime import datetime, timedelta
 
     from markupsafe import escape
-
-    from datetime import datetime, timedelta
 
     @app.template_filter("cst")
     def cst_filter(dt, fmt="%Y-%m-%d %H:%M"):
@@ -108,6 +107,8 @@ def create_app(config_object=None):
             cst_dt = dt + timedelta(hours=8)
             return cst_dt.strftime(fmt)
         return str(dt)
+
+    from .services.sticker_service import render_stickers_html
 
     _URL_RE = _re.compile(r"(https?://[^\s<]+)")
 

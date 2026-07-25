@@ -30,7 +30,7 @@ from ..models import (
     User,
     UserFollow,
 )
-from ..services.image_service import compress_image, raw_bytes_to_webp_data_url
+from ..services.image_service import raw_bytes_to_webp_data_url
 from ..services.notification_service import notify
 from ..services.sticker_service import sanitize_stickers
 from ..utils import get_user_by_username, rate_hit, respond, toggle_relation

@@ -44,9 +44,9 @@ from ..models.punishment import (
     APPEAL_REJECTED,
     PUNISHMENT_TYPES,
 )
+from ..services.image_service import raw_bytes_to_webp_data_url
 from ..services.notification_service import notify, notify_super_admins
 from ..services.report_service import describe_report_target
-from ..services.image_service import raw_bytes_to_webp_data_url
 from ..services.sticker_service import sanitize_stickers
 from ..utils import (
     ensure_owner_or_admin,
@@ -70,7 +70,6 @@ from ..services.card_service import (
 )
 from ..services.image_service import (
     compress_image,
-    crop_square_and_compress,
     crop_square_and_compress_bytes,
     send_webp,
 )
