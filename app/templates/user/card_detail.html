@@ -92,7 +92,7 @@
               <i class="bi bi-clipboard"></i>
               <span>复制<span class="dna-act-sub">卡片</span></span>
             </button>
-            <a href="{{ url_for('teahouse.index', card_id=card.id, card_name=card.name) }}" class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1 rounded-pill dna-action-secondary" style="padding:5px 12px;" title="引用此角色卡发布到茶馆">
+            <a href="{{ url_for('teahouse.index', card_id=card.id, card_name=card.name) }}" class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1 rounded-pill dna-action-secondary" style="padding:5px 12px;" title="引用此角色卡发布到茶馆" data-no-pjax>
               <i class="bi bi-chat-quote"></i>
               <span>引用<span class="dna-act-sub">到茶馆</span></span>
             </a>
@@ -228,7 +228,7 @@
   </div>
   <div class="dna-comment-drawer__body">
     <div class="d-flex flex-column gap-2">
-      <a href="{{ url_for('teahouse.index', card_id=card.id, card_name=card.name) }}" class="btn btn-outline-primary d-flex align-items-center gap-2 justify-content-start w-100">
+      <a href="{{ url_for('teahouse.index', card_id=card.id, card_name=card.name) }}" class="btn btn-outline-primary d-flex align-items-center gap-2 justify-content-start w-100" data-no-pjax>
         <i class="bi bi-chat-quote"></i><span>引用到茶馆</span>
       </a>
       {% if not is_owner and author %}
