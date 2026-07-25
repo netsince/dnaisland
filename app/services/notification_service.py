@@ -1,5 +1,11 @@
+import time
+
 from ..extensions import db
 from ..models import Notification
+
+# 未读计数按用户缓存 30s：角标延迟最多 30s 可接受，省去每个请求查库。
+_unread_cache: dict[int, tuple[float, int]] = {}
+_UNREAD_TTL = 30
 
 
 def notify(user_id: int, message: str, type_: str = "system", related_card_id=None):
@@ -12,6 +18,8 @@ def notify(user_id: int, message: str, type_: str = "system", related_card_id=No
     )
     db.session.add(n)
     db.session.flush()
+    # 新通知使其未读计数缓存失效，确保角标及时更新
+    _unread_cache.pop(user_id, None)
     return n
 
 
@@ -24,7 +32,13 @@ def notify_super_admins(message: str, type_: str = "system"):
 
 
 def unread_count(user_id: int) -> int:
-    return Notification.query.filter_by(user_id=user_id, is_read=False).count()
+    now = time.time()
+    ts, val = _unread_cache.get(user_id, (0.0, 0))
+    if now - ts < _UNREAD_TTL:
+        return val
+    val = Notification.query.filter_by(user_id=user_id, is_read=False).count()
+    _unread_cache[user_id] = (now, val)
+    return val
 
 
 def mark_all_read(user_id: int):
@@ -32,3 +46,4 @@ def mark_all_read(user_id: int):
         {"is_read": True}
     )
     db.session.commit()
+    _unread_cache.pop(user_id, None)

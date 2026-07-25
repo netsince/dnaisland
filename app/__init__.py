@@ -184,14 +184,14 @@ def create_app(config_object=None):
     # 管理员（super_admin）与登录/退出/静态资源/站点配置 API 不受影响。
     @app.before_request
     def enforce_shutdown():
-        from .services.site_service import get_site_config as _get_cfg
+        from .services.site_service import public_config
 
         try:
-            cfg = _get_cfg()
+            cfg = public_config()
         except Exception:
             # 配置表尚未初始化（如迁移未执行），放行
             return
-        if not cfg.shutdown_enabled:
+        if not cfg["shutdown"]["enabled"]:
             return
 
         path = request.path
@@ -216,11 +216,11 @@ def create_app(config_object=None):
                 jsonify(
                     ok=False,
                     code="SITE_CLOSED",
-                    message=cfg.shutdown_message or "站点维护中，请稍后恢复。",
+                    message=cfg["shutdown"]["message"] or "站点维护中，请稍后恢复。",
                 ),
                 503,
             )
-        return render_template("shutdown.html", message=cfg.shutdown_message or ""), 503
+        return render_template("shutdown.html", message=cfg["shutdown"]["message"] or ""), 503
 
     # ---------------- 被封禁 / 注销 / 纪念账号：自动登出 ----------------
     # 这类账号（status 为 admin_del / user_del / mourning）禁止登录与一切写操作；

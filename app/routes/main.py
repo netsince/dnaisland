@@ -3,7 +3,7 @@ from io import BytesIO
 
 from flask import Blueprint, abort, jsonify, render_template, request, send_file, url_for
 from flask_login import current_user
-from sqlalchemy import case, func, or_
+from sqlalchemy import case, func, literal_column, or_
 
 from ..extensions import db
 from ..models import Article, Card, CardLike, CardTag, Punishment, User
@@ -60,26 +60,41 @@ def _banned_author_ids():
     ).distinct()
 
 
-def _calc_card_hot_score_expr():
-    """计算角色卡的重力时间衰减热度得分 (Hacker News Gravity Model).
-
-    公式：Hot Score = (Views + Likes*5 + 1) / (AgeInHours + 2)^1.5
-    """
-    from sqlalchemy import literal_column
-    like_sub = (
-        db.session.query(func.count(CardLike.card_id))
-        .filter(CardLike.card_id == Card.id)
-        .correlate(Card)
-        .scalar_subquery()
+def _likes_agg_subquery():
+    """一次聚合出每张卡的赞数（card_id -> count），避免排序时逐行关联子查询。"""
+    return (
+        db.session.query(
+            CardLike.card_id,
+            func.count(CardLike.card_id).label("lc"),
+        )
+        .group_by(CardLike.card_id)
+        .subquery("card_likes_agg")
     )
-    interactions = (func.coalesce(Card.view_count, 0) * 1.0) + (func.coalesce(like_sub, 0) * 5.0)
 
+
+def _card_hot_score(interactions_expr, created_at_col):
+    """Hacker News 重力时间衰减热度得分：(Interactions + 1) / (AgeInHours + 2)^1.5。"""
     if db.engine.name == "sqlite":
-        age_hours = (func.julianday("now") - func.julianday(Card.created_at)) * 24.0
+        age_hours = (func.julianday("now") - func.julianday(created_at_col)) * 24.0
     else:
-        age_hours = func.timestampdiff(literal_column("HOUR"), Card.created_at, func.now())
+        age_hours = func.timestampdiff(literal_column("HOUR"), created_at_col, func.now())
+    return (interactions_expr + 1.0) / func.pow(age_hours + 2.0, 1.5)
 
-    return (interactions + 1.0) / func.pow(age_hours + 2.0, 1.5)
+
+def _order_by_hot(q):
+    """按热度排序：先 outerjoin 赞数聚合子查询，再套用时间衰减公式（消除逐行关联子查询）。"""
+    agg = _likes_agg_subquery()
+    q = q.outerjoin(agg, agg.c.card_id == Card.id)
+    interactions = func.coalesce(Card.view_count, 0) * 1.0 + func.coalesce(agg.c.lc, 0) * 5.0
+    score = _card_hot_score(interactions, Card.created_at)
+    return q.order_by(score.desc(), Card.created_at.desc())
+
+
+def _order_by_likes(q):
+    """按赞数排序：复用赞数聚合子查询，避免逐行关联子查询。"""
+    agg = _likes_agg_subquery()
+    q = q.outerjoin(agg, agg.c.card_id == Card.id)
+    return q.order_by(func.coalesce(agg.c.lc, 0).desc(), Card.created_at.desc())
 
 
 def _card_search_query(q, sort, tag=None):
@@ -101,9 +116,9 @@ def _card_search_query(q, sort, tag=None):
     base = base.filter(*filters).distinct()
 
     if sort == "hot":
-        order = [_calc_card_hot_score_expr().desc(), Card.created_at.desc()]
+        base = _order_by_hot(base)
     elif sort == "new":
-        order = [Card.created_at.desc()]
+        base = base.order_by(Card.created_at.desc())
     else:  # relevance
         score = case(
             (Card.name.like(like), 3),
@@ -111,8 +126,8 @@ def _card_search_query(q, sort, tag=None):
             (or_(Card.intro.like(like), Card.persona.like(like)), 1),
             else_=0,
         )
-        order = [score.desc(), Card.view_count.desc(), Card.created_at.desc()]
-    return base.order_by(*order)
+        base = base.order_by(score.desc(), Card.view_count.desc(), Card.created_at.desc())
+    return base
 
 
 def _user_search_query(q, sort):
@@ -239,17 +254,11 @@ def explore():
         q = q.join(CardTag, CardTag.card_id == Card.id).filter(CardTag.tag == tag)
 
     if sort == "hot":
-        q = q.order_by(_calc_card_hot_score_expr().desc(), Card.created_at.desc())
+        q = _order_by_hot(q)
     elif sort == "new":
         q = q.order_by(Card.created_at.desc())
-    else:  # likes：相关子查询计数，避免 group by 触发 only_full_group_by 问题
-        like_count = (
-            db.session.query(func.count(CardLike.card_id))
-            .filter(CardLike.card_id == Card.id)
-            .correlate(Card)
-            .scalar_subquery()
-        )
-        q = q.order_by(like_count.desc(), Card.created_at.desc())
+    else:  # likes：复用赞数聚合子查询，避免逐行关联子查询
+        q = _order_by_likes(q)
 
     if tag:
         q = q.distinct()

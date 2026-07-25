@@ -13,7 +13,7 @@ from flask import (
     url_for,
 )
 from flask_login import current_user, login_required
-from sqlalchemy import func, or_
+from sqlalchemy import func, literal_column, or_
 from sqlalchemy.orm import aliased, joinedload
 
 from ..decorators import block_if_muted
@@ -41,34 +41,31 @@ TEA_IMAGE_MAX_EDGE = 1280
 TEA_IMAGE_QUALITY = 82
 
 
-def _calc_teahouse_hot_score_expr():
-    """计算茶馆帖子的重力时间衰减热度得分 (Hacker News Gravity Model).
+def _order_by_teahouse_hot(q):
+    """按热度排序：一次聚合赞数与回复数（避免排序时逐行关联子查询），再套用时间衰减。
 
     公式：Hot Score = (Likes + Replies*1.5 + 1) / (AgeInHours + 2)^1.5
-    保证最新发布的内容能在热度列表有一席之地，同时老热帖随着时间推移热度自然衰减。
     """
-    from sqlalchemy import literal_column
+    likes_agg = (
+        db.session.query(TeaPostLike.post_id, func.count(TeaPostLike.post_id).label("lc"))
+        .group_by(TeaPostLike.post_id)
+        .subquery("tp_likes_agg")
+    )
     child = aliased(TeaPost)
-    like_sub = (
-        db.session.query(func.count(TeaPostLike.post_id))
-        .filter(TeaPostLike.post_id == TeaPost.id)
-        .correlate(TeaPost)
-        .scalar_subquery()
+    replies_agg = (
+        db.session.query(child.parent_id, func.count(child.id).label("rc"))
+        .group_by(child.parent_id)
+        .subquery("tp_replies_agg")
     )
-    reply_sub = (
-        db.session.query(func.count(child.id))
-        .filter(child.parent_id == TeaPost.id)
-        .correlate(TeaPost)
-        .scalar_subquery()
-    )
-    interactions = (func.coalesce(like_sub, 0) * 1.0) + (func.coalesce(reply_sub, 0) * 1.5)
-
+    q = q.outerjoin(likes_agg, likes_agg.c.post_id == TeaPost.id)
+    q = q.outerjoin(replies_agg, replies_agg.c.parent_id == TeaPost.id)
+    interactions = func.coalesce(likes_agg.c.lc, 0) * 1.0 + func.coalesce(replies_agg.c.rc, 0) * 1.5
     if db.engine.name == "sqlite":
         age_hours = (func.julianday("now") - func.julianday(TeaPost.created_at)) * 24.0
     else:
         age_hours = func.timestampdiff(literal_column("HOUR"), TeaPost.created_at, func.now())
-
-    return (interactions + 1.0) / func.pow(age_hours + 2.0, 1.5)
+    score = (interactions + 1.0) / func.pow(age_hours + 2.0, 1.5)
+    return q.order_by(score.desc(), TeaPost.created_at.desc())
 
 
 def _resolve_card(card_id_raw, viewer):
@@ -301,8 +298,7 @@ def index():
         q = q.order_by(db.func.rand())
     elif sort == "hot":
         # 最热：按 Hacker News 重力时间衰减公式计算热度分降序，时间兜底
-        hot_score = _calc_teahouse_hot_score_expr()
-        q = q.order_by(hot_score.desc(), TeaPost.created_at.desc())
+        q = _order_by_teahouse_hot(q)
     else:  # new
         q = q.order_by(TeaPost.created_at.desc())
     pagination = q.paginate(page=page, per_page=20, error_out=False)
@@ -435,8 +431,7 @@ def post_detail(post_id):
     rq = TeaPost.query.filter(TeaPost.parent_id == p.id)
     rq = _visible_query(rq, current_user)
     if sort == "hot":
-        hot_score = _calc_teahouse_hot_score_expr()
-        rq = rq.order_by(hot_score.desc(), TeaPost.created_at.desc())
+        rq = _order_by_teahouse_hot(rq)
     else:
         rq = rq.order_by(TeaPost.created_at.desc())
     reply_pagination = rq.paginate(page=page, per_page=20, error_out=False)
