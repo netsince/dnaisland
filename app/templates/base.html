@@ -1321,43 +1321,122 @@ data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded=
     });
   }
 
+  // ---- 表情包：最近使用（cookie，最多 50）与上次打开的标签 ----
+  function setCookie(name, value, days) {
+    var d = new Date();
+    d.setTime(d.getTime() + (days || 365) * 86400000);
+    document.cookie = name + '=' + encodeURIComponent(value) + ';expires=' + d.toUTCString() + ';path=/';
+  }
+  function getCookie(name) {
+    var m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+    return m ? decodeURIComponent(m[1]) : '';
+  }
+  function readRecentStickers() {
+    try {
+      var a = JSON.parse(getCookie('dna_sticker_recent'));
+      return Array.isArray(a) ? a : [];
+    } catch (e) { return []; }
+  }
+  function pushRecentSticker(code) {
+    var a = readRecentStickers().filter(function (c) { return c !== code; });
+    a.unshift(code);
+    if (a.length > 50) a = a.slice(0, 50);
+    setCookie('dna_sticker_recent', JSON.stringify(a), 365);
+  }
+  function setActiveTab(tabs, activeA) {
+    var links = tabs.querySelectorAll('.nav-link');
+    for (var i = 0; i < links.length; i++) links[i].classList.remove('active');
+    activeA.classList.add('active');
+  }
+  function showRecentStickers() {
+    var grid = document.getElementById('stickerGrid');
+    if (!grid) return;
+    var recent = readRecentStickers();
+    if (!recent.length) {
+      grid.innerHTML = '<div class="text-muted p-2">还没有使用记录，用过的表情会显示在这里</div>';
+      return;
+    }
+    grid.innerHTML = '';
+    recent.forEach(function (code) {
+      var data = window.DnaStickers.map[code];
+      if (!data) return;  // 表情可能已删除
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'btn p-1 sticker-pick-btn';
+      b.title = code;
+      b.innerHTML = '<img src="' + data + '" style="width:48px;height:48px;object-fit:contain;">';
+      b.addEventListener('click', function () { insertStickerToken(code); });
+      grid.appendChild(b);
+    });
+  }
+
   function openStickerPanel(textareaEl) {
     _stickerTarget = textareaEl;
     var modal = document.getElementById('stickerPanel');
     var tabs = document.getElementById('stickerSeriesTabs');
+    var grid = document.getElementById('stickerGrid');
     if (!modal || !tabs) return;
+    // 先打开面板，不等表情包请求返回，避免"卡死"的等待感
+    bootstrap.Modal.getOrCreateInstance(modal).show();
+    // 立即给出加载占位（表情包后续慢慢填充）
+    tabs.innerHTML = '';
+    if (grid) grid.innerHTML = '<div class="text-muted p-3 d-flex align-items-center gap-2"><span class="spinner-border spinner-border-sm"></span>表情包加载中…</div>';
     loadStickers().then(function () {
       tabs.innerHTML = '';
       var series = window.DnaStickers.series;
+      var lastTab = getCookie('dna_sticker_last_tab') || '__recent__';
+      var defaultShow = '__recent__';
+
+      // 第一个标签：最常使用（始终在最前）
+      var recentLi = document.createElement('li');
+      recentLi.className = 'nav-item';
+      var recentA = document.createElement('button');
+      recentA.type = 'button';
+      recentA.className = 'nav-link' + (lastTab === '__recent__' ? ' active' : '');
+      recentA.textContent = '最常使用';
+      recentA.addEventListener('click', function () {
+        setActiveTab(tabs, recentA);
+        setCookie('dna_sticker_last_tab', '__recent__', 365);
+        showRecentStickers();
+      });
+      recentLi.appendChild(recentA);
+      tabs.appendChild(recentLi);
+
       if (!series.length) {
-        tabs.innerHTML = '';
-        var grid = document.getElementById('stickerGrid');
         if (grid) grid.innerHTML = '<div class="text-muted p-2">暂无表情包</div>';
+        if (lastTab === '__recent__') showRecentStickers();
+        return;
       }
       series.forEach(function (s, i) {
+        var key = 's' + s.id;
         var li = document.createElement('li');
         li.className = 'nav-item';
         var a = document.createElement('button');
         a.type = 'button';
-        a.className = 'nav-link' + (i === 0 ? ' active' : '');
+        a.className = 'nav-link' + (lastTab === key ? ' active' : '');
         a.textContent = s.name;
         a.addEventListener('click', function () {
-          var siblings = tabs.children;
-          for (var j = 0; j < siblings.length; j++) {
-            siblings[j].firstChild.classList.remove('active');
-          }
-          a.classList.add('active');
+          setActiveTab(tabs, a);
+          setCookie('dna_sticker_last_tab', key, 365);
           showStickerSeries(s);
         });
         li.appendChild(a);
         tabs.appendChild(li);
+        if (lastTab === key) defaultShow = key;
       });
-      if (series[0]) showStickerSeries(series[0]);
-      bootstrap.Modal.getOrCreateInstance(modal).show();
+      // 默认展示上次打开的标签；若已失效则回退到"最常使用"
+      if (defaultShow && defaultShow !== '__recent__') {
+        var lastSeries = series.filter(function (s) { return 's' + s.id === defaultShow; })[0];
+        if (lastSeries) { showStickerSeries(lastSeries); return; }
+      }
+      showRecentStickers();
+    }).catch(function () {
+      if (grid) grid.innerHTML = '<div class="text-muted p-3">表情包加载失败，请稍后重试</div>';
     });
   }
 
   function insertStickerToken(code) {
+    pushRecentSticker(code);
     var ta = _stickerTarget;
     var token = '[sticker:' + code + ']';
     if (ta && typeof ta.focus === 'function') {
