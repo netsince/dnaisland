@@ -1859,9 +1859,9 @@ body.is-mobile-plus-open header {
 
 /* 表情包（内联 token 渲染） */
 .dna-sticker {
-  height: 1.6em;
-  width: 1.6em;
-  vertical-align: -0.35em;
+  height: 3em;
+  width: 3em;
+  vertical-align: -0.55em;
   object-fit: contain;
   border-radius: 4px;
   margin: 0 1px;
@@ -1999,7 +1999,8 @@ body.dna-page-card-detail main {
   border-radius: 16px;
   padding: 1rem;
 }
-.dna-card-profile__head { display: flex; gap: .75rem; align-items: flex-end; }
+.dna-card-profile__head { display: flex; gap: .75rem; align-items: center; }
+.dna-card-profile__head > .flex-grow-1 { min-width: 0; }
 .dna-card-profile .dna-avatar,
 .dna-card-profile .dna-avatar-ph {
   width: 84px; height: 84px; font-size: 2rem;
@@ -2007,6 +2008,20 @@ body.dna-page-card-detail main {
   flex-shrink: 0;
 }
 .dna-card-profile__tags { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .85rem; }
+.dna-card-profile a.dna-chip { transition: color .18s ease, border-color .18s ease, background .18s ease; }
+.dna-card-profile a.dna-chip:hover { color: var(--dna-text); border-color: var(--dna-border-strong); background: var(--dna-surface); }
+
+/* 桌面端：头像在上、信息居中堆叠，比左右并排更整洁；手机端保持左右并排 */
+@media (min-width: 992px) {
+  .dna-card-profile__head {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 1rem;
+  }
+  .dna-card-profile__head > .flex-grow-1 { width: 100%; }
+  .dna-card-profile__head .dna-card-meta { justify-content: center; }
+}
 
 .dna-card-actions {
   display: flex; flex-wrap: wrap; gap: .5rem;

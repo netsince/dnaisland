@@ -484,7 +484,7 @@ def sticker_upload():
     mimetype = f.mimetype or "image/png"
     try:
         data_url = f"data:{mimetype};base64," + base64.b64encode(raw).decode()
-        image_data = compress_image(data_url, max_edge=240, quality=90)
+        image_data = compress_image(data_url, max_edge=480, quality=90)
     except Exception:
         flash("图片处理失败，请换一张", "danger")
         return redirect(url_for("admin.stickers"))

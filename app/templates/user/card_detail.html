@@ -39,16 +39,15 @@
             {% else %}
             <div class="dna-avatar-ph">{{ card.name[:1] }}</div>
             {% endif %}
-            <div class="flex-grow-1 pb-1">
+            <div class="flex-grow-1">
               <h1 class="h4 mb-1 fw-bold">{{ card.name }}</h1>
-              <div class="text-muted small d-flex flex-wrap gap-2 align-items-center">
-                {% if card.gender %}<span>{{ card.gender }}</span>{% endif %}
+              <div class="dna-card-meta d-flex flex-wrap gap-2 align-items-center">
+                {% if card.gender %}<span class="dna-chip">{{ card.gender }}</span>{% endif %}
                 {% if author %}
-                <span>·</span>
-                <a href="{{ url_for('user.profile', username=author.username) }}" class="text-decoration-none text-muted">{{ author.display_name }}{{ badge(author) }}</a>
+                <a href="{{ url_for('user.profile', username=author.username) }}" class="dna-chip text-decoration-none">{{ author.display_name }}{{ badge(author) }}</a>
                 {% endif %}
-                <span>· {{ card.view_count }} 次浏览</span>
-                {% if card.created_at %}<span>· {{ card.created_at|cst('%Y-%m-%d') }}</span>{% endif %}
+                <span class="dna-chip">{{ card.view_count }} 次浏览</span>
+                {% if card.created_at %}<span class="dna-chip">{{ card.created_at|cst('%Y-%m-%d') }}</span>{% endif %}
               </div>
             </div>
           </div>
