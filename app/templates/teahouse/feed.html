@@ -43,7 +43,7 @@
        data-action="{{ url_for('teahouse.create_post') }}"
        data-btn-text="发布"
        data-placeholder="分享此刻的想法，发布到茶馆…">
-   <div class="card-body p-3 d-flex align-items-center gap-3">
+   <div class="card-body p-2 d-flex align-items-center gap-3">
      {% if current_user.avatar %}
      <img src="{{ url_for('user.avatar', user_id=current_user.id) }}" alt="头像" class="tea-compose__avatar rounded-circle">
      {% else %}

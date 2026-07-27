@@ -1456,6 +1456,9 @@ body.is-mobile-plus-open header {
 .dna-post-card .card-body {
   padding: 10px 14px !important;
 }
+@media (max-width: 991.98px) {
+  .dna-post-card .card-body { padding: 8px 12px !important; }
+}
 
 /* 通知列表卡片收紧与 8px 微型精细圆角 */
 .dna-notification-item {
