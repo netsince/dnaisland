@@ -1268,7 +1268,7 @@ data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded=
         var map = {};
         series.forEach(function (s) {
           if (s.stickers) {
-            s.stickers.forEach(function (st) { map[st.code] = st.image_data; });
+            s.stickers.forEach(function (st) { map[st.code] = st.image_url; });
           }
         });
         window.DnaStickers.series = series;
@@ -1315,7 +1315,7 @@ data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded=
       b.type = 'button';
       b.className = 'btn p-1 sticker-pick-btn';
       b.title = st.code;
-      b.innerHTML = '<img src="' + st.image_data + '" style="width:48px;height:48px;object-fit:contain;">';
+      b.innerHTML = '<img src="' + st.image_url + '" loading="lazy" style="width:48px;height:48px;object-fit:contain;">';
       b.addEventListener('click', function () { insertStickerToken(st.code); });
       grid.appendChild(b);
     });
@@ -1364,7 +1364,7 @@ data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded=
       b.type = 'button';
       b.className = 'btn p-1 sticker-pick-btn';
       b.title = code;
-      b.innerHTML = '<img src="' + data + '" style="width:48px;height:48px;object-fit:contain;">';
+      b.innerHTML = '<img src="' + data + '" loading="lazy" style="width:48px;height:48px;object-fit:contain;">';
       b.addEventListener('click', function () { insertStickerToken(code); });
       grid.appendChild(b);
     });
@@ -1380,14 +1380,13 @@ data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded=
     bootstrap.Modal.getOrCreateInstance(modal).show();
     // 立即给出加载占位（表情包后续慢慢填充）
     tabs.innerHTML = '';
-    if (grid) grid.innerHTML = '<div class="text-muted p-3 d-flex align-items-center gap-2"><span class="spinner-border spinner-border-sm"></span>表情包加载中…</div>';
+    if (grid) grid.innerHTML = '<div class="text-muted p-3 small">表情包加载中…</div>';
     loadStickers().then(function () {
       tabs.innerHTML = '';
       var series = window.DnaStickers.series;
-      var lastTab = getCookie('dna_sticker_last_tab') || '__recent__';
-      var defaultShow = '__recent__';
+      var lastTab = getCookie('dna_sticker_last_tab');  // 无记录则为空字符串
 
-      // 第一个标签：最常使用（始终在最前）
+      // 第一个标签：最常使用（始终在最前；仅当 lastTab 显式为 __recent__ 时默认激活）
       var recentLi = document.createElement('li');
       recentLi.className = 'nav-item';
       var recentA = document.createElement('button');
@@ -1413,7 +1412,9 @@ data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded=
         li.className = 'nav-item';
         var a = document.createElement('button');
         a.type = 'button';
-        a.className = 'nav-link' + (lastTab === key ? ' active' : '');
+        // 无 lastTab 记录时默认激活第一个系列，而不是"最常使用"
+        var isDefault = (lastTab === key) || (!lastTab && i === 0);
+        a.className = 'nav-link' + (isDefault ? ' active' : '');
         a.textContent = s.name;
         a.addEventListener('click', function () {
           setActiveTab(tabs, a);
@@ -1422,14 +1423,17 @@ data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded=
         });
         li.appendChild(a);
         tabs.appendChild(li);
-        if (lastTab === key) defaultShow = key;
       });
-      // 默认展示上次打开的标签；若已失效则回退到"最常使用"
-      if (defaultShow && defaultShow !== '__recent__') {
-        var lastSeries = series.filter(function (s) { return 's' + s.id === defaultShow; })[0];
-        if (lastSeries) { showStickerSeries(lastSeries); return; }
+      // 默认展示：lastTab 为 __recent__ → 最常使用；否则展示被默认激活的系列（无记录即第一个系列）
+      if (lastTab === '__recent__') {
+        showRecentStickers();
+      } else {
+        var def = series.filter(function (s) {
+          return (lastTab && 's' + s.id === lastTab) || (!lastTab && series[0] && 's' + s.id === 's' + series[0].id);
+        })[0];
+        if (def) showStickerSeries(def);
+        else showRecentStickers();
       }
-      showRecentStickers();
     }).catch(function () {
       if (grid) grid.innerHTML = '<div class="text-muted p-3">表情包加载失败，请稍后重试</div>';
     });

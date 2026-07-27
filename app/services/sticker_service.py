@@ -1,6 +1,7 @@
 """表情包服务：进程内缓存映射、文本渲染与提交清洗。"""
 import re
 import time
+from urllib.parse import quote
 
 from ..models import Sticker
 
@@ -40,11 +41,11 @@ def render_stickers_html(text):
 
     def _repl(mm):
         code = mm.group(1)
-        data = smap.get(code)
-        if not data:
+        if code not in smap:
             return ""
+        url = "/stickers/file/" + quote(code, safe="")
         return (
-            f'<img class="dna-sticker" src="{data}" alt="{code}" title="{code}">'
+            f'<img class="dna-sticker" src="{url}" alt="{code}" title="{code}">'
         )
 
     return _STICKER_TOKEN_RE.sub(_repl, text)
