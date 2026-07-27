@@ -6,7 +6,7 @@ from flask_login import current_user
 from sqlalchemy import case, func, literal_column, or_
 
 from ..extensions import db
-from ..models import Article, Card, CardLike, CardTag, Punishment, User
+from ..models import Article, Card, CardFavorite, CardLike, CardTag, Comment, Punishment, User
 from ..models.teahouse import TeaPost
 from ..services.card_service import attach_covers, popular_tags
 from ..services.image_service import send_webp
@@ -39,12 +39,11 @@ def article_cover(article_id):
 @main_bp.route("/")
 def index():
     page = request.args.get("page", 1, type=int)
-    # 信息层面统一过滤：被「屏蔽全部角色卡」作者的卡片不会出现在首页
-    pagination = (
-        Card.visible_to(current_user)
-        .order_by(Card.view_count.desc(), Card.created_at.desc())
-        .paginate(page=page, per_page=12, error_out=False)
-    )
+    # 信息层面统一过滤：被「屏蔽全部角色卡」作者的卡片不会出现在首页；
+    # 首页「热门推荐」按多重互动信号 + 时间衰减排序（见 _order_by_home_hot）。
+    q = Card.visible_to(current_user)
+    q = _order_by_home_hot(q)
+    pagination = q.paginate(page=page, per_page=12, error_out=False)
     return render_template(
         "index.html",
         cards=attach_covers(pagination.items),
@@ -72,6 +71,31 @@ def _likes_agg_subquery():
     )
 
 
+def _favorites_agg_subquery():
+    """一次聚合出每张卡的收藏数（card_id -> count），避免排序时逐行关联子查询。"""
+    return (
+        db.session.query(
+            CardFavorite.card_id,
+            func.count(CardFavorite.card_id).label("fc"),
+        )
+        .group_by(CardFavorite.card_id)
+        .subquery("card_favs_agg")
+    )
+
+
+def _comments_agg_subquery():
+    """一次聚合出每张卡（未隐藏）评论数（card_id -> count），避免排序时逐行关联子查询。"""
+    return (
+        db.session.query(
+            Comment.card_id,
+            func.count(Comment.card_id).label("cc"),
+        )
+        .filter(Comment.is_hidden.is_(False))
+        .group_by(Comment.card_id)
+        .subquery("card_comments_agg")
+    )
+
+
 def _card_hot_score(interactions_expr, created_at_col):
     """Hacker News 重力时间衰减热度得分：(Interactions + 1) / (AgeInHours + 2)^1.5。"""
     if db.engine.name == "sqlite":
@@ -86,6 +110,31 @@ def _order_by_hot(q):
     agg = _likes_agg_subquery()
     q = q.outerjoin(agg, agg.c.card_id == Card.id)
     interactions = func.coalesce(Card.view_count, 0) * 1.0 + func.coalesce(agg.c.lc, 0) * 5.0
+    score = _card_hot_score(interactions, Card.created_at)
+    return q.order_by(score.desc(), Card.created_at.desc())
+
+
+def _order_by_home_hot(q):
+    """首页「热门推荐」排序：多重互动信号 + Hacker News 时间衰减。
+
+    互动量 = 浏览×1 + 点赞×5 + 收藏×8 + 评论×3
+      —— 收藏/点赞是比单纯浏览更强的正反馈信号，权重更高；评论代表讨论度。
+    热度分 = (互动量 + 1) / (存在小时数 + 2)^1.5
+      —— 重力模型兼顾「当下热度」与「新鲜度」：新卡凭互动快速上浮，老卡随时间自然下沉，
+         避免老牌高浏览卡长期霸榜、新优质卡无法出头。
+    """
+    la = _likes_agg_subquery()
+    fa = _favorites_agg_subquery()
+    ca = _comments_agg_subquery()
+    q = q.outerjoin(la, la.c.card_id == Card.id)
+    q = q.outerjoin(fa, fa.c.card_id == Card.id)
+    q = q.outerjoin(ca, ca.c.card_id == Card.id)
+    interactions = (
+        func.coalesce(Card.view_count, 0) * 1.0
+        + func.coalesce(la.c.lc, 0) * 5.0
+        + func.coalesce(fa.c.fc, 0) * 8.0
+        + func.coalesce(ca.c.cc, 0) * 3.0
+    )
     score = _card_hot_score(interactions, Card.created_at)
     return q.order_by(score.desc(), Card.created_at.desc())
 
