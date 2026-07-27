@@ -141,7 +141,8 @@ def generate():
     aspect = request.form.get("size", "auto")
     if aspect not in ASPECT_TO_SIZE:
         aspect = "auto"
-    size = ASPECT_TO_SIZE[aspect]
+    # auto 表示不指定尺寸，不传给 API；其余按比例映射为具体的 size
+    size = ASPECT_TO_SIZE.get(aspect) if aspect in ASPECT_TO_SIZE else None
 
     try:
         count = int(request.form.get("count", 1))
