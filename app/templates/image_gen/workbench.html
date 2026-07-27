@@ -5,12 +5,6 @@
 {% block body_class %}dna-hide-header-on-mobile{% endblock %}
 
 {% block head %}
-<style>
-  .ig-active-tasks { display:flex; flex-direction:column; gap:4px; margin-top:6px; }
-  .ig-active-task { font-size:12px; color:var(--dna-text-muted,#8a8a8a); display:flex; align-items:center; gap:6px; }
-  .ig-spin { display:inline-block; width:12px; height:12px; border:2px solid currentColor; border-top-color:transparent; border-radius:50%; animation:ig-spin 0.8s linear infinite; }
-  @keyframes ig-spin { to { transform:rotate(360deg); } }
-</style>
 {% endblock %}
 
 {% block content %}
@@ -75,7 +69,6 @@
  <div style="margin-top:auto;display:flex;align-items:center;gap:12px;">
  <button type="submit" class="ig-gen" id="genBtn"> 生成</button>
  <span id="genStatus" class="ig-status"></span>
- <div id="activeTasks" class="ig-active-tasks"></div>
  </div>
  </form>
  </aside>
@@ -375,7 +368,7 @@
  resizeTimer = setTimeout(renderWorkbenchMasonry, 100);
  });
 
-  // ===== 进行中任务轮询 =====
+  // ===== 进行中任务：骨架卡片表现「生成中」，后台轮询检测完成 =====
   var activeTaskIds = new Set();
   var pollTimer = null;
 
@@ -386,19 +379,6 @@
       statusEl.textContent = msg;
       statusEl.className = 'ig-status ' + (kind === 'danger' ? 'err' : (kind === 'success' ? 'ok' : ''));
     }
-  }
-
-  function renderActiveTasks(tasks) {
-    var box = document.getElementById('activeTasks');
-    if (!box) return;
-    box.innerHTML = '';
-    (tasks || []).forEach(function (t) {
-      var line = document.createElement('div');
-      line.className = 'ig-active-task';
-      var label = t.status === 'pending' ? '排队中' : '生成中';
-      line.innerHTML = '<span class="ig-spin"></span>' + label + '…（' + (t.model_name || '') + ' · ' + (t.size || 'auto') + '）';
-      box.appendChild(line);
-    });
   }
 
   function updateGenBtn() {
@@ -412,22 +392,31 @@
     }
   }
 
-  // 任务从列表消失 = 已完成，拉详情以区分成功/失败
+  // 任务从轮询列表消失 = 已完成，拉详情区分成功/失败
   function onTaskGone(id) {
     fetch('/image-gen/api/tasks/' + id, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
       .then(function (r) { return r.json(); })
       .then(function (d) {
+        setSkeletonState(false);
         if (d.ok && d.status === 'succeeded') {
-          toast('生图完成', 'success');
+          var spent = d.points_spent || 0;
+          statusEl.textContent = '完成，消耗 ' + spent + ' 点';
+          statusEl.className = 'ig-status ok';
           if (pointsEl && typeof d.balance !== 'undefined') pointsEl.innerHTML = '点数 <b>' + d.balance + '</b>';
+          toast('生图完成', 'success');
           loadWorkbenchLogs();
         } else if (d.ok) {
+          statusEl.textContent = '生图失败：' + (d.error || '未知错误');
+          statusEl.className = 'ig-status err';
           toast('生图失败：' + (d.error || '未知错误'), 'danger');
         } else {
           loadWorkbenchLogs();
         }
       })
-      .catch(function () { loadWorkbenchLogs(); });
+      .catch(function () {
+        setSkeletonState(false);
+        loadWorkbenchLogs();
+      });
   }
 
   function pollTasks() {
@@ -439,13 +428,20 @@
         res.tasks.forEach(function (t) {
           if (!activeTaskIds.has(t.id)) activeTaskIds.add(t.id);
         });
+        // 有进行中任务时仅用骨架卡片表示「生成中」（按钮旁不再重复转圈）
+        if (activeTaskIds.size > 0) {
+          setSkeletonState(true);
+        }
         Array.from(activeTaskIds).forEach(function (id) {
           if (!returned.has(id)) {
             activeTaskIds.delete(id);
             onTaskGone(id);
           }
         });
-        renderActiveTasks(res.tasks);
+        // 若已无进行中任务，收起骨架
+        if (activeTaskIds.size === 0) {
+          setSkeletonState(false);
+        }
         updateGenBtn();
       })
       .catch(function () {});
@@ -464,7 +460,7 @@
     if (document.hidden) stopPolling(); else ensurePolling();
   });
 
-  // AJAX 提交：仅提交任务并立即返回 task_id，结果由轮询驱动
+  // AJAX 提交：仅提交任务并立即返回 task_id，「生成中」沿用骨架卡片表现
   form.addEventListener('submit', function (e) {
     e.preventDefault();
     if (activeTaskIds.size > 0) {
@@ -485,8 +481,6 @@
     var fd = new FormData(form);
     genBtn.disabled = true;
     genBtn.textContent = '提交中…';
-    statusEl.innerHTML = '<span class="ig-spin"></span>已提交，生成中…';
-    statusEl.className = 'ig-status';
     if (window.innerWidth <= 768) openSheet();
 
     fetch(form.action, {
@@ -499,10 +493,8 @@
       if (data.ok && data.task_id) {
         activeTaskIds.add(data.task_id);
         ensurePolling();
-        renderActiveTasks([{ id: data.task_id, status: 'pending', model_name: modelEl.options[modelEl.selectedIndex].text, size: hidden.value }]);
+        setSkeletonState(true);
         updateGenBtn();
-        statusEl.textContent = '已提交，生成中…';
-        statusEl.className = 'ig-status';
         promptEl.value = '';
         if (refInput) refInput.value = '';
         selectedRefs = [];

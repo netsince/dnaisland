@@ -250,12 +250,18 @@ def api_task_detail(task_id):
     t = db.session.get(GenerationTask, task_id)
     if not t or t.user_id != current_user.id:
         return jsonify(ok=False, error="任务不存在"), 404
+    points_spent = 0
+    if t.result_log_id:
+        log = db.session.get(GenerationLog, t.result_log_id)
+        if log:
+            points_spent = log.points_spent or 0
     return jsonify(
         ok=True,
         id=t.id,
         status=t.status,
         error=t.error,
         log_id=t.result_log_id,
+        points_spent=points_spent,
         balance=current_user.points,
     )
 
