@@ -959,38 +959,6 @@ data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded=
  })();
  </script>
 
-<!-- 茶馆：编辑帖子弹窗（仅发布后 15 分钟内可编辑） -->
-<div class="modal fade" id="teahouseEditModal" tabindex="-1" aria-labelledby="teahouseEditModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <form id="teahouseEditForm" method="post" class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="teahouseEditModalLabel">编辑帖子</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
-      </div>
-      <div class="modal-body">
-        <textarea name="content" id="teahouseEditContent" class="form-control" rows="5" maxlength="280" required></textarea>
-        <div class="form-text"><span id="teahouseEditCount">0</span>/280 · 仅发布后 15 分钟内可编辑</div>
-
-        <div class="d-flex align-items-center mt-2" data-card-picker>
-          <input type="hidden" name="card_id" value="">
-          <input type="hidden" name="card_removed" value="0">
-          <button type="button" class="btn btn-sm btn-outline-secondary" data-pick-card><i class="bi bi-person-badge"></i> 关联角色卡</button>
-          <span class="tea-card-picked d-none ms-2 small"></span>
-        </div>
-        <div class="d-flex align-items-center mt-2" data-image-picker>
-          <input type="hidden" name="images" value="">
-          <input type="hidden" name="image_removed" value="0">
-          <button type="button" class="btn btn-sm btn-outline-secondary" data-pick-image><i class="bi bi-image"></i> 配图</button>
-          <span class="tea-image-picked d-none ms-2 small"></span>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-        <button type="submit" class="btn btn-primary">保存</button>
-      </div>
-    </form>
-  </div>
-</div>
 <!-- 茶馆：删除帖子（软删）隐藏表单，配合 confirm 使用 -->
 <form id="teahouseDeleteForm" method="post" style="display:none"></form>
 
@@ -1019,12 +987,14 @@ data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded=
       <!-- 关联角色卡 preview -->
       <div class="tea-compose__field d-flex align-items-center mb-2" data-card-picker>
         <input type="hidden" name="card_id" id="teaComposeCardId" value="">
+        <input type="hidden" name="card_removed" value="0">
         <span class="tea-card-picked d-none"></span>
       </div>
 
       <!-- 配图 preview -->
       <div class="tea-compose__field d-flex align-items-center mb-3" data-image-picker>
         <input type="hidden" name="images" id="teaComposeImages" value="">
+        <input type="hidden" name="image_removed" value="0">
         <span class="tea-image-picked d-none"></span>
         <button type="button" class="tea-tool" data-pick-image><i class="bi bi-image"></i><span>添加配图</span></button>
       </div>
@@ -1070,89 +1040,49 @@ data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded=
     btn.textContent = folded ? '展开全文' : '收起';
   });
 
-  // 编辑弹窗：填充内容并设置提交地址；预填关联卡与配图
+  // 编辑帖子：复用发布抽屉（teahouseEditModal 已废弃），预填内容/关联卡/话题并切换提交地址为编辑路由
   document.addEventListener('click', function (e) {
     var btn = e.target.closest && e.target.closest('.js-post-edit');
     if (!btn) return;
     e.preventDefault();
     var id = btn.getAttribute('data-post-id');
     var content = btn.getAttribute('data-content') || '';
-    var form = document.getElementById('teahouseEditForm');
-    var ta = document.getElementById('teahouseEditContent');
-    var counter = document.getElementById('teahouseEditCount');
-    if (!form || !ta) return;
-    form.action = '/teahouse/' + id + '/edit';
-    ta.value = content;
-    if (counter) counter.textContent = content.length;
-
-    // 关联角色卡：从按钮 data 属性预填
     var cardCard = btn.closest('.card');
-    var cardHid = form.querySelector('input[name=card_id]');
-    var cardRem = form.querySelector('input[name=card_removed]');
-    var cardLabel = form.querySelector('.tea-card-picked');
-    if (cardHid) cardHid.value = btn.getAttribute('data-card-id') || '';
-    if (cardRem) cardRem.value = '0';
-    if (cardLabel) {
-      var cid = btn.getAttribute('data-card-id') || '';
-      var cname = btn.getAttribute('data-card-name') || '';
-      if (cid) {
-        cardLabel.classList.remove('d-none');
-        cardLabel.innerHTML = '已关联：<strong>' + cname + '</strong> <button type="button" class="btn btn-link btn-sm p-0 ms-1 align-baseline" data-clear-card>✕</button>';
-      } else {
-        cardLabel.classList.add('d-none');
-        cardLabel.innerHTML = '';
-      }
-    }
+    var cardId = btn.getAttribute('data-card-id') || '';
+    var cardName = btn.getAttribute('data-card-name') || '';
+    // 从帖子卡片读取话题文本，避免编辑时丢失
+    var topicBadge = cardCard && cardCard.querySelector('a.badge[href*="topic"]');
+    var topicName = topicBadge ? topicBadge.textContent.replace(/^#/, '').trim() : '';
 
-    // 配图：从帖子卡片 DOM 中读取当前配图（保持原样，除非用户替换/移除）
-    var imgEl = cardCard && cardCard.querySelector('img.tea-post-img');
-    var imgHid = form.querySelector('input[name=images]');
-    var imgRem = form.querySelector('input[name=image_removed]');
-    var imgLabel = form.querySelector('.tea-image-picked');
-    if (imgHid) imgHid.value = '';
-    if (imgRem) imgRem.value = '0';
-    var imgPicker = form.querySelector('[data-image-picker]');
-    if (imgPicker) imgPicker._file = null;   // 打开时清空上一轮残留的配图文件
-    if (imgLabel) {
-      if (imgEl) {
-        imgLabel.classList.remove('d-none');
-        imgLabel.innerHTML = '<img src="' + imgEl.src + '" class="img-thumbnail" style="height:48px;width:48px;object-fit:cover;"> <button type="button" class="btn btn-link btn-sm p-0 ms-1 align-baseline" data-clear-image>✕</button>';
-      } else {
-        imgLabel.classList.add('d-none');
-        imgLabel.innerHTML = '';
-      }
-    }
-
-    bootstrap.Modal.getOrCreateInstance(document.getElementById('teahouseEditModal')).show();
-  });
-
-  // 编辑弹窗：拦截原生提交，改为以 multipart 文件形式上传配图（去掉 base64 内联）
-  (function () {
-    var editForm = document.getElementById('teahouseEditForm');
-    if (!editForm) return;
-    editForm.addEventListener('submit', function (e) {
-      e.preventDefault();
-      var fd = new FormData(editForm);
-      editForm.querySelectorAll('[data-image-picker]').forEach(function (p) {
-        fd.delete('images');
-        if (p._file) fd.append('images', p._file, p._file.name);
+    if (window.openTeaComposeDrawer) {
+      window.openTeaComposeDrawer({
+        title: '编辑帖子',
+        action: '/teahouse/' + id + '/edit',
+        btnText: '保存',
+        cardId: cardId,
+        cardName: cardName,
+        clear: false
       });
-      var btn = editForm.querySelector('button[type="submit"]');
-      if (btn) btn.disabled = true;
-      fetch(editForm.action, {
-        method: 'POST',
-        body: fd,
-        headers: { 'X-Requested-With': 'XMLHttpRequest' }
-      })
-      .then(function () { window.location.reload(); })
-      .catch(function () { window.location.reload(); });
-    });
-  })();
-
-  document.addEventListener('input', function (e) {
-    if (e.target && e.target.id === 'teahouseEditContent') {
-      var c = document.getElementById('teahouseEditCount');
-      if (c) c.textContent = e.target.value.length;
+    }
+    // openDrawer 在 clear:false 下不会自动填入正文/话题，这里手动预填
+    var ta = document.getElementById('teaComposeContent');
+    if (ta) ta.value = content;
+    var counter = document.getElementById('teaComposeCounter');
+    if (counter) counter.textContent = content.length;
+    var topicInput = document.getElementById('teaComposeTopic');
+    if (topicInput) topicInput.value = topicName;
+    // 确保关联卡展示正确（无卡时清空）
+    var cardHid = document.getElementById('teaComposeCardId');
+    if (cardHid) cardHid.value = cardId;
+    var cardPicked = document.querySelector('#teaComposeForm .tea-card-picked');
+    if (cardPicked) {
+      if (cardId) {
+        cardPicked.classList.remove('d-none');
+        cardPicked.innerHTML = '已关联：<strong>' + cardName + '</strong> <button type="button" class="btn btn-link btn-sm p-0 ms-1 align-baseline" data-clear-card>✕</button>';
+      } else {
+        cardPicked.classList.add('d-none');
+        cardPicked.innerHTML = '';
+      }
     }
   });
 

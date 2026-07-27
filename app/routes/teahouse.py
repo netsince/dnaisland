@@ -633,36 +633,49 @@ def edit_post(post_id):
     content = (request.form.get("content") or "").strip()
     content, _ = sanitize_stickers(content, max_count=20)
     if not content:
-        flash("帖子内容不能为空", "warning")
-    elif len(content) > TEA_POST_MAX_LEN:
-        flash(f"帖子内容不能超过 {TEA_POST_MAX_LEN} 字", "warning")
-    else:
-        p.content = content
-        p.edited_at = datetime.utcnow()
-        # 编辑窗口内允许改/清除关联角色卡（仅当表单显式提交 card_id 时，避免编辑内容时误清）
-        if "card_id" in request.form:
-            card_removed = request.form.get("card_removed") == "1"
-            if card_removed:
-                p.card_id = None
-            else:
-                card = _resolve_card(request.form.get("card_id"), current_user)
-                p.card_id = card.id if card else None
-        # 配图：仅当表单显式上传 images 文件或提交 image_removed 时才调整，未改动则保持原样
-        if request.files.get("images") or "image_removed" in request.form:
-            f = request.files.get("images")
-            if f and f.filename:
-                _attach_images(p, [f])
-            elif request.form.get("image_removed") == "1":
-                for old in list(p.images):
-                    db.session.delete(old)
-                p.images.clear()
-        # 话题：仅当表单显式提交 topic 字段时才调整
-        if "topic" in request.form:
-            _set_single_topic(p, request.form.get("topic"))
-        db.session.commit()
-        _notify_mentions(content, p, current_user)
-        flash("已更新", "success")
-    return redirect(request.referrer or url_for("teahouse.post_detail", post_id=post_id))
+        return respond(
+            request.referrer or url_for("teahouse.post_detail", post_id=post_id),
+            ok=False,
+            flash_msg="帖子内容不能为空",
+            flash_cat="warning",
+        )
+    if len(content) > TEA_POST_MAX_LEN:
+        return respond(
+            request.referrer or url_for("teahouse.post_detail", post_id=post_id),
+            ok=False,
+            flash_msg=f"帖子内容不能超过 {TEA_POST_MAX_LEN} 字",
+            flash_cat="warning",
+        )
+    p.content = content
+    p.edited_at = datetime.utcnow()
+    # 编辑窗口内允许改/清除关联角色卡（仅当表单显式提交 card_id 时，避免编辑内容时误清）
+    if "card_id" in request.form:
+        card_removed = request.form.get("card_removed") == "1"
+        if card_removed:
+            p.card_id = None
+        else:
+            card = _resolve_card(request.form.get("card_id"), current_user)
+            p.card_id = card.id if card else None
+    # 配图：仅当表单显式上传 images 文件或提交 image_removed 时才调整，未改动则保持原样
+    if request.files.get("images") or "image_removed" in request.form:
+        f = request.files.get("images")
+        if f and f.filename:
+            _attach_images(p, [f])
+        elif request.form.get("image_removed") == "1":
+            for old in list(p.images):
+                db.session.delete(old)
+            p.images.clear()
+    # 话题：仅当表单显式提交 topic 字段时才调整
+    if "topic" in request.form:
+        _set_single_topic(p, request.form.get("topic"))
+    db.session.commit()
+    _notify_mentions(content, p, current_user)
+    return respond(
+        request.referrer or url_for("teahouse.post_detail", post_id=post_id),
+        flash_msg="已更新",
+        flash_cat="success",
+        action="post",
+    )
 
 
 @teahouse_bp.route("/<int:post_id>/delete", methods=["POST"])

@@ -16,7 +16,7 @@ from flask import (
     url_for,
 )
 from flask_login import current_user
-from sqlalchemy import func
+from sqlalchemy import case, func, update
 
 from ..decorators import super_admin_required
 from ..extensions import db
@@ -609,22 +609,22 @@ def sticker_edit(sticker_id):
 def sticker_reorder():
     data = request.get_json(silent=True) or {}
     kind = data.get("type")
-    ids = data.get("ids") or []
+    ids = [int(x) for x in (data.get("ids") or []) if str(x).strip().isdigit()]
+    if not ids:
+        return jsonify(ok=True)
     if kind == "series":
-        for i, sid in enumerate(ids):
-            s = db.session.get(StickerSeries, int(sid))
-            if s:
-                s.sort_order = i
+        stmt = update(StickerSeries).where(StickerSeries.id.in_(ids)).values(
+            sort_order=case({sid: i for i, sid in enumerate(ids)}, value=StickerSeries.id)
+        )
     elif kind == "sticker":
-        for i, stid in enumerate(ids):
-            st = db.session.get(Sticker, int(stid))
-            if st:
-                st.sort_order = i
+        # 单条 CASE WHEN 批量更新，不 SELECT 巨大的 image_data 字段
+        stmt = update(Sticker).where(Sticker.id.in_(ids)).values(
+            sort_order=case({stid: i for i, stid in enumerate(ids)}, value=Sticker.id)
+        )
     else:
         return jsonify(ok=False, error="unknown type"), 400
+    db.session.execute(stmt)
     db.session.commit()
-    if kind == "series":
-        invalidate_sticker_cache()
     return jsonify(ok=True)
 
 

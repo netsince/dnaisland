@@ -238,7 +238,8 @@
       handle: '.drag-handle',
       animation: 150,
       ghostClass: 'sortable-ghost',
-      onEnd: function () {
+      onEnd: function (evt) {
+        if (evt.oldIndex === evt.newIndex) return;
         var ids = Array.prototype.map.call(
           seriesListEl.querySelectorAll('.series-card'),
           function (el) { return el.dataset.id; }
@@ -253,7 +254,8 @@
       draggable: '.sticker-item',
       animation: 150,
       ghostClass: 'sortable-ghost',
-      onEnd: function () {
+      onEnd: function (evt) {
+        if (evt.oldIndex === evt.newIndex) return;
         var ids = Array.prototype.map.call(
           grid.querySelectorAll('.sticker-item'),
           function (el) { return el.dataset.id; }
