@@ -4,8 +4,8 @@ import time
 
 from ..models import Sticker
 
-# [sticker:CODE]，CODE 仅允许字母数字下划线连字符
-_STICKER_TOKEN_RE = re.compile(r"\[sticker:([A-Za-z0-9_-]+)\]")
+# [sticker:CODE]，CODE 允许中文、字母数字下划线连字符
+_STICKER_TOKEN_RE = re.compile(r"\[sticker:([A-Za-z0-9_\u4e00-\u9fff-]+)\]")
 
 # 进程内缓存 {code: image_data}，避免每条内容渲染都查库
 _CACHE = {"map": None, "at": 0.0}

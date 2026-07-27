@@ -6,6 +6,7 @@
 <h2 class="h4 mb-3">表情包管理</h2>
 
 <div class="row g-4">
+  <!-- 左侧：新增表单 -->
   <div class="col-lg-4">
     <div class="card mb-4">
       <div class="card-header">新增系列</div>
@@ -45,14 +46,14 @@
             </select>
           </div>
           <div class="col-12">
-            <label class="form-label">表情 ID</label>
-            <input type="text" class="form-control" name="code" placeholder="如 doge" required>
-            <div class="form-text">唯一，用户内容中以 [sticker:ID] 引用。</div>
+            <label class="form-label">ID 前缀（可选）</label>
+            <input type="text" class="form-control" name="code" placeholder="留空则用图片文件名">
+            <div class="form-text">支持中文、字母、数字、下划线、连字符；多张时会作为每张 ID 的前缀。</div>
           </div>
           <div class="col-12">
-            <label class="form-label">图片</label>
-            <input type="file" class="form-control" name="image" accept="image/png,image/jpeg,image/gif,image/webp" required>
-            <div class="form-text">将压缩为边长 ≤240 的 WebP（保留透明）。</div>
+            <label class="form-label">图片（可多选）</label>
+            <input type="file" class="form-control" name="image" accept="image/png,image/jpeg,image/gif,image/webp" multiple required>
+            <div class="form-text">可一次选择多张，自动以文件名（去扩展名）作为表情 ID，压缩为边长 ≤480 的 WebP。</div>
           </div>
           <div class="col-12">
             <label class="form-label">排序</label>
@@ -66,39 +67,235 @@
     </div>
   </div>
 
+  <!-- 右侧：系列列表（可拖拽排序） -->
   <div class="col-lg-8">
-    {% for s in series %}
-    <div class="card mb-4">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <span>{{ s.name }} <small class="text-muted">（{{ s.slug }}）</small></span>
-        <form method="post" action="{{ url_for('admin.sticker_series_delete', sid=s.id) }}" class="d-inline"
-              onsubmit="return confirm('删除该系列会同时删除其下所有表情，确认？');">
-          <button class="btn btn-sm btn-outline-danger">删除系列</button>
-        </form>
-      </div>
-      <div class="card-body">
-        {% if s.stickers %}
-        <div class="d-flex flex-wrap gap-3">
-          {% for st in s.stickers|sort(attribute='sort_order') %}
-          <div class="text-center" style="width:72px;">
-            <img src="{{ st.image_data }}" alt="{{ st.code }}" title="{{ st.code }}"
-                 style="width:56px;height:56px;object-fit:contain;">
-            <div class="small text-muted text-truncate" style="max-width:72px;" title="{{ st.code }}">{{ st.code }}</div>
-            <form method="post" action="{{ url_for('admin.sticker_delete', sticker_id=st.id) }}" class="d-inline"
-                  onsubmit="return confirm('确认删除该表情？');">
-              <button class="btn btn-sm btn-link text-danger p-0">删除</button>
+    <p class="text-muted small mb-2">拖动卡片左侧手柄可调整系列顺序，拖动表情可调整其在系列内的顺序，松手即保存。</p>
+    <div id="seriesList">
+      {% for s in series %}
+      <div class="card mb-4 series-card" data-drag="series" data-id="{{ s.id }}" draggable="true">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span>
+            <span class="drag-handle me-2" title="拖动排序">⠿</span>
+            <span>{{ s.name }}</span>
+            <small class="text-muted">（{{ s.slug }}）</small>
+          </span>
+          <span>
+            <button type="button" class="btn btn-sm btn-outline-secondary"
+                    data-id="{{ s.id }}" data-name="{{ s.name }}" data-slug="{{ s.slug }}" data-sort="{{ s.sort_order }}"
+                    onclick="openSeriesEdit(this)">编辑</button>
+            <form method="post" action="{{ url_for('admin.sticker_series_delete', sid=s.id) }}" class="d-inline"
+                  onsubmit="return confirm('删除该系列会同时删除其下所有表情，确认？');">
+              <button class="btn btn-sm btn-outline-danger">删除系列</button>
             </form>
-          </div>
-          {% endfor %}
+          </span>
         </div>
-        {% else %}
-        <div class="text-muted">该系列下暂无表情</div>
-        {% endif %}
+        <div class="card-body">
+          {% if s.stickers %}
+          <div class="sticker-grid d-flex flex-wrap gap-3" data-drag="sticker" data-series="{{ s.id }}">
+            {% for st in s.stickers|sort(attribute='sort_order') %}
+            <div class="sticker-item text-center" data-id="{{ st.id }}" draggable="true" style="width:92px;">
+              <img src="{{ st.image_data }}" alt="{{ st.code }}" title="{{ st.code }}"
+                   style="width:56px;height:56px;object-fit:contain;cursor:grab;">
+              <div class="small text-muted text-truncate" style="max-width:92px;" title="{{ st.code }}">{{ st.code }}</div>
+              <div class="btn-group btn-group-sm mt-1" role="group">
+                <button type="button" class="btn btn-outline-secondary py-0"
+                        data-id="{{ st.id }}" data-code="{{ st.code }}" data-series="{{ st.series_id }}" data-sort="{{ st.sort_order }}"
+                        onclick="openStickerEdit(this)">编辑</button>
+                <form method="post" action="{{ url_for('admin.sticker_delete', sticker_id=st.id) }}" class="d-inline"
+                      onsubmit="return confirm('确认删除该表情？');">
+                  <button class="btn btn-outline-danger py-0">删</button>
+                </form>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div class="text-muted">该系列下暂无表情</div>
+          {% endif %}
+        </div>
       </div>
+      {% else %}
+      <div class="text-muted">暂无表情系列，请先在左侧添加。</div>
+      {% endfor %}
     </div>
-    {% else %}
-    <div class="text-muted">暂无表情系列，请先在左侧添加。</div>
-    {% endfor %}
   </div>
 </div>
+
+<!-- 编辑系列弹窗 -->
+<div class="modal fade" id="seriesEditModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <form method="post" id="seriesEditForm" class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">编辑系列</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">系列名称</label>
+          <input type="text" class="form-control" name="name" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">系列标识</label>
+          <input type="text" class="form-control" name="slug" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">排序</label>
+          <input type="number" class="form-control" name="sort_order" value="0">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+        <button type="submit" class="btn btn-primary">保存</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- 编辑表情弹窗 -->
+<div class="modal fade" id="stickerEditModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <form method="post" id="stickerEditForm" class="modal-content" enctype="multipart/form-data">
+      <div class="modal-header">
+        <h5 class="modal-title">编辑表情</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">所属系列</label>
+          <select class="form-select" name="series_id" required>
+            {% for s in series %}
+            <option value="{{ s.id }}">{{ s.name }}（{{ s.slug }}）</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">表情 ID</label>
+          <input type="text" class="form-control" name="code" required>
+          <div class="form-text">支持中文、字母、数字、下划线和连字符。</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">替换图片（留空则不修改）</label>
+          <input type="file" class="form-control" name="image" accept="image/png,image/jpeg,image/gif,image/webp">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">排序</label>
+          <input type="number" class="form-control" name="sort_order" value="0">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+        <button type="submit" class="btn btn-primary">保存</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<style>
+  .drag-handle { cursor: grab; color: #888; user-select: none; }
+  .series-card.dragging, .sticker-item.dragging { opacity: .5; }
+  .sticker-item { cursor: grab; }
+</style>
+
+<script>
+  var baseUrl = "{{ url_for('admin.stickers') }}";  // /admin/stickers
+
+  function openSeriesEdit(btn) {
+    var f = document.getElementById('seriesEditForm');
+    f.action = baseUrl + '/series/' + btn.dataset.id + '/edit';
+    f.elements['name'].value = btn.dataset.name;
+    f.elements['slug'].value = btn.dataset.slug;
+    f.elements['sort_order'].value = btn.dataset.sort || 0;
+    new bootstrap.Modal(document.getElementById('seriesEditModal')).show();
+  }
+
+  function openStickerEdit(btn) {
+    var f = document.getElementById('stickerEditForm');
+    f.action = baseUrl + '/' + btn.dataset.id + '/edit';
+    f.elements['series_id'].value = btn.dataset.series;
+    f.elements['code'].value = btn.dataset.code;
+    f.elements['image'].value = '';
+    f.elements['sort_order'].value = btn.dataset.sort || 0;
+    new bootstrap.Modal(document.getElementById('stickerEditModal')).show();
+  }
+
+  // ---- 拖拽排序（原生 HTML5） ----
+  var drag = null;
+
+  document.addEventListener('dragstart', function (e) {
+    var item = e.target.closest('.sticker-item');
+    var card = e.target.closest('.series-card');
+    if (item) {
+      drag = { kind: 'sticker', el: item, container: item.parentElement };
+      item.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', '');
+    } else if (card) {
+      drag = { kind: 'series', el: card, container: document.getElementById('seriesList') };
+      card.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', '');
+    }
+  });
+
+  document.addEventListener('dragover', function (e) {
+    if (!drag) return;
+    var cont = drag.kind === 'series'
+      ? document.getElementById('seriesList')
+      : e.target.closest('.sticker-grid');
+    if (!cont) return;
+    if (drag.kind === 'series' && !cont.contains(e.target)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    var after = getDragAfter(cont, drag.kind, e.clientX, e.clientY);
+    if (after == null) cont.appendChild(drag.el);
+    else cont.insertBefore(drag.el, after);
+  });
+
+  document.addEventListener('drop', function (e) {
+    if (!drag) return;
+    var cont = drag.kind === 'series'
+      ? document.getElementById('seriesList')
+      : e.target.closest('.sticker-grid');
+    if (!cont) return;
+    if (drag.kind === 'series' && !cont.contains(e.target)) return;
+    e.preventDefault();
+    var ids = [];
+    cont.querySelectorAll(drag.kind === 'series' ? '.series-card' : '.sticker-item')
+      .forEach(function (el) { ids.push(el.dataset.id); });
+    var payload = { type: drag.kind, ids: ids };
+    var el = drag.el;
+    drag = null;
+    el.classList.remove('dragging');
+    fetch(baseUrl + '/reorder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).then(function (r) { return r.json(); }).then(function (d) {
+      if (!d.ok) location.reload();
+    }).catch(function () { location.reload(); });
+  });
+
+  document.addEventListener('dragend', function () {
+    if (drag && drag.el) drag.el.classList.remove('dragging');
+    drag = null;
+  });
+
+  function getDragAfter(container, kind, x, y) {
+    var els = Array.prototype.slice.call(
+      container.querySelectorAll(kind === 'series' ? '.series-card' : '.sticker-item')
+    );
+    var closest = null, closestOffset = -Infinity;
+    els.forEach(function (el) {
+      if (el === drag.el) return;
+      var box = el.getBoundingClientRect();
+      var center = kind === 'series' ? box.top + box.height / 2 : box.left + box.width / 2;
+      var pointer = kind === 'series' ? y : x;
+      if (pointer < center && center > closestOffset) {
+        closestOffset = center;
+        closest = el;
+      }
+    });
+    return closest;
+  }
+</script>
 {% endblock %}

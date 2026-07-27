@@ -1355,7 +1355,7 @@ data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded=
 
   function renderStickers(text) {
     if (!text) return text;
-    return text.replace(/\[sticker:([A-Za-z0-9_-]+)\]/g, function (m, code) {
+    return text.replace(/\[sticker:([A-Za-z0-9_\u4e00-\u9fff-]+)\]/g, function (m, code) {
       var d = window.DnaStickers.map[code];
       if (!d) {
         return '<span class="dna-sticker-placeholder" data-sticker-code="' + code + '">' + m + '</span>';

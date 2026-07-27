@@ -9,6 +9,7 @@ from flask import (
     Response,
     abort,
     flash,
+    jsonify,
     redirect,
     render_template,
     request,
@@ -465,41 +466,72 @@ def sticker_series_delete(sid):
 @super_admin_required
 def sticker_upload():
     series_id = request.form.get("series_id", type=int)
-    code = (request.form.get("code") or "").strip()
-    f = request.files.get("image")
-    if not series_id or not code or not f or not f.filename:
-        flash("系列、表情ID与图片均必填", "danger")
+    prefix = (request.form.get("code") or "").strip()
+    files = request.files.getlist("image")
+    if not series_id or not files:
+        flash("系列与至少一张图片均必填", "danger")
         return redirect(url_for("admin.stickers"))
-    if not re.fullmatch(r"[A-Za-z0-9_-]+", code):
-        flash("表情ID仅允许字母、数字、下划线和连字符", "danger")
+    if prefix and not re.fullmatch(r"[A-Za-z0-9_\u4e00-\u9fff-]+", prefix):
+        flash("ID前缀仅允许中文、字母、数字、下划线和连字符", "danger")
         return redirect(url_for("admin.stickers"))
     if not StickerSeries.query.get(series_id):
         flash("系列不存在", "danger")
         return redirect(url_for("admin.stickers"))
-    if Sticker.query.filter_by(code=code).first():
-        flash("表情ID已存在", "danger")
-        return redirect(url_for("admin.stickers"))
 
-    raw = f.read()
-    mimetype = f.mimetype or "image/png"
-    try:
-        data_url = f"data:{mimetype};base64," + base64.b64encode(raw).decode()
-        image_data = compress_image(data_url, max_edge=480, quality=90)
-    except Exception:
-        flash("图片处理失败，请换一张", "danger")
-        return redirect(url_for("admin.stickers"))
+    base_sort = request.form.get("sort_order", 0, type=int)
+    used = set()
+    imported = 0
+    skipped = 0
 
-    db.session.add(
-        Sticker(
-            code=code,
-            series_id=series_id,
-            image_data=image_data,
-            sort_order=request.form.get("sort_order", 0, type=int),
+    def clean_stem(name):
+        stem = name.rsplit(".", 1)[0]
+        cleaned = re.sub(r"[^A-Za-z0-9_\u4e00-\u9fff-]", "_", stem)
+        return cleaned.strip("_-") or "sticker"
+
+    for idx, f in enumerate(files):
+        if not f or not f.filename:
+            continue
+        stem = clean_stem(f.filename)
+        base = (prefix + "_" + stem) if prefix else stem
+        code = base
+        n = 2
+        while True:
+            dup = code in used or Sticker.query.filter_by(code=code).first() is not None
+            if not dup:
+                break
+            code = f"{base}_{n}"
+            n += 1
+        used.add(code)
+
+        raw = f.read()
+        mimetype = f.mimetype or "image/png"
+        try:
+            data_url = f"data:{mimetype};base64," + base64.b64encode(raw).decode()
+            image_data = compress_image(data_url, max_edge=480, quality=90)
+        except Exception:
+            skipped += 1
+            continue
+        db.session.add(
+            Sticker(
+                code=code,
+                series_id=series_id,
+                image_data=image_data,
+                sort_order=base_sort + idx,
+            )
         )
-    )
-    db.session.commit()
-    invalidate_sticker_cache()
-    flash("表情已上传", "success")
+        imported += 1
+
+    if imported:
+        db.session.commit()
+        invalidate_sticker_cache()
+    if imported and not skipped:
+        flash(f"已上传 {imported} 个表情", "success")
+    elif imported and skipped:
+        flash(f"已上传 {imported} 个表情，{skipped} 个图片处理失败已跳过", "warning")
+    elif skipped:
+        flash(f"{skipped} 个图片处理失败", "danger")
+    else:
+        flash("未上传任何有效图片", "danger")
     return redirect(url_for("admin.stickers"))
 
 
@@ -512,6 +544,88 @@ def sticker_delete(sticker_id):
     invalidate_sticker_cache()
     flash("表情已删除", "success")
     return redirect(url_for("admin.stickers"))
+
+
+@admin_bp.route("/stickers/series/<int:sid>/edit", methods=["POST"])
+@super_admin_required
+def sticker_series_edit(sid):
+    s = db.get_or_404(StickerSeries, sid)
+    name = (request.form.get("name") or "").strip()
+    slug = (request.form.get("slug") or "").strip()
+    sort_order = request.form.get("sort_order", 0, type=int) or 0
+    if not name or not slug:
+        flash("系列名称与标识均必填", "danger")
+    elif slug != s.slug and StickerSeries.query.filter_by(slug=slug).first():
+        flash("系列标识已存在", "danger")
+    else:
+        s.name = name
+        s.slug = slug
+        s.sort_order = sort_order
+        db.session.commit()
+        flash("系列已更新", "success")
+    return redirect(url_for("admin.stickers"))
+
+
+@admin_bp.route("/stickers/<int:sticker_id>/edit", methods=["POST"])
+@super_admin_required
+def sticker_edit(sticker_id):
+    st = db.get_or_404(Sticker, sticker_id)
+    code = (request.form.get("code") or "").strip()
+    series_id = request.form.get("series_id", type=int)
+    sort_order = request.form.get("sort_order", 0, type=int) or 0
+    f = request.files.get("image")
+    if not code or not series_id:
+        flash("表情ID与所属系列均必填", "danger")
+        return redirect(url_for("admin.stickers"))
+    if not re.fullmatch(r"[A-Za-z0-9_\u4e00-\u9fff-]+", code):
+        flash("表情ID仅允许中文、字母、数字、下划线和连字符", "danger")
+        return redirect(url_for("admin.stickers"))
+    if not StickerSeries.query.get(series_id):
+        flash("系列不存在", "danger")
+        return redirect(url_for("admin.stickers"))
+    if code != st.code and Sticker.query.filter_by(code=code).first():
+        flash("表情ID已存在", "danger")
+        return redirect(url_for("admin.stickers"))
+    st.code = code
+    st.series_id = series_id
+    st.sort_order = sort_order
+    if f and f.filename:
+        raw = f.read()
+        mimetype = f.mimetype or "image/png"
+        try:
+            data_url = f"data:{mimetype};base64," + base64.b64encode(raw).decode()
+            st.image_data = compress_image(data_url, max_edge=480, quality=90)
+        except Exception:
+            flash("图片处理失败，请换一张", "danger")
+            return redirect(url_for("admin.stickers"))
+    db.session.commit()
+    invalidate_sticker_cache()
+    flash("表情已更新", "success")
+    return redirect(url_for("admin.stickers"))
+
+
+@admin_bp.route("/stickers/reorder", methods=["POST"])
+@super_admin_required
+def sticker_reorder():
+    data = request.get_json(silent=True) or {}
+    kind = data.get("type")
+    ids = data.get("ids") or []
+    if kind == "series":
+        for i, sid in enumerate(ids):
+            s = db.session.get(StickerSeries, int(sid))
+            if s:
+                s.sort_order = i
+    elif kind == "sticker":
+        for i, stid in enumerate(ids):
+            st = db.session.get(Sticker, int(stid))
+            if st:
+                st.sort_order = i
+    else:
+        return jsonify(ok=False, error="unknown type"), 400
+    db.session.commit()
+    if kind == "series":
+        invalidate_sticker_cache()
+    return jsonify(ok=True)
 
 
 @admin_bp.route("/image-logs")
