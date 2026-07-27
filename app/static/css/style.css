@@ -1884,8 +1884,10 @@ body.is-mobile-plus-open header {
 #stickerPanel {
   z-index: 1070 !important;
 }
+/* 遮罩必须低于弹框本身（Bootstrap .modal 默认 1055），否则黑色遮罩会盖住弹框。
+   1050 与 Bootstrap 默认 --bs-backdrop-zindex 一致，表情包底栏 1070 仍在最上层。 */
 body > .modal-backdrop:last-of-type {
-  z-index: 1065 !important;
+  z-index: 1050 !important;
 }
 
 #stickerPanel .modal-dialog.modal-dialog-bottom {
