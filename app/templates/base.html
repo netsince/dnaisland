@@ -739,6 +739,17 @@ data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded=
       })
       .then(function (res) {
         if (!res.ok) throw new Error('HTTP ' + res.status);
+        // 服务端发生重定向（例如未登录被跳转到登录页）时，放弃 SPA 软切、改为整页跳转。
+        // 否则 fetch 会静默跟随 302、把登录页当成目标页渲染，但地址栏仍停留在原目标地址
+        // （如 /image-gen/），导致登录表单 action="" 提交到该地址而 405，且登录态无法写入。
+        try {
+          var finalUrl = new URL(res.url).href;
+          var reqUrl = new URL(url, location.href).href;
+          if (finalUrl !== reqUrl) {
+            location.href = res.url;
+            return null;
+          }
+        } catch (e) {}
         var ct = res.headers.get('content-type') || '';
         if (!ct.includes('text/html')) {
           location.href = url;
