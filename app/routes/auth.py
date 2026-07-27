@@ -119,7 +119,7 @@ def register():
         db.session.add(user)
         db.session.commit()
 
-        login_user(user)
+        login_user(user, remember=True)
         flash("注册成功，欢迎来到 DNAISLAND！", "success")
         return redirect(url_for("main.index"))
 
@@ -153,7 +153,8 @@ def login():
             flash("用户名/邮箱或密码错误", "danger")
             return render_template("auth/login.html")
 
-        login_user(user)
+        remember = bool(request.form.get("remember"))
+        login_user(user, remember=remember)
         flash(f"欢迎回来，{user.nickname}！", "success")
         return redirect(next_url)
 
