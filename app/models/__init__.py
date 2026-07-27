@@ -8,7 +8,7 @@ from .card import (
     Comment,
     CommentLike,
 )
-from .image_gen import GenerationLog, GenerationModel
+from .image_gen import GenerationLog, GenerationModel, GenerationTask
 from .notification import Notification
 from .points import KeyUsageLog, PointTransaction, RedemptionKey
 from .punishment import Punishment
@@ -60,6 +60,7 @@ __all__ = [
     "KeyUsageLog",
     "GenerationModel",
     "GenerationLog",
+    "GenerationTask",
     "Sticker",
     "StickerSeries",
 ]

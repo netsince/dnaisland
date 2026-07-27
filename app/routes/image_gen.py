@@ -4,13 +4,15 @@
 扣费：完成后按实产张数 × 模型每图积分扣减（写入 PointTransaction）。
 """
 
-import contextlib
+import base64
 import json
+import threading
 from datetime import timedelta
 
 from flask import (
     Blueprint,
     abort,
+    current_app,
     flash,
     jsonify,
     redirect,
@@ -21,19 +23,13 @@ from flask import (
 from flask_login import current_user, login_required
 
 from ..extensions import db
-from ..models import GenerationLog, GenerationModel, PointTransaction
-from ..services.image_gen_service import generate_images
-from ..services.image_service import (
-    raw_bytes_to_webp_data_url,
-    send_webp,
-)
+from ..models import GenerationLog, GenerationModel, GenerationTask
+from ..services.generation_worker import process_generation_task, recover_stale_tasks
+from ..services.image_service import send_webp
 from ..services.site_service import get_site_config
 from ..utils import ensure_owner_or_admin, is_xhr
 
 image_gen_bp = Blueprint("image_gen", __name__, url_prefix="/image-gen")
-
-# 正在进行中的生图任务用户集合，用于防止同一用户并发生图
-ACTIVE_GENERATION_TASKS: set = set()
 
 # 宽高比 -> OpenAI size（照搬 infinite-canvas 默认 1k 分辨率）；auto 不传 size
 ASPECT_TO_SIZE = {
@@ -150,17 +146,20 @@ def generate():
         count = 1
     count = max(1, min(count, MAX_COUNT))
 
-    # 参考图（最多 5 张）
-    references = []
-    ref_b64_list = []
+    # 参考图：原样存储（filename/mimetype/base64），后台线程还原为字节
+    ref_payload = []
     for f in request.files.getlist("references")[:MAX_REFERENCES]:
         if f and f.filename:
             data = f.read()
             if data:
-                references.append((f.filename, data, f.mimetype or "image/png"))
-                with contextlib.suppress(Exception):
-                    ref_b64_list.append(raw_bytes_to_webp_data_url(data))
-    ref_count = len(references)
+                ref_payload.append(
+                    {
+                        "filename": f.filename,
+                        "mimetype": f.mimetype or "image/png",
+                        "data_b64": base64.b64encode(data).decode("ascii"),
+                    }
+                )
+    ref_count = len(ref_payload)
     if ref_count:
         labels = "、".join(f"图片{i + 1}" for i in range(ref_count))
         prompt = (
@@ -178,91 +177,87 @@ def generate():
         flash(msg, "warning")
         return redirect(url_for("image_gen.workbench"))
 
-    # 加锁定，进入生成任务
-    ACTIVE_GENERATION_TASKS.add(current_user.id)
-    try:
-        # 调用生图
-        try:
-            images = generate_images(
-                base_url=cfg.image_base_url,
-                api_key=cfg.image_api_key,
-                model=model.name,
-                prompt=prompt,
-                size=size,
-                n=count,
-                references=references,
-            )
-        except Exception as e:
-            log = GenerationLog(
-                user_id=current_user.id,
-                model_id=model.id,
-                model_name=model.display_name,
-                prompt=prompt,
-                size=size,
-                count=count,
-                references_count=ref_count,
-                status="failed",
-                images="[]",
-                reference_images=json.dumps(ref_b64_list),
-                points_spent=0,
-                error=str(e)[:500],
-            )
-            db.session.add(log)
-            db.session.commit()
-            if want_json:
-                return jsonify(ok=False, error=str(e)[:200], log_id=log.id), 200
-            flash(f"生图失败：{str(e)[:200]}", "danger")
-            return redirect(url_for("image_gen.workbench"))
+    # 同一用户仅允许一个进行中的任务，避免并发超额扣点
+    existing = GenerationTask.query.filter(
+        GenerationTask.user_id == current_user.id,
+        GenerationTask.status.in_(["pending", "processing"]),
+    ).first()
+    if existing:
+        return early("已有进行中的生图任务，请稍候")
 
-        actual = len(images)
-        spent = actual * (model.points_per_image or 0)
-        status = "success" if actual == count else ("partial" if actual > 0 else "failed")
+    # 创建任务即返回，实际生图在后台线程完成（避免反向代理超时）
+    task = GenerationTask(
+        user_id=current_user.id,
+        model_id=model.id,
+        model_name=model.display_name,
+        prompt=prompt,
+        size=size,
+        count=count,
+        references_count=ref_count,
+        reference_data=(
+            json.dumps(ref_payload, ensure_ascii=False) if ref_payload else None
+        ),
+        status="pending",
+    )
+    db.session.add(task)
+    db.session.commit()
 
-        log = GenerationLog(
-            user_id=current_user.id,
-            model_id=model.id,
-            model_name=model.display_name,
-            prompt=prompt,
-            size=size,
-            count=count,
-            references_count=ref_count,
-            status=status,
-            images=json.dumps(images, ensure_ascii=False),
-            reference_images=json.dumps(ref_b64_list),
-            points_spent=spent,
-        )
-        db.session.add(log)
-        if spent:
-            current_user.points = balance - spent
-            db.session.add(
-                PointTransaction(
-                    user_id=current_user.id,
-                    delta=-spent,
-                    balance_after=current_user.points,
-                    reason=f"生图消耗（{model.display_name} ×{actual}）",
-                    source="consume",
-                )
-            )
-        db.session.commit()
+    threading.Thread(
+        target=process_generation_task,
+        args=(current_app._get_current_object(), task.id),
+        daemon=True,
+    ).start()
 
-        if want_json:
-            return jsonify(
-                ok=True,
-                log_id=log.id,
-                model_name=model.display_name,
-                size=size,
-                images=[
-                    url_for("image_gen.output_image", log_id=log.id, idx=i)
-                    for i in range(len(images))
-                ],
-                points_spent=spent,
-                balance=current_user.points,
-                status=status,
-            )
-        flash(f"生图完成，成功 {actual} 张，消耗 {spent} 点", "success")
-        return redirect(url_for("image_gen.log_detail", log_id=log.id))
-    finally:
-        ACTIVE_GENERATION_TASKS.discard(current_user.id)
+    if want_json:
+        return jsonify(ok=True, task_id=task.id)
+    flash("已提交生图任务，生成中…", "info")
+    return redirect(url_for("image_gen.workbench"))
+
+
+@image_gen_bp.route("/api/tasks", methods=["GET"])
+@login_required
+def api_tasks():
+    """返回当前用户进行中的任务（pending/processing），不含任何历史任务。"""
+    recover_stale_tasks(current_app._get_current_object())
+    tasks = (
+        GenerationTask.query.filter(GenerationTask.user_id == current_user.id)
+        .filter(GenerationTask.status.in_(["pending", "processing"]))
+        .order_by(GenerationTask.created_at.desc())
+        .all()
+    )
+    data = [
+        {
+            "id": t.id,
+            "status": t.status,
+            "model_name": t.model_name,
+            "size": t.size or "auto",
+            "count": t.count,
+            "created_at": (
+                (t.created_at + timedelta(hours=8)).strftime("%Y-%m-%d %H:%M:%S")
+                if t.created_at
+                else ""
+            ),
+        }
+        for t in tasks
+    ]
+    return jsonify(ok=True, tasks=data)
+
+
+@image_gen_bp.route("/api/tasks/<int:task_id>", methods=["GET"])
+@login_required
+def api_task_detail(task_id):
+    """任务详情：用于轮询发现任务完成后，拉取最终状态/错误/结果日志。"""
+    t = db.session.get(GenerationTask, task_id)
+    if not t or t.user_id != current_user.id:
+        return jsonify(ok=False, error="任务不存在"), 404
+    return jsonify(
+        ok=True,
+        id=t.id,
+        status=t.status,
+        error=t.error,
+        log_id=t.result_log_id,
+        balance=current_user.points,
+    )
 
 
 from sqlalchemy.orm import defer

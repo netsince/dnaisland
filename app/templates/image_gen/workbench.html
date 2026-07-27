@@ -5,6 +5,12 @@
 {% block body_class %}dna-hide-header-on-mobile{% endblock %}
 
 {% block head %}
+<style>
+  .ig-active-tasks { display:flex; flex-direction:column; gap:4px; margin-top:6px; }
+  .ig-active-task { font-size:12px; color:var(--dna-text-muted,#8a8a8a); display:flex; align-items:center; gap:6px; }
+  .ig-spin { display:inline-block; width:12px; height:12px; border:2px solid currentColor; border-top-color:transparent; border-radius:50%; animation:ig-spin 0.8s linear infinite; }
+  @keyframes ig-spin { to { transform:rotate(360deg); } }
+</style>
 {% endblock %}
 
 {% block content %}
@@ -69,6 +75,7 @@
  <div style="margin-top:auto;display:flex;align-items:center;gap:12px;">
  <button type="submit" class="ig-gen" id="genBtn"> 生成</button>
  <span id="genStatus" class="ig-status"></span>
+ <div id="activeTasks" class="ig-active-tasks"></div>
  </div>
  </form>
  </aside>
@@ -248,29 +255,16 @@
  }
  }
 
- // 页面 DOMContentLoaded 加载时：检测 localStorage 是否有进行中的任务（刷新不掉状态）
- document.addEventListener('DOMContentLoaded', function () {
- var activeTask = localStorage.getItem('dna_ig_active_task');
- if (activeTask) {
- try {
- var task = JSON.parse(activeTask);
- if (Date.now() - task.time < 180000) {
- setSkeletonState(true);
- } else {
- localStorage.removeItem('dna_ig_active_task');
- }
- } catch (e) {
- localStorage.removeItem('dna_ig_active_task');
- }
- }
-
- if (sessionStorage.getItem('ig_just_generated') === '1' && window.innerWidth <= 768) {
- sessionStorage.removeItem('ig_just_generated');
- openSheet();
- var sBody = sheet ? sheet.querySelector('.ig-sheet__body') : null;
- if (sBody) sBody.scrollTop = 0;
- }
- });
+  // 页面加载即开始轮询任务列表（不依赖点击生图）
+  document.addEventListener('DOMContentLoaded', function () {
+    ensurePolling();
+    if (sessionStorage.getItem('ig_just_generated') === '1' && window.innerWidth <= 768) {
+      sessionStorage.removeItem('ig_just_generated');
+      openSheet();
+      var sBody = sheet ? sheet.querySelector('.ig-sheet__body') : null;
+      if (sBody) sBody.scrollTop = 0;
+    }
+  });
 
  // 移动端底部弹窗：生图日志
  var sheet = document.getElementById('igLogSheet');
@@ -381,96 +375,160 @@
  resizeTimer = setTimeout(renderWorkbenchMasonry, 100);
  });
 
- // AJAX 提交：按钮旁显示「正在生成中」，插入虚化骨架，结果就地插入画廊
+  // ===== 进行中任务轮询 =====
+  var activeTaskIds = new Set();
+  var pollTimer = null;
+
+  function toast(msg, kind) {
+    if (typeof showToast === 'function') {
+      showToast(msg, kind || 'info');
+    } else if (statusEl) {
+      statusEl.textContent = msg;
+      statusEl.className = 'ig-status ' + (kind === 'danger' ? 'err' : (kind === 'success' ? 'ok' : ''));
+    }
+  }
+
+  function renderActiveTasks(tasks) {
+    var box = document.getElementById('activeTasks');
+    if (!box) return;
+    box.innerHTML = '';
+    (tasks || []).forEach(function (t) {
+      var line = document.createElement('div');
+      line.className = 'ig-active-task';
+      var label = t.status === 'pending' ? '排队中' : '生成中';
+      line.innerHTML = '<span class="ig-spin"></span>' + label + '…（' + (t.model_name || '') + ' · ' + (t.size || 'auto') + '）';
+      box.appendChild(line);
+    });
+  }
+
+  function updateGenBtn() {
+    if (!genBtn) return;
+    if (activeTaskIds.size > 0) {
+      genBtn.disabled = true;
+      genBtn.textContent = '生成中…';
+    } else {
+      genBtn.disabled = false;
+      genBtn.textContent = ' 生成';
+    }
+  }
+
+  // 任务从列表消失 = 已完成，拉详情以区分成功/失败
+  function onTaskGone(id) {
+    fetch('/image-gen/api/tasks/' + id, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d.ok && d.status === 'succeeded') {
+          toast('生图完成', 'success');
+          if (pointsEl && typeof d.balance !== 'undefined') pointsEl.innerHTML = '点数 <b>' + d.balance + '</b>';
+          loadWorkbenchLogs();
+        } else if (d.ok) {
+          toast('生图失败：' + (d.error || '未知错误'), 'danger');
+        } else {
+          loadWorkbenchLogs();
+        }
+      })
+      .catch(function () { loadWorkbenchLogs(); });
+  }
+
+  function pollTasks() {
+    fetch('/image-gen/api/tasks', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        if (!res.ok || !res.tasks) return;
+        var returned = new Set(res.tasks.map(function (t) { return t.id; }));
+        res.tasks.forEach(function (t) {
+          if (!activeTaskIds.has(t.id)) activeTaskIds.add(t.id);
+        });
+        Array.from(activeTaskIds).forEach(function (id) {
+          if (!returned.has(id)) {
+            activeTaskIds.delete(id);
+            onTaskGone(id);
+          }
+        });
+        renderActiveTasks(res.tasks);
+        updateGenBtn();
+      })
+      .catch(function () {});
+  }
+
+  function ensurePolling() {
+    if (pollTimer) return;
+    pollTimer = setInterval(pollTasks, 3500);
+    pollTasks();
+  }
+  function stopPolling() {
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  }
+
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) stopPolling(); else ensurePolling();
+  });
+
+  // AJAX 提交：仅提交任务并立即返回 task_id，结果由轮询驱动
   form.addEventListener('submit', function (e) {
     e.preventDefault();
-    if (genBtn.disabled || localStorage.getItem('dna_ig_active_task')) {
+    if (activeTaskIds.size > 0) {
       statusEl.textContent = '当前已有正在进行的生图任务，请等待完成';
       statusEl.className = 'ig-status err';
       return;
     }
     var promptEl = form.querySelector('[name=prompt]');
- var modelEl = form.querySelector('[name=model]');
- if (!modelEl.value) {
- statusEl.textContent = '请选择模型'; statusEl.className = 'ig-status err'; return;
- }
- if (!promptEl.value.trim()) {
- statusEl.textContent = '请输入提示词'; statusEl.className = 'ig-status err'; return;
- }
+    var modelEl = form.querySelector('[name=model]');
+    if (!modelEl.value) {
+      statusEl.textContent = '请选择模型'; statusEl.className = 'ig-status err'; return;
+    }
+    if (!promptEl.value.trim()) {
+      statusEl.textContent = '请输入提示词'; statusEl.className = 'ig-status err'; return;
+    }
 
- sessionStorage.setItem('ig_just_generated', '1');
- localStorage.setItem('dna_ig_active_task', JSON.stringify({ time: Date.now() }));
- setSkeletonState(true);
- if (window.innerWidth <= 768) openSheet();
+    syncRefInput();
+    var fd = new FormData(form);
+    genBtn.disabled = true;
+    genBtn.textContent = '提交中…';
+    statusEl.innerHTML = '<span class="ig-spin"></span>已提交，生成中…';
+    statusEl.className = 'ig-status';
+    if (window.innerWidth <= 768) openSheet();
 
- genBtn.disabled = true;
- genBtn.textContent = '生成中…';
- statusEl.innerHTML = '<span class="ig-spin"></span>正在生成中…';
- statusEl.className = 'ig-status';
-
- syncRefInput(); // 提交前把已选参考图同步回 input，确保 FormData 带上
- var fd = new FormData(form);
- fetch(form.action, {
- method: 'POST',
- headers: { 'X-Requested-With': 'XMLHttpRequest' },
- body: fd
- })
- .then(function (r) { return r.json(); })
- .then(function (data) {
- genBtn.disabled = false;
- genBtn.textContent = ' 生成';
- localStorage.removeItem('dna_ig_active_task');
- setSkeletonState(false);
-
- if (data.ok) {
- statusEl.textContent = '完成，消耗 ' + data.points_spent + ' 点';
- statusEl.className = 'ig-status ok';
- if (pointsEl) pointsEl.innerHTML = '点数 <b>' + data.balance + '</b>';
- var rawContainer = document.getElementById('igRawItems');
- (data.images || []).forEach(function (img) {
-  var container = document.createElement('div');
-  container.className = 'ig-mitem';
-  var a = document.createElement('a');
-  a.className = 'ig-mcard dna-img-fade';
-  a.href = '/image-gen/logs/' + data.log_id;
-  a.innerHTML = '<img src="' + img + '" alt="生成图" class="dna-img-fade__img" loading="lazy" decoding="async">' +
-  '<span class="tag">' + (data.size || 'auto') + ' · ' + data.model_name + '</span>';
-  container.appendChild(a);
-  if (rawContainer) rawContainer.insertBefore(container, rawContainer.firstChild);
- });
- if (rawContainer) renderWorkbenchMasonry();
- promptEl.value = '';
- if (refInput) refInput.value = '';
- selectedRefs = [];
- if (refPreviewContainer) refPreviewContainer.innerHTML = '';
- var empty = document.querySelector('.ig-empty');
- if (empty) empty.remove();
- if (window.innerWidth <= 768) {
- sessionStorage.removeItem('ig_just_generated');
- document.getElementById('igGrid')?.scrollIntoView({ behavior: 'smooth' });
- }
- } else {
- statusEl.textContent = data.error || '生成失败';
- statusEl.className = 'ig-status err';
- if (data.code === 'insufficient_points') {
- var msgEl = document.getElementById('noPointsMsg');
- if (msgEl) msgEl.textContent = data.error || '点数不足，请先获取积分。';
- var modalEl = document.getElementById('noPointsModal');
- if (modalEl && window.bootstrap && bootstrap.Modal) {
- bootstrap.Modal.getOrCreateInstance(modalEl).show();
- }
- }
- }
- })
- .catch(function (err) {
- genBtn.disabled = false;
- genBtn.textContent = ' 生成';
- localStorage.removeItem('dna_ig_active_task');
- setSkeletonState(false);
- statusEl.textContent = '网络错误，请重试';
- statusEl.className = 'ig-status err';
- });
- });
+    fetch(form.action, {
+      method: 'POST',
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      body: fd
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (data.ok && data.task_id) {
+        activeTaskIds.add(data.task_id);
+        ensurePolling();
+        renderActiveTasks([{ id: data.task_id, status: 'pending', model_name: modelEl.options[modelEl.selectedIndex].text, size: hidden.value }]);
+        updateGenBtn();
+        statusEl.textContent = '已提交，生成中…';
+        statusEl.className = 'ig-status';
+        promptEl.value = '';
+        if (refInput) refInput.value = '';
+        selectedRefs = [];
+        if (refPreviewContainer) refPreviewContainer.innerHTML = '';
+      } else {
+        genBtn.disabled = false;
+        genBtn.textContent = ' 生成';
+        statusEl.textContent = data.error || '提交失败';
+        statusEl.className = 'ig-status err';
+        if (data.code === 'insufficient_points') {
+          var msgEl = document.getElementById('noPointsMsg');
+          if (msgEl) msgEl.textContent = data.error || '点数不足，请先获取积分。';
+          var modalEl = document.getElementById('noPointsModal');
+          if (modalEl && window.bootstrap && bootstrap.Modal) {
+            bootstrap.Modal.getOrCreateInstance(modalEl).show();
+          }
+        }
+      }
+    })
+    .catch(function () {
+      genBtn.disabled = false;
+      genBtn.textContent = ' 生成';
+      statusEl.textContent = '网络错误，请重试';
+      statusEl.className = 'ig-status err';
+    });
+  });
 
   initWorkbenchImgFade();
   function onWorkbenchPageLoaded() {
