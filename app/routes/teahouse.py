@@ -274,7 +274,7 @@ def _set_single_topic(post, topic_raw):
 @teahouse_bp.route("/")
 def index():
     page = request.args.get("page", 1, type=int)
-    default_sort = "follow" if current_user.is_authenticated else "hot"
+    default_sort = "hot"
     sort = request.args.get("sort", default_sort)
     q = TeaPost.query.filter(TeaPost.parent_id.is_(None))
     q = _visible_query(q, current_user)
@@ -430,10 +430,7 @@ def post_detail(post_id):
     # 回复列表：当前帖的直接子回复，SQL 层排序 + 分页（只铺一层，跟帖的跟帖点进去看）
     rq = TeaPost.query.filter(TeaPost.parent_id == p.id)
     rq = _visible_query(rq, current_user)
-    if sort == "hot":
-        rq = _order_by_teahouse_hot(rq)
-    else:
-        rq = rq.order_by(TeaPost.created_at.desc())
+    rq = _order_by_teahouse_hot(rq) if sort == "hot" else rq.order_by(TeaPost.created_at.desc())
     reply_pagination = rq.paginate(page=page, per_page=20, error_out=False)
     replies = reply_pagination.items
 
