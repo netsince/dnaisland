@@ -1315,10 +1315,12 @@ data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded=
       b.type = 'button';
       b.className = 'btn p-1 sticker-pick-btn';
       b.title = st.code;
-      b.innerHTML = '<img src="' + st.image_url + '" loading="lazy" style="width:48px;height:48px;object-fit:contain;">';
+      b.innerHTML = '<span class="dna-img-fade d-inline-block align-middle" style="width:48px;height:48px;border-radius:8px;">'
+        + '<img class="dna-img-fade__img" src="' + st.image_url + '" loading="lazy" decoding="async" style="object-fit:contain;"></span>';
       b.addEventListener('click', function () { insertStickerToken(st.code); });
       grid.appendChild(b);
     });
+    if (window.bindFade) window.bindFade(grid);
   }
 
   // ---- 表情包：最近使用（cookie，最多 50）与上次打开的标签 ----
@@ -1364,10 +1366,12 @@ data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded=
       b.type = 'button';
       b.className = 'btn p-1 sticker-pick-btn';
       b.title = code;
-      b.innerHTML = '<img src="' + data + '" loading="lazy" style="width:48px;height:48px;object-fit:contain;">';
+      b.innerHTML = '<span class="dna-img-fade d-inline-block align-middle" style="width:48px;height:48px;border-radius:8px;">'
+        + '<img class="dna-img-fade__img" src="' + data + '" loading="lazy" decoding="async" style="object-fit:contain;"></span>';
       b.addEventListener('click', function () { insertStickerToken(code); });
       grid.appendChild(b);
     });
+    if (window.bindFade) window.bindFade(grid);
   }
 
   function openStickerPanel(textareaEl) {
@@ -1378,12 +1382,24 @@ data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded=
     if (!modal || !tabs) return;
     // 先打开面板，不等表情包请求返回，避免"卡死"的等待感
     bootstrap.Modal.getOrCreateInstance(modal).show();
-    // 立即给出加载占位（表情包后续慢慢填充）
+    // 已缓存过：直接进入面板，标签与表情立即可用，不再闪现"加载中"
+    if (window.DnaStickers.loaded) {
+      buildStickerPanelTabs(tabs, grid);
+      return;
+    }
+    // 首次打开：先占位，数据回来后再填充
     tabs.innerHTML = '';
     if (grid) grid.innerHTML = '<div class="text-muted p-3 small">表情包加载中…</div>';
     loadStickers().then(function () {
-      tabs.innerHTML = '';
-      var series = window.DnaStickers.series;
+      buildStickerPanelTabs(tabs, grid);
+    }).catch(function () {
+      if (grid) grid.innerHTML = '<div class="text-muted p-3">表情包加载失败，请稍后重试</div>';
+    });
+  }
+
+  function buildStickerPanelTabs(tabs, grid) {
+    tabs.innerHTML = '';
+    var series = window.DnaStickers.series;
       var lastTab = getCookie('dna_sticker_last_tab');  // 无记录则为空字符串
 
       // 第一个标签：最常使用（始终在最前；仅当 lastTab 显式为 __recent__ 时默认激活）
@@ -1431,12 +1447,9 @@ data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded=
         var def = series.filter(function (s) {
           return (lastTab && 's' + s.id === lastTab) || (!lastTab && series[0] && 's' + s.id === 's' + series[0].id);
         })[0];
-        if (def) showStickerSeries(def);
-        else showRecentStickers();
+      if (def) showStickerSeries(def);
+      else showRecentStickers();
       }
-    }).catch(function () {
-      if (grid) grid.innerHTML = '<div class="text-muted p-3">表情包加载失败，请稍后重试</div>';
-    });
   }
 
   function insertStickerToken(code) {
@@ -1487,7 +1500,7 @@ data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded=
   <div class="modal-dialog modal-dialog-bottom mb-0">
     <div class="modal-content border-bottom-0 rounded-bottom-0">
       <div class="modal-header py-2 border-secondary border-opacity-25">
-        <h6 class="modal-title fw-bold text-white mb-0 d-flex align-items-center gap-1" id="stickerPanelLabel"><i class="bi bi-emoji-smile"></i> 表情包</h6>
+        <h6 class="modal-title fw-bold mb-0 d-flex align-items-center gap-1" id="stickerPanelLabel"><i class="bi bi-emoji-smile"></i> 表情包</h6>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
       </div>
       <div class="modal-body p-3">

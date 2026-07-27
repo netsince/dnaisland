@@ -18,6 +18,7 @@
   --dna-bg-2: #121215;
   --dna-surface: #121215;
   --dna-surface-solid: #121215;
+  --dna-surface-hover: rgba(255, 255, 255, 0.08);
   --dna-border: #27272a;
   --dna-border-strong: #3f3f46;
 
@@ -915,6 +916,7 @@ body, .navbar, .footer, .card, .dna-tile, .dna-hero,
   --dna-bg-2: #fafafa;
   --dna-surface: #f4f4f5;
   --dna-surface-solid: #ffffff;
+  --dna-surface-hover: rgba(0, 0, 0, 0.05);
   --dna-border: #e4e4e7;
   --dna-border-strong: #d4d4d8;
 
@@ -1875,7 +1877,7 @@ body.is-mobile-plus-open header {
   background: transparent;
 }
 .sticker-pick-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--dna-surface-hover);
 }
 
 /* ---------------- 表情包从下往上弹出底栏样式与 +1 超高层级 ---------------- */
@@ -1902,13 +1904,15 @@ body > .modal-backdrop:last-of-type {
 }
 
 #stickerPanel .modal-content {
-  background: rgba(18, 18, 21, 0.96);
+  background: var(--dna-surface-solid);
+  background: color-mix(in srgb, var(--dna-surface-solid) 94%, transparent);
+  color: var(--dna-text);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--dna-border-strong, #3f3f46);
   border-bottom: none;
   border-radius: 20px 20px 0 0;
-  box-shadow: 0 -16px 40px rgba(0, 0, 0, 0.85);
+  box-shadow: 0 -16px 40px rgba(0, 0, 0, 0.45);
 }
 
 /* Emoji 工具栏与快捷面板 */
@@ -1950,7 +1954,7 @@ body > .modal-backdrop:last-of-type {
   transition: background-color 0.15s ease, transform 0.10s ease;
 }
 .dna-emoji-btn:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--dna-surface-hover);
   transform: scale(1.15);
 }
 .dna-emoji-toggle-btn {
@@ -1966,7 +1970,7 @@ body > .modal-backdrop:last-of-type {
 }
 .dna-emoji-toggle-btn:hover {
   color: var(--bs-emphasis-color);
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--dna-surface-hover);
 }
 
 /* 专属控制：手机端（<992px）隐藏特定页面顶栏 Header，统一 main 手机端顶边距 padding 为 15px */

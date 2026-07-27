@@ -1,8 +1,9 @@
 """表情包公开 API：供前端面板与评论渲染使用。"""
 import base64
 import contextlib
+import hashlib
 
-from flask import Blueprint, Response, jsonify
+from flask import Blueprint, Response, jsonify, request
 
 from ..models import Sticker, StickerSeries
 
@@ -36,7 +37,11 @@ def api_list():
 
 @sticker_bp.route("/file/<code>")
 def sticker_file(code):
-    """按表情 ID 返回图片字节，供前端逐张懒加载（加载一张显示一张）。"""
+    """按表情 ID 返回图片字节，供前端逐张懒加载（加载一张显示一张）。
+
+    通过 ETag + Cache-Control 让浏览器把图片缓存到本地：同一会话重复打开
+    表情面板时，图片直接从本地缓存读取，不再回源请求。
+    """
     st = Sticker.query.filter_by(code=code).first_or_404()
     raw = st.image_data
     mime = "image/webp"
@@ -47,4 +52,10 @@ def sticker_file(code):
         data = base64.b64decode(b64)
     else:
         data = base64.b64decode(raw)
-    return Response(data, mimetype=mime)
+    etag = '"' + hashlib.md5(data).hexdigest() + '"'
+    if request.headers.get("If-None-Match") == etag:
+        return Response(status=304)
+    resp = Response(data, mimetype=mime)
+    resp.headers["Cache-Control"] = "public, max-age=86400"
+    resp.headers["ETag"] = etag
+    return resp
