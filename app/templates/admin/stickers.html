@@ -72,7 +72,7 @@
     <p class="text-muted small mb-2">拖动卡片左侧手柄可调整系列顺序，拖动表情可调整其在系列内的顺序，松手即保存。</p>
     <div id="seriesList">
       {% for s in series %}
-      <div class="card mb-4 series-card" data-drag="series" data-id="{{ s.id }}" draggable="true">
+      <div class="card mb-4 series-card" data-id="{{ s.id }}">
         <div class="card-header d-flex justify-content-between align-items-center">
           <span>
             <span class="drag-handle me-2" title="拖动排序">⠿</span>
@@ -93,7 +93,7 @@
           {% if s.stickers %}
           <div class="sticker-grid d-flex flex-wrap gap-3" data-drag="sticker" data-series="{{ s.id }}">
             {% for st in s.stickers|sort(attribute='sort_order') %}
-            <div class="sticker-item text-center" data-id="{{ st.id }}" draggable="true" style="width:92px;">
+            <div class="sticker-item text-center" data-id="{{ st.id }}" style="width:92px;">
               <img src="{{ st.image_data }}" alt="{{ st.code }}" title="{{ st.code }}"
                    style="width:56px;height:56px;object-fit:contain;cursor:grab;">
               <div class="small text-muted text-truncate" style="max-width:92px;" title="{{ st.code }}">{{ st.code }}</div>
@@ -192,10 +192,11 @@
 
 <style>
   .drag-handle { cursor: grab; color: #888; user-select: none; }
-  .series-card.dragging, .sticker-item.dragging { opacity: .5; }
   .sticker-item { cursor: grab; }
+  .series-card.sortable-ghost, .sticker-item.sortable-ghost { opacity: .4; background: #f8f9fa; }
 </style>
 
+<script src="{{ url_for('static', filename='vendor/sortable.min.js') }}"></script>
 <script>
   var baseUrl = "{{ url_for('admin.stickers') }}";  // /admin/stickers
 
@@ -218,84 +219,48 @@
     new bootstrap.Modal(document.getElementById('stickerEditModal')).show();
   }
 
-  // ---- 拖拽排序（原生 HTML5） ----
-  var drag = null;
-
-  document.addEventListener('dragstart', function (e) {
-    var item = e.target.closest('.sticker-item');
-    var card = e.target.closest('.series-card');
-    if (item) {
-      drag = { kind: 'sticker', el: item, container: item.parentElement };
-      item.classList.add('dragging');
-      e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setData('text/plain', '');
-    } else if (card) {
-      drag = { kind: 'series', el: card, container: document.getElementById('seriesList') };
-      card.classList.add('dragging');
-      e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setData('text/plain', '');
-    }
-  });
-
-  document.addEventListener('dragover', function (e) {
-    if (!drag) return;
-    var cont = drag.kind === 'series'
-      ? document.getElementById('seriesList')
-      : e.target.closest('.sticker-grid');
-    if (!cont) return;
-    if (drag.kind === 'series' && !cont.contains(e.target)) return;
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    var after = getDragAfter(cont, drag.kind, e.clientX, e.clientY);
-    if (after == null) cont.appendChild(drag.el);
-    else cont.insertBefore(drag.el, after);
-  });
-
-  document.addEventListener('drop', function (e) {
-    if (!drag) return;
-    var cont = drag.kind === 'series'
-      ? document.getElementById('seriesList')
-      : e.target.closest('.sticker-grid');
-    if (!cont) return;
-    if (drag.kind === 'series' && !cont.contains(e.target)) return;
-    e.preventDefault();
-    var ids = [];
-    cont.querySelectorAll(drag.kind === 'series' ? '.series-card' : '.sticker-item')
-      .forEach(function (el) { ids.push(el.dataset.id); });
-    var payload = { type: drag.kind, ids: ids };
-    var el = drag.el;
-    drag = null;
-    el.classList.remove('dragging');
+  // ---- 拖拽排序（SortableJS，本地引入） ----
+  function saveOrder(type, ids) {
     fetch(baseUrl + '/reorder', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    }).then(function (r) { return r.json(); }).then(function (d) {
-      if (!d.ok) location.reload();
-    }).catch(function () { location.reload(); });
-  });
+      body: JSON.stringify({ type: type, ids: ids })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (d) { if (!d.ok) location.reload(); })
+      .catch(function () { location.reload(); });
+  }
 
-  document.addEventListener('dragend', function () {
-    if (drag && drag.el) drag.el.classList.remove('dragging');
-    drag = null;
-  });
-
-  function getDragAfter(container, kind, x, y) {
-    var els = Array.prototype.slice.call(
-      container.querySelectorAll(kind === 'series' ? '.series-card' : '.sticker-item')
-    );
-    var closest = null, closestOffset = -Infinity;
-    els.forEach(function (el) {
-      if (el === drag.el) return;
-      var box = el.getBoundingClientRect();
-      var center = kind === 'series' ? box.top + box.height / 2 : box.left + box.width / 2;
-      var pointer = kind === 'series' ? y : x;
-      if (pointer < center && center > closestOffset) {
-        closestOffset = center;
-        closest = el;
+  var seriesListEl = document.getElementById('seriesList');
+  if (seriesListEl) {
+    new Sortable(seriesListEl, {
+      draggable: '.series-card',
+      handle: '.drag-handle',
+      animation: 150,
+      ghostClass: 'sortable-ghost',
+      onEnd: function () {
+        var ids = Array.prototype.map.call(
+          seriesListEl.querySelectorAll('.series-card'),
+          function (el) { return el.dataset.id; }
+        );
+        saveOrder('series', ids);
       }
     });
-    return closest;
   }
+
+  document.querySelectorAll('.sticker-grid').forEach(function (grid) {
+    new Sortable(grid, {
+      draggable: '.sticker-item',
+      animation: 150,
+      ghostClass: 'sortable-ghost',
+      onEnd: function () {
+        var ids = Array.prototype.map.call(
+          grid.querySelectorAll('.sticker-item'),
+          function (el) { return el.dataset.id; }
+        );
+        saveOrder('sticker', ids);
+      }
+    });
+  });
 </script>
 {% endblock %}
