@@ -85,12 +85,14 @@ def _generate_single(base_url, api_key, model, prompt, size):
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=180) as resp:
+        with urllib.request.urlopen(req, timeout=240) as resp:
             return _extract_images(json.loads(resp.read().decode("utf-8")))
     except urllib.error.HTTPError as e:
         raise RuntimeError(_read_http_error(e)) from e
     except urllib.error.URLError as e:
         raise RuntimeError(f"无法连接生图服务：{e.reason}") from e
+    except TimeoutError:
+        raise RuntimeError("出现问题，请稍后重试") from None
 
 
 def _edit_single(base_url, api_key, model, prompt, size, references):
@@ -144,6 +146,8 @@ def _edit_single(base_url, api_key, model, prompt, size, references):
         raise RuntimeError(_read_http_error(e)) from e
     except urllib.error.URLError as e:
         raise RuntimeError(f"无法连接生图服务：{e.reason}") from e
+    except TimeoutError:
+        raise RuntimeError("出现问题，请稍后重试") from None
 
 
 def _single_task(base_url, api_key, model, prompt, size, references):
