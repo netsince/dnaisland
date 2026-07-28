@@ -188,6 +188,11 @@ def create_app(config_object=None):
     # 管理员（super_admin）与登录/退出/静态资源/站点配置 API 不受影响。
     @app.before_request
     def enforce_shutdown():
+        # 静态资源（CSS/JS/图片等）无需关站检测：直接在最前面放行，
+        # 省去每个静态请求都跑一次 public_config() 查库（一页往往伴随数十个静态请求）。
+        if request.endpoint == "static" or request.path.startswith("/static"):
+            return
+
         from .services.site_service import public_config
 
         try:

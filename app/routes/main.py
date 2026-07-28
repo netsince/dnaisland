@@ -325,11 +325,11 @@ def search():
     posts_count = 0
 
     if q:
-        cards_count = _card_search_query(q, sort, tag).count()
-        users_count = _user_search_query(q, sort).count()
-        posts_count = _post_search_query(q).count()
-
         if search_type == "all":
+            # 汇总视图：需三类总数 + 各取少量样例，分别 count 一次（此处无分页，故无重复计数）
+            cards_count = _card_search_query(q, sort, tag).count()
+            users_count = _user_search_query(q, sort).count()
+            posts_count = _post_search_query(q).count()
             cards = attach_covers(_card_search_query(q, sort, tag).limit(4).all())
             users = _user_search_query(q, sort).limit(3).all()
             posts = _post_search_query(q).limit(4).all()
@@ -338,16 +338,19 @@ def search():
                 page=page, per_page=12, error_out=False
             )
             cards = attach_covers(cards_pagination.items)
+            cards_count = cards_pagination.total  # 复用分页的 total，避免重复 COUNT
         elif search_type == "user":
             users_pagination = _user_search_query(q, sort).paginate(
                 page=page, per_page=20, error_out=False
             )
             users = users_pagination.items
+            users_count = users_pagination.total
         elif search_type == "post":
             posts_pagination = _post_search_query(q).paginate(
                 page=page, per_page=15, error_out=False
             )
             posts = posts_pagination.items
+            posts_count = posts_pagination.total
 
     return render_template(
         "search.html",

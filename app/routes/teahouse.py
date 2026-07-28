@@ -117,20 +117,16 @@ TEA_RATE_LIMIT = 5
 TEA_MENTION_RE = re.compile(r"@([A-Za-z0-9_]+)")
 
 
-def _visible_query(query, viewer):
-    """对 viewer 可见的帖子：未隐藏、未删除，或本人/超级管理员可见自己被隐藏的帖子。
+def _apply_feed_image_loads(query):
+    """为 feed 列表查询应用 eager-load，避免模板渲染时的惰性查询（N+1）：
 
-    非超级管理员额外隐藏「已删除」（admin_del）作者的帖子；但保留「已注销」
-    （user_del）与「纪念」（mourning）作者的帖子（其作者名显示对应占位昵称）。
+    - 每张帖子只加载「第一张」配图（模板 render_images 只内联首图）；
+    - 每张卡片只加载「第一张」图（模板只用到 card.images[0].slot）；
+    - 预加载 post.author（模板每帖渲染作者昵称/头像，否则逐帖惰性查作者 = N+1）。
 
-    feed 模板只用到 card.images[0].slot（生成 url_for）与 post.images[0].image_data
-    （内联首图）。原实现用 joinedload(TeaPost.images)/joinedload(Card.images) 会把
-    全部配图元数据通过 JOIN 扇出到结果集（post × 卡图 × 帖图），而 CardImage.data 与
-    TeaPostImage.image_data 都是 deferred，base64 并不会被拉进内存，真正的浪费是这次
-    JOIN 扇出与多查的元数据。这里改用 contains_eager + 「最小 sort_order/id」子查询，
-    只为每张帖子加载「第一张」配图、为每张卡片加载「第一张」图，消除扇出。
+    CardImage.data / TeaPostImage.image_data 是 deferred，base64 不会被拉进内存，
+    只有被访问的首图 image_data 才惰性加载。返回带 outerjoin 与 options 的 query。
     """
-    # 每张帖子的首张配图（sort_order 最小）
     fpi = (
         db.session.query(
             TeaPostImage.post_id.label("fpi_pid"),
@@ -140,7 +136,6 @@ def _visible_query(query, viewer):
         .subquery("first_post_img")
     )
     fpi_alias = aliased(TeaPostImage)
-    # 每张卡片的首张图（id 最小）
     fci = (
         db.session.query(
             CardImage.card_id.label("fci_cid"),
@@ -158,24 +153,31 @@ def _visible_query(query, viewer):
     q = q.outerjoin(
         fci, and_(fci_alias.card_id == Card.id, fci_alias.id == fci.c.fci_id)
     )
+    return q.options(
+        contains_eager(TeaPost.images, alias=fpi_alias),
+        contains_eager(TeaPost.card).contains_eager(Card.images, alias=fci_alias),
+        joinedload(TeaPost.author),
+    )
 
+
+def _visible_query(query, viewer):
+    """对 viewer 可见的帖子：未隐藏、未删除，或本人/超级管理员可见自己被隐藏的帖子。
+
+    非超级管理员额外隐藏「已删除」（admin_del）作者的帖子；但保留「已注销」
+    （user_del）与「纪念」（mourning）作者的帖子（其作者名显示对应占位昵称）。
+    可见性过滤后复用 _apply_feed_image_loads 做 feed 所需的 eager-load。
+    """
     if viewer.is_authenticated and viewer.is_super_admin:
-        return q.options(
-            contains_eager(TeaPost.images, alias=fpi_alias),
-            contains_eager(TeaPost.card).contains_eager(Card.images, alias=fci_alias),
-        )
+        return _apply_feed_image_loads(query)
     if viewer.is_authenticated:
-        q = q.filter(
+        query = query.filter(
             or_(TeaPost.is_hidden.is_(False), TeaPost.user_id == viewer.id),
             TeaPost.is_deleted.is_(False),
         )
     else:
-        q = q.filter(TeaPost.is_hidden.is_(False), TeaPost.is_deleted.is_(False))
-    q = q.join(User, TeaPost.user_id == User.id).filter(User.status != "admin_del")
-    return q.options(
-        contains_eager(TeaPost.images, alias=fpi_alias),
-        contains_eager(TeaPost.card).contains_eager(Card.images, alias=fci_alias),
-    )
+        query = query.filter(TeaPost.is_hidden.is_(False), TeaPost.is_deleted.is_(False))
+    query = query.join(User, TeaPost.user_id == User.id).filter(User.status != "admin_del")
+    return _apply_feed_image_loads(query)
 
 
 def _too_frequent(user_id):
@@ -223,8 +225,46 @@ def _notify_mentions(content, post, actor):
         notify(u.id, f"{actor.nickname} 在茶馆提到了你：{url}", type_="mention")
 
 
+# feed 每页帖子的计数聚合（点赞数/回复数/话题）按「当页 id 集合」缓存 30s，
+# 避免每个请求都跑多轮 group by。本人赞/藏是 per-user 状态，始终实时计算（见 _build_stats）。
+_STATS_CACHE = OrderedDict()  # frozenset(ids) -> (ts, {pid: {...全局计数...}})
+_STATS_TTL = 30
+
+
+def _compute_global_stats(ids):
+    """计算一组帖子的全局计数：点赞数、直接回复数、话题列表（不含 per-user 状态）。"""
+    result = {pid: {"like_count": 0, "reply_count": 0, "topics": []} for pid in ids}
+    for pid, cnt in (
+        db.session.query(TeaPostLike.post_id, func.count())
+        .filter(TeaPostLike.post_id.in_(ids))
+        .group_by(TeaPostLike.post_id)
+        .all()
+    ):
+        result[pid]["like_count"] = cnt
+    for pid, cnt in (
+        db.session.query(TeaPost.parent_id, func.count())
+        .filter(TeaPost.parent_id.in_(ids))
+        .group_by(TeaPost.parent_id)
+        .all()
+    ):
+        result[pid]["reply_count"] = cnt
+    rows = (
+        db.session.query(TeaPostTopic.post_id, TeaTopic.id, TeaTopic.name)
+        .join(TeaTopic, TeaTopic.id == TeaPostTopic.topic_id)
+        .filter(TeaPostTopic.post_id.in_(ids))
+        .all()
+    )
+    for pid, tid, tname in rows:
+        result[pid]["topics"].append({"id": tid, "name": tname})
+    return result
+
+
 def _build_stats(posts):
-    """预计算一组帖子的点赞数、本人是否点赞、直接回复数，返回 {post_id: {...}}。"""
+    """预计算一组帖子的点赞数、本人是否点赞、直接回复数，返回 {post_id: {...}}。
+
+    点赞数/回复数/话题为全局数据，按「当页帖子 id 集合」缓存 30s（计数滞后至多 30s，
+    对 feed 角标可接受）；本人是否点赞/收藏是 per-user 状态，始终实时计算。
+    """
     ids = [p.id for p in posts]
     stats = {
         pid: {
@@ -238,6 +278,16 @@ def _build_stats(posts):
     }
     if not ids:
         return stats
+    now = time.time()
+    key = frozenset(ids)
+    cached = _STATS_CACHE.get(key)
+    if cached is None or now - cached[0] >= _STATS_TTL:
+        cached = (now, _compute_global_stats(ids))
+        _STATS_CACHE[key] = cached
+        while len(_STATS_CACHE) > 200:
+            _STATS_CACHE.popitem(last=False)
+    for pid, g in cached[1].items():
+        stats[pid].update(g)
     if current_user.is_authenticated:
         liked = TeaPostLike.query.filter(
             TeaPostLike.user_id == current_user.id,
@@ -251,28 +301,6 @@ def _build_stats(posts):
         ).all()
         for f in faved:
             stats[f.post_id]["favorited"] = True
-    for pid, cnt in (
-        db.session.query(TeaPostLike.post_id, func.count())
-        .filter(TeaPostLike.post_id.in_(ids))
-        .group_by(TeaPostLike.post_id)
-        .all()
-    ):
-        stats[pid]["like_count"] = cnt
-    for pid, cnt in (
-        db.session.query(TeaPost.parent_id, func.count())
-        .filter(TeaPost.parent_id.in_(ids))
-        .group_by(TeaPost.parent_id)
-        .all()
-    ):
-        stats[pid]["reply_count"] = cnt
-    rows = (
-        db.session.query(TeaPostTopic.post_id, TeaTopic.id, TeaTopic.name)
-        .join(TeaTopic, TeaTopic.id == TeaPostTopic.topic_id)
-        .filter(TeaPostTopic.post_id.in_(ids))
-        .all()
-    )
-    for pid, tid, tname in rows:
-        stats[pid]["topics"].append({"id": tid, "name": tname})
     return stats
 
 
