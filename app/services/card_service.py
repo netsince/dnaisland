@@ -203,11 +203,30 @@ def build_export_package(
         for d in CardDialogueStyle.query.filter_by(card_id=card.id)
         .order_by(CardDialogueStyle.turn_index)
     ]
-    image_rows = {
-        img.slot: img.data
-        for img in CardImage.query.filter_by(card_id=card.id).all()
-        if img.data
-    }
+    from .image_service import optimize_image_for_export
+
+    image_rows = CardImage.query.filter_by(card_id=card.id).all()
+    need_commit = False
+    optimized_images = {}
+    for slot in ("square", "landscape", "portrait"):
+        row = next((r for r in image_rows if r.slot == slot), None)
+        if row is None or not row.data:
+            optimized_images[slot] = None
+            continue
+        data = row.data
+        # 首次复制（图片尚未优化）时做轻度压缩，并写回数据库、打上 optimized 标记；
+        # 已优化的图片直接复用，避免每次复制都重编码。
+        if not row.optimized:
+            data = optimize_image_for_export(data)
+            row.data = data
+            row.optimized = True
+            need_commit = True
+        optimized_images[slot] = data
+    if need_commit:
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
 
     # originalLink 兜底：没有源链接时用站内卡片 URL
     original_link = card.original_link or f"{origin}/user/card/{card.id}"
@@ -230,7 +249,7 @@ def build_export_package(
     # 三个图片槽位始终存在，且每槽都注入 fx / dataverification（缺图时 data 为 null）
     images = {
         slot: {
-            "data": image_rows.get(slot),
+            "data": optimized_images.get(slot),
             "fx": fx_value,
             "dataverification": dataverification_value,
         }

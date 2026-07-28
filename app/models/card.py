@@ -102,6 +102,10 @@ class CardImage(db.Model):
     card_id = db.Column(db.String(36), db.ForeignKey("cards.id"), nullable=False)
     slot = db.Column(db.String(20), nullable=False)  # square | landscape | portrait
     data = db.deferred(db.Column(LONGTEXT, nullable=False))  # base64 data URI
+    # 是否已做过“导出复制专用”的轻度压缩优化；优化过的图片在导出时直接复用，不再重压缩
+    optimized = db.Column(
+        db.Boolean, nullable=False, server_default=db.text("0"), index=True
+    )
 
 
 class CardLike(db.Model):

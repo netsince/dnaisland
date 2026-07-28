@@ -16,7 +16,11 @@ from sqlalchemy.exc import IntegrityError
 from ..extensions import db
 from ..models import Card, CardDialogueStyle, CardImage, CardTag
 from ..services.card_import_service import parse_export_package
-from ..services.image_service import compress_image, raw_bytes_to_webp_data_url
+from ..services.image_service import (
+    compress_image,
+    optimize_image_for_export,
+    raw_bytes_to_webp_data_url,
+)
 
 publish_bp = Blueprint("publish", __name__, url_prefix="/publish")
 
@@ -127,7 +131,14 @@ def edit():
             )
         )
     for slot, data_uri in images.items():
-        db.session.add(CardImage(card_id=card_id, slot=slot, data=data_uri))
+        # 发布上传时即做“复制导出专用”轻度压缩，并打上 optimized 标记，
+        # 使后续复制导出直接复用、无需再压缩。
+        optimized_data = optimize_image_for_export(data_uri)
+        db.session.add(
+            CardImage(
+                card_id=card_id, slot=slot, data=optimized_data, optimized=True
+            )
+        )
 
     try:
         db.session.commit()

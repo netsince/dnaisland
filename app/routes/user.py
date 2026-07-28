@@ -494,7 +494,8 @@ def card_export(card_id):
         copier_ip=copier_ip,
         platform_domain=origin,
     )
-    body = json.dumps(package, ensure_ascii=False, indent=2)
+    # 紧凑 JSON：复制到剪贴板时不带缩进，显著减小体积，避免浏览器写入剪贴板失败
+    body = json.dumps(package, ensure_ascii=False, separators=(",", ":"))
     resp = make_response(body)
     resp.headers["Content-Type"] = "application/json; charset=utf-8"
     resp.headers["Content-Disposition"] = (

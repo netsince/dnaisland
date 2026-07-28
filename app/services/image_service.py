@@ -126,3 +126,25 @@ def send_webp(data_url: str, max_edge: int = 1024, quality: int = 82):
     webp = data_url_to_webp_bytes(data_url, max_edge=max_edge, quality=quality)
     return send_file(BytesIO(webp), mimetype="image/webp", max_age=86400)
 
+
+# 复制到剪贴板导出专用的轻度压缩参数：控制在剪贴板体积上限内，但不过度损失观感。
+# 这三个槽位都会内联进 JSON 文本，体积过大会导致浏览器写入剪贴板失败，故适度缩小。
+EXPORT_OPTIMIZE_MAX_EDGE = 768
+EXPORT_OPTIMIZE_QUALITY = 82
+
+
+def optimize_image_for_export(data_url: str, max_edge: int = EXPORT_OPTIMIZE_MAX_EDGE, quality: int = EXPORT_OPTIMIZE_QUALITY) -> str:
+    """为“复制到剪贴板”导出准备：轻度压缩为 WebP，控制体积但保留可识别度。
+
+    用于两种场景：
+    1. 发布上传时即对图片做此轻度优化，并打上 optimized 标记；
+    2. 首次复制导出时，对未优化的图片再做一次优化并写回数据库、打上标记。
+    解码或重编码失败时原样返回，避免阻断导出流程。
+    """
+    if not data_url:
+        return data_url
+    try:
+        return compress_image(data_url, max_edge=max_edge, quality=quality)
+    except Exception:
+        return data_url
+
