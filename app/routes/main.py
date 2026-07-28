@@ -6,12 +6,35 @@ from flask_login import current_user
 from sqlalchemy import case, func, literal_column, or_
 
 from ..extensions import db
-from ..models import Article, Card, CardFavorite, CardLike, CardTag, Comment, Punishment, User
+from ..models import (
+    Article,
+    Card,
+    CardFavorite,
+    CardImage,
+    CardLike,
+    CardTag,
+    Comment,
+    Punishment,
+    User,
+)
 from ..models.teahouse import TeaPost
 from ..services.card_service import attach_covers, popular_tags
 from ..services.image_service import send_webp
 
 main_bp = Blueprint("main", __name__)
+
+# 「有图片的角色卡」在热门推荐排序中的热度加权（等效于额外互动量）。
+# 用于让带封面的卡片优先被推荐，同时保留互动量极高但无图的卡片浮出空间。
+IMAGE_PRIORITY_BOOST = 60
+
+
+def _has_image_subquery():
+    """返回「至少有一张图片」的卡片 id 子查询，用于推荐排序时给有图卡加权。"""
+    return (
+        db.session.query(CardImage.card_id)
+        .group_by(CardImage.card_id)
+        .subquery("card_has_image")
+    )
 
 
 @main_bp.route("/article-cover/<int:article_id>")
@@ -105,16 +128,25 @@ def _card_hot_score(interactions_expr, created_at_col):
     return (interactions_expr + 1.0) / func.pow(age_hours + 2.0, 1.5)
 
 
-def _order_by_hot(q):
-    """按热度排序：先 outerjoin 赞数聚合子查询，再套用时间衰减公式（消除逐行关联子查询）。"""
+def _order_by_hot(q, image_boost=IMAGE_PRIORITY_BOOST):
+    """按热度排序：先 outerjoin 赞数聚合子查询，再套用时间衰减公式（消除逐行关联子查询）。
+
+    image_boost>0 时，对「至少有一张图片」的卡片额外加权，使其优先被推荐。
+    """
     agg = _likes_agg_subquery()
     q = q.outerjoin(agg, agg.c.card_id == Card.id)
     interactions = func.coalesce(Card.view_count, 0) * 1.0 + func.coalesce(agg.c.lc, 0) * 5.0
+    if image_boost:
+        ia = _has_image_subquery()
+        q = q.outerjoin(ia, ia.c.card_id == Card.id)
+        interactions = interactions + case(
+            (ia.c.card_id.isnot(None), image_boost), else_=0
+        )
     score = _card_hot_score(interactions, Card.created_at)
     return q.order_by(score.desc(), Card.created_at.desc())
 
 
-def _order_by_home_hot(q):
+def _order_by_home_hot(q, image_boost=IMAGE_PRIORITY_BOOST):
     """首页「热门推荐」排序：多重互动信号 + Hacker News 时间衰减。
 
     互动量 = 浏览×1 + 点赞×5 + 收藏×8 + 评论×3
@@ -122,6 +154,7 @@ def _order_by_home_hot(q):
     热度分 = (互动量 + 1) / (存在小时数 + 2)^1.5
       —— 重力模型兼顾「当下热度」与「新鲜度」：新卡凭互动快速上浮，老卡随时间自然下沉，
          避免老牌高浏览卡长期霸榜、新优质卡无法出头。
+    image_boost>0 时，对「至少有一张图片」的卡片额外加权，使其优先被推荐。
     """
     la = _likes_agg_subquery()
     fa = _favorites_agg_subquery()
@@ -135,6 +168,12 @@ def _order_by_home_hot(q):
         + func.coalesce(fa.c.fc, 0) * 8.0
         + func.coalesce(ca.c.cc, 0) * 3.0
     )
+    if image_boost:
+        ia = _has_image_subquery()
+        q = q.outerjoin(ia, ia.c.card_id == Card.id)
+        interactions = interactions + case(
+            (ia.c.card_id.isnot(None), image_boost), else_=0
+        )
     score = _card_hot_score(interactions, Card.created_at)
     return q.order_by(score.desc(), Card.created_at.desc())
 
