@@ -1410,17 +1410,32 @@ body.is-mobile-plus-open header {
 /* 茶馆单行横划胶囊 Tab 栏 */
 .dna-horizontal-tabs {
   display: flex;
+  flex-wrap: nowrap;
   gap: 8px;
   overflow-x: auto;
+  overflow-y: hidden;
   white-space: nowrap;
   padding-bottom: 4px;
   -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
+  /* 改为细可见滚动条：既保留移动端触摸横滑，又让桌面端能看清/拖动，
+     避免“滚动条被完全隐藏导致用户以为不能左右滑动、标签看不到”的问题 */
+  scrollbar-width: thin;
+  scrollbar-color: var(--dna-border) transparent;
 }
 .dna-horizontal-tabs::-webkit-scrollbar {
-  display: none;
+  height: 6px;
+}
+.dna-horizontal-tabs::-webkit-scrollbar-thumb {
+  background: var(--dna-border);
+  border-radius: 3px;
+}
+.dna-horizontal-tabs::-webkit-scrollbar-track {
+  background: transparent;
 }
 .dna-tab-pill {
+  /* 关键：禁止收缩，保证标签超出容器宽度时溢出并触发横向滚动，
+     而不是被压扁导致既不溢出也无法滑动 */
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   padding: 6px 14px;
