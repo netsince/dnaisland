@@ -3,13 +3,15 @@
 统一「后端 → 模板」的卡片数据契约：模板只认卡片对象自身的属性，
 不再需要路由额外传入 images / card_images 之类的旁路字典。
 
-- attach_covers(cards): 批量为卡片对象附加 `cover`（方形封面 data URI 或 None）。
+- attach_covers(cards): 批量标记卡片是否有方形封面（仅置布尔标记，不加载 base64 数据）。
 - load_card_images(card_id): 返回单卡 {slot: data} 图片字典。
 """
 
 import json
 import random
 import string
+import time
+from collections import OrderedDict
 from datetime import datetime
 
 from sqlalchemy import func
@@ -133,23 +135,25 @@ def _obfuscate(s):
 
 
 def attach_covers(cards, slot="square"):
-    """批量为一组卡片附加封面图，避免模板层 N 次查询或旁路字典。
+    """批量标记一组卡片是否存在指定槽位的封面图。
 
-    直接在卡片对象上写入 `cover` 属性（None 表示无图），返回原列表以便链式调用。
+    仅查询 `card_id` 列表（不加载 base64 数据），在卡片对象上写入布尔 `cover`，
+    供模板 {% if card.cover %} 分支判断；真实图片由 user.card_image 端点按需提供。
+    这样避免在每张卡片墙页面把数 MB 的 base64 拉进应用内存（模板并不消费 data）。
     """
     cards = list(cards or [])
     if not cards:
         return cards
 
     ids = [c.id for c in cards]
-    covers = {
-        img.card_id: img.data
-        for img in CardImage.query.filter(
-            CardImage.slot == slot, CardImage.card_id.in_(ids)
-        ).all()
+    present = {
+        cid
+        for (cid,) in db.session.query(CardImage.card_id)
+        .filter(CardImage.slot == slot, CardImage.card_id.in_(ids))
+        .all()
     }
     for c in cards:
-        c.cover = covers.get(c.id)
+        c.cover = c.id in present
     return cards
 
 
@@ -281,11 +285,22 @@ def build_export_package(
     return package
 
 
+# 热门标签云：全量 card_tags 的 group by 较重，且变化不频繁，缓存 5 分钟。
+# 注意：标签可见性依赖 viewer（屏蔽作者），此处缓存全局可见结果；
+# 登录用户看到被屏蔽作者的标签最多滞后 TTL，社区标签云可接受。
+_TAG_CACHE = OrderedDict()  # {limit: (timestamp, result)}
+_TAG_CACHE_TTL = 300
+
+
 def popular_tags(viewer=None, limit=30):
     """返回可见卡片中的热门标签（含计数），按卡片数降序，用于探索页标签云。
 
     标签计数只统计对 viewer 可见的卡片，避免使用被屏蔽作者/未通过卡片的噪声标签。
     """
+    now = time.time()
+    hit = _TAG_CACHE.get(limit)
+    if hit is not None and now - hit[0] < _TAG_CACHE_TTL:
+        return hit[1]
     visible_ids = Card.visible_to(viewer).with_entities(Card.id)
     rows = (
         db.session.query(CardTag.tag, func.count(CardTag.card_id).label("n"))
@@ -295,4 +310,6 @@ def popular_tags(viewer=None, limit=30):
         .limit(limit)
         .all()
     )
-    return [{"tag": r.tag, "count": r.n} for r in rows]
+    result = [{"tag": r.tag, "count": r.n} for r in rows]
+    _TAG_CACHE[limit] = (now, result)
+    return result

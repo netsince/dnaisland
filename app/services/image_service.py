@@ -4,7 +4,10 @@
 在观感损失极小的前提下最大化压缩，减少数据库存储与传输体积。
 """
 import base64
+import hashlib
 import re
+import time
+from collections import OrderedDict
 from io import BytesIO
 
 from PIL import Image
@@ -90,12 +93,35 @@ def data_url_to_bytes_and_mime(data_url: str) -> tuple[bytes, str]:
     return raw, mime
 
 
-def data_url_to_webp_bytes(data_url: str, max_edge: int = 1024, quality: int = 82) -> bytes:
-    """存储的 base64 Data URL -> WEBP/图片原始字节（供图片 API 直接二进制响应）。
+# 图片转码结果缓存：图片在库中以 base64 存储，每次请求都要解码（甚至 PIL 重编码）。
+# 以 (max_edge, quality, data_url 哈希) 为键缓存编码结果，图片不变则命中，
+# 避免重复 CPU 重算。值带过期时间与容量上限（LRU），防止内存无限增长。
+_WEBP_CACHE: "OrderedDict[str, tuple[bytes, float]]" = OrderedDict()
+_WEBP_CACHE_TTL = 3600
+_WEBP_CACHE_MAX = 500
 
-    对于库内存储的 Data URL（几乎全部为经 compress_image 处理过的 WebP/PNG/JPEG），
-    直接提取解码原始 bytes 发送，避免在每次 HTTP GET 时触发 PIL 重度 CPU 重编码。
+
+def data_url_to_webp_bytes(data_url: str, max_edge: int = 1024, quality: int = 82) -> bytes:
+    """存储的 base64 Data URL -> 图片原始字节（供图片 API 直接二进制响应）。
+
+    对于库内存储的 Data URL（几乎全部为 WebP/PNG/JPEG），直接提取解码原始 bytes
+    发送；非 WebP 才触发 PIL 重编码。结果按 (data_url, max_edge, quality) 缓存，
+    避免每次 HTTP GET 都重复解码/重编码。
     """
+    key = hashlib.sha1(f"{max_edge}|{quality}|{data_url}".encode("utf-8")).hexdigest()
+    cached = _WEBP_CACHE.get(key)
+    now = time.time()
+    if cached is not None and now - cached[1] < _WEBP_CACHE_TTL:
+        return cached[0]
+    webp = _encode_webp_uncached(data_url, max_edge=max_edge, quality=quality)
+    _WEBP_CACHE[key] = (webp, now)
+    while len(_WEBP_CACHE) > _WEBP_CACHE_MAX:
+        _WEBP_CACHE.popitem(last=False)
+    return webp
+
+
+def _encode_webp_uncached(data_url: str, max_edge: int = 1024, quality: int = 82) -> bytes:
+    """无缓存的底层转码实现（见 data_url_to_webp_bytes）。"""
     raw, _ = data_url_to_bytes_and_mime(data_url)
     if data_url.startswith("data:image/"):
         return raw

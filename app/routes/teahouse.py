@@ -1,4 +1,5 @@
 import re
+import random
 from datetime import datetime
 
 from flask import (
@@ -294,8 +295,12 @@ def index():
         q = q.filter(TeaPost.user_id.in_(sub))
 
     if sort == "random":
-        # 随机看：MySQL 用 RAND()；翻页会重新随机
-        q = q.order_by(db.func.rand())
+        # 用「随机起始页」替代 db.func.rand()：RAND() 会触发全表扫描 + filesort，
+        # 数据量大时极慢。随机页后仍走正常 paginate，对“随便逛逛”场景足够。
+        per_page = 20
+        total = q.count()
+        if total > per_page:
+            page = random.randint(1, (total + per_page - 1) // per_page)
     elif sort == "hot":
         # 最热：按 Hacker News 重力时间衰减公式计算热度分降序，时间兜底
         q = _order_by_teahouse_hot(q)

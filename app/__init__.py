@@ -171,8 +171,12 @@ def create_app(config_object=None):
 
     @app.context_processor
     def inject_site():
-        # public_config() 内部已对数据库异常做回退，不会抛错
-        return {"site_cfg": public_config()}
+        # 优先复用 enforce_shutdown 已读取并存入 g 的 public_config，
+        # 避免同一次请求内 before_request 与模板渲染各查一次库/缓存。
+        cfg = getattr(g, "site_cfg", None)
+        if cfg is None:
+            cfg = public_config()
+        return {"site_cfg": cfg}
 
     # 富文本渲染（仅管理员后台录入的内容，直接按 HTML 输出）
     @app.template_filter("richtext")
@@ -191,6 +195,8 @@ def create_app(config_object=None):
         except Exception:
             # 配置表尚未初始化（如迁移未执行），放行
             return
+        # 记到 g 上，供 inject_site 复用，避免同一次请求二次查库/读缓存
+        g.site_cfg = cfg
         if not cfg["shutdown"]["enabled"]:
             return
 
