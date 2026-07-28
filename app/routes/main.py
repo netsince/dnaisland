@@ -1,9 +1,13 @@
 import base64
+import time
+from collections import OrderedDict
 from io import BytesIO
 
 from flask import Blueprint, abort, jsonify, render_template, request, send_file, url_for
 from flask_login import current_user
 from sqlalchemy import case, func, literal_column, or_
+
+from ..paging import IdListPagination
 
 from ..extensions import db
 from ..models import (
@@ -63,10 +67,11 @@ def article_cover(article_id):
 def index():
     page = request.args.get("page", 1, type=int)
     # 信息层面统一过滤：被「屏蔽全部角色卡」作者的卡片不会出现在首页；
-    # 首页「热门推荐」按多重互动信号 + 时间衰减排序（见 _order_by_home_hot）。
-    q = Card.visible_to(current_user)
-    q = _order_by_home_hot(q)
-    pagination = q.paginate(page=page, per_page=12, error_out=False)
+    # 首页「热门推荐」按多重互动信号 + 时间衰减排序（见 _order_by_home_hot），
+    # 排序结果缓存 60s，分页直接切片，免去每请求全表聚合+排序+COUNT。
+    pagination = _paginate_hot_cards(
+        lambda: Card.visible_to(current_user), "home", _order_by_home_hot, page, 12
+    )
     return render_template(
         "index.html",
         cards=attach_covers(pagination.items),
@@ -183,6 +188,44 @@ def _order_by_likes(q):
     agg = _likes_agg_subquery()
     q = q.outerjoin(agg, agg.c.card_id == Card.id)
     return q.order_by(func.coalesce(agg.c.lc, 0).desc(), Card.created_at.desc())
+
+
+# 「热门」排序结果缓存：首页/探索默认按热度排序，每次请求都要对整表做
+# 点赞/收藏/评论聚合 + Hacker News 时间衰减排序，且 paginate 还要额外 COUNT 一次。
+# 这些顺序在 60s 内变化极小，故按 (路由 + 过滤条件) 缓存有序 id 列表，分页时直接切片，
+# 免去每请求重算。缓存基于「全局可见」集合；登录用户屏蔽的作者可能滞后至多 TTL 出现
+# 于其热门流（与 popular_tags 的取舍一致），对热门推荐流可接受。
+_HOT_CARD_CACHE = OrderedDict()  # signature -> (ts, [card_id,...])
+_HOT_CARD_TTL = 60
+
+
+def _hot_card_order(signature, build_query, order_fn):
+    """返回按热度降序排列的卡片 id 列表，带 60s TTL 缓存。"""
+    now = time.time()
+    hit = _HOT_CARD_CACHE.get(signature)
+    if hit is not None and now - hit[0] < _HOT_CARD_TTL:
+        return hit[1]
+    q = order_fn(build_query())
+    ids = [cid for (cid,) in q.with_entities(Card.id).all()]
+    _HOT_CARD_CACHE[signature] = (now, ids)
+    while len(_HOT_CARD_CACHE) > 50:
+        _HOT_CARD_CACHE.popitem(last=False)
+    return ids
+
+
+def _paginate_hot_cards(build_query, signature, order_fn, page, per_page):
+    """用缓存的有序 id 列表做分页：切片取本页 id，再按 id 批量取卡并就地排序。"""
+    ids = _hot_card_order(signature, build_query, order_fn)
+    total = len(ids)
+    if page < 1:
+        page = 1
+    start = (page - 1) * per_page
+    slice_ids = ids[start : start + per_page]
+    cards = []
+    if slice_ids:
+        fetched = {c.id: c for c in Card.query.filter(Card.id.in_(slice_ids)).all()}
+        cards = [fetched[cid] for cid in slice_ids if cid in fetched]
+    return IdListPagination(cards, page, per_page, total)
 
 
 def _card_search_query(q, sort, tag=None):
@@ -342,17 +385,29 @@ def explore():
         q = q.join(CardTag, CardTag.card_id == Card.id).filter(CardTag.tag == tag)
 
     if sort == "hot":
-        q = _order_by_hot(q)
-    elif sort == "new":
-        q = q.order_by(Card.created_at.desc())
-    else:  # likes：复用赞数聚合子查询，避免逐行关联子查询
-        q = _order_by_likes(q)
+        # 热门排序结果缓存 60s，分页直接切片（其余排序较轻，走实时查询）。
+        def _base():
+            bq = Card.visible_to(current_user)
+            if gender:
+                bq = bq.filter(Card.gender == gender)
+            if tag:
+                bq = bq.join(CardTag, CardTag.card_id == Card.id).filter(
+                    CardTag.tag == tag
+                ).distinct()
+            return bq
 
-    if tag:
-        q = q.distinct()
-
-    pagination = q.paginate(page=page, per_page=24, error_out=False)
-    cards = attach_covers(pagination.items)
+        signature = f"explore|g={gender or ''}|t={tag or ''}"
+        pagination = _paginate_hot_cards(_base, signature, _order_by_hot, page, 24)
+        cards = attach_covers(pagination.items)
+    else:
+        if sort == "new":
+            q = q.order_by(Card.created_at.desc())
+        else:  # likes：复用赞数聚合子查询，避免逐行关联子查询
+            q = _order_by_likes(q)
+        if tag:
+            q = q.distinct()
+        pagination = q.paginate(page=page, per_page=24, error_out=False)
+        cards = attach_covers(pagination.items)
 
     genders = [
         g[0]

@@ -1,5 +1,7 @@
 import re
 import random
+import time
+from collections import OrderedDict
 from datetime import datetime
 
 from flask import (
@@ -14,8 +16,10 @@ from flask import (
     url_for,
 )
 from flask_login import current_user, login_required
-from sqlalchemy import func, literal_column, or_
-from sqlalchemy.orm import aliased, joinedload
+from sqlalchemy import and_, func, literal_column, or_
+from sqlalchemy.orm import aliased, contains_eager
+
+from ..paging import IdListPagination
 
 from ..decorators import block_if_muted
 from ..extensions import db
@@ -118,25 +122,60 @@ def _visible_query(query, viewer):
 
     非超级管理员额外隐藏「已删除」（admin_del）作者的帖子；但保留「已注销」
     （user_del）与「纪念」（mourning）作者的帖子（其作者名显示对应占位昵称）。
+
+    feed 模板只用到 card.images[0].slot（生成 url_for）与 post.images[0].image_data
+    （内联首图）。原实现用 joinedload(TeaPost.images)/joinedload(Card.images) 会把
+    全部配图元数据通过 JOIN 扇出到结果集（post × 卡图 × 帖图），而 CardImage.data 与
+    TeaPostImage.image_data 都是 deferred，base64 并不会被拉进内存，真正的浪费是这次
+    JOIN 扇出与多查的元数据。这里改用 contains_eager + 「最小 sort_order/id」子查询，
+    只为每张帖子加载「第一张」配图、为每张卡片加载「第一张」图，消除扇出。
     """
-    if viewer.is_authenticated and viewer.is_super_admin:
-        return query.options(
-            joinedload(TeaPost.card).joinedload(Card.images)
+    # 每张帖子的首张配图（sort_order 最小）
+    fpi = (
+        db.session.query(
+            TeaPostImage.post_id.label("fpi_pid"),
+            func.min(TeaPostImage.sort_order).label("fpi_so"),
         )
-    query = query.join(User, TeaPost.user_id == User.id).filter(
-        User.status != "admin_del"
+        .group_by(TeaPostImage.post_id)
+        .subquery("first_post_img")
     )
+    fpi_alias = aliased(TeaPostImage)
+    # 每张卡片的首张图（id 最小）
+    fci = (
+        db.session.query(
+            CardImage.card_id.label("fci_cid"),
+            func.min(CardImage.id).label("fci_id"),
+        )
+        .group_by(CardImage.card_id)
+        .subquery("first_card_img")
+    )
+    fci_alias = aliased(CardImage)
+
+    q = query.outerjoin(TeaPost.card)
+    q = q.outerjoin(
+        fpi, and_(fpi_alias.post_id == TeaPost.id, fpi_alias.sort_order == fpi.c.fpi_so)
+    )
+    q = q.outerjoin(
+        fci, and_(fci_alias.card_id == Card.id, fci_alias.id == fci.c.fci_id)
+    )
+
+    if viewer.is_authenticated and viewer.is_super_admin:
+        return q.options(
+            contains_eager(TeaPost.images, alias=fpi_alias),
+            contains_eager(TeaPost.card).contains_eager(Card.images, alias=fci_alias),
+        )
     if viewer.is_authenticated:
-        return query.filter(
+        q = q.filter(
             or_(TeaPost.is_hidden.is_(False), TeaPost.user_id == viewer.id),
             TeaPost.is_deleted.is_(False),
-        ).options(
-            joinedload(TeaPost.card).joinedload(Card.images),
-            joinedload(TeaPost.images),
         )
-    return query.filter(
-        TeaPost.is_hidden.is_(False), TeaPost.is_deleted.is_(False)
-    ).options(joinedload(TeaPost.card).joinedload(Card.images))
+    else:
+        q = q.filter(TeaPost.is_hidden.is_(False), TeaPost.is_deleted.is_(False))
+    q = q.join(User, TeaPost.user_id == User.id).filter(User.status != "admin_del")
+    return q.options(
+        contains_eager(TeaPost.images, alias=fpi_alias),
+        contains_eager(TeaPost.card).contains_eager(Card.images, alias=fci_alias),
+    )
 
 
 def _too_frequent(user_id):
@@ -271,6 +310,27 @@ def _set_single_topic(post, topic_raw):
     topic.post_count = (topic.post_count or 0) + 1
 
 
+# 茶馆「最热」排序结果缓存：每次请求都要对整表做点赞/回复数聚合 + 时间衰减排序 +
+# COUNT 分页；60s 内顺序变化极小，故缓存有序帖子 id 列表，分页直接切片，
+# 免去每请求重算。缓存基于「全局可见」集合（超管可见范围不同，故 key 区分）。
+_HOT_POST_CACHE = OrderedDict()  # signature -> (ts, [post_id,...])
+_HOT_POST_TTL = 60
+
+
+def _hot_post_order(signature, build_query):
+    now = time.time()
+    hit = _HOT_POST_CACHE.get(signature)
+    if hit is not None and now - hit[0] < _HOT_POST_TTL:
+        return hit[1]
+    q = build_query()
+    q = _order_by_teahouse_hot(q)
+    ids = [pid for (pid,) in q.with_entities(TeaPost.id).all()]
+    _HOT_POST_CACHE[signature] = (now, ids)
+    while len(_HOT_POST_CACHE) > 50:
+        _HOT_POST_CACHE.popitem(last=False)
+    return ids
+
+
 # ---------------- 推荐流（首页） ----------------
 @teahouse_bp.route("/")
 def index():
@@ -294,19 +354,45 @@ def index():
             )
         q = q.filter(TeaPost.user_id.in_(sub))
 
+    per_page = 20
     if sort == "random":
         # 用「随机起始页」替代 db.func.rand()：RAND() 会触发全表扫描 + filesort，
         # 数据量大时极慢。随机页后仍走正常 paginate，对“随便逛逛”场景足够。
-        per_page = 20
         total = q.count()
         if total > per_page:
             page = random.randint(1, (total + per_page - 1) // per_page)
+        pagination = q.paginate(page=page, per_page=per_page, error_out=False)
     elif sort == "hot":
-        # 最热：按 Hacker News 重力时间衰减公式计算热度分降序，时间兜底
-        q = _order_by_teahouse_hot(q)
+        # 最热：按 Hacker News 重力时间衰减公式计算热度分降序；结果缓存 60s，
+        # 分页直接切片，避免每请求全表聚合+排序+COUNT。
+        sig = (
+            "teahouse_hot_admin"
+            if (current_user.is_authenticated and current_user.is_super_admin)
+            else "teahouse_hot"
+        )
+        ids = _hot_post_order(
+            sig,
+            lambda: _visible_query(
+                TeaPost.query.filter(TeaPost.parent_id.is_(None)), current_user
+            ),
+        )
+        if page < 1:
+            page = 1
+        start = (page - 1) * per_page
+        slice_ids = ids[start : start + per_page]
+        posts = []
+        if slice_ids:
+            fetched = {
+                p.id: p
+                for p in _visible_query(
+                    TeaPost.query.filter(TeaPost.id.in_(slice_ids)), current_user
+                ).all()
+            }
+            posts = [fetched[pid] for pid in slice_ids if pid in fetched]
+        pagination = IdListPagination(posts, page, per_page, len(ids))
     else:  # new
         q = q.order_by(TeaPost.created_at.desc())
-    pagination = q.paginate(page=page, per_page=20, error_out=False)
+        pagination = q.paginate(page=page, per_page=per_page, error_out=False)
     posts = pagination.items
     stats = _build_stats(posts)
     return render_template(
