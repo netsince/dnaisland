@@ -147,11 +147,15 @@ def _apply_feed_image_loads(query):
     fci_alias = aliased(CardImage)
 
     q = query.outerjoin(TeaPost.card)
+    q = q.outerjoin(fpi, fpi.c.fpi_pid == TeaPost.id)
     q = q.outerjoin(
-        fpi, and_(fpi_alias.post_id == TeaPost.id, fpi_alias.sort_order == fpi.c.fpi_so)
+        fpi_alias,
+        and_(fpi_alias.post_id == fpi.c.fpi_pid, fpi_alias.sort_order == fpi.c.fpi_so),
     )
+    q = q.outerjoin(fci, fci.c.fci_cid == Card.id)
     q = q.outerjoin(
-        fci, and_(fci_alias.card_id == Card.id, fci_alias.id == fci.c.fci_id)
+        fci_alias,
+        and_(fci_alias.card_id == fci.c.fci_cid, fci_alias.id == fci.c.fci_id),
     )
     return q.options(
         contains_eager(TeaPost.images, alias=fpi_alias),
