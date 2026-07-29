@@ -29,7 +29,17 @@ main_bp = Blueprint("main", __name__)
 
 # 「有图片的角色卡」在热门推荐排序中的热度加权（等效于额外互动量）。
 # 用于让带封面的卡片优先被推荐，同时保留互动量极高但无图的卡片浮出空间。
-IMAGE_PRIORITY_BOOST = 60
+IMAGE_PRIORITY_BOOST = 10
+
+# 探索页「热门」排序权重（数字即业务优先级：1 = 最重要，6 = 最次要）。
+#   评论(1) > 0~5日新发布(2) > 收藏(3) > 点赞(4) > 带图(5) > 浏览(6)
+HOT_W_COMMENT      = 6.0   # 优先级 1：评论代表讨论度，权重最高
+HOT_W_FAVORITE     = 3.0   # 优先级 3：每个收藏都加一次权
+HOT_W_LIKE         = 2.0   # 优先级 4：每个点赞都加一次权
+HOT_W_VIEW         = 1.0   # 优先级 6：浏览最弱信号
+HOT_W_IMAGE        = 1.5   # 优先级 5：带图基础加权（低于单条点赞）
+HOT_RECENCY_BOOST  = 5.0   # 优先级 2：0~5 日内新发布的一次性上浮（高于单条收藏/点赞）
+HOT_RECENCY_DAYS   = 5
 
 
 def _has_image_subquery():
@@ -153,21 +163,40 @@ def _card_hot_score(interactions_expr, created_at_col):
     return (interactions_expr + 1.0) / func.pow(age_hours + 2.0, 1.5)
 
 
-def _order_by_hot(q, image_boost=IMAGE_PRIORITY_BOOST):
-    """按热度排序：先 outerjoin 赞数聚合子查询，再套用时间衰减公式（消除逐行关联子查询）。
+def _order_by_hot(q):
+    """探索页「热门」排序：按业务优先级加权求和（非时间衰减重力模型）。
 
-    image_boost>0 时，对「至少有一张图片」的卡片额外加权，使其优先被推荐。
+    得分 = 评论×6 + 新发布(0~5日)+5 + 收藏×3 + 点赞×2 + 带图+1.5 + 浏览×1
+
+    排序优先级：评论最高、最新发布次之，其后依次为收藏、点赞、带图、浏览。
+    新发布仅「0~5 日内」给一次性上浮（不随时间持续衰减），避免老卡无期限霸榜，
+    也不会让零互动的新卡仅凭新鲜度压过热门（新卡仍需评论/收藏/点赞等信号才靠前）。
     """
-    agg = _likes_agg_subquery()
-    q = q.outerjoin(agg, agg.c.card_id == Card.id)
-    interactions = func.coalesce(Card.view_count, 0) * 1.0 + func.coalesce(agg.c.lc, 0) * 5.0
-    if image_boost:
-        ia = _has_image_subquery()
-        q = q.outerjoin(ia, ia.c.card_id == Card.id)
-        interactions = interactions + case(
-            (ia.c.card_id.isnot(None), image_boost), else_=0
-        )
-    score = _card_hot_score(interactions, Card.created_at)
+    la = _likes_agg_subquery()
+    fa = _favorites_agg_subquery()
+    ca = _comments_agg_subquery()
+    ia = _has_image_subquery()
+    q = q.outerjoin(la, la.c.card_id == Card.id)
+    q = q.outerjoin(fa, fa.c.card_id == Card.id)
+    q = q.outerjoin(ca, ca.c.card_id == Card.id)
+    q = q.outerjoin(ia, ia.c.card_id == Card.id)
+
+    if db.engine.name == "sqlite":
+        age_hours = (func.julianday("now") - func.julianday(Card.created_at)) * 24.0
+    else:
+        age_hours = func.timestampdiff(literal_column("HOUR"), Card.created_at, func.now())
+    recency_boost = case(
+        (age_hours <= HOT_RECENCY_DAYS * 24, HOT_RECENCY_BOOST), else_=0
+    )
+
+    score = (
+        func.coalesce(ca.c.cc, 0) * HOT_W_COMMENT
+        + recency_boost
+        + func.coalesce(fa.c.fc, 0) * HOT_W_FAVORITE
+        + func.coalesce(la.c.lc, 0) * HOT_W_LIKE
+        + case((ia.c.card_id.isnot(None), HOT_W_IMAGE), else_=0)
+        + func.coalesce(Card.view_count, 0) * HOT_W_VIEW
+    )
     return q.order_by(score.desc(), Card.created_at.desc())
 
 
