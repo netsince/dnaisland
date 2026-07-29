@@ -42,10 +42,10 @@ def describe_report_target(target_type: str, raw_id: str):
         if not c:
             return None
         author = c.author
-        card = c.card
+        card = db_get(Card, c.card_id) if c.card_id else None
         return {
             "id": str(c.id),
-            "display": f"{author.nickname if author else '某用户'} 对角色卡《{card.name if card else '?' }》的评论",
+            "display": f"{author.nickname if author else '某用户'} 对角色卡《{card.name if card else '?'}》的评论",
             "url": url_for("user.card_detail", card_id=c.card_id) + f"#comment-{c.id}",
             "snippet": "评论：\n" + (c.content or ""),
         }
@@ -70,10 +70,7 @@ def describe_report_target(target_type: str, raw_id: str):
             "id": str(u.id),
             "display": f"用户 {u.nickname or u.username}",
             "url": url_for("user.profile", username=u.username),
-            "snippet": (
-                f"昵称：{u.nickname}\n性别：{u.gender}\n"
-                f"简介：{u.persona or ''}"
-            ),
+            "snippet": (f"昵称：{u.nickname}\n地区：{u.location or ''}\n简介：{u.bio or ''}"),
         }
 
     return None
@@ -90,8 +87,14 @@ def resolve_report_target(target_type: str, raw_id: str):
 def db_get(model, raw_id):
     from ..extensions import db
 
+    # 主键可能是整数（Comment / TeaPost / User），也可能是字符串 UUID（Card）。
+    # 先尝试按整数解析，失败则退回原始字符串，避免 Card 的 UUID 主键被 int() 拒绝。
     try:
-        return db.session.get(model, int(raw_id))
+        pk = int(raw_id)
+    except (ValueError, TypeError):
+        pk = raw_id
+    try:
+        return db.session.get(model, pk)
     except (ValueError, TypeError):
         return None
 
