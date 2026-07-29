@@ -63,7 +63,7 @@ def article_cover(article_id):
     abort(404)
 
 
-def _random_recommend(limit=10):
+def _random_recommend(limit=12):
     """首页「为你推荐」：随机推荐 limit 张，优先推荐有封面的卡。
 
     取全站可见卡片 id，按「是否有图片」分区，各自打乱后封面卡优先、
@@ -91,7 +91,7 @@ def _random_recommend(limit=10):
 def index():
     # 首页「为你推荐」：随机 10 张，优先有封面的卡；点击「换一换」时 ?fragment=1
     # 仅返回卡片网格片段，由前端无刷新替换，免去整页重载与重复聚合。
-    cards = _random_recommend(10)
+    cards = _random_recommend(12)
     if request.args.get("fragment"):
         return render_template("partials/card_grid_fragment.html", cards=cards)
     return render_template(
