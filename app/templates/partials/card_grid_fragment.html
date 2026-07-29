@@ -1,0 +1,6 @@
+{% from "macros/cards.html" import card_grid, empty_state %}
+{% if cards %}
+{{ card_grid(cards) }}
+{% else %}
+{{ empty_state('还没有公开的角色卡，来发布第一张吧！', '') }}
+{% endif %}

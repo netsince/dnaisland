@@ -29,14 +29,45 @@
 {% endif %}
 
 <div class="d-flex align-items-center justify-content-between mb-3">
- <h2 class="dna-section-title h4 mb-0">热门推荐</h2>
- <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('main.explore') }}">探索</a>
+ <h2 class="dna-section-title h4 mb-0">为你推荐</h2>
+ <div class="d-flex gap-2">
+  <button id="refreshRec" class="btn btn-sm btn-outline-secondary" type="button">换一换</button>
+  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('main.explore') }}">探索</a>
+ </div>
 </div>
 
-{% if pagination.items %}
+<div id="recGrid">
+{% if cards %}
  {{ card_grid(cards) }}
- {{ render_pagination(pagination, 'main.index', args) }}
 {% else %}
  {{ empty_state('还没有公开的角色卡，来发布第一张吧！', '') }}
 {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const btn = document.getElementById('refreshRec');
+  const grid = document.getElementById('recGrid');
+  if (btn && grid) {
+    btn.addEventListener('click', async () => {
+      const old = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = '换一批…';
+      try {
+        const resp = await fetch('{{ url_for('main.index') }}?fragment=1', {
+          headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        });
+        if (resp.ok) {
+          grid.innerHTML = await resp.text();
+        }
+      } catch (e) {
+        // 网络异常静默失败，保留当前列表
+      } finally {
+        btn.disabled = false;
+        btn.textContent = old;
+      }
+    });
+  }
+</script>
 {% endblock %}
