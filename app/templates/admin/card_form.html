@@ -4,7 +4,7 @@
 
 {% block admin_content %}
 <h2 class="h4 mb-3">编辑角色卡 #{{ card.id }}</h2>
-<form method="post" class="col-12 col-lg-8">
+<form method="post" class="col-12 col-lg-8" enctype="multipart/form-data">
   <div class="mb-3">
     <label class="form-label">名称</label>
     <input type="text" class="form-control" name="name" value="{{ card.name }}" required>
@@ -32,6 +32,35 @@
   <div class="mb-3">
     <label class="form-label">标签（逗号分隔）</label>
     <input type="text" class="form-control" name="tags" value="{{ tags }}">
+    <div class="form-text">支持中英文逗号分隔。</div>
+  </div>
+  <div class="mb-3">
+    <label class="form-label">图片</label>
+    <div class="row g-3">
+      {% for slot in ['square', 'landscape', 'portrait'] %}
+      <div class="col-12 col-md-4">
+        <div class="border rounded p-2 h-100">
+          <div class="form-label small">
+            {% if slot == 'square' %}1:1 形象
+            {% elif slot == 'landscape' %}16:9 形象（头图）
+            {% else %}9:16 形象{% endif %}
+          </div>
+          {% if images.get(slot) %}
+          <img class="img-fluid rounded bg-light mb-2" style="min-height:80px;width:100%;object-fit:cover"
+               src="{{ images[slot] }}" alt="{{ slot }}">
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" name="image_remove_{{ slot }}" id="rm-{{ slot }}">
+            <label class="form-check-label" for="rm-{{ slot }}">移除当前图片</label>
+          </div>
+          {% else %}
+          <div class="text-muted small mb-2">暂无图片</div>
+          {% endif %}
+          <input type="file" class="form-control form-control-sm" accept="image/*" name="image_{{ slot }}">
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="form-text">留空则保留原有图片；选择新图片后保存将替换该槽位。</div>
   </div>
   <div class="mb-3">
     <label class="form-label">状态</label>

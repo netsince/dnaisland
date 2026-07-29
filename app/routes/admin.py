@@ -53,7 +53,11 @@ from ..models.punishment import (
     PUNISHMENT_TYPES,
 )
 from ..services.card_service import cascade_delete_card
-from ..services.image_service import compress_image, raw_bytes_to_webp_data_url
+from ..services.image_service import (
+    compress_image,
+    optimize_image_for_export,
+    raw_bytes_to_webp_data_url,
+)
 from ..services.notification_service import notify
 from ..services.report_service import describe_report_target
 from ..services.site_service import get_site_config
@@ -821,15 +825,43 @@ def card_edit(card_id):
         card.intro = request.form.get("intro") or ""
         card.opening = request.form.get("opening") or ""
         card.status = request.form.get("status") or card.status
-        # 标签覆盖式更新
+        # 标签：中文逗号统一转为英文逗号后按逗号拆分、覆盖式更新
+        raw_tags = (request.form.get("tags") or "").replace("，", ",")
         CardTag.query.filter_by(card_id=card.id).delete()
-        for t in [t.strip() for t in (request.form.get("tags") or "").split(",") if t.strip()]:
+        for t in [t.strip() for t in raw_tags.split(",") if t.strip()]:
             db.session.add(CardTag(card_id=card.id, tag=t))
+        # 图片：分槽位替换 / 移除 / 保留
+        existing = {i.slot: i for i in CardImage.query.filter_by(card_id=card.id).all()}
+        for slot in ("square", "landscape", "portrait"):
+            f = request.files.get("image_" + slot)
+            if f and f.filename:
+                raw = f.read()
+                if raw:
+                    old = existing.pop(slot, None)
+                    if old:
+                        db.session.delete(old)
+                    data_uri = raw_bytes_to_webp_data_url(raw, max_edge=1024, quality=80)
+                    db.session.add(
+                        CardImage(
+                            card_id=card.id,
+                            slot=slot,
+                            data=optimize_image_for_export(data_uri),
+                            optimized=True,
+                        )
+                    )
+                    continue
+            if request.form.get("image_remove_" + slot):
+                old = existing.pop(slot, None)
+                if old:
+                    db.session.delete(old)
         db.session.commit()
         flash("角色卡已更新", "success")
         return redirect(url_for("admin.cards"))
     tags = [t.tag for t in CardTag.query.filter_by(card_id=card.id).all()]
-    return render_template("admin/card_form.html", card=card, tags=", ".join(tags))
+    images = {i.slot: i.data for i in CardImage.query.filter_by(card_id=card.id).all()}
+    return render_template(
+        "admin/card_form.html", card=card, tags=", ".join(tags), images=images
+    )
 
 
 @admin_bp.route("/cards/<card_id>/delete", methods=["POST"])

@@ -49,7 +49,7 @@
         <label class="form-label">标签</label>
         <div id="tagChips" class="d-flex flex-wrap gap-2 mb-2"></div>
         <input type="text" class="form-control" id="tagInput"
-               placeholder="输入标签后按回车或逗号添加，例如：温柔、傲娇">
+               placeholder="输入标签后按回车或逗号添加，中英文逗号均可，例如：温柔、傲娇">
         <div class="form-text">点击标签上的 × 可移除。</div>
       </div>
 
@@ -237,7 +237,7 @@
 
   // ---- 标签 chips ----
   let tagsArr = (document.getElementById('tagsInput').value || "")
-    .split(",").map(s => s.trim()).filter(Boolean);
+    .replace(/[，]/g, ",").split(",").map(s => s.trim()).filter(Boolean);
   const tagChips = document.getElementById('tagChips');
   const tagInput = document.getElementById('tagInput');
   function syncTags() {
@@ -262,15 +262,18 @@
     });
   }
   function addTag(raw) {
-    const t = (raw || "").trim();
-    if (!t) return;
-    if (tagsArr.includes(t)) return;
-    tagsArr.push(t);
-    renderTags();
-    syncTags();
+    const parts = (raw || "").split(/[，,]/).map(s => s.trim()).filter(Boolean);
+    parts.forEach(t => {
+      if (!t || tagsArr.includes(t)) return;
+      tagsArr.push(t);
+    });
+    if (parts.length) {
+      renderTags();
+      syncTags();
+    }
   }
   tagInput.addEventListener('keydown', e => {
-    if (e.key === 'Enter' || e.key === ',') {
+    if (e.key === 'Enter' || e.key === ',' || e.key === '，') {
       e.preventDefault();
       addTag(tagInput.value);
       tagInput.value = "";
