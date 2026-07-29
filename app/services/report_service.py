@@ -69,7 +69,7 @@ def describe_report_target(target_type: str, raw_id: str):
         return {
             "id": str(u.id),
             "display": f"用户 {u.nickname or u.username}",
-            "url": url_for("user.user_home", username=u.username),
+            "url": url_for("user.profile", username=u.username),
             "snippet": (
                 f"昵称：{u.nickname}\n性别：{u.gender}\n"
                 f"简介：{u.persona or ''}"
