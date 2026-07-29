@@ -50,12 +50,20 @@
   const btn = document.getElementById('refreshRec');
   const grid = document.getElementById('recGrid');
   if (btn && grid) {
+    // 跨多次「换一换」累积已展示过的 id，回传后端做不重复推荐
+    let shownAll = Array.from(grid.querySelectorAll('.dna-tile[data-id]'))
+      .map(el => el.getAttribute('data-id')).filter(Boolean);
     btn.addEventListener('click', async () => {
       const old = btn.textContent;
       btn.disabled = true;
       btn.textContent = '换一批…';
       try {
-        const resp = await fetch('{{ url_for('main.index') }}?fragment=1', {
+        const shown = Array.from(grid.querySelectorAll('.dna-tile[data-id]'))
+          .map(el => el.getAttribute('data-id')).filter(Boolean);
+        shownAll = shownAll.concat(shown.filter(id => !shownAll.includes(id)));
+        const url = '{{ url_for('main.index') }}?fragment=1'
+          + (shownAll.length ? '&exclude=' + encodeURIComponent(shownAll.join(',')) : '');
+        const resp = await fetch(url, {
           headers: { 'X-Requested-With': 'XMLHttpRequest' },
         });
         if (resp.ok) {

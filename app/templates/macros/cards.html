@@ -16,7 +16,7 @@
  card 需具备 id/name/gender/intro/persona/view_count/status/cover（由 card_service.attach_covers 附加）。
  q：搜索关键词，用于高亮；show_status：是否叠加审核状态角标。 #}
 {% macro card_tile(card, q=None, show_status=False) %}
-<a class="dna-tile" href="{{ url_for('user.card_detail', card_id=card.id) }}">
+<a class="dna-tile" href="{{ url_for('user.card_detail', card_id=card.id) }}" data-id="{{ card.id }}">
  <div class="dna-tile__media">
  {% if card.cover %}
  <img src="{{ url_for('user.card_image', card_id=card.id, slot='square') }}" alt="{{ card.name }}" loading="lazy">

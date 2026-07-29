@@ -1,4 +1,5 @@
 import base64
+import math
 import random
 import time
 from collections import OrderedDict
@@ -37,9 +38,21 @@ HOT_W_COMMENT      = 6.0   # 优先级 1：评论代表讨论度，权重最高
 HOT_W_FAVORITE     = 3.0   # 优先级 3：每个收藏都加一次权
 HOT_W_LIKE         = 2.0   # 优先级 4：每个点赞都加一次权
 HOT_W_VIEW         = 1.0   # 优先级 6：浏览最弱信号
-HOT_W_IMAGE        = 1.5   # 优先级 5：带图基础加权（低于单条点赞）
-HOT_RECENCY_BOOST  = 5.0   # 优先级 2：0~5 日内新发布的一次性上浮（高于单条收藏/点赞）
-HOT_RECENCY_DAYS   = 5
+# 浏览量对数压缩：用 log(1+views) 替代线性 views，削弱「被动累加」的浏览主导
+# （几百次浏览不会再以线性方式碾压互动信号），同时保留「看得多 = 略热门」的弱信号。
+HOT_VIEW_LOG_BASE   = 10.0
+# 带图改为「倍数放大」而非固定加分：带图为 IMG_MULT，无图为 1.0。
+# 这样带图卡的整段互动得分按比例放大，不再被浏览量级淹没（固定 +5 在几百浏览面前无意义）。
+HOT_IMG_MULT        = 1.3   # 带图卡整体得分 ×1.3
+# 探索页「热门」排序的年龄权重曲线（三段式）：
+#   0~5 日  ：上升权重 —— 最新发布的卡权重最高（×1.4），到 5 日时回落到 ×1.0；
+#   6~8 日  ：平稳权重 —— 固定 ×1.0，不增不减；
+#   9 日及以后：下降权重 —— 按半衰期平滑衰减，老卡随时间下沉、前排轮换。
+HOT_RISE_END_DAYS   = 5     # 上升段终点（含）
+HOT_RISE_BOOST      = 0.4   # 上升段额外权重：最新卡 ×(1+0.4)=1.4，线性回落到 5 日时 ×1.0
+HOT_STABLE_END_DAYS = 8     # 平稳段终点（含）；6~8 日权重固定 ×1.0
+HOT_DECAY_START_DAYS = 8    # 下降段起点（>8 日即衰减）
+HOT_DECAY_HALF_DAYS = 7     # 下降段半衰期（天）：每过 7 天权重减半，值越小衰减越快
 
 
 def _has_image_subquery():
@@ -73,35 +86,61 @@ def article_cover(article_id):
     abort(404)
 
 
-def _random_recommend(limit=12):
-    """首页「为你推荐」：随机推荐 limit 张，优先推荐有封面的卡。
+def _random_recommend(limit=12, exclude_ids=None):
+    """首页「为你推荐」：与探索页同款加权得分做加权随机，但保留发现感。
 
-    取全站可见卡片 id，按「是否有图片」分区，各自打乱后封面卡优先、
-    无图卡补充，最终取前 limit 张。点击「换一换」时重新随机一批。
+    - 每张卡用探索同款得分（互动加权 × 三段年龄权重）作为抽样权重，热门卡被抽中概率更高；
+      得分里已含「带图 +1.5」与新鲜度加成，故天然「有图优先」。
+    - 预留 1~2 个名额做「纯随机」均匀抽样，注入偶遇感，避免前排总被热门占据。
+    - exclude_ids 为已展示过的 id（换一换时传入），从候选池剔除，保证不重复。
     """
-    visible_ids = [r[0] for r in Card.visible_to(current_user).with_entities(Card.id).all()]
-    if not visible_ids:
+    exclude = set()
+    if exclude_ids:
+        exclude = {int(x) for x in exclude_ids if str(x).strip().isdigit()}
+
+    q, score_expr = _apply_hot_score(Card.visible_to(current_user))
+    rows = q.with_entities(Card.id, score_expr).all()
+    if not rows:
         return []
-    has_img = {
-        r[0]
-        for r in db.session.query(CardImage.card_id)
-        .group_by(CardImage.card_id)
-        .all()
-    }
-    with_img = [i for i in visible_ids if i in has_img]
-    no_img = [i for i in visible_ids if i not in has_img]
-    random.shuffle(with_img)
-    random.shuffle(no_img)
-    chosen = (with_img + no_img)[:limit]
-    fetched = {c.id: c for c in Card.query.filter(Card.id.in_(chosen)).all()}
-    return attach_covers([fetched[cid] for cid in chosen if cid in fetched])
+
+    score_map = {}
+    for cid, s in rows:
+        try:
+            score_map[cid] = float(s) if s is not None else 0.0
+        except (TypeError, ValueError):
+            score_map[cid] = 0.0
+
+    pool = [cid for cid in score_map if cid not in exclude] or list(score_map.keys())
+
+    # 纯随机保底名额：1~2 个；其余按得分加权无放回抽样
+    pure = min(random.randint(1, 2), max(0, limit - 1))
+    weighted_n = max(0, limit - pure)
+
+    chosen = []
+    avail = list(pool)
+    while len(chosen) < weighted_n and avail:
+        weights = [max(score_map[c], 0.0) for c in avail]
+        if sum(weights) <= 0:
+            break
+        pick = random.choices(avail, weights=weights, k=1)[0]
+        chosen.append(pick)
+        avail.remove(pick)
+
+    pure_picks = random.sample(avail, min(pure, len(avail))) if pure and avail else []
+    result_ids = chosen + pure_picks
+    random.shuffle(result_ids)
+
+    fetched = {c.id: c for c in Card.query.filter(Card.id.in_(result_ids)).all()}
+    return attach_covers([fetched[cid] for cid in result_ids if cid in fetched])
 
 
 @main_bp.route("/")
 def index():
-    # 首页「为你推荐」：随机 10 张，优先有封面的卡；点击「换一换」时 ?fragment=1
-    # 仅返回卡片网格片段，由前端无刷新替换，免去整页重载与重复聚合。
-    cards = _random_recommend(12)
+    # 首页「为你推荐」：与探索同款加权随机 12 张（保留 1~2 纯随机名额）；
+    # 点击「换一换」时 ?fragment=1 仅返回卡片网格片段，并带 ?exclude=已展示id 避免重复。
+    exclude = request.args.get("exclude")
+    exclude_ids = exclude.split(",") if exclude else None
+    cards = _random_recommend(12, exclude_ids)
     if request.args.get("fragment"):
         return render_template("partials/card_grid_fragment.html", cards=cards)
     return render_template(
@@ -163,14 +202,12 @@ def _card_hot_score(interactions_expr, created_at_col):
     return (interactions_expr + 1.0) / func.pow(age_hours + 2.0, 1.5)
 
 
-def _order_by_hot(q):
-    """探索页「热门」排序：按业务优先级加权求和（非时间衰减重力模型）。
+def _apply_hot_score(q):
+    """对查询 q 做探索热度所需的 outerjoin，并返回 (q, score_expr)。
 
-    得分 = 评论×6 + 新发布(0~5日)+5 + 收藏×3 + 点赞×2 + 带图+1.5 + 浏览×1
-
-    排序优先级：评论最高、最新发布次之，其后依次为收藏、点赞、带图、浏览。
-    新发布仅「0~5 日内」给一次性上浮（不随时间持续衰减），避免老卡无期限霸榜，
-    也不会让零互动的新卡仅凭新鲜度压过热门（新卡仍需评论/收藏/点赞等信号才靠前）。
+    score_expr 与探索页排序同款：互动加权（评论6/收藏3/点赞2/带图1.5/浏览1）× 三段年龄权重
+    （0~5日上升、6~8日平稳、9日+下降）。供 `_order_by_hot` 排序与首页加权随机复用，确保
+    两处推荐口径一致。
     """
     la = _likes_agg_subquery()
     fa = _favorites_agg_subquery()
@@ -185,18 +222,44 @@ def _order_by_hot(q):
         age_hours = (func.julianday("now") - func.julianday(Card.created_at)) * 24.0
     else:
         age_hours = func.timestampdiff(literal_column("HOUR"), Card.created_at, func.now())
-    recency_boost = case(
-        (age_hours <= HOT_RECENCY_DAYS * 24, HOT_RECENCY_BOOST), else_=0
+    age_days = age_hours / 24.0
+
+    # 三段式年龄权重：
+    #   0~5 日  → 上升：1 + boost * (5 - age)/5，最新 ×1.4 线性回落到 ×1.0
+    #   6~8 日  → 平稳：×1.0
+    #   >8 日   → 下降：0.5^((age-8)/半衰期)，平滑衰减
+    age_factor = case(
+        (age_days <= HOT_RISE_END_DAYS,
+         1.0 + HOT_RISE_BOOST * (HOT_RISE_END_DAYS - age_days) / HOT_RISE_END_DAYS),
+        (age_days <= HOT_STABLE_END_DAYS, 1.0),
+        else_=func.pow(
+            literal_column("0.5"),
+            (age_days - HOT_DECAY_START_DAYS) / HOT_DECAY_HALF_DAYS,
+        ),
     )
 
-    score = (
+    # 浏览量对数压缩：log(1+views)/log(base)，几百次浏览也只贡献个位数量级，
+    # 不再以线性方式碾压互动信号。
+    view_term = func.log(
+        func.coalesce(Card.view_count, 0) + 1.0
+    ) / math.log(HOT_VIEW_LOG_BASE)
+
+    engagement = (
         func.coalesce(ca.c.cc, 0) * HOT_W_COMMENT
-        + recency_boost
         + func.coalesce(fa.c.fc, 0) * HOT_W_FAVORITE
         + func.coalesce(la.c.lc, 0) * HOT_W_LIKE
-        + case((ia.c.card_id.isnot(None), HOT_W_IMAGE), else_=0)
-        + func.coalesce(Card.view_count, 0) * HOT_W_VIEW
+        + view_term * HOT_W_VIEW
     )
+    # 带图倍数放大：带图卡整体互动得分 ×HOT_IMG_MULT，无图 ×1.0，
+    # 让带图的优势按整卡规模生效，而非被浏览量淹没的固定加分。
+    img_mult = case((ia.c.card_id.isnot(None), HOT_IMG_MULT), else_=1.0)
+    score = engagement * img_mult * age_factor
+    return q, score
+
+
+def _order_by_hot(q):
+    """探索页「热门」排序：按与首页同款的加权得分降序。"""
+    q, score = _apply_hot_score(q)
     return q.order_by(score.desc(), Card.created_at.desc())
 
 

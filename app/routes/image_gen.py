@@ -107,7 +107,14 @@ def reference_image(log_id, idx):
     refs = log.reference_image_list()
     if idx < 0 or idx >= len(refs):
         abort(404)
-    return _serve_webp_from_data_url(refs[idx])
+    ref = refs[idx]
+    # 参考图在库中存为 dict（filename/mimetype/data_b64），而非 data URL 字符串；
+    # 统一规范成 data URL 再转 WEBP 发送（兼容历史上可能存在的纯字符串格式）。
+    if isinstance(ref, dict):
+        ref = "data:{};base64,{}".format(
+            ref.get("mimetype") or "image/png", ref.get("data_b64") or ""
+        )
+    return _serve_webp_from_data_url(ref)
 
 
 @image_gen_bp.route("/generate", methods=["POST"])
