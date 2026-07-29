@@ -1240,13 +1240,8 @@ body.is-mobile-plus-open #mobilePlusBtn span {
     padding: 1rem !important;
   }
   .dna-profile-tabs {
-    position: sticky;
-    top: 52px;
-    z-index: 1020;
-    background: var(--dna-bg-2);
+    /* 取消吸顶：改为正常文档流，随页面一起滚动，滚出视口即不可见 */
     padding-top: 6px;
-    margin-inline: -10px;
-    padding-inline: 10px;
     border-bottom: 1px solid var(--dna-border);
   }
 }
