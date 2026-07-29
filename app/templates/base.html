@@ -79,6 +79,12 @@ function showToast(message, type) {
 <button class="btn btn-link nav-link p-1 text-muted d-flex align-items-center" id="globalSearchTriggerMobile" type="button" aria-label="展开搜索" title="搜索">
 <i class="bi bi-search fs-5"></i>
 </button>
+{% if current_user.is_authenticated %}
+<a class="btn btn-link nav-link p-1 text-muted d-flex align-items-center position-relative" href="{{ url_for('user.notifications') }}" aria-label="通知" title="通知">
+<i class="bi bi-bell fs-5"></i>
+{% if unread_notifications %}<span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size:.55rem;">{{ unread_notifications }}</span>{% endif %}
+</a>
+{% endif %}
 <button class="btn btn-link nav-link p-1" type="button" data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-label="功能菜单" title="功能菜单">
 <i class="bi bi-list fs-5"></i>
 </button>
@@ -118,6 +124,14 @@ function showToast(message, type) {
  <i class="bi bi-search"></i>
  </button>
  </li>
+{% if current_user.is_authenticated %}
+<li class="nav-item">
+ <a class="nav-link position-relative px-2" href="{{ url_for('user.notifications') }}" aria-label="通知" title="通知">
+ <i class="bi bi-bell"></i>
+ {% if unread_notifications %}<span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size:.6rem;padding:.2em .4em;">{{ unread_notifications }}</span>{% endif %}
+ </a>
+</li>
+{% endif %}
 <li class="nav-item d-lg-none">
 <button class="btn btn-link nav-link px-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-label="功能菜单" title="功能菜单">
 <i class="bi bi-list"></i>
