@@ -1,0 +1,228 @@
+F401 [*] `..services.card_service.attach_covers` imported but unused
+  --> app\routes\api.py:39:37
+   |
+37 | from ..routes.main import _random_recommend
+38 | from ..routes.teahouse import _visible_query as _teahouse_visible_query
+39 | from ..services.card_service import attach_covers, load_card_images
+   |                                     ^^^^^^^^^^^^^
+40 | from ..services.notification_service import mark_all_read, unread_count
+41 | from ..utils import get_user_by_username, toggle_relation
+   |
+help: Remove unused import
+   |
+38 | from ..routes.teahouse import _visible_query as _teahouse_visible_query
+   - from ..services.card_service import attach_covers, load_card_images
+39 | from ..services.notification_service import mark_all_read, unread_count
+   |
+
+F401 [*] `..services.card_service.load_card_images` imported but unused
+  --> app\routes\api.py:39:52
+   |
+37 | from ..routes.main import _random_recommend
+38 | from ..routes.teahouse import _visible_query as _teahouse_visible_query
+39 | from ..services.card_service import attach_covers, load_card_images
+   |                                                    ^^^^^^^^^^^^^^^^
+40 | from ..services.notification_service import mark_all_read, unread_count
+41 | from ..utils import get_user_by_username, toggle_relation
+   |
+help: Remove unused import
+   |
+38 | from ..routes.teahouse import _visible_query as _teahouse_visible_query
+   - from ..services.card_service import attach_covers, load_card_images
+39 | from ..services.notification_service import mark_all_read, unread_count
+   |
+
+F823 Local variable `CommentLike` referenced before assignment
+   --> app\routes\api.py:450:17
+    |
+448 |     like_count_sub = (
+449 |         db.session.query(func.count().label("lc"))
+450 |         .filter(CommentLike.comment_id == Comment.id)
+    |                 ^^^^^^^^^^^
+451 |         .scalar_subquery()
+452 |     )
+    |
+
+F401 [*] `..decorators.block_if_muted` imported but unused
+   --> app\routes\api.py:495:30
+    |
+493 | def cards_comment_post(card_id):
+494 |     """发表评论。"""
+495 |     from ..decorators import block_if_muted
+    |                              ^^^^^^^^^^^^^^
+496 |     from ..services.sticker_service import sanitize_stickers
+    |
+help: Remove unused import: `..decorators.block_if_muted`
+    |
+494 |     """发表评论。"""
+    -     from ..decorators import block_if_muted
+495 |     from ..services.sticker_service import sanitize_stickers
+    |
+
+I001 [*] Import block is un-sorted or un-formatted
+   --> app\routes\api.py:739:5
+    |
+737 |   @api_login_required
+738 |   def teahouse_create_post():
+739 | /     from ..decorators import block_if_muted
+740 | |     from ..routes.teahouse import _too_frequent, _set_single_topic, _notify_mentions, _resolve_card, TEA_POST_MAX_LEN
+741 | |     from ..services.sticker_service import sanitize_stickers
+    | |____________________________________________________________^
+742 |
+743 |       if getattr(_ensure_self(), "is_muted", False):
+    |
+help: Organize imports
+    |
+739 |     from ..decorators import block_if_muted
+    -     from ..routes.teahouse import _too_frequent, _set_single_topic, _notify_mentions, _resolve_card, TEA_POST_MAX_LEN
+740 +     from ..routes.teahouse import (
+741 +         TEA_POST_MAX_LEN,
+742 +         _notify_mentions,
+743 +         _resolve_card,
+744 +         _set_single_topic,
+745 +         _too_frequent,
+746 +     )
+747 |     from ..services.sticker_service import sanitize_stickers
+    |
+
+F401 [*] `..decorators.block_if_muted` imported but unused
+   --> app\routes\api.py:739:30
+    |
+737 | @api_login_required
+738 | def teahouse_create_post():
+739 |     from ..decorators import block_if_muted
+    |                              ^^^^^^^^^^^^^^
+740 |     from ..routes.teahouse import _too_frequent, _set_single_topic, _notify_mentions, _resolve_card, TEA_POST_MAX_LEN
+741 |     from ..services.sticker_service import sanitize_stickers
+    |
+help: Remove unused import: `..decorators.block_if_muted`
+    |
+738 | def teahouse_create_post():
+    -     from ..decorators import block_if_muted
+739 |     from ..routes.teahouse import _too_frequent, _set_single_topic, _notify_mentions, _resolve_card, TEA_POST_MAX_LEN
+    |
+
+I001 [*] Import block is un-sorted or un-formatted
+   --> app\routes\api.py:776:5
+    |
+774 | @api_bp.route("/teahouse/posts/<int:post_id>", methods=["GET"])
+775 | def teahouse_post_detail(post_id):
+776 |     from ..routes.teahouse import _require_visible_post, _build_stats, _order_by_teahouse_hot
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+777 |
+778 |     p = _require_visible_post(post_id)
+    |
+help: Organize imports
+    |
+775 | def teahouse_post_detail(post_id):
+    -     from ..routes.teahouse import _require_visible_post, _build_stats, _order_by_teahouse_hot
+776 +     from ..routes.teahouse import _build_stats, _order_by_teahouse_hot, _require_visible_post
+777 |
+    |
+
+F841 Local variable `root` is assigned to but never used
+   --> app\routes\api.py:786:5
+    |
+784 |         node = node.parent
+785 |     chain.reverse()
+786 |     root = chain[0] if chain else p
+    |     ^^^^
+787 |     page = request.args.get("page", 1, type=int)
+788 |     sort = request.args.get("sort", "hot")
+    |
+help: Remove assignment to unused variable `root`
+
+I001 [*] Import block is un-sorted or un-formatted
+   --> app\routes\api.py:813:5
+    |
+811 |   @api_login_required
+812 |   def teahouse_reply(post_id):
+813 | /     from ..decorators import block_if_muted
+814 | |     from ..routes.teahouse import (
+815 | |         _require_visible_post, _too_frequent, _set_single_topic, _attach_images,
+816 | |         _notify_mentions, _resolve_card, TEA_POST_MAX_LEN,
+817 | |     )
+818 | |     from ..services.sticker_service import sanitize_stickers
+819 | |     from ..services.notification_service import notify
+    | |______________________________________________________^
+820 |
+821 |       if getattr(_ensure_self(), "is_muted", False):
+    |
+help: Organize imports
+    |
+814 |     from ..routes.teahouse import (
+    -         _require_visible_post, _too_frequent, _set_single_topic, _attach_images,
+    -         _notify_mentions, _resolve_card, TEA_POST_MAX_LEN,
+815 +         TEA_POST_MAX_LEN,
+816 +         _attach_images,
+817 +         _notify_mentions,
+818 +         _require_visible_post,
+819 +         _resolve_card,
+820 +         _set_single_topic,
+821 +         _too_frequent,
+822 |     )
+823 +     from ..services.notification_service import notify
+824 |     from ..services.sticker_service import sanitize_stickers
+    -     from ..services.notification_service import notify
+825 |
+    |
+
+F401 [*] `..decorators.block_if_muted` imported but unused
+   --> app\routes\api.py:813:30
+    |
+811 | @api_login_required
+812 | def teahouse_reply(post_id):
+813 |     from ..decorators import block_if_muted
+    |                              ^^^^^^^^^^^^^^
+814 |     from ..routes.teahouse import (
+815 |         _require_visible_post, _too_frequent, _set_single_topic, _attach_images,
+    |
+help: Remove unused import: `..decorators.block_if_muted`
+    |
+812 | def teahouse_reply(post_id):
+    -     from ..decorators import block_if_muted
+813 |     from ..routes.teahouse import (
+    |
+
+F401 [*] `..routes.teahouse._attach_images` imported but unused
+   --> app\routes\api.py:815:66
+    |
+813 |     from ..decorators import block_if_muted
+814 |     from ..routes.teahouse import (
+815 |         _require_visible_post, _too_frequent, _set_single_topic, _attach_images,
+    |                                                                  ^^^^^^^^^^^^^^
+816 |         _notify_mentions, _resolve_card, TEA_POST_MAX_LEN,
+817 |     )
+    |
+help: Remove unused import: `..routes.teahouse._attach_images`
+    |
+814 |     from ..routes.teahouse import (
+    -         _require_visible_post, _too_frequent, _set_single_topic, _attach_images,
+    -         _notify_mentions, _resolve_card, TEA_POST_MAX_LEN,
+815 +         _require_visible_post, _too_frequent, _set_single_topic, _notify_mentions, _resolve_card, TEA_POST_MAX_LEN,
+816 |     )
+    |
+
+I001 [*] Import block is un-sorted or un-formatted
+   --> app\routes\api.py:917:5
+    |
+915 |   @api_login_required
+916 |   def points_redeem():
+917 | /     from ..routes.points import redeem_allowed, record_redeem, MAX_KEYS_PER_REQUEST
+918 | |     from ..models import RedemptionKey, KeyUsageLog
+    | |___________________________________________________^
+919 |
+920 |       data = request.get_json(silent=True) or {}
+    |
+help: Organize imports
+    |
+916 | def points_redeem():
+    -     from ..routes.points import redeem_allowed, record_redeem, MAX_KEYS_PER_REQUEST
+    -     from ..models import RedemptionKey, KeyUsageLog
+917 +     from ..models import KeyUsageLog, RedemptionKey
+918 +     from ..routes.points import MAX_KEYS_PER_REQUEST, record_redeem, redeem_allowed
+919 |
+    |
+
+Found 12 errors.
+[*] 10 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).

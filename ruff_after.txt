@@ -1,0 +1,25 @@
+F823 Local variable `CommentLike` referenced before assignment
+   --> app\routes\api.py:449:17
+    |
+447 |     like_count_sub = (
+448 |         db.session.query(func.count().label("lc"))
+449 |         .filter(CommentLike.comment_id == Comment.id)
+    |                 ^^^^^^^^^^^
+450 |         .scalar_subquery()
+451 |     )
+    |
+
+F841 Local variable `root` is assigned to but never used
+   --> app\routes\api.py:789:5
+    |
+787 |         node = node.parent
+788 |     chain.reverse()
+789 |     root = chain[0] if chain else p
+    |     ^^^^
+790 |     page = request.args.get("page", 1, type=int)
+791 |     sort = request.args.get("sort", "hot")
+    |
+help: Remove assignment to unused variable `root`
+
+Found 2 errors.
+No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).

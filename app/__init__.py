@@ -65,8 +65,13 @@ def create_app(config_object=None):
 
     app.jinja_env.globals["teapost_visible"] = _teapost_visible
 
+    from flask_cors import CORS
+
+    CORS(app, resources={r"/api/*": {"origins": "*"}})
+
     from .routes import (
         admin_bp,
+        api_bp,
         auth_bp,
         image_gen_bp,
         main_bp,
@@ -88,6 +93,7 @@ def create_app(config_object=None):
     app.register_blueprint(points_bp)
     app.register_blueprint(image_gen_bp)
     app.register_blueprint(sticker_bp)
+    app.register_blueprint(api_bp)
 
     from .commands import init_commands
 
