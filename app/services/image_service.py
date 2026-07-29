@@ -108,7 +108,7 @@ def data_url_to_webp_bytes(data_url: str, max_edge: int = 1024, quality: int = 8
     发送；非 WebP 才触发 PIL 重编码。结果按 (data_url, max_edge, quality) 缓存，
     避免每次 HTTP GET 都重复解码/重编码。
     """
-    key = hashlib.sha1(f"{max_edge}|{quality}|{data_url}".encode("utf-8")).hexdigest()
+    key = hashlib.sha1(f"{max_edge}|{quality}|{data_url}".encode()).hexdigest()
     cached = _WEBP_CACHE.get(key)
     now = time.time()
     if cached is not None and now - cached[1] < _WEBP_CACHE_TTL:

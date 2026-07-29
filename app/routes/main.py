@@ -8,8 +8,6 @@ from flask import Blueprint, abort, jsonify, render_template, request, send_file
 from flask_login import current_user
 from sqlalchemy import case, func, literal_column, or_
 
-from ..paging import IdListPagination
-
 from ..extensions import db
 from ..models import (
     Article,
@@ -23,6 +21,7 @@ from ..models import (
     User,
 )
 from ..models.teahouse import TeaPost
+from ..paging import IdListPagination
 from ..services.card_service import attach_covers, popular_tags
 from ..services.image_service import send_webp
 
@@ -73,12 +72,12 @@ def _random_recommend(limit=10):
     visible_ids = [r[0] for r in Card.visible_to(current_user).with_entities(Card.id).all()]
     if not visible_ids:
         return []
-    has_img = set(
+    has_img = {
         r[0]
         for r in db.session.query(CardImage.card_id)
         .group_by(CardImage.card_id)
         .all()
-    )
+    }
     with_img = [i for i in visible_ids if i in has_img]
     no_img = [i for i in visible_ids if i not in has_img]
     random.shuffle(with_img)
@@ -424,10 +423,7 @@ def explore():
         pagination = _paginate_hot_cards(_base, signature, _order_by_hot, page, 24)
         cards = attach_covers(pagination.items)
     else:
-        if sort == "new":
-            q = q.order_by(Card.created_at.desc())
-        else:  # likes：复用赞数聚合子查询，避免逐行关联子查询
-            q = _order_by_likes(q)
+        q = q.order_by(Card.created_at.desc()) if sort == "new" else _order_by_likes(q)
         if tag:
             q = q.distinct()
         pagination = q.paginate(page=page, per_page=24, error_out=False)
