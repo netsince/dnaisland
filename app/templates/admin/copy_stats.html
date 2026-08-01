@@ -1,0 +1,73 @@
+{% extends "admin/base.html" %}
+{% from "macros/pagination.html" import render_pagination %}
+
+{% block title %}角色卡复制统计 · DNAISLAND{% endblock %}
+
+{% block admin_content %}
+<h2 class="h4 mb-3">角色卡复制统计</h2>
+
+<div class="row g-3 mb-3">
+  <div class="col-6 col-md-3">
+    <div class="border rounded p-3 text-center">
+      <div class="h3 mb-0">{{ total }}</div>
+      <div class="small text-muted">总复制次数</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="border rounded p-3 text-center">
+      <div class="h3 mb-0">{{ cards_copied }}</div>
+      <div class="small text-muted">被复制角色卡数</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="border rounded p-3 text-center">
+      <div class="h3 mb-0">{{ users_copied }}</div>
+      <div class="small text-muted">复制用户数</div>
+    </div>
+  </div>
+</div>
+
+<form class="row g-2 mb-3" method="get">
+  <div class="col-auto flex-grow-1">
+    <input type="text" class="form-control" name="q" value="{{ q }}"
+           placeholder="按角色卡名称或复制者用户名搜索">
+  </div>
+  <div class="col-auto">
+    <button type="submit" class="btn btn-primary">搜索</button>
+  </div>
+</form>
+
+{% if stats %}
+<div class="table-responsive">
+  <table class="table table-hover align-middle">
+    <thead>
+      <tr>
+        <th>角色卡</th>
+        <th>复制者</th>
+        <th>来源 IP</th>
+        <th>复制时间</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in stats %}
+      <tr>
+        <td>
+          <a href="{{ url_for('user.card_detail', card_id=s.card_id) }}">{{ s.card_name }}</a>
+          <div class="small text-muted">ID: {{ s.card_id }}</div>
+        </td>
+        <td>
+          {{ s.username }}
+          <div class="small text-muted">UID: {{ s.user_id }}</div>
+        </td>
+        <td class="small text-muted">{{ s.copier_ip or '—' }}</td>
+        <td class="small text-muted">{{ s.copied_at|cst }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{{ render_pagination(pagination, 'admin.copy_stats', {'q': q}) }}
+{% else %}
+<p class="text-muted">暂无复制记录。</p>
+{% endif %}
+{% endblock %}

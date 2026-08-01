@@ -1,5 +1,6 @@
 from .card import (
     Card,
+    CardCopyStat,
     CardDialogueStyle,
     CardFavorite,
     CardImage,
@@ -38,6 +39,7 @@ __all__ = [
     "CardImage",
     "CardLike",
     "CardFavorite",
+    "CardCopyStat",
     "Comment",
     "CommentLike",
     "Notification",

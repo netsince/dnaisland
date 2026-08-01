@@ -64,6 +64,10 @@
                href="{{ url_for('admin.image_logs') }}">生图记录</a>
           </li>
           <li class="nav-item">
+            <a class="nav-link {% if request.endpoint == 'admin.copy_stats' %}active{% endif %}"
+               href="{{ url_for('admin.copy_stats') }}">复制统计</a>
+          </li>
+          <li class="nav-item">
             <a class="nav-link {% if request.endpoint == 'admin.stickers' %}active{% endif %}"
                href="{{ url_for('admin.stickers') }}">表情包</a>
           </li>

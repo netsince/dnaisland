@@ -23,6 +23,7 @@ from ..extensions import db
 from ..models import (
     Article,
     Card,
+    CardCopyStat,
     CardDialogueStyle,
     CardImage,
     CardTag,
@@ -650,6 +651,42 @@ def image_logs():
         log.nickname = users_map.get(log.user_id, f"UID{log.user_id}")
     return render_template(
         "admin/image_logs.html", pagination=pagination, logs=logs
+    )
+
+
+@admin_bp.route("/copy-stats")
+@super_admin_required
+def copy_stats():
+    """角色卡复制统计：可按角色卡名 / 复制者用户名筛选，按复制时间倒序。"""
+    q = request.args.get("q", "").strip()
+    query = CardCopyStat.query
+    if q:
+        like = f"%{q}%"
+        query = query.filter(
+            db.or_(CardCopyStat.card_name.like(like), CardCopyStat.username.like(like))
+        )
+    page = request.args.get("page", 1, type=int)
+    pagination = query.order_by(CardCopyStat.copied_at.desc()).paginate(
+        page=page, per_page=30, error_out=False
+    )
+    # 概览统计：总复制次数、去重角色卡数、去重复制用户数
+    total = db.session.query(func.count(CardCopyStat.id)).scalar() or 0
+    cards_copied = (
+        db.session.query(func.count(db.func.distinct(CardCopyStat.card_id))).scalar()
+        or 0
+    )
+    users_copied = (
+        db.session.query(func.count(db.func.distinct(CardCopyStat.user_id))).scalar()
+        or 0
+    )
+    return render_template(
+        "admin/copy_stats.html",
+        pagination=pagination,
+        stats=pagination.items,
+        total=total,
+        cards_copied=cards_copied,
+        users_copied=users_copied,
+        q=q,
     )
 
 

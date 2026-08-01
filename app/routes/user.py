@@ -29,6 +29,7 @@ from ..models import (
     CardImage,
     CardLike,
     CardTag,
+    CardCopyStat,
     Comment,
     CommentLike,
     Notification,
@@ -494,6 +495,23 @@ def card_export(card_id):
         copier_ip=copier_ip,
         platform_domain=origin,
     )
+    # 记录复制统计（复制了哪张卡、谁复制的、什么时候、来源 IP）
+    # 失败不应影响正常的复制导出流程
+    try:
+        db.session.add(
+            CardCopyStat(
+                card_id=card.id,
+                card_name=card.name,
+                user_id=current_user.id,
+                username=current_user.username,
+                copier_ip=copier_ip,
+            )
+        )
+        db.session.commit()
+    except Exception as exc:  # noqa: BLE001
+        db.session.rollback()
+        current_app.logger.warning("记录角色卡复制统计失败: %s", exc)
+
     # 紧凑 JSON：复制到剪贴板时不带缩进，显著减小体积，避免浏览器写入剪贴板失败
     body = json.dumps(package, ensure_ascii=False, separators=(",", ":"))
     resp = make_response(body)

@@ -124,6 +124,37 @@ class CardFavorite(db.Model):
     created_at = db.Column(db.DateTime, server_default=db.func.now())
 
 
+class CardCopyStat(db.Model):
+    """角色卡复制（导出）统计。
+
+    每次用户点击「复制角色卡」触发 card_export 时写入一条记录，
+    记录复制了哪张卡、谁复制的、复制时间以及复制者 IP（用于版权溯源）。
+    用户名与卡名均做快照存储，即使后续改名/删卡也能追溯当时信息。
+    """
+
+    __tablename__ = "card_copy_stats"
+
+    id = db.Column(db.Integer, primary_key=True)
+    card_id = db.Column(
+        db.String(36), db.ForeignKey("cards.id"), nullable=False, index=True
+    )
+    # 角色卡名称快照（复制时的名称，后续改名不影响历史记录）
+    card_name = db.Column(db.String(120), nullable=False, server_default="")
+    user_id = db.Column(
+        db.Integer, db.ForeignKey("users.id"), nullable=False, index=True
+    )
+    # 复制者用户名快照
+    username = db.Column(db.String(120), nullable=False, server_default="")
+    copied_at = db.Column(
+        db.DateTime, server_default=db.func.now(), nullable=False, index=True
+    )
+    # 复制者来源 IP，用于版权溯源
+    copier_ip = db.Column(db.String(64), nullable=True)
+
+    user = db.relationship("User", backref="card_copy_stats")
+    card = db.relationship("Card", backref="copy_stats")
+
+
 class CommentLike(db.Model):
     __tablename__ = "comment_likes"
 
