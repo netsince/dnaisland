@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% from "macros/cards.html" import card_tile %}
+
+{% block title %}站长推荐 · DNAISLAND{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <h1 class="h3 mb-1">站长推荐</h1>
+  <p class="text-muted">由站长精选的优质角色卡与创作者，欢迎围观～</p>
+
+  {% if not card_items and not user_items %}
+    <div class="alert alert-info mt-3">暂无推荐内容。</div>
+  {% endif %}
+
+  {% if card_items %}
+    <h2 class="h5 mt-4 mb-3">推荐角色卡</h2>
+    <div class="row g-2 g-md-3 dna-explore-grid mb-4">
+      {% for item in card_items %}
+        <div class="col-6 col-sm-4 col-md-3 col-lg-2">
+          {{ card_tile(item.card) }}
+          {% if item.note %}
+            <div class="small text-muted mt-1">{{ item.note }}</div>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  {% if user_items %}
+    <h2 class="h5 mt-4 mb-3">推荐创作者</h2>
+    <div class="row g-2 g-md-3">
+      {% for item in user_items %}
+        <div class="col-6 col-sm-4 col-md-3 col-lg-2">
+          <a class="dna-tile text-decoration-none" href="{{ url_for('user.profile', user_id=item.user.id) }}">
+            <div class="dna-tile__media">
+              <img src="{{ url_for('user.avatar', user_id=item.user.id) }}"
+                   alt="{{ item.user.nickname or item.user.username }}" loading="lazy">
+            </div>
+            <div class="dna-tile__body">
+              <div class="dna-tile__name">{{ item.user.nickname or item.user.username }}</div>
+              <div class="dna-tile__meta">@{{ item.user.username }}</div>
+            </div>
+          </a>
+          {% if item.note %}
+            <div class="small text-muted mt-1">{{ item.note }}</div>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

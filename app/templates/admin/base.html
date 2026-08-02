@@ -75,6 +75,10 @@
             <a class="nav-link {% if request.endpoint == 'admin.system_config' %}active{% endif %}"
                href="{{ url_for('admin.system_config') }}">系统配置</a>
           </li>
+          <li class="nav-item">
+            <a class="nav-link {% if request.endpoint.startswith('admin.recommend') %}active{% endif %}"
+               href="{{ url_for('admin.recommend') }}">站长推荐</a>
+          </li>
         </ul>
       </div>
     </nav>

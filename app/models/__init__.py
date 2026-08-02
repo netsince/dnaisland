@@ -13,6 +13,7 @@ from .image_gen import GenerationLog, GenerationModel, GenerationTask
 from .notification import Notification
 from .points import KeyUsageLog, PointTransaction, RedemptionKey
 from .punishment import Punishment
+from .recommendation import SiteRecommendation
 from .report import Report
 from .site import Article, SiteConfig
 from .sticker import Sticker, StickerSeries
@@ -44,6 +45,7 @@ __all__ = [
     "CommentLike",
     "Notification",
     "Punishment",
+    "SiteRecommendation",
     "Report",
     "SiteConfig",
     "Article",

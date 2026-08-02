@@ -19,6 +19,7 @@ from ..models import (
     CardTag,
     Comment,
     Punishment,
+    SiteRecommendation,
     User,
 )
 from ..models.teahouse import TeaPost
@@ -146,6 +147,41 @@ def index():
     return render_template(
         "index.html",
         cards=cards,
+    )
+
+
+@main_bp.route("/recommend")
+def recommendations():
+    """站长板块（站长推荐）。仅展示仍有效的推荐项：
+    - 角色卡需处于「已通过审核」且未隐藏；
+    - 用户需状态正常、非管理员且无生效处罚。
+    """
+    recs = SiteRecommendation.query.order_by(
+        SiteRecommendation.sort_order, SiteRecommendation.created_at
+    ).all()
+    card_items = []
+    user_items = []
+    for r in recs:
+        if r.kind == "card":
+            c = db.session.get(Card, r.ref_id)
+            if c and c.status == "approved" and not c.is_hidden:
+                card_items.append({"card": c, "note": r.note})
+        elif r.kind == "user":
+            if str(r.ref_id).isdigit():
+                u = db.session.get(User, int(r.ref_id))
+                if (
+                    u
+                    and u.status == "active"
+                    and u.role != "super_admin"
+                    and not u.active_punishments
+                ):
+                    user_items.append({"user": u, "note": r.note})
+    cards = [ci["card"] for ci in card_items]
+    attach_covers(cards)
+    return render_template(
+        "recommend/index.html",
+        card_items=card_items,
+        user_items=user_items,
     )
 
 

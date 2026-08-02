@@ -1,0 +1,127 @@
+{% extends "admin/base.html" %}
+{% block admin_content %}
+<h2 class="h4 mb-3">站长推荐（站长板块）</h2>
+<p class="text-muted">
+  挑选「已通过审核的角色卡」或「未被处罚的普通用户」加入推荐位。
+  可手动粘贴 ID，也可使用下方快速选择器搜索后点选。
+</p>
+
+<form method="post" action="{{ url_for('admin.recommend_add') }}" class="card card-body mb-4">
+  <div class="row g-3">
+    <div class="col-md-3">
+      <label class="form-label">推荐类型</label>
+      <select class="form-select" id="rec-kind" name="kind">
+        <option value="card">角色卡</option>
+        <option value="user">用户</option>
+      </select>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">ID / UID</label>
+      <input type="text" class="form-control" id="ref_id" name="ref_id"
+             placeholder="可直接粘贴角色卡 ID 或用户 UID">
+      <div class="form-text" id="rec-selected"></div>
+    </div>
+    <div class="col-md-5">
+      <label class="form-label">快速选择器（仅显示可选对象）</label>
+      <input type="text" class="form-control" id="rec-search" autocomplete="off"
+             placeholder="输入名称搜索…">
+      <div id="rec-results" class="list-group mt-1" style="position:relative;z-index:20;"></div>
+    </div>
+    <div class="col-12">
+      <label class="form-label">推荐语（可选，最多 200 字）</label>
+      <input type="text" class="form-control" name="note" maxlength="200" placeholder="例如：剧情张力十足的悬疑推理卡">
+    </div>
+    <div class="col-12">
+      <button type="submit" class="btn btn-primary">添加推荐</button>
+    </div>
+  </div>
+</form>
+
+<h3 class="h5 mb-3">当前推荐列表</h3>
+{% if not items %}
+  <div class="alert alert-info">还没有任何推荐。</div>
+{% else %}
+  <div class="table-responsive">
+    <table class="table table-sm align-middle">
+      <thead>
+        <tr><th>#</th><th>类型</th><th>对象</th><th>推荐语</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for it in items %}
+          <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ '角色卡' if it.rec.kind == 'card' else '用户' }}</td>
+            <td>
+              {% if it.target %}
+                <a href="{{ it.target.link }}" target="_blank" rel="noopener">
+                  {{ it.target.name }}{% if it.target.gender %}（{{ it.target.gender }}）{% endif %}
+                </a>
+              {% else %}
+                <span class="text-danger">（对象已失效：{{ it.rec.ref_id }}）</span>
+              {% endif %}
+            </td>
+            <td>{{ it.rec.note or '' }}</td>
+            <td class="text-end">
+              <form method="post" action="{{ url_for('admin.recommend_delete', rec_id=it.rec.id) }}" class="d-inline">
+                <button type="submit" class="btn btn-sm btn-outline-danger"
+                        onclick="return confirm('确认移除该推荐？');">移除</button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}
+
+<script>
+(function () {
+  const kindEl = document.getElementById('rec-kind');
+  const searchEl = document.getElementById('rec-search');
+  const resultsEl = document.getElementById('rec-results');
+  const refEl = document.getElementById('ref_id');
+  const selEl = document.getElementById('rec-selected');
+  let timer = null;
+
+  function clearResults() { resultsEl.innerHTML = ''; }
+
+  function pick(kind, id, label) {
+    refEl.value = id;
+    selEl.textContent = '已选择：' + label + '（' + id + '）';
+    clearResults();
+    searchEl.value = '';
+  }
+
+  searchEl.addEventListener('input', function () {
+    clearTimeout(timer);
+    const q = searchEl.value.trim();
+    if (!q) { clearResults(); return; }
+    timer = setTimeout(function () {
+      fetch('{{ url_for("admin.recommend_search") }}?kind=' + encodeURIComponent(kindEl.value) + '&q=' + encodeURIComponent(q))
+        .then(r => r.json())
+        .then(function (rows) {
+          resultsEl.innerHTML = '';
+          if (!rows.length) {
+            resultsEl.innerHTML = '<div class="list-group-item text-muted">无匹配结果</div>';
+            return;
+          }
+          rows.forEach(function (row) {
+            const a = document.createElement('button');
+            a.type = 'button';
+            a.className = 'list-group-item list-group-item-action';
+            const name = row.name || row.nickname || ('@' + row.username);
+            a.textContent = name + (row.username && !row.nickname ? '（@' + row.username + '）' : '');
+            a.addEventListener('click', function () { pick(kindEl.value, String(row.id), name); });
+            resultsEl.appendChild(a);
+          });
+        });
+    }, 250);
+  });
+
+  kindEl.addEventListener('change', function () { clearResults(); searchEl.value = ''; selEl.textContent = ''; });
+  document.addEventListener('click', function (e) {
+    if (!resultsEl.contains(e.target) && e.target !== searchEl) clearResults();
+  });
+})();
+</script>
+{% endblock %}

@@ -36,6 +36,7 @@ from ..models import (
     Punishment,
     RedemptionKey,
     Report,
+    SiteRecommendation,
     Sticker,
     StickerSeries,
     TeaPoll,
@@ -688,6 +689,127 @@ def copy_stats():
         users_copied=users_copied,
         q=q,
     )
+
+
+# ---------------- 站长推荐（站长板块） ----------------
+@admin_bp.route("/recommend")
+@super_admin_required
+def recommend():
+    recs = SiteRecommendation.query.order_by(
+        SiteRecommendation.sort_order, SiteRecommendation.created_at
+    ).all()
+    # 附带被推荐对象的简要信息，便于后台展示
+    items = []
+    for r in recs:
+        target = None
+        if r.kind == "card":
+            c = db.session.get(Card, r.ref_id)
+            if c:
+                target = {"name": c.name, "gender": c.gender, "link": url_for("user.card_detail", card_id=c.id)}
+        elif r.kind == "user":
+            u = db.session.get(User, int(r.ref_id)) if str(r.ref_id).isdigit() else None
+            if u:
+                target = {"name": u.nickname or u.username, "gender": None, "link": url_for("user.profile", user_id=u.id)}
+        items.append({"rec": r, "target": target})
+    return render_template("admin/recommend.html", items=items)
+
+
+@admin_bp.route("/recommend/add", methods=["POST"])
+@super_admin_required
+def recommend_add():
+    kind = (request.form.get("kind") or "").strip()
+    ref_id = (request.form.get("ref_id") or "").strip()
+    note = (request.form.get("note") or "").strip() or None
+    if note:
+        note = note[:200]
+
+    if kind not in ("card", "user") or not ref_id:
+        flash("请选择推荐类型并填写 ID", "danger")
+        return redirect(url_for("admin.recommend"))
+
+    if kind == "card":
+        card = db.session.get(Card, ref_id)
+        # 只接受「已通过审核」且未隐藏的角色卡
+        if not card or card.status != "approved" or card.is_hidden:
+            flash("只能推荐已通过审核且未隐藏的角色卡", "danger")
+            return redirect(url_for("admin.recommend"))
+        ref_id = str(card.id)
+    else:
+        try:
+            uid = int(ref_id)
+        except (TypeError, ValueError):
+            flash("用户 UID 必须是数字", "danger")
+            return redirect(url_for("admin.recommend"))
+        u = db.session.get(User, uid)
+        # 只接受状态正常、非管理员、且无生效处罚的用户
+        if not u or u.status != "active" or u.role == "super_admin":
+            flash("只能推荐状态正常、非管理员的用户", "danger")
+            return redirect(url_for("admin.recommend"))
+        if u.active_punishments:
+            flash("不能推荐存在生效处罚的用户", "danger")
+            return redirect(url_for("admin.recommend"))
+        ref_id = str(uid)
+
+    if SiteRecommendation.query.filter_by(kind=kind, ref_id=ref_id).first():
+        flash("该内容已在推荐列表中", "warning")
+        return redirect(url_for("admin.recommend"))
+
+    max_order = db.session.query(
+        db.func.coalesce(db.func.max(SiteRecommendation.sort_order), 0)
+    ).scalar()
+    db.session.add(
+        SiteRecommendation(
+            kind=kind,
+            ref_id=ref_id,
+            note=note,
+            sort_order=(max_order + 1),
+            created_by=current_user.id,
+        )
+    )
+    db.session.commit()
+    flash("已添加推荐", "success")
+    return redirect(url_for("admin.recommend"))
+
+
+@admin_bp.route("/recommend/<int:rec_id>/delete", methods=["POST"])
+@super_admin_required
+def recommend_delete(rec_id):
+    rec = db.session.get(SiteRecommendation, rec_id)
+    if rec:
+        db.session.delete(rec)
+        db.session.commit()
+        flash("已移除推荐", "success")
+    return redirect(url_for("admin.recommend"))
+
+
+@admin_bp.route("/recommend/search")
+@super_admin_required
+def recommend_search():
+    """快速选择器：仅返回「已通过审核的角色卡」或「未被处罚的普通用户」。"""
+    kind = (request.args.get("kind") or "").strip()
+    q = (request.args.get("q") or "").strip()
+    if kind == "card":
+        query = Card.query.filter(Card.status == "approved", Card.is_hidden.is_(False))
+        if q:
+            query = query.filter(Card.name.ilike(f"%{q}%"))
+        rows = query.order_by(Card.view_count.desc()).limit(20).all()
+        return jsonify([{"id": c.id, "name": c.name, "gender": c.gender} for c in rows])
+    if kind == "user":
+        punished = db.session.query(Punishment.user_id).filter(Punishment.status == "active")
+        query = User.query.filter(
+            User.status == "active",
+            User.role != "super_admin",
+            User.id.notin_(punished),
+        )
+        if q:
+            query = query.filter(
+                or_(User.nickname.ilike(f"%{q}%"), User.username.ilike(f"%{q}%"))
+            )
+        rows = query.order_by(User.id.desc()).limit(20).all()
+        return jsonify(
+            [{"id": u.id, "nickname": u.nickname, "username": u.username} for u in rows]
+        )
+    return jsonify([])
 
 
 @admin_bp.route("/users/<int:user_id>/punish", methods=["GET", "POST"])
