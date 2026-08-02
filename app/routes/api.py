@@ -175,7 +175,7 @@ def _card_summary(card: Card, current_user=None) -> dict:
         "favorited": favorited,
         "covers": covers,
         "created_at": card.created_at.isoformat() if card.created_at else "",
-        "author": _user_public(card.author) if card.author else None,
+        "author": _user_public(card.author) if card.author else None,  # type: ignore[arg-type]
     }
 
 
@@ -223,7 +223,7 @@ def _card_detail(card: Card) -> dict:
         "created_at": card.created_at.isoformat() if card.created_at else "",
         "updated_at": card.updated_at.isoformat() if card.updated_at else "",
         "status": card.status,
-        "author": _user_public(card.author) if card.author else None,
+        "author": _user_public(card.author) if card.author else None,  # type: ignore[arg-type]
     }
 
 
@@ -246,12 +246,12 @@ def _comment_item(cm, liked_by_user: bool, like_count: int) -> dict:
 
 def _teapost_item(post: TeaPost, stats: dict) -> dict:
     """茶馆帖子摘要。"""
-    img = post.images[0] if post.images else None
+    img = post.images[0] if post.images else None  # type: ignore[index]
     return {
         "id": post.id,
         "content": post.content,
         "created_at": post.created_at.isoformat() if post.created_at else "",
-        "author": _user_public(post.author) if post.author else None,
+        "author": _user_public(post.author) if post.author else None,  # type: ignore[arg-type]
         "image": {
             "id": img.id,
             "sort_order": img.sort_order,

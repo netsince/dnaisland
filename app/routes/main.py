@@ -4,6 +4,7 @@ import random
 import time
 from collections import OrderedDict
 from io import BytesIO
+from typing import Any
 
 from flask import Blueprint, abort, jsonify, render_template, request, send_file, url_for
 from flask_login import current_user
@@ -355,7 +356,7 @@ def _order_by_likes(q):
 # 这些顺序在 60s 内变化极小，故按 (路由 + 过滤条件) 缓存有序 id 列表，分页时直接切片，
 # 免去每请求重算。缓存基于「全局可见」集合；登录用户屏蔽的作者可能滞后至多 TTL 出现
 # 于其热门流（与 popular_tags 的取舍一致），对热门推荐流可接受。
-_HOT_CARD_CACHE = OrderedDict()  # signature -> (ts, [card_id,...])
+_HOT_CARD_CACHE: "OrderedDict[str, tuple[float, Any]]" = OrderedDict()  # signature -> (ts, [card_id,...])
 _HOT_CARD_TTL = 60
 
 

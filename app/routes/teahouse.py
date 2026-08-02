@@ -3,6 +3,7 @@ import re
 import time
 from collections import OrderedDict
 from datetime import datetime
+from typing import Any
 
 from flask import (
     Blueprint,
@@ -231,7 +232,7 @@ def _notify_mentions(content, post, actor):
 
 # feed 每页帖子的计数聚合（点赞数/回复数/话题）按「当页 id 集合」缓存 30s，
 # 避免每个请求都跑多轮 group by。本人赞/藏是 per-user 状态，始终实时计算（见 _build_stats）。
-_STATS_CACHE = OrderedDict()  # frozenset(ids) -> (ts, {pid: {...全局计数...}})
+_STATS_CACHE: "OrderedDict[frozenset[int], tuple[float, Any]]" = OrderedDict()  # frozenset(ids) -> (ts, {pid: {...全局计数...}})
 _STATS_TTL = 30
 
 
@@ -345,7 +346,7 @@ def _set_single_topic(post, topic_raw):
 # 茶馆「最热」排序结果缓存：每次请求都要对整表做点赞/回复数聚合 + 时间衰减排序 +
 # COUNT 分页；60s 内顺序变化极小，故缓存有序帖子 id 列表，分页直接切片，
 # 免去每请求重算。缓存基于「全局可见」集合（超管可见范围不同，故 key 区分）。
-_HOT_POST_CACHE = OrderedDict()  # signature -> (ts, [post_id,...])
+_HOT_POST_CACHE: "OrderedDict[str, tuple[float, Any]]" = OrderedDict()  # signature -> (ts, [post_id,...])
 _HOT_POST_TTL = 60
 
 

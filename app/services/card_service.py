@@ -13,6 +13,7 @@ import string
 import time
 from collections import OrderedDict
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import func
 
@@ -290,7 +291,7 @@ def build_export_package(
 # 热门标签云：全量 card_tags 的 group by 较重，且变化不频繁，缓存 5 分钟。
 # 注意：标签可见性依赖 viewer（屏蔽作者），此处缓存全局可见结果；
 # 登录用户看到被屏蔽作者的标签最多滞后 TTL，社区标签云可接受。
-_TAG_CACHE = OrderedDict()  # {limit: (timestamp, result)}
+_TAG_CACHE: "OrderedDict[int, tuple[float, Any]]" = OrderedDict()  # {limit: (timestamp, result)}
 _TAG_CACHE_TTL = 300
 
 
