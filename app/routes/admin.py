@@ -709,7 +709,7 @@ def recommend():
         elif r.kind == "user":
             u = db.session.get(User, int(r.ref_id)) if str(r.ref_id).isdigit() else None
             if u:
-                target = {"name": u.nickname or u.username, "gender": None, "link": url_for("user.profile", user_id=u.id)}
+                target = {"name": u.nickname or u.username, "gender": None, "link": url_for("user.profile", username=u.username)}
         items.append({"rec": r, "target": target})
     return render_template("admin/recommend.html", items=items)
 
@@ -805,7 +805,11 @@ def recommend_reorder():
 @admin_bp.route("/recommend/search")
 @super_admin_required
 def recommend_search():
-    """快速选择器：仅返回「已通过审核的角色卡」或「未被处罚的普通用户」。"""
+    """快速选择器：仅返回「已通过审核的角色卡」或「未被处罚的用户」，并附带展示所需字段。
+
+    - 角色卡：正方形（或 landscape/portrait 兜底）图片、制作者、简介。
+    - 用户：头像、昵称 / 用户名、拥有的角色卡数量。
+    """
     kind = (request.args.get("kind") or "").strip()
     q = (request.args.get("q") or "").strip()
     if kind == "card":
@@ -813,7 +817,38 @@ def recommend_search():
         if q:
             query = query.filter(Card.name.ilike(f"%{q}%"))
         rows = query.order_by(Card.view_count.desc()).limit(20).all()
-        return jsonify([{"id": c.id, "name": c.name, "gender": c.gender} for c in rows])
+        # 角色卡图片：批量取出，优先 square，其次 landscape / portrait
+        card_ids = [c.id for c in rows]
+        img_map = {}
+        if card_ids:
+            for ci in CardImage.query.filter(CardImage.card_id.in_(card_ids)).all():
+                img_map.setdefault(ci.card_id, {})[ci.slot] = ci.data
+        author_ids = [c.author_id for c in rows]
+        author_map = (
+            {u.id: u for u in User.query.filter(User.id.in_(author_ids)).all()}
+            if author_ids
+            else {}
+        )
+        results = []
+        for c in rows:
+            data = None
+            slots = img_map.get(c.id, {})
+            for slot in ("square", "landscape", "portrait"):
+                if slot in slots:
+                    data = slots[slot]
+                    break
+            author = author_map.get(c.author_id)
+            results.append(
+                {
+                    "id": c.id,
+                    "name": c.name,
+                    "gender": c.gender,
+                    "image": data,
+                    "author": (author.nickname or author.username) if author else None,
+                    "intro": (c.intro or "").strip()[:120],
+                }
+            )
+        return jsonify(results)
     if kind == "user":
         punished = db.session.query(Punishment.user_id).filter(Punishment.status == "active")
         # 仅排除被处罚用户；管理员（含 super_admin）亦可被推荐
@@ -826,9 +861,28 @@ def recommend_search():
                 or_(User.nickname.ilike(f"%{q}%"), User.username.ilike(f"%{q}%"))
             )
         rows = query.order_by(User.id.desc()).limit(20).all()
-        return jsonify(
-            [{"id": u.id, "nickname": u.nickname, "username": u.username} for u in rows]
+        # 拥有的角色卡数量（含任意状态，反映创作量）
+        uid_counts = (
+            dict(
+                db.session.query(Card.author_id, db.func.count())
+                .filter(Card.author_id.in_([u.id for u in rows]))
+                .group_by(Card.author_id)
+                .all()
+            )
+            if rows
+            else {}
         )
+        results = [
+            {
+                "id": u.id,
+                "nickname": u.nickname,
+                "username": u.username,
+                "avatar": u.avatar,
+                "card_count": uid_counts.get(u.id, 0),
+            }
+            for u in rows
+        ]
+        return jsonify(results)
     return jsonify([])
 
 

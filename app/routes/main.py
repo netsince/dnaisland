@@ -159,25 +159,42 @@ def recommend():
     recs = SiteRecommendation.query.order_by(
         SiteRecommendation.sort_order, SiteRecommendation.created_at
     ).all()
-    card_items = []
-    user_items = []
+    # 统一成单一有序列表（角色卡与创作者按推荐顺序交织排布）
+    user_ids = [
+        int(r.ref_id) for r in recs if r.kind == "user" and str(r.ref_id).isdigit()
+    ]
+    card_counts = (
+        dict(
+            db.session.query(Card.author_id, db.func.count())
+            .filter(Card.author_id.in_(user_ids))
+            .group_by(Card.author_id)
+            .all()
+        )
+        if user_ids
+        else {}
+    )
+    items = []
+    cover_cards = []
     for r in recs:
         if r.kind == "card":
             c = db.session.get(Card, r.ref_id)
             if c and c.status == "approved" and not c.is_hidden:
-                card_items.append({"card": c, "note": r.note})
+                items.append({"kind": "card", "card": c, "note": r.note})
+                cover_cards.append(c)
         elif r.kind == "user":
             if str(r.ref_id).isdigit():
                 u = db.session.get(User, int(r.ref_id))
                 if u and u.status == "active" and not u.active_punishments:
-                    user_items.append({"user": u, "note": r.note})
-    cards = [ci["card"] for ci in card_items]
-    attach_covers(cards)
-    return render_template(
-        "recommend/index.html",
-        card_items=card_items,
-        user_items=user_items,
-    )
+                    items.append(
+                        {
+                            "kind": "user",
+                            "user": u,
+                            "note": r.note,
+                            "card_count": card_counts.get(u.id, 0),
+                        }
+                    )
+    attach_covers(cover_cards)
+    return render_template("recommend/index.html", items=items)
 
 
 def _banned_author_ids():

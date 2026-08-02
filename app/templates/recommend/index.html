@@ -1,52 +1,161 @@
 {% extends "base.html" %}
-{% from "macros/cards.html" import card_tile %}
+{% from "macros/verified.html" import badge %}
 
 {% block title %}站长推荐 · DNAISLAND{% endblock %}
 
 {% block content %}
 <div class="container py-4">
-  <h1 class="h3 mb-1">💗站长💗推荐💗</h1>
-  <p class="text-muted">由站长精选的优质角色卡与创作者，欢迎围观～</p>
 
-  {% if not card_items and not user_items %}
+  <!-- 头部 -->
+  <div class="rec-hero mb-4">
+    <h1 class="rec-hero__title">站长推荐</h1>
+    <p class="rec-hero__sub">由站长亲自精选的优质角色卡与创作者，欢迎围观。</p>
+  </div>
+
+  {% if not items %}
     <div class="alert alert-info mt-3">暂无推荐内容。</div>
-  {% endif %}
-
-  {% if card_items %}
-    <h2 class="h5 mt-4 mb-3">推荐角色卡</h2>
-    <div class="row g-2 g-md-3 dna-explore-grid mb-4">
-      {% for item in card_items %}
-        <div class="col-6 col-sm-4 col-md-3 col-lg-2">
-          {{ card_tile(item.card) }}
-          {% if item.note %}
-            <div class="small text-muted mt-1">{{ item.note }}</div>
+  {% else %}
+    <!-- 瀑布流：角色卡（竖版大图）与创作者（横向个人卡）按推荐顺序交织排布 -->
+    <div class="rec-masonry">
+      {% for it in items %}
+        <div class="rec-masonry__item">
+          {% if it.kind == "card" %}
+            {% set c = it.card %}
+            <a class="rec-card" href="{{ url_for('user.card_detail', card_id=c.id) }}">
+              <div class="rec-card__media">
+                {% if c.cover %}
+                  <img src="{{ url_for('user.card_image', card_id=c.id, slot='square') }}" alt="{{ c.name }}" loading="lazy">
+                {% else %}
+                  <div class="rec-card__ph">{{ c.name[:1] if c.name else '?' }}</div>
+                {% endif %}
+              </div>
+              <div class="rec-card__body">
+                <h3 class="rec-card__name">{{ c.name }}</h3>
+                <div class="rec-card__author">
+                  <i class="bi bi-person me-1"></i>{{ (c.author.nickname or c.author.username) if c.author else '未知作者' }}
+                </div>
+                {% if c.intro %}
+                  <p class="rec-card__desc">{{ c.intro }}</p>
+                {% endif %}
+                {% if it.note %}
+                  <div class="rec-card__note"><i class="bi bi-chat-quote me-1"></i>{{ it.note }}</div>
+                {% endif %}
+              </div>
+            </a>
+          {% else %}
+            <a class="rec-user" href="{{ url_for('user.profile', username=it.user.username) }}">
+              <div class="rec-user__avatar">
+                <img src="{{ url_for('user.avatar', user_id=it.user.id) }}"
+                     alt="{{ it.user.nickname or it.user.username }}" loading="lazy">
+              </div>
+              <div class="rec-user__info">
+                <div class="rec-user__name">
+                  <span class="rec-user__name-text">{{ it.user.nickname or it.user.username }}</span>
+                  {{ badge(it.user) }}
+                </div>
+                <div class="rec-user__meta">@{{ it.user.username }} · {{ it.card_count or 0 }} 张角色卡</div>
+              </div>
+            </a>
+            {% if it.note %}
+              <div class="rec-tile-note"><i class="bi bi-chat-quote me-1"></i>{{ it.note }}</div>
+            {% endif %}
           {% endif %}
         </div>
       {% endfor %}
     </div>
   {% endif %}
 
-  {% if user_items %}
-    <h2 class="h5 mt-4 mb-3">推荐创作者</h2>
-    <div class="row g-2 g-md-3">
-      {% for item in user_items %}
-        <div class="col-6 col-sm-4 col-md-3 col-lg-2">
-          <a class="dna-tile text-decoration-none" href="{{ url_for('user.profile', user_id=item.user.id) }}">
-            <div class="dna-tile__media">
-              <img src="{{ url_for('user.avatar', user_id=item.user.id) }}"
-                   alt="{{ item.user.nickname or item.user.username }}" loading="lazy">
-            </div>
-            <div class="dna-tile__body">
-              <div class="dna-tile__name">{{ item.user.nickname or item.user.username }}</div>
-              <div class="dna-tile__meta">@{{ item.user.username }}</div>
-            </div>
-          </a>
-          {% if item.note %}
-            <div class="small text-muted mt-1">{{ item.note }}</div>
-          {% endif %}
-        </div>
-      {% endfor %}
-    </div>
-  {% endif %}
 </div>
+{% endblock %}
+
+{% block head %}
+<style>
+  /* 头部：干净的实体面板，仅以边框与留白区分 */
+  .rec-hero {
+    border: 1px solid var(--dna-border);
+    border-radius: 14px;
+    padding: 2.1rem 1.5rem;
+    text-align: center;
+    background: var(--dna-surface);
+  }
+  .rec-hero__title { font-size: 1.75rem; font-weight: 800; margin: 0 0 .5rem; color: var(--dna-emphasis); letter-spacing: .02em; }
+  .rec-hero__sub { color: var(--dna-muted); margin: 0; font-size: .95rem; }
+
+  /* 瀑布流容器：不同高度的角色卡与创作者卡自然排列，避免对齐空隙 */
+  .rec-masonry { column-count: 1; column-gap: 1rem; }
+  .rec-masonry__item { break-inside: avoid; margin-bottom: 1rem; }
+  /* 列数适度：保证每列足够宽，横向创作者卡也能完整展示信息 */
+  @media (min-width: 576px)  { .rec-masonry { column-count: 2; } }
+  @media (min-width: 992px)  { .rec-masonry { column-count: 3; } }
+  @media (min-width: 1400px) { .rec-masonry { column-count: 4; } }
+
+  /* ---------- 角色卡瓦片（竖版大图） ---------- */
+  .rec-card {
+    display: flex; flex-direction: column;
+    border: 1px solid var(--dna-border); border-radius: var(--dna-radius);
+    text-decoration: none; color: var(--dna-text); background: var(--dna-surface);
+    overflow: hidden;
+    transition: transform .2s ease, border-color .25s ease, box-shadow .25s ease;
+  }
+  .rec-card:hover {
+    transform: translateY(-4px); border-color: var(--dna-border-strong);
+    box-shadow: 0 12px 30px rgba(0,0,0,.35); color: var(--dna-text);
+  }
+  .rec-card__media { position: relative; aspect-ratio: 3 / 4; overflow: hidden; background: var(--dna-bg-2); }
+  .rec-card__media img { width: 100%; height: 100%; object-fit: cover; transition: transform .35s ease; }
+  .rec-card:hover .rec-card__media img { transform: scale(1.06); }
+  .rec-card__ph {
+    width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
+    font-size: 3rem; font-weight: 800; color: var(--dna-text); background: var(--dna-surface);
+  }
+  .rec-card__body { padding: .85rem 1rem 1rem; display: flex; flex-direction: column; gap: .4rem; flex: 1; min-width: 0; }
+  .rec-card__name { font-size: 1.05rem; font-weight: 700; margin: 0; color: var(--dna-emphasis); line-height: 1.25;
+    display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+  .rec-card__author { font-size: .8rem; color: var(--dna-muted); display: flex; align-items: center; min-width: 0; }
+  .rec-card__author > :not(.bi-person) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rec-card__desc {
+    font-size: .84rem; line-height: 1.55; color: var(--dna-muted); margin: 0;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .rec-card__note {
+    font-size: .78rem; color: var(--dna-text);
+    border-left: 2px solid var(--dna-border-strong); padding-left: .45rem; margin-top: auto;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+
+  /* ---------- 创作者瓦片（横向个人卡，与角色卡区分） ---------- */
+  .rec-user {
+    display: flex; flex-direction: row; align-items: center; gap: .7rem;
+    border: 1px solid var(--dna-border); border-radius: var(--dna-radius); padding: .75rem .85rem;
+    text-decoration: none; color: var(--dna-text); background: var(--dna-surface);
+    transition: transform .2s ease, border-color .25s ease, box-shadow .25s ease;
+  }
+  .rec-user:hover {
+    transform: translateY(-3px); border-color: var(--dna-border-strong);
+    box-shadow: 0 10px 26px rgba(0,0,0,.35); color: var(--dna-text);
+  }
+  .rec-user__avatar {
+    width: 46px; height: 46px; border-radius: 50%; overflow: hidden; flex: 0 0 auto;
+    background: var(--dna-bg-2); border: 2px solid var(--dna-border-strong);
+  }
+  .rec-user__avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .rec-user__info { min-width: 0; display: flex; flex-direction: column; gap: .1rem; }
+  .rec-user__name { font-weight: 700; font-size: .95rem; color: var(--dna-emphasis); display: flex; align-items: center; gap: .3rem; }
+  .rec-user__name-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rec-user__meta { font-size: .76rem; color: var(--dna-muted);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* 推荐语小标注（创作者卡下） */
+  .rec-tile-note {
+    font-size: .75rem; color: var(--dna-muted); margin-top: .3rem;
+    border-left: 2px solid var(--dna-border-strong); padding-left: .45rem;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+
+  /* 手机端：单列，角色卡封面改为横向比例避免过高 */
+  @media (max-width: 575px) {
+    .rec-card__media { aspect-ratio: 16 / 10; }
+    .rec-card__body { padding: .7rem .85rem .85rem; gap: .35rem; }
+  }
+</style>
 {% endblock %}
