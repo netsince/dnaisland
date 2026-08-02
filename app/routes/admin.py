@@ -741,9 +741,9 @@ def recommend_add():
             flash("用户 UID 必须是数字", "danger")
             return redirect(url_for("admin.recommend"))
         u = db.session.get(User, uid)
-        # 只接受状态正常、非管理员、且无生效处罚的用户
-        if not u or u.status != "active" or u.role == "super_admin":
-            flash("只能推荐状态正常、非管理员的用户", "danger")
+        # 只接受状态正常、且无生效处罚的用户（管理员亦可被推荐）
+        if not u or u.status != "active":
+            flash("只能推荐状态正常的用户", "danger")
             return redirect(url_for("admin.recommend"))
         if u.active_punishments:
             flash("不能推荐存在生效处罚的用户", "danger")
@@ -782,6 +782,26 @@ def recommend_delete(rec_id):
     return redirect(url_for("admin.recommend"))
 
 
+@admin_bp.route("/recommend/reorder", methods=["POST"])
+@super_admin_required
+def recommend_reorder():
+    """拖拽排序：接收排序后的推荐 ID 列表，批量更新 sort_order。"""
+    data = request.get_json(silent=True) or {}
+    ids = [int(x) for x in (data.get("ids") or []) if str(x).strip().isdigit()]
+    if not ids:
+        return jsonify(ok=True)
+    stmt = update(SiteRecommendation).where(
+        SiteRecommendation.id.in_(ids)
+    ).values(
+        sort_order=case(
+            {rid: i for i, rid in enumerate(ids)}, value=SiteRecommendation.id
+        )
+    )
+    db.session.execute(stmt)
+    db.session.commit()
+    return jsonify(ok=True)
+
+
 @admin_bp.route("/recommend/search")
 @super_admin_required
 def recommend_search():
@@ -796,9 +816,9 @@ def recommend_search():
         return jsonify([{"id": c.id, "name": c.name, "gender": c.gender} for c in rows])
     if kind == "user":
         punished = db.session.query(Punishment.user_id).filter(Punishment.status == "active")
+        # 仅排除被处罚用户；管理员（含 super_admin）亦可被推荐
         query = User.query.filter(
             User.status == "active",
-            User.role != "super_admin",
             User.id.notin_(punished),
         )
         if q:

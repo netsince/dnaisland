@@ -41,14 +41,16 @@
 {% if not items %}
   <div class="alert alert-info">还没有任何推荐。</div>
 {% else %}
+  <p class="text-muted small mb-2">拖动每行左侧手柄可调整推荐顺序，松手即保存。</p>
   <div class="table-responsive">
     <table class="table table-sm align-middle">
       <thead>
-        <tr><th>#</th><th>类型</th><th>对象</th><th>推荐语</th><th></th></tr>
+        <tr><th style="width:2.5rem;"></th><th>#</th><th>类型</th><th>对象</th><th>推荐语</th><th></th></tr>
       </thead>
-      <tbody>
+      <tbody id="recList">
         {% for it in items %}
-          <tr>
+          <tr data-id="{{ it.rec.id }}">
+            <td class="drag-handle text-muted" title="拖动排序" style="cursor:grab;">⠿</td>
             <td>{{ loop.index }}</td>
             <td>{{ '角色卡' if it.rec.kind == 'card' else '用户' }}</td>
             <td>
@@ -74,6 +76,7 @@
   </div>
 {% endif %}
 
+<script src="{{ url_for('static', filename='vendor/sortable.min.js') }}"></script>
 <script>
 (function () {
   const kindEl = document.getElementById('rec-kind');
@@ -122,6 +125,36 @@
   document.addEventListener('click', function (e) {
     if (!resultsEl.contains(e.target) && e.target !== searchEl) clearResults();
   });
+
+  // ---- 拖拽排序（SortableJS，本地引入） ----
+  const listEl = document.getElementById('recList');
+  if (listEl && typeof Sortable !== 'undefined') {
+    new Sortable(listEl, {
+      draggable: 'tr',
+      handle: '.drag-handle',
+      animation: 150,
+      ghostClass: 'sortable-ghost',
+      onEnd: function (evt) {
+        if (evt.oldIndex === evt.newIndex) return;
+        const ids = Array.prototype.map.call(
+          listEl.querySelectorAll('tr[data-id]'),
+          function (el) { return el.dataset.id; }
+        );
+        fetch('{{ url_for("admin.recommend_reorder") }}', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids: ids })
+        })
+          .then(function (r) { return r.json(); })
+          .then(function (d) { if (!d.ok) location.reload(); })
+          .catch(function () { location.reload(); });
+      }
+    });
+  }
 })();
 </script>
+<style>
+  .drag-handle { user-select: none; }
+  #recList tr.sortable-ghost { opacity: .4; background: #f8f9fa; }
+</style>
 {% endblock %}
