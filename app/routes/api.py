@@ -26,6 +26,7 @@ from ..models import (
     CommentLike,
     Notification,
     PointTransaction,
+    SiteRecommendation,
     TeaPost,
     TeaPostFavorite,
     TeaPostLike,
@@ -342,6 +343,57 @@ def cards_featured():
     exclude_ids = exclude_raw.split(",") if exclude_raw else None
     cards = _random_recommend(12, exclude_ids)
     return ok([_card_summary(c, current_user) for c in cards])
+
+
+@api_bp.route("/recommend", methods=["GET"])
+def recommend():
+    """站长推荐：按推荐顺序返回角色卡与创作者交织的列表（公开，无需登录）。
+
+    每条 item: {"kind": "card"|"user", "note": 站长推荐语, "data": ...}
+      - card: 见 _card_summary
+      - user: 见 _user_public，并额外带 card_count（拥有的角色卡数量）
+    """
+    recs = SiteRecommendation.query.order_by(
+        SiteRecommendation.sort_order, SiteRecommendation.created_at
+    ).all()
+    user_ids = [
+        int(r.ref_id) for r in recs if r.kind == "user" and str(r.ref_id).isdigit()
+    ]
+    card_counts = (
+        dict(
+            db.session.query(Card.author_id, func.count())
+            .filter(Card.author_id.in_(user_ids))
+            .group_by(Card.author_id)
+            .all()
+        )
+        if user_ids
+        else {}
+    )
+    items = []
+    for r in recs:
+        if r.kind == "card":
+            c = db.session.get(Card, r.ref_id)
+            if c and c.status == "approved" and not c.is_hidden:
+                items.append(
+                    {
+                        "kind": "card",
+                        "note": r.note,
+                        "data": _card_summary(c, current_user),
+                    }
+                )
+        elif r.kind == "user":
+            if str(r.ref_id).isdigit():
+                u = db.session.get(User, int(r.ref_id))
+                if u and u.status == "active" and not u.active_punishments:
+                    items.append(
+                        {
+                            "kind": "user",
+                            "note": r.note,
+                            "card_count": card_counts.get(u.id, 0),
+                            "data": _user_public(u),
+                        }
+                    )
+    return ok({"items": items})
 
 
 @api_bp.route("/cards/explore", methods=["GET"])
