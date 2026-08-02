@@ -8,6 +8,7 @@
 
 import functools
 import time
+from datetime import datetime
 
 import jwt
 from flask import Blueprint, current_app, g, jsonify, request
@@ -17,6 +18,7 @@ from sqlalchemy import func, or_
 from ..extensions import db
 from ..models import (
     Card,
+    CardCopyStat,
     CardDialogueStyle,
     CardFavorite,
     CardImage,
@@ -37,6 +39,7 @@ from ..models import (
 )
 from ..routes.main import _random_recommend
 from ..routes.teahouse import _visible_query as _teahouse_visible_query
+from ..services.card_service import build_export_package
 from ..services.notification_service import mark_all_read, unread_count
 from ..utils import get_user_by_username, toggle_relation
 
@@ -394,6 +397,66 @@ def recommend():
                         }
                     )
     return ok({"items": items})
+
+
+@api_bp.route("/cards/<card_id>/export", methods=["GET"])
+@api_login_required
+def cards_export(card_id):
+    """复制角色卡：返回可被 dna-client 识别的导出包（JSON）。
+
+    与 web 端 /card/<card_id>/export 语义一致：
+      - 需登录（JWT）；
+      - 可见性：公开卡、作者本人或管理员可导出；
+      - 调用即记录一次复制统计（同一用户同一卡每天去重累加 copy_count）。
+    """
+    user = _ensure_self()
+    card = db.session.get(Card, card_id)
+    if not card:
+        return err("角色卡不存在", 404)
+    is_owner = user.id == card.author_id
+    is_admin = user.is_super_admin
+    if not (card.is_public or is_owner or is_admin):
+        return err("角色卡不存在", 404)
+
+    origin = request.host_url.rstrip("/")
+    copier = user.username
+    copier_ip = (
+        (request.headers.get("X-Forwarded-For") or request.remote_addr or "unknown")
+        .split(",")[0]
+        .strip()
+    )
+    package = build_export_package(
+        card,
+        origin=origin,
+        copier=copier,
+        copier_ip=copier_ip,
+        platform_domain=origin,
+    )
+    # 记录复制统计（失败不应影响导出）
+    try:
+        today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        copied_today = CardCopyStat.query.filter(
+            CardCopyStat.user_id == user.id,
+            CardCopyStat.card_id == card.id,
+            CardCopyStat.copied_at >= today_start,
+        ).first()
+        db.session.add(
+            CardCopyStat(
+                card_id=card.id,
+                card_name=card.name,
+                user_id=user.id,
+                username=user.username,
+                copier_ip=copier_ip,
+            )
+        )
+        if copied_today is None:
+            card.copy_count = (card.copy_count or 0) + 1
+        db.session.commit()
+    except Exception as exc:  # noqa: BLE001
+        db.session.rollback()
+        current_app.logger.warning("记录角色卡复制统计失败: %s", exc)
+
+    return ok({"package": package, "copy_count": card.copy_count or 0})
 
 
 @api_bp.route("/cards/explore", methods=["GET"])
