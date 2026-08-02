@@ -782,6 +782,54 @@ def recommend_delete(rec_id):
     return redirect(url_for("admin.recommend"))
 
 
+@admin_bp.route("/recommend/<int:rec_id>/edit", methods=["POST"])
+@super_admin_required
+def recommend_edit(rec_id):
+    rec = db.session.get(SiteRecommendation, rec_id)
+    if not rec:
+        flash("推荐不存在", "danger")
+        return redirect(url_for("admin.recommend"))
+
+    kind = (request.form.get("kind") or rec.kind).strip()
+    ref_id = (request.form.get("ref_id") or "").strip() or str(rec.ref_id)
+    note = (request.form.get("note") or "").strip() or None
+    if note:
+        note = note[:200]
+
+    if kind not in ("card", "user"):
+        flash("推荐类型非法", "danger")
+        return redirect(url_for("admin.recommend"))
+
+    # 重新校验被推荐对象的可见性（与添加时一致）
+    if kind == "card":
+        card = db.session.get(Card, ref_id)
+        if not card or card.status != "approved" or card.is_hidden:
+            flash("只能推荐已通过审核且未隐藏的角色卡", "danger")
+            return redirect(url_for("admin.recommend"))
+        ref_id = str(card.id)
+    else:
+        try:
+            uid = int(ref_id)
+        except (TypeError, ValueError):
+            flash("用户 UID 必须是数字", "danger")
+            return redirect(url_for("admin.recommend"))
+        u = db.session.get(User, uid)
+        if not u or u.status != "active":
+            flash("只能推荐状态正常的用户", "danger")
+            return redirect(url_for("admin.recommend"))
+        if u.active_punishments:
+            flash("不能推荐存在生效处罚的用户", "danger")
+            return redirect(url_for("admin.recommend"))
+        ref_id = str(uid)
+
+    rec.kind = kind
+    rec.ref_id = ref_id
+    rec.note = note
+    db.session.commit()
+    flash("已更新推荐", "success")
+    return redirect(url_for("admin.recommend"))
+
+
 @admin_bp.route("/recommend/reorder", methods=["POST"])
 @super_admin_required
 def recommend_reorder():

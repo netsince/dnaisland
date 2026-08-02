@@ -64,6 +64,10 @@
             </td>
             <td>{{ it.rec.note or '' }}</td>
             <td class="text-end">
+              <button type="button" class="btn btn-sm btn-outline-secondary me-1"
+                      data-edit='{{ {"id": it.rec.id, "kind": it.rec.kind, "ref_id": it.rec.ref_id, "note": it.rec.note or ""}|tojson }}'>
+                编辑
+              </button>
               <form method="post" action="{{ url_for('admin.recommend_delete', rec_id=it.rec.id) }}" class="d-inline">
                 <button type="submit" class="btn btn-sm btn-outline-danger"
                         onclick="return confirm('确认移除该推荐？');">移除</button>
@@ -75,6 +79,40 @@
     </table>
   </div>
 {% endif %}
+
+<div class="modal fade" id="editModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <form method="post" id="editForm" class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">编辑推荐</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">推荐类型</label>
+          <select class="form-select" name="kind" id="edit-kind">
+            <option value="card">角色卡</option>
+            <option value="user">用户</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">ID / UID</label>
+          <input type="text" class="form-control" name="ref_id" id="edit-ref"
+                 placeholder="角色卡 ID 或用户 UID">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">推荐语（最多 200 字）</label>
+          <input type="text" class="form-control" name="note" id="edit-note" maxlength="200"
+                 placeholder="例如：剧情张力十足的悬疑推理卡">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+        <button type="submit" class="btn btn-primary">保存</button>
+      </div>
+    </form>
+  </div>
+</div>
 
 <script src="{{ url_for('static', filename='vendor/sortable.min.js') }}"></script>
 <script>
@@ -158,6 +196,22 @@
   document.addEventListener('click', function (e) {
     if (!resultsEl.contains(e.target) && e.target !== searchEl) clearResults();
   });
+
+  // ---- 编辑弹窗 ----
+  const editForm = document.getElementById('editForm');
+  if (editForm) {
+    document.querySelectorAll('[data-edit]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const d = JSON.parse(btn.getAttribute('data-edit'));
+        document.getElementById('edit-kind').value = d.kind;
+        document.getElementById('edit-ref').value = d.ref_id;
+        document.getElementById('edit-note').value = d.note || '';
+        editForm.action =
+          '{{ url_for("admin.recommend_edit", rec_id=0) }}'.replace('/0', '/' + d.id);
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('editModal')).show();
+      });
+    });
+  }
 
   // ---- 拖拽排序（SortableJS，本地引入） ----
   const listEl = document.getElementById('recList');
