@@ -151,10 +151,10 @@ def index():
 
 
 @main_bp.route("/recommend")
-def recommendations():
+def recommend():
     """站长板块（站长推荐）。仅展示仍有效的推荐项：
     - 角色卡需处于「已通过审核」且未隐藏；
-    - 用户需状态正常、非管理员且无生效处罚。
+    - 用户需状态正常、无生效处罚（管理员亦可被展示）。
     """
     recs = SiteRecommendation.query.order_by(
         SiteRecommendation.sort_order, SiteRecommendation.created_at
@@ -169,12 +169,7 @@ def recommendations():
         elif r.kind == "user":
             if str(r.ref_id).isdigit():
                 u = db.session.get(User, int(r.ref_id))
-                if (
-                    u
-                    and u.status == "active"
-                    and u.role != "super_admin"
-                    and not u.active_punishments
-                ):
+                if u and u.status == "active" and not u.active_punishments:
                     user_items.append({"user": u, "note": r.note})
     cards = [ci["card"] for ci in card_items]
     attach_covers(cards)

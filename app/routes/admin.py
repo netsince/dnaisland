@@ -16,7 +16,7 @@ from flask import (
     url_for,
 )
 from flask_login import current_user
-from sqlalchemy import case, func, update
+from sqlalchemy import case, func, or_, update
 
 from ..decorators import super_admin_required
 from ..extensions import db

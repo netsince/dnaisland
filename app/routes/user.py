@@ -24,12 +24,12 @@ from ..decorators import block_if_muted
 from ..extensions import db
 from ..models import (
     Card,
+    CardCopyStat,
     CardDialogueStyle,
     CardFavorite,
     CardImage,
     CardLike,
     CardTag,
-    CardCopyStat,
     Comment,
     CommentLike,
     Notification,
