@@ -498,6 +498,14 @@ def card_export(card_id):
     # 记录复制统计（复制了哪张卡、谁复制的、什么时候、来源 IP）
     # 失败不应影响正常的复制导出流程
     try:
+        # 去重：同一用户同一张卡每天（自然日）只累加一次复制量；
+        # 明细溯源（CardCopyStat）仍每次复制都记一条，不受此去重影响。
+        today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        copied_today = CardCopyStat.query.filter(
+            CardCopyStat.user_id == current_user.id,
+            CardCopyStat.card_id == card.id,
+            CardCopyStat.copied_at >= today_start,
+        ).first()
         db.session.add(
             CardCopyStat(
                 card_id=card.id,
@@ -507,6 +515,8 @@ def card_export(card_id):
                 copier_ip=copier_ip,
             )
         )
+        if copied_today is None:
+            card.copy_count = (card.copy_count or 0) + 1
         db.session.commit()
     except Exception as exc:  # noqa: BLE001
         db.session.rollback()

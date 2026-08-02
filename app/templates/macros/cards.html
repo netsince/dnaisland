@@ -29,7 +29,7 @@
  </div>
  <div class="dna-tile__body">
  <h3 class="dna-tile__title">{% if q %}{{ hl(card.name, q) }}{% else %}{{ card.name }}{% endif %}</h3>
- <div class="dna-tile__meta">{{ card.gender or '未知' }} · 浏览 {{ card.view_count or 0 }}</div>
+ <div class="dna-tile__meta">{{ card.gender or '未知' }} · 浏览 {{ card.view_count or 0 }} · 复制 {{ card.copy_count or 0 }}</div>
  {% set desc = card.intro or card.persona %}
  {% if desc %}
  <p class="dna-tile__desc">{% if q %}{{ hl(desc, q) }}{% else %}{{ desc }}{% endif %}</p>

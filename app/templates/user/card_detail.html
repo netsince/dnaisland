@@ -47,6 +47,7 @@
                 <a href="{{ url_for('user.profile', username=author.username) }}" class="dna-chip text-decoration-none">{{ author.display_name }}{{ badge(author) }}</a>
                 {% endif %}
                 <span class="dna-chip">{{ card.view_count }} 次浏览</span>
+                <span class="dna-chip">{{ card.copy_count or 0 }} 次复制</span>
                 {% if card.created_at %}<span class="dna-chip">{{ card.created_at|cst('%Y-%m-%d') }}</span>{% endif %}
               </div>
             </div>
