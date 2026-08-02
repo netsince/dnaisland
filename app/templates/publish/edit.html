@@ -91,6 +91,25 @@
         <div class="form-text">选择图片后会弹出裁剪框，按对应比例裁剪后确认。</div>
       </div>
 
+      <div class="mb-3">
+        <a class="btn btn-sm btn-link p-0 text-decoration-none" data-bs-toggle="collapse"
+           href="#moreOptions" role="button" aria-expanded="false" aria-controls="moreOptions">
+          更多选项 ▾
+        </a>
+        <div class="collapse mt-3" id="moreOptions">
+          <div class="mb-3">
+            <label class="form-label">语音 Seed（可选）</label>
+            <input type="number" class="form-control" name="seed"
+                   value="{% set ps = prefill.get('seed') if prefill else none %}{{ ps if ps is not none else '' }}"
+                   placeholder="留空则由客户端决定音色">
+            <div class="form-text">
+              填一个整数可固定该角色卡的音色；从客户端 JSON 导入时会自动填入。
+              同一 seed 在客户端会复现相同音色。留空表示不固定。
+            </div>
+          </div>
+        </div>
+      </div>
+
       <button type="submit" class="btn btn-primary">提交</button>
     </form>
   </div>

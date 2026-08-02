@@ -64,6 +64,15 @@ def parse_export_package(json_str: str) -> dict:
     tags = character.get("tags") or []
     tags = [str(t) for t in tags] if isinstance(tags, list) else []
 
+    # 语音合成 seed：优先读顶层 seed，其次 character.voiceSeed / 顶层 voiceSeed。
+    # 非整数（或缺失）时置为 None（发布页 seed 为非必填项）。
+    seed = data.get("seed")
+    if not isinstance(seed, int):
+        seed = character.get("voiceSeed")
+    if not isinstance(seed, int):
+        seed = data.get("voiceSeed")
+    seed = seed if isinstance(seed, int) else None
+
     # 注意：不读取 JSON 中的 id，平台始终自动分配新 id
     return {
         "name": character.get("name") or "",
@@ -74,6 +83,7 @@ def parse_export_package(json_str: str) -> dict:
         "tags": tags,
         "dialogue_style": dialogue_style,
         "images": images,
+        "seed": seed,
         # 导入成功后强制清空源链接
         "original_link": "",
     }

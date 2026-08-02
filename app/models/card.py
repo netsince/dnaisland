@@ -27,6 +27,9 @@ class Card(db.Model):
     # 去重规则：同一用户（user_id）对同一张卡每天（自然日）最多 +1，重复复制不累加。
     # 明细溯源记录见 CardCopyStat（每次复制都记一条，不受去重影响）。
     copy_count = db.Column(db.Integer, server_default="0")
+    # 角色卡的语音合成 seed（音色）。可空：未设置时由客户端按全局/兜底规则决定音色。
+    # 导入客户端导出的 JSON 时从 seed / voiceSeed 读取；导出时回写为 voiceSeed。
+    seed = db.Column(db.Integer, nullable=True)
     # 头图封面焦点（脸部位置），格式 "x%,y%" 如 "50,30"，留空则居中
     cover_focus = db.Column(db.String(16), nullable=True)
 

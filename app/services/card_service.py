@@ -270,6 +270,8 @@ def build_export_package(
         "tags": tags,
         "dialogueStyle": dialogue,
         "images": images,
+        # 回写语音 seed：客户端以 character.voiceSeed 读取，保证复制后音色一致
+        "voiceSeed": card.seed,
     }
 
     package = {

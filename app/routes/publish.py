@@ -69,6 +69,14 @@ def edit():
     opening = request.form.get("opening") or ""
     original_link = request.form.get("original_link") or ""
     cover_focus = request.form.get("cover_focus") or None
+    # 语音合成 seed：非必填，空白/非法时置为 None（交由客户端决定音色）
+    seed_raw = (request.form.get("seed") or "").strip()
+    seed = None
+    if seed_raw:
+        try:
+            seed = int(seed_raw)
+        except ValueError:
+            seed = None
     # 不读取客户端传入的 id，始终由平台自动分配新 id
     card_id = str(uuid.uuid4())
 
@@ -116,6 +124,7 @@ def edit():
         opening=opening,
         original_link=original_link or None,
         cover_focus=cover_focus,
+        seed=seed,
         status="pending",  # 未审核
     )
     db.session.add(card)
