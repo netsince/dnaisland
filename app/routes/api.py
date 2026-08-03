@@ -31,6 +31,7 @@ from ..models import (
     SiteRecommendation,
     TeaPost,
     TeaPostFavorite,
+    TeaPostImage,
     TeaPostLike,
     TeaPostTopic,
     TeaTopic,
@@ -255,6 +256,7 @@ def _teapost_item(post: TeaPost, stats: dict) -> dict:
         "image": {
             "id": img.id,
             "sort_order": img.sort_order,
+            "url": f"/api/v1/teahouse/images/{img.id}",
         } if img else None,
         "card": {
             "id": post.card.id,
@@ -879,10 +881,24 @@ def teahouse_create_post():
     if card:
         post.card_id = card.id
 
-    # 话题
-    topic_raw = data.get("topic")
     db.session.add(post)
     db.session.flush()
+
+    # 配图（base64 data URL，与网页端一致仅取首图）
+    images = data.get("images") or []
+    if images:
+        if not isinstance(images, list):
+            images = [images]
+        first = images[0]
+        try:
+            from ..services.image_service import data_url_to_bytes_and_mime
+            data_url_to_bytes_and_mime(first)
+        except Exception:
+            return err("图片格式非法")
+        db.session.add(TeaPostImage(post_id=post.id, image_data=first, sort_order=0))
+
+    # 话题
+    topic_raw = data.get("topic")
     if topic_raw:
         _set_single_topic(post, topic_raw)
     db.session.commit()
@@ -1104,3 +1120,75 @@ def site_config():
     """站点公开配置（复用现有 /api/site-config）。"""
     from ..services.site_service import public_config
     return jsonify(ok=True, data=public_config())
+
+
+# ---------------------------------------------------------------------------
+# 图片上传（客户端 multipart 文件 → WebP data URL）
+# ---------------------------------------------------------------------------
+
+@api_bp.route("/upload/image", methods=["POST"])
+@api_login_required
+def upload_image():
+    """通用图片上传。接收 multipart 文件，压缩为 WebP data URL 返回，
+    客户端可在发茶馆帖/评论时引用返回的图片串。
+
+    表单字段：
+      - image: 图片文件（必填）
+      - kind:  teapost（默认，1280px）/ comment（1024px），影响压缩尺寸
+    返回：{"image": "<data url>", "bytes": int}
+    """
+    from ..services.image_service import raw_bytes_to_webp_data_url
+
+    f = request.files.get("image")
+    if not f or not f.filename:
+        return err("未收到图片文件")
+    raw = f.read()
+    if not raw:
+        return err("图片内容为空")
+    if len(raw) > 16 * 1024 * 1024:
+        return err("图片过大，请控制在 16MB 以内")
+
+    kind = (request.form.get("kind") or "teapost").lower()
+    max_edge, quality = (1024, 80) if kind == "comment" else (1280, 82)
+    try:
+        data_url = raw_bytes_to_webp_data_url(raw, max_edge=max_edge, quality=quality)
+    except Exception:
+        return err("图片格式无法识别或处理失败")
+    return ok({"image": data_url, "bytes": len(data_url)})
+
+
+@api_bp.route("/me/avatar", methods=["POST"])
+@api_login_required
+def me_avatar():
+    """上传并更新头像。接收 multipart 文件，居中裁剪为 256x256 WebP。"""
+    from ..services.image_service import crop_square_and_compress_bytes
+
+    user = _ensure_self()
+    if getattr(user, "is_edit_profile_banned", False):
+        return err("当前账号被禁止修改资料", 403)
+    f = request.files.get("image")
+    if not f or not f.filename:
+        return err("未收到图片文件")
+    raw = f.read()
+    if not raw:
+        return err("图片内容为空")
+    if len(raw) > 16 * 1024 * 1024:
+        return err("图片过大，请控制在 16MB 以内")
+    try:
+        data_url = crop_square_and_compress_bytes(raw, size=256, quality=82)
+    except Exception:
+        return err("图片格式无法识别或处理失败")
+    user.avatar = data_url
+    db.session.commit()
+    return ok({"avatar": data_url})
+
+
+@api_bp.route("/teahouse/images/<int:image_id>", methods=["GET"])
+def teahouse_image(image_id):
+    """按 id 返回茶馆配图（WebP）。供客户端显示上传后的图片。"""
+    from ..services.image_service import send_webp
+
+    img = db.session.get(TeaPostImage, image_id)
+    if not img:
+        return ("", 404)
+    return send_webp(img.image_data)
