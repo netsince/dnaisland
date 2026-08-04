@@ -17,6 +17,7 @@ from sqlalchemy import or_
 from ..extensions import db
 from ..models import (
     Card,
+    Comment,
     Notification,
     PointTransaction,
     Punishment,
@@ -58,6 +59,11 @@ from ..routes.teahouse import (
     _visible_query as _teahouse_visible_query,
 )
 from ..services.card_service import enrich_cards
+from ..services.comment_service import (
+    delete_comment,
+    pin_comment,
+    toggle_comment_like,
+)
 from ..services.notification_service import mark_all_read, notifications_page, unread_count
 from ..services.punishment_service import my_punishments_list, submit_punishment_appeal
 from ..services.report_service import (
@@ -520,6 +526,43 @@ def cards_comment_post(card_id):
     if err_code == "too_long":
         return err("评论不能超过 500 字")
     return ok({"id": cm.id, "message": "评论成功"}), 201
+
+
+@api_bp.route("/cards/<card_id>/comments/<int:comment_id>/like", methods=["POST"])
+@api_login_required
+def cards_comment_like(card_id, comment_id):
+    """角色卡评论点赞/取消（与网页 card_comment_like 共用逻辑）。"""
+    cm = db.session.get(Comment, comment_id)
+    if not cm or cm.card_id != card_id:
+        return err("评论不存在", 404)
+    is_now_liked, new_count = toggle_comment_like(_ensure_self(), cm)
+    return ok({"liked": is_now_liked, "count": new_count})
+
+
+@api_bp.route("/cards/<card_id>/comments/<int:comment_id>/pin", methods=["POST"])
+@api_login_required
+def cards_comment_pin(card_id, comment_id):
+    """置顶/取消置顶角色卡评论（仅卡作者，与网页 card_comment_pin 共用逻辑）。"""
+    cm = db.session.get(Comment, comment_id)
+    if not cm or cm.card_id != card_id:
+        return err("评论不存在", 404)
+    error = pin_comment(_ensure_self(), cm)
+    if error:
+        return err(error, 403)
+    return ok({"is_pinned": cm.is_pinned})
+
+
+@api_bp.route("/cards/<card_id>/comments/<int:comment_id>/delete", methods=["POST"])
+@api_login_required
+def cards_comment_delete(card_id, comment_id):
+    """删除角色卡评论（仅评论作者，与网页 card_comment_delete 共用逻辑）。"""
+    cm = db.session.get(Comment, comment_id)
+    if not cm or cm.card_id != card_id:
+        return err("评论不存在", 404)
+    error = delete_comment(_ensure_self(), cm)
+    if error:
+        return err(error, 403)
+    return ok({"ok": True})
 
 
 # ---------------------------------------------------------------------------

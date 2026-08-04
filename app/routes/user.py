@@ -27,7 +27,6 @@ from ..models import (
     CardImage,
     CardTag,
     Comment,
-    CommentLike,
     Punishment,
     TeaPost,
     User,
@@ -39,8 +38,13 @@ from ..models.punishment import (
     APPEAL_REJECTED,
     PUNISHMENT_TYPES,
 )
+from ..services.comment_service import (
+    delete_comment,
+    pin_comment,
+    toggle_comment_like,
+)
 from ..services.image_service import raw_bytes_to_webp_data_url
-from ..services.notification_service import notifications_page, notify
+from ..services.notification_service import notifications_page
 from ..services.punishment_service import my_punishments_list, submit_punishment_appeal
 from ..services.report_service import (
     REPORT_REASONS,
@@ -49,12 +53,10 @@ from ..services.report_service import (
     submit_report,
 )
 from ..utils import (
-    ensure_owner_or_admin,
     get_user_by_username,
     is_xhr,
     respond,
     status_counts,
-    toggle_relation,
 )
 
 # 审核状态徽章 HTML（与 macros/cards.html::status_badge 保持一致，供 AJAX 局部更新）
@@ -704,22 +706,7 @@ def card_comment_like(card_id, comment_id):
     cm = db.get_or_404(Comment, comment_id)
     if cm.card_id != card_id:
         abort(404)
-    is_now_liked, new_count = toggle_relation(
-        CommentLike.query.filter_by(
-            user_id=current_user.id, comment_id=comment_id
-        ).first(),
-        CommentLike(user_id=current_user.id, comment_id=comment_id),
-        CommentLike.query.filter_by(comment_id=comment_id),
-    )
-    if is_now_liked and cm.user_id != current_user.id:
-        card = db.session.get(Card, card_id)
-        if card:
-            notify(
-                user_id=cm.user_id,
-                message=f"{current_user.display_name} 点赞了你在《{card.name}》下的评论",
-                type_="comment_like",
-                related_card_id=card.id,
-            )
+    is_now_liked, new_count = toggle_comment_like(current_user, cm)
     return jsonify({"ok": True, "liked": is_now_liked, "count": new_count})
 
 
@@ -729,10 +716,9 @@ def card_comment_pin(card_id, comment_id):
     cm = db.get_or_404(Comment, comment_id)
     if cm.card_id != card_id:
         abort(404)
-    card = db.get_or_404(Card, card_id)
-    ensure_owner_or_admin(card.author_id, message="无权置顶此评论")
-    cm.is_pinned = not cm.is_pinned
-    db.session.commit()
+    err = pin_comment(current_user, cm)
+    if err:
+        abort(403, description=err)
     return jsonify({"ok": True, "is_pinned": cm.is_pinned})
 
 
@@ -742,9 +728,9 @@ def card_comment_delete(card_id, comment_id):
     cm = db.get_or_404(Comment, comment_id)
     if cm.card_id != card_id:
         abort(404)
-    ensure_owner_or_admin(cm.user_id, message="无权删除此评论")
-    db.session.delete(cm)
-    db.session.commit()
+    err = delete_comment(current_user, cm)
+    if err:
+        abort(403, description=err)
     return jsonify({"ok": True})
 
 
