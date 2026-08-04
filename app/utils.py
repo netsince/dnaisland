@@ -1,8 +1,10 @@
 """跨路由复用的小工具函数。"""
 
+import hashlib
+import os
 import time
 
-from flask import abort, flash, g, jsonify, redirect, request
+from flask import abort, current_app, flash, g, jsonify, redirect, request, url_for
 from flask_login import current_user
 
 from .extensions import db
@@ -55,6 +57,46 @@ def toggle_relation(existing, add_obj, count_query):
 # ---------------------------------------------------------------------------
 # 响应与鉴权相关的通用逻辑
 # ---------------------------------------------------------------------------
+_STATIC_HASH_CACHE: dict[str, tuple[float, str]] = {}
+
+
+def _static_file_hash(fs_path: str) -> str:
+    """返回文件的 sha1 前 8 位；按文件 mtime 缓存，文件未变不重复读取。"""
+    try:
+        mtime = os.path.getmtime(fs_path)
+    except OSError:
+        return ""
+    cached = _STATIC_HASH_CACHE.get(fs_path)
+    if cached is not None and cached[0] == mtime:
+        return cached[1]
+    try:
+        with open(fs_path, "rb") as f:
+            h = hashlib.sha1(f.read()).hexdigest()[:8]
+    except OSError:
+        return ""
+    _STATIC_HASH_CACHE[fs_path] = (mtime, h)
+    return h
+
+
+def static_versioned(filename: str) -> str:
+    """返回带内容指纹的本地静态资源 URL（`?v=<sha1前8位>`）。
+
+    - 存在同名 `.min` 构建产物（如 `css/style.min.css`，由 scripts/build_static.py
+      产出）时自动使用压缩版；未构建则回退原文件，不会 404。
+    - 指纹随内容变化而变，配合强缓存可实现「文件更新即自动失效」。
+    """
+    fs_path = os.path.join(current_app.static_folder, filename)
+    base, ext = os.path.splitext(filename)
+    if ext.lower() in (".css", ".js"):
+        min_path = os.path.join(current_app.static_folder, base + ".min" + ext)
+        if os.path.exists(min_path):
+            fs_path = min_path
+            filename = base + ".min" + ext
+    h = _static_file_hash(fs_path)
+    url = url_for("static", filename=filename)
+    return f"{url}?v={h}" if h else url
+
+
 def is_xhr() -> bool:
     """当前请求是否期望 JSON 响应（XHR 或 /api/ 前缀，由 before_request 写入 g.want_json）。"""
     return bool(getattr(g, "want_json", False))

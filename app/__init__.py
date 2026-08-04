@@ -49,6 +49,12 @@ def create_app(config_object=None):
     # context）也能访问到，避免 'current_user' is undefined 报错
     app.jinja_env.globals["current_user"] = current_user
 
+    # 静态资源带内容指纹的 URL（static_versioned 的模板别名）：
+    # 自动使用 .min 压缩版并加 ?v=content-hash，实现强缓存 + 版本失效
+    from .utils import static_versioned
+
+    app.jinja_env.globals["staticv"] = static_versioned
+
     # 翻译函数占位：项目未接入 Flask-Babel 时，模板里用 _('...') 做文案占位，
     # 这里提供透传实现，避免 " '_' is undefined " 报错。后续接入 i18n 时替换即可。
     def _(s, *args, **kwargs):
