@@ -81,6 +81,20 @@ def ensure_owner_or_admin(owner_id, message="无权访问该资源"):
 
 
 _RATE_LIMITS: dict[str, list[float]] = {}  # "scope:key" -> [timestamp, ...]
+# 限流窗口记录条数上限，超过后先淘汰过期/最旧窗口，防止长时间运行内存无限增长
+_RATE_LIMITS_MAX = 10000
+
+
+def _prune_rate_limits() -> None:
+    """容量超限时淘汰过期窗口与最旧的窗口。"""
+    for k in [k for k, v in _RATE_LIMITS.items() if not v]:
+        _RATE_LIMITS.pop(k, None)
+    while len(_RATE_LIMITS) > _RATE_LIMITS_MAX:
+        k = min(
+            _RATE_LIMITS,
+            key=lambda x: (min(_RATE_LIMITS[x]) if _RATE_LIMITS[x] else float("inf")),
+        )
+        _RATE_LIMITS.pop(k, None)
 
 
 def rate_hit(scope, limit=5, per=60, key=None):
@@ -98,4 +112,6 @@ def rate_hit(scope, limit=5, per=60, key=None):
     if len(hits) >= limit:
         return True
     hits.append(now)
+    if len(_RATE_LIMITS) > _RATE_LIMITS_MAX:
+        _prune_rate_limits()
     return False

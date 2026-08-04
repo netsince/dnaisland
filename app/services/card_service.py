@@ -10,13 +10,11 @@
 import json
 import random
 import string
-import time
-from collections import OrderedDict
 from datetime import datetime
-from typing import Any
 
 from sqlalchemy import func
 
+from ..caching import TimedCache
 from ..extensions import db
 from ..models import (
     Card,
@@ -328,8 +326,7 @@ def build_export_package(
 # 热门标签云：全量 card_tags 的 group by 较重，且变化不频繁，缓存 5 分钟。
 # 注意：标签可见性依赖 viewer（屏蔽作者），此处缓存全局可见结果；
 # 登录用户看到被屏蔽作者的标签最多滞后 TTL，社区标签云可接受。
-_TAG_CACHE: "OrderedDict[int, tuple[float, Any]]" = OrderedDict()  # {limit: (timestamp, result)}
-_TAG_CACHE_TTL = 300
+_TAG_CACHE = TimedCache(ttl=300)
 
 
 def popular_tags(viewer=None, limit=30):
@@ -337,10 +334,9 @@ def popular_tags(viewer=None, limit=30):
 
     标签计数只统计对 viewer 可见的卡片，避免使用被屏蔽作者/未通过卡片的噪声标签。
     """
-    now = time.time()
     hit = _TAG_CACHE.get(limit)
-    if hit is not None and now - hit[0] < _TAG_CACHE_TTL:
-        return hit[1]
+    if hit is not None:
+        return hit
     visible_ids = Card.visible_to(viewer).with_entities(Card.id)
     rows = (
         db.session.query(CardTag.tag, func.count(CardTag.card_id).label("n"))
@@ -351,5 +347,5 @@ def popular_tags(viewer=None, limit=30):
         .all()
     )
     result = [{"tag": r.tag, "count": r.n} for r in rows]
-    _TAG_CACHE[limit] = (now, result)
+    _TAG_CACHE.set(limit, result)
     return result

@@ -1,5 +1,4 @@
-import time
-
+from ..caching import TimedCache
 from ..extensions import db
 from ..models import SiteConfig
 
@@ -31,8 +30,8 @@ def default_public_config():
 
 # 站点公开配置基本不变，加一层 TTL 内存缓存，避免每个请求都查库
 # （enforce_shutdown 与 inject_site 两处都会用到，缓存后同一进程内复用）。
-_cfg_cache = {"value": None, "ts": 0.0}
-_CFG_TTL = 60  # 秒
+_cfg_cache = TimedCache(ttl=60)
+_CFG_KEY = "site_cfg"
 
 
 def public_config():
@@ -41,9 +40,9 @@ def public_config():
     任何数据库异常都回退到默认配置，避免模板因缺少键而 500。
     结果带 60s TTL 内存缓存，省去每个请求重复查 SiteConfig。
     """
-    now = time.time()
-    if _cfg_cache["value"] is not None and now - _cfg_cache["ts"] < _CFG_TTL:
-        return _cfg_cache["value"]
+    cached = _cfg_cache.get(_CFG_KEY)
+    if cached is not None:
+        return cached
     try:
         cfg = get_site_config()
     except Exception:
@@ -76,8 +75,7 @@ def public_config():
         "memorial_banner_url": cfg.memorial_banner_url or "",
         "redeem_code_url": cfg.redeem_code_url or "",
     }
-    _cfg_cache["value"] = value
-    _cfg_cache["ts"] = now
+    _cfg_cache.set(_CFG_KEY, value)
     return value
 
 

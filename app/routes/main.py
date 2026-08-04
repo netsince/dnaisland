@@ -1,10 +1,7 @@
 import base64
 import math
 import random
-import time
-from collections import OrderedDict
 from io import BytesIO
-from typing import Any
 
 from flask import (
     Blueprint,
@@ -20,6 +17,7 @@ from flask_login import current_user
 from sqlalchemy import case, func, literal_column, or_
 from sqlalchemy.orm import joinedload
 
+from ..caching import TimedCache
 from ..extensions import db
 from ..models import (
     Article,
@@ -102,18 +100,15 @@ def article_cover(article_id):
 # 热度分需要对整表做 4 次聚合 + 加权计算，较昂贵，且 60s 内变化极小；
 # 但分数依赖 viewer 可见性，故按 viewer 身份分 key，并带 TTL 与 LRU 上限。
 # 随机抽样（含「换一换」的排除与纯随机名额）保留在缓存外执行，维持推荐动态性。
-_FEATURED_SCORE_CACHE: "OrderedDict[str, tuple[float, dict]]" = OrderedDict()
-_FEATURED_SCORE_TTL = 60
-_FEATURED_SCORE_MAX = 100
+_FEATURED_SCORE_CACHE = TimedCache(ttl=60, maxsize=100)  # viewer -> {card_id: score}
 
 
 def _featured_score_map() -> dict:
     """返回首页推荐候选池（card_id -> 热度分），带 60s TTL + LRU 上限缓存。"""
     vid = current_user.id if current_user.is_authenticated else "anon"
-    now = time.time()
     hit = _FEATURED_SCORE_CACHE.get(vid)
-    if hit is not None and now - hit[0] < _FEATURED_SCORE_TTL:
-        return hit[1]
+    if hit is not None:
+        return hit
     q, score_expr = _apply_hot_score(Card.visible_to(current_user))
     rows = q.with_entities(Card.id, score_expr).all()
     score_map: dict = {}
@@ -122,9 +117,7 @@ def _featured_score_map() -> dict:
             score_map[cid] = float(s) if s is not None else 0.0
         except (TypeError, ValueError):
             score_map[cid] = 0.0
-    _FEATURED_SCORE_CACHE[vid] = (now, score_map)
-    while len(_FEATURED_SCORE_CACHE) > _FEATURED_SCORE_MAX:
-        _FEATURED_SCORE_CACHE.popitem(last=False)
+    _FEATURED_SCORE_CACHE.set(vid, score_map)
     return score_map
 
 
@@ -368,21 +361,17 @@ def _order_by_likes(q):
 # 这些顺序在 60s 内变化极小，故按 (路由 + 过滤条件) 缓存有序 id 列表，分页时直接切片，
 # 免去每请求重算。缓存基于「全局可见」集合；登录用户屏蔽的作者可能滞后至多 TTL 出现
 # 于其热门流（与 popular_tags 的取舍一致），对热门推荐流可接受。
-_HOT_CARD_CACHE: "OrderedDict[str, tuple[float, Any]]" = OrderedDict()  # signature -> (ts, [card_id,...])
-_HOT_CARD_TTL = 60
+_HOT_CARD_CACHE = TimedCache(ttl=60, maxsize=50)  # signature -> [card_id,...]
 
 
 def _hot_card_order(signature, build_query, order_fn):
     """返回按热度降序排列的卡片 id 列表，带 60s TTL 缓存。"""
-    now = time.time()
-    hit = _HOT_CARD_CACHE.get(signature)
-    if hit is not None and now - hit[0] < _HOT_CARD_TTL:
-        return hit[1]
+    ids = _HOT_CARD_CACHE.get(signature)
+    if ids is not None:
+        return ids
     q = order_fn(build_query())
     ids = [cid for (cid,) in q.with_entities(Card.id).all()]
-    _HOT_CARD_CACHE[signature] = (now, ids)
-    while len(_HOT_CARD_CACHE) > 50:
-        _HOT_CARD_CACHE.popitem(last=False)
+    _HOT_CARD_CACHE.set(signature, ids)
     return ids
 
 

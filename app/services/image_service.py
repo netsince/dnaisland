@@ -6,11 +6,11 @@
 import base64
 import hashlib
 import re
-import time
-from collections import OrderedDict
 from io import BytesIO
 
 from PIL import Image
+
+from ..caching import TimedCache
 
 _DATA_URL_RE = re.compile(r"^data:(?P<mime>[\w/+.-]+);base64,(?P<data>.+)$", re.DOTALL)
 
@@ -95,10 +95,8 @@ def data_url_to_bytes_and_mime(data_url: str) -> tuple[bytes, str]:
 
 # 图片转码结果缓存：图片在库中以 base64 存储，每次请求都要解码（甚至 PIL 重编码）。
 # 以 (max_edge, quality, data_url 哈希) 为键缓存编码结果，图片不变则命中，
-# 避免重复 CPU 重算。值带过期时间与容量上限（LRU），防止内存无限增长。
-_WEBP_CACHE: "OrderedDict[str, tuple[bytes, float]]" = OrderedDict()
-_WEBP_CACHE_TTL = 3600
-_WEBP_CACHE_MAX = 500
+# 避免重复 CPU 重算。带过期时间与容量上限（LRU），防止内存无限增长。
+_WEBP_CACHE = TimedCache(ttl=3600, maxsize=500)
 
 
 def data_url_to_webp_bytes(data_url: str, max_edge: int = 1024, quality: int = 82) -> bytes:
@@ -110,13 +108,10 @@ def data_url_to_webp_bytes(data_url: str, max_edge: int = 1024, quality: int = 8
     """
     key = hashlib.sha1(f"{max_edge}|{quality}|{data_url}".encode()).hexdigest()
     cached = _WEBP_CACHE.get(key)
-    now = time.time()
-    if cached is not None and now - cached[1] < _WEBP_CACHE_TTL:
-        return cached[0]
+    if cached is not None:
+        return cached
     webp = _encode_webp_uncached(data_url, max_edge=max_edge, quality=quality)
-    _WEBP_CACHE[key] = (webp, now)
-    while len(_WEBP_CACHE) > _WEBP_CACHE_MAX:
-        _WEBP_CACHE.popitem(last=False)
+    _WEBP_CACHE.set(key, webp)
     return webp
 
 

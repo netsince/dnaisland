@@ -1,36 +1,37 @@
 """表情包服务：进程内缓存映射、文本渲染与提交清洗。"""
 import re
-import time
 from urllib.parse import quote
 
+from ..caching import TimedCache
 from ..models import Sticker
 
 # [sticker:CODE]，CODE 允许中文、字母数字下划线连字符
 _STICKER_TOKEN_RE = re.compile(r"\[sticker:([A-Za-z0-9_\u4e00-\u9fff-]+)\]")
 
 # 进程内缓存 {code: image_data}，避免每条内容渲染都查库
-_CACHE = {"map": None, "at": 0.0}
-_CACHE_TTL = 300  # 秒
+_CACHE = TimedCache(ttl=300)
+_CACHE_KEY = "sticker_map"
 
 
 def get_sticker_map():
-    """返回 {code: image_data} 的缓存映射；过期或失效后重新加载。"""
-    now = time.time()
-    if _CACHE["map"] is not None and now - _CACHE["at"] < _CACHE_TTL:
-        return _CACHE["map"]
+    """返回 {code: image_data} 的缓存映射；过期或失效后重新加载。
+
+    数据库异常时降级返回上一次的映射（即使已过期），避免渲染中断。
+    """
+    m = _CACHE.get(_CACHE_KEY)
+    if m is not None:
+        return m
     try:
         m = {s.code: s.image_data for s in Sticker.query.all()}
     except Exception:
-        m = _CACHE["map"] or {}
-    _CACHE["map"] = m
-    _CACHE["at"] = now
+        m = _CACHE.get(_CACHE_KEY, stale=True) or {}
+    _CACHE.set(_CACHE_KEY, m)
     return m
 
 
 def invalidate_sticker_cache():
     """后台增删表情后调用，使映射立即失效。"""
-    _CACHE["map"] = None
-    _CACHE["at"] = 0.0
+    _CACHE.invalidate(_CACHE_KEY)
 
 
 def render_stickers_html(text):
