@@ -143,9 +143,22 @@ def recommend_items():
     recs = SiteRecommendation.query.order_by(
         SiteRecommendation.sort_order, SiteRecommendation.created_at
     ).all()
+
+    # 批量取推荐引用到的卡片 / 用户，避免在循环里逐条 db.session.get 造成 N+1
+    card_ids = [r.ref_id for r in recs if r.kind == "card"]
     user_ids = [
         int(r.ref_id) for r in recs if r.kind == "user" and str(r.ref_id).isdigit()
     ]
+    card_map: dict = (
+        {c.id: c for c in Card.query.filter(Card.id.in_(card_ids)).all()}
+        if card_ids
+        else {}
+    )
+    user_map: dict = (
+        {u.id: u for u in User.query.filter(User.id.in_(user_ids)).all()}
+        if user_ids
+        else {}
+    )
     card_counts = (
         dict(
             db.session.query(Card.author_id, db.func.count())
@@ -161,13 +174,13 @@ def recommend_items():
     cover_cards = []
     for r in recs:
         if r.kind == "card":
-            c = db.session.get(Card, r.ref_id)
+            c = card_map.get(r.ref_id)
             if c and c.status == "approved" and not c.is_hidden:
                 items.append({"kind": "card", "card": c, "note": r.note})
                 cover_cards.append(c)
         elif r.kind == "user":
             if str(r.ref_id).isdigit():
-                u = db.session.get(User, int(r.ref_id))
+                u = user_map.get(int(r.ref_id))
                 if u and u.status == "active" and not u.active_punishments:
                     items.append(
                         {
