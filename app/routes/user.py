@@ -70,7 +70,13 @@ from ..services.card_service import (
     enrich_cards,
     load_card_images,
 )
-from ..routes.card_lists import card_detail_core, card_export_package, profile_cards
+from ..routes.card_lists import (
+    card_comments_list,
+    card_detail_core,
+    card_export_package,
+    create_comment,
+    profile_cards,
+)
 from ..routes.card_lists import my_cards as shared_my_cards
 from ..routes.card_lists import my_favorites as shared_my_favorites
 from ..routes.card_lists import my_likes as shared_my_likes
@@ -579,65 +585,19 @@ def user_follow(username):
 
 @user_bp.route("/api/card/<card_id>/comments", methods=["GET"])
 def card_comments_api(card_id):
-    """返回角色卡评论 JSON，供前端抽屉 AJAX 分页加载。"""
-    from sqlalchemy.orm import joinedload
-
-    card = db.session.get(Card, card_id)
-    if not card:
-        return jsonify({"error": "not found"}), 404
+    """返回角色卡评论 JSON，供前端抽屉 AJAX 分页加载。与 App 共用 card_comments_list。"""
     page = request.args.get("page", 1, type=int)
     per_page = 20
     sort = request.args.get("sort", "latest")
 
-    like_count_sub = (
-        db.session.query(func.count(CommentLike.user_id))
-        .filter(CommentLike.comment_id == Comment.id)
-        .scalar_subquery()
+    card, data, err_code = card_comments_list(
+        card_id, current_user, page=page, per_page=per_page, sort=sort
     )
-
-    q = Comment.query.options(
-        joinedload(Comment.author),
-        joinedload(Comment.reply_to).joinedload(Comment.author),
-    ).filter_by(card_id=card_id, is_hidden=False)
-    if sort == "hottest":
-        q = q.order_by(
-            Comment.is_pinned.desc(),
-            like_count_sub.desc(),
-            Comment.created_at.desc(),
-            Comment.id.desc(),
-        )
-    else:
-        q = q.order_by(
-            Comment.is_pinned.desc(),
-            Comment.created_at.desc(),
-            Comment.id.desc(),
-        )
-
-    pagination = q.paginate(page=page, per_page=per_page, error_out=False)
-
-    comment_ids = [cm.id for cm in pagination.items]
-    like_counts = {}
-    user_liked_ids = set()
-
-    if comment_ids:
-        counts = (
-            db.session.query(CommentLike.comment_id, func.count(CommentLike.user_id))
-            .filter(CommentLike.comment_id.in_(comment_ids))
-            .group_by(CommentLike.comment_id)
-            .all()
-        )
-        like_counts = dict(counts)
-
-        if current_user.is_authenticated:
-            user_likes = (
-                db.session.query(CommentLike.comment_id)
-                .filter(
-                    CommentLike.user_id == current_user.id,
-                    CommentLike.comment_id.in_(comment_ids),
-                )
-                .all()
-            )
-            user_liked_ids = {r[0] for r in user_likes}
+    if err_code == "not_found":
+        return jsonify({"error": "not found"}), 404
+    pagination = data["pagination"]
+    like_counts = data["like_counts"]
+    user_liked_ids = data["user_liked_ids"]
 
     items = []
     for idx, cm in enumerate(pagination.items):
@@ -719,18 +679,12 @@ def card_comments_api(card_id):
 @login_required
 @block_if_muted(message="你已被禁言，暂时无法评论")
 def card_comment(card_id):
+    """发表评论：核心逻辑与 App 共用 create_comment 一个函数。"""
     card = db.get_or_404(Card, card_id)
     content = (request.form.get("content") or "").strip()
-    content, _ = sanitize_stickers(content, max_count=20)
-    if not content:
-        return respond(url_for("user.card_detail", card_id=card_id), ok=False, status=400,
-                       flash_msg="评论内容不能为空", flash_cat="warning",
-                       error="评论内容不能为空")
-    if len(content) > 500:
-        return respond(url_for("user.card_detail", card_id=card_id), ok=False, status=400,
-                       flash_msg="评论内容不能超过 500 字", flash_cat="warning",
-                       error="评论内容不能超过 500 字")
+    reply_to_id = request.form.get("reply_to_id", type=int)
 
+    # 图片上传：转成 base64 data URL 后交给共享函数
     image_data = None
     image_file = request.files.get("image")
     if image_file and image_file.filename:
@@ -756,9 +710,8 @@ def card_comment(card_id):
 
         raw = image_file.read()
         try:
-            # 压缩为 WebP 后以 base64 data URL 直接存入数据库（与其它图片上传保持一致），不再落地目录
             image_data = raw_bytes_to_webp_data_url(raw, max_edge=1280, quality=80)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             current_app.logger.error(f"评论图片转 WebP 失败: {e}")
             err_msg = "图片处理失败，请重试"
             if is_xhr():
@@ -766,41 +719,22 @@ def card_comment(card_id):
             flash(err_msg, "danger")
             return redirect(url_for("user.card_detail", card_id=card_id))
 
-    reply_to_id = request.form.get("reply_to_id", type=int)
-    valid_reply_to_id = None
-    parent_cm = None
-    if reply_to_id:
-        parent_cm = db.session.get(Comment, reply_to_id)
-        if parent_cm and parent_cm.card_id == card_id:
-            valid_reply_to_id = parent_cm.id
-        else:
-            parent_cm = None
-
-    db.session.add(
-        Comment(
-            card_id=card_id,
-            user_id=current_user.id,
-            content=content,
-            reply_to_id=valid_reply_to_id,
-            image_data=image_data,
-        )
+    _cm, err_code = create_comment(
+        card_id, current_user, content,
+        reply_to_id=reply_to_id, image_data=image_data,
     )
-    if parent_cm and parent_cm.user_id != current_user.id:
-        notify(
-            user_id=parent_cm.user_id,
-            message=f'{current_user.display_name} 在《{card.name}》中回复了你："{content[:30]}"',
-            type_="comment_reply",
-            related_card_id=card.id,
-        )
-    elif card.author_id != current_user.id:
-        notify(
-            user_id=card.author_id,
-            message=f"{current_user.display_name} 在你的角色卡《{card.name}》下发表了评论",
-            type_="card_comment",
-            related_card_id=card.id,
-        )
-
-    db.session.commit()
+    if err_code == "empty":
+        return respond(url_for("user.card_detail", card_id=card_id), ok=False, status=400,
+                       flash_msg="评论内容不能为空", flash_cat="warning",
+                       error="评论内容不能为空")
+    if err_code == "too_long":
+        return respond(url_for("user.card_detail", card_id=card_id), ok=False, status=400,
+                       flash_msg="评论内容不能超过 500 字", flash_cat="warning",
+                       error="评论内容不能超过 500 字")
+    if err_code == "muted":
+        return respond(url_for("user.card_detail", card_id=card_id), ok=False, status=403,
+                       flash_msg="你已被禁言，暂时无法评论", flash_cat="warning",
+                       error="你已被禁言，暂时无法评论")
     return respond(url_for("user.card_detail", card_id=card_id),
                    flash_msg="评论成功", flash_cat="success")
 

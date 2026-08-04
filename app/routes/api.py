@@ -42,8 +42,10 @@ from ..routes.main import featured_cards
 from ..routes.teahouse import _visible_query as _teahouse_visible_query
 from ..services.card_service import build_export_package, enrich_cards
 from ..routes.card_lists import (
+    card_comments_list,
     card_detail_core,
     card_export_package,
+    create_comment,
     explore_cards,
     profile_cards,
     recommend_items,
@@ -448,49 +450,21 @@ def cards_favorite(card_id):
 
 @api_bp.route("/cards/<card_id>/comments", methods=["GET"])
 def cards_comments(card_id):
-    """角色卡评论列表（复用现有 /api/card/<id>/comments 的 SQL 逻辑，返回格式微调）。"""
-    from sqlalchemy.orm import joinedload
-
-    card = db.session.get(Card, card_id)
-    if not card:
-        return err("角色卡不存在", 404)
+    """角色卡评论列表：与网页版共用 card_comments_list 一个函数。"""
     page = request.args.get("page", 1, type=int)
-    per_page = 20
     sort = request.args.get("sort", "latest")
-
-    like_count_sub = (
-        db.session.query(func.count().label("lc"))
-        .filter(CommentLike.comment_id == Comment.id)
-        .scalar_subquery()
+    card, data, err_code = card_comments_list(
+        card_id, _ensure_self(), page=page, per_page=20, sort=sort
     )
-
-    q = Comment.query.options(
-        joinedload(Comment.author),
-        joinedload(Comment.reply_to).joinedload(Comment.author),
-    ).filter_by(card_id=card_id, is_hidden=False)
-    if sort == "hottest":
-        q = q.order_by(Comment.is_pinned.desc(), like_count_sub.desc(), Comment.created_at.desc(), Comment.id.desc())
-    else:
-        q = q.order_by(Comment.is_pinned.desc(), Comment.created_at.desc(), Comment.id.desc())
-
-    pag = q.paginate(page=page, per_page=per_page, error_out=False)
-
-    comment_ids = [cm.id for cm in pag.items]
-    like_counts = {}
-    user_liked_ids = set()
-    if comment_ids:
-        rows = db.session.query(CommentLike.comment_id, func.count().label("cnt")).filter(
-            CommentLike.comment_id.in_(comment_ids)
-        ).group_by(CommentLike.comment_id).all()
-        like_counts = dict(rows)
-        cu = _ensure_self()
-        if cu.is_authenticated:
-            ul = db.session.query(CommentLike.comment_id).filter(
-                CommentLike.user_id == cu.id, CommentLike.comment_id.in_(comment_ids)
-            ).all()
-            user_liked_ids = {r[0] for r in ul}
-
-    items = [_comment_item(cm, cm.id in user_liked_ids, like_counts.get(cm.id, 0)) for cm in pag.items]
+    if err_code == "not_found":
+        return err("角色卡不存在", 404)
+    pag = data["pagination"]
+    like_counts = data["like_counts"]
+    user_liked_ids = data["user_liked_ids"]
+    items = [
+        _comment_item(cm, cm.id in user_liked_ids, like_counts.get(cm.id, 0))
+        for cm in pag.items
+    ]
     return ok({
         "items": items,
         "page": pag.page,
@@ -503,52 +477,29 @@ def cards_comments(card_id):
 @api_bp.route("/cards/<card_id>/comments", methods=["POST"])
 @api_login_required
 def cards_comment_post(card_id):
-    """发表评论。"""
-    from ..services.sticker_service import sanitize_stickers
-
+    """发表评论：与网页版共用 create_comment 一个函数。"""
     card = db.session.get(Card, card_id)
     if not card:
         return err("角色卡不存在", 404)
-    if getattr(_ensure_self(), "is_muted", False):
-        return err("你已被禁言，暂时无法评论", 403)
 
     data = request.get_json(silent=True) or {}
     content = (data.get("content") or "").strip()
-    content, _ = sanitize_stickers(content, max_count=20)
-    if not content:
-        return err("评论内容不能为空")
-    if len(content) > 500:
-        return err("评论不能超过 500 字")
-
-    reply_to_id = data.get("reply_to_id", type=int)
-    valid_reply = None
-    if reply_to_id:
-        parent = db.session.get(Comment, reply_to_id)
-        if parent and parent.card_id == card_id:
-            valid_reply = parent.id
-
-    # 图片支持（base64 data URL 或忽略）
+    raw_reply = data.get("reply_to_id")
+    reply_to_id = int(raw_reply) if str(raw_reply).isdigit() else None
     image_data = data.get("image_data") or None
 
-    cm = Comment(
-        card_id=card_id,
-        user_id=_ensure_self().id,
-        content=content,
-        reply_to_id=valid_reply,
-        image_data=image_data,
+    cm, err_code = create_comment(
+        card_id, _ensure_self(), content,
+        reply_to_id=reply_to_id, image_data=image_data,
     )
-    db.session.add(cm)
-
-    # 通知
-    from ..services.notification_service import notify
-    if valid_reply:
-        parent = db.session.get(Comment, valid_reply)
-        if parent and parent.user_id != _ensure_self().id:
-            notify(parent.user_id, f'{_ensure_self().display_name} 回复了你的评论："{content[:30]}"', type_="comment_reply", related_card_id=card.id)
-    elif card.author_id != _ensure_self().id:
-        notify(card.author_id, f"{_ensure_self().display_name} 评论了你的角色卡《{card.name}》", type_="card_comment", related_card_id=card.id)
-    db.session.commit()
-
+    if err_code == "not_found":
+        return err("角色卡不存在", 404)
+    if err_code == "muted":
+        return err("你已被禁言，暂时无法评论", 403)
+    if err_code == "empty":
+        return err("评论内容不能为空")
+    if err_code == "too_long":
+        return err("评论不能超过 500 字")
     return ok({"id": cm.id, "message": "评论成功"}), 201
 
 

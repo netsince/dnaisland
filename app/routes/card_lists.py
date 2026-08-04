@@ -8,6 +8,8 @@ viewer 参数表示「以谁的身份看」（Web 传 current_user，App 传 JWT
 from datetime import datetime
 
 from flask import current_app, request
+from sqlalchemy import func
+from sqlalchemy.orm import joinedload
 
 from ..models import (
     Card,
@@ -18,6 +20,7 @@ from ..models import (
     CardLike,
     CardTag,
     Comment,
+    CommentLike,
     SiteRecommendation,
     User,
     db,
@@ -292,3 +295,124 @@ def card_detail_core(card_id, viewer):
         "liked": liked,
         "favorited": favorited,
     }, None
+
+
+def card_comments_list(card_id, viewer, page=1, per_page=20, sort="latest"):
+    """评论列表核心：Web 与 App 共用（查询 + 批量点赞统计 + 预载作者）。
+
+    返回 (card, data, error_code)；data 含：
+      pagination / like_counts / user_liked_ids / sort
+    """
+    card = db.session.get(Card, card_id)
+    if not card:
+        return None, None, "not_found"
+
+    like_count_sub = (
+        db.session.query(func.count().label("lc"))
+        .filter(CommentLike.comment_id == Comment.id)
+        .scalar_subquery()
+    )
+    q = Comment.query.options(
+        joinedload(Comment.author),
+        joinedload(Comment.reply_to).joinedload(Comment.author),
+    ).filter_by(card_id=card_id, is_hidden=False)
+    if sort == "hottest":
+        q = q.order_by(
+            Comment.is_pinned.desc(),
+            like_count_sub.desc(),
+            Comment.created_at.desc(),
+            Comment.id.desc(),
+        )
+    else:
+        q = q.order_by(
+            Comment.is_pinned.desc(), Comment.created_at.desc(), Comment.id.desc()
+        )
+    pag = q.paginate(page=page, per_page=per_page, error_out=False)
+
+    comment_ids = [cm.id for cm in pag.items]
+    like_counts: dict[int, int] = {}
+    user_liked_ids: set = set()
+    if comment_ids:
+        rows = (
+            db.session.query(CommentLike.comment_id, func.count().label("cnt"))
+            .filter(CommentLike.comment_id.in_(comment_ids))
+            .group_by(CommentLike.comment_id)
+            .all()
+        )
+        like_counts = dict(rows)
+        if viewer.is_authenticated:
+            ul = (
+                db.session.query(CommentLike.comment_id)
+                .filter(
+                    CommentLike.user_id == viewer.id,
+                    CommentLike.comment_id.in_(comment_ids),
+                )
+                .all()
+            )
+            user_liked_ids = {r[0] for r in ul}
+
+    return card, {
+        "pagination": pag,
+        "like_counts": like_counts,
+        "user_liked_ids": user_liked_ids,
+        "sort": sort,
+    }, None
+
+
+def create_comment(card_id, viewer, content, reply_to_id=None, image_data=None):
+    """发表评论核心：Web 与 App 共用（校验 + 回复验证 + 通知）。
+
+    返回 (comment, error_code)；error_code：
+      None | "not_found" | "muted" | "empty" | "too_long"
+    图片上传的格式转换由两端各自处理后再传入 image_data。
+    """
+    from ..services.sticker_service import sanitize_stickers
+    from ..services.notification_service import notify
+
+    card = db.session.get(Card, card_id)
+    if not card:
+        return None, "not_found"
+    if getattr(viewer, "is_muted", False):
+        return None, "muted"
+
+    content, _ = sanitize_stickers(content, max_count=20)
+    if not content:
+        return None, "empty"
+    if len(content) > 500:
+        return None, "too_long"
+
+    parent = None
+    valid_reply_id = None
+    if reply_to_id:
+        parent = db.session.get(Comment, reply_to_id)
+        if parent and parent.card_id == card_id:
+            valid_reply_id = parent.id
+        else:
+            parent = None
+
+    cm = Comment(
+        card_id=card_id,
+        user_id=viewer.id,
+        content=content,
+        reply_to_id=valid_reply_id,
+        image_data=image_data,
+    )
+    db.session.add(cm)
+
+    if valid_reply_id and parent:
+        if parent.user_id != viewer.id:
+            notify(
+                parent.user_id,
+                f'{viewer.display_name} 回复了你的评论："{content[:30]}"',
+                type_="comment_reply",
+                related_card_id=card.id,
+            )
+    elif card.author_id != viewer.id:
+        notify(
+            card.author_id,
+            f"{viewer.display_name} 评论了你的角色卡《{card.name}》",
+            type_="card_comment",
+            related_card_id=card.id,
+        )
+    db.session.commit()
+    return cm, None
