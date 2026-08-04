@@ -206,25 +206,25 @@ def redeem():
         codes = [c.strip() for c in raw.splitlines() if c.strip()]
         codes = list(dict.fromkeys(codes))  # 去重并保持顺序
 
-    if not codes:
-        flash("请输入至少一个兑换码", "warning")
-        return redirect(url_for("points.redeem"))
-    if len(codes) > MAX_KEYS_PER_REQUEST:
-        flash(f"一次最多兑换 {MAX_KEYS_PER_REQUEST} 个兑换码", "warning")
-        return redirect(url_for("points.redeem"))
+        if not codes:
+            flash("请输入至少一个兑换码", "warning")
+            return redirect(url_for("points.redeem"))
+        if len(codes) > MAX_KEYS_PER_REQUEST:
+            flash(f"一次最多兑换 {MAX_KEYS_PER_REQUEST} 个兑换码", "warning")
+            return redirect(url_for("points.redeem"))
 
-    ok_flag, message, results, success_count = redeem_codes(current_user, codes)
-    if not ok_flag:
-        flash(message, "warning")
-        return redirect(url_for("points.redeem"))
+        ok_flag, message, results, success_count = redeem_codes(current_user, codes)
+        if not ok_flag:
+            flash(message, "warning")
+            return redirect(url_for("points.redeem"))
 
-    # 通过 session 传递结果，避免刷新页面重复兑换
-    session["redeem_results"] = results
-    flash(
-        f"兑换完成：成功 {success_count} 个，失败 {len(codes) - success_count} 个",
-        "success" if success_count else "warning",
-    )
-    return redirect(url_for("points.redeem"))
+        # 通过 session 传递结果，避免刷新页面重复兑换
+        session["redeem_results"] = results
+        flash(
+            f"兑换完成：成功 {success_count} 个，失败 {len(codes) - success_count} 个",
+            "success" if success_count else "warning",
+        )
+        return redirect(url_for("points.redeem"))
 
     # GET
     results = session.pop("redeem_results", None)
