@@ -70,7 +70,7 @@ from ..services.card_service import (
     enrich_cards,
     load_card_images,
 )
-from ..routes.card_lists import profile_cards
+from ..routes.card_lists import card_detail_core, card_export_package, profile_cards
 from ..routes.card_lists import my_cards as shared_my_cards
 from ..routes.card_lists import my_favorites as shared_my_favorites
 from ..routes.card_lists import my_likes as shared_my_likes
@@ -364,41 +364,22 @@ def punish_appeal(punishment_id):
 
 @user_bp.route("/card/<card_id>")
 def card_detail(card_id):
-    card = db.get_or_404(Card, card_id)
-    author = card.author
-
-    is_owner = current_user.is_authenticated and current_user.id == card.author_id
-    is_admin = current_user.is_authenticated and current_user.is_super_admin
-
-    # 隐藏卡、未通过审核的卡、以及被封禁作者的卡，仅对作者与管理员可见
-    if not (card.is_public or is_owner or is_admin):
+    """角色卡详情：核心数据与 App 共用 card_detail_core 一个函数。"""
+    card, data, err_code = card_detail_core(card_id, current_user)
+    if err_code in ("not_found", "forbidden"):
         abort(404)
 
-    # 外部带 comment 参数进入时，自动展开评论区并定位到对应评论
+    author = card.author
+    is_owner = current_user.is_authenticated and current_user.id == card.author_id
+    is_admin = current_user.is_authenticated and current_user.is_super_admin
     focus_comment = request.args.get("comment", type=int)
 
-    if not is_owner:
-        card.view_count = (card.view_count or 0) + 1
-        db.session.commit()
-
-    tags = [t.tag for t in CardTag.query.filter_by(card_id=card.id).all()]
-    dialogue = [
-        {"user": d.user_text, "assistant": d.assistant_text}
-        for d in CardDialogueStyle.query.filter_by(card_id=card.id)
-        .order_by(CardDialogueStyle.turn_index)
-    ]
-    images = load_card_images(card.id)
-
-    like_count = CardLike.query.filter_by(card_id=card.id).count()
-    favorite_count = CardFavorite.query.filter_by(card_id=card.id).count()
+    # 评论区与关联茶馆帖（页面级内容，web 独有）
     comments = (
         Comment.query.filter_by(card_id=card.id)
         .order_by(Comment.created_at.asc())
         .all()
     )
-    # 屏蔽全部评论：被处罚用户的评论对他人不可见（本人与管理员可见）；
-    # 被审核拒绝（is_hidden）的评论同样对他人不可见。
-    # 「已删除」（admin_del）作者的评论对他人/本人均隐藏（管理员仍可见）。
     visible_comments = [
         c
         for c in comments
@@ -411,16 +392,6 @@ def card_detail(card_id):
             and not is_admin
         )
     ]
-    liked = (
-        current_user.is_authenticated
-        and CardLike.query.filter_by(user_id=current_user.id, card_id=card.id).first()
-        is not None
-    )
-    favorited = (
-        current_user.is_authenticated
-        and CardFavorite.query.filter_by(user_id=current_user.id, card_id=card.id).first()
-        is not None
-    )
     following = (
         current_user.is_authenticated
         and author is not None
@@ -429,7 +400,6 @@ def card_detail(card_id):
         ).first()
         is not None
     )
-    # 反向聚合：关联此角色卡的茶馆帖子（仅公开可见的）
     linked_posts = (
         TeaPost.query.filter(
             TeaPost.card_id == card.id,
@@ -444,18 +414,18 @@ def card_detail(card_id):
         "user/card_detail.html",
         card=card,
         author=author,
-        tags=tags,
-        dialogue=dialogue,
-        images=images,
+        tags=data["tags"],
+        dialogue=data["dialogue"],
+        images=load_card_images(card.id),
         is_owner=is_owner,
         is_admin=is_admin,
-        like_count=like_count,
-        favorite_count=favorite_count,
+        like_count=data["like_count"],
+        favorite_count=data["favorite_count"],
         comment_count=len(visible_comments),
         comments=visible_comments,
         linked_posts=linked_posts,
-        liked=liked,
-        favorited=favorited,
+        liked=data["liked"],
+        favorited=data["favorited"],
         following=following,
         focus_comment=focus_comment,
     )
@@ -465,63 +435,16 @@ def card_detail(card_id):
 def card_export(card_id):
     """导出角色卡为 dna-client 可识别的 JSON 下载。
 
-    可见性与 card_detail 一致：仅对已通过且未隐藏的公开卡、作者本人或管理员开放。
-    仅登录用户可复制。
+    核心逻辑与 App 共用 card_export_package 一个函数。
     """
-    if not current_user.is_authenticated:
+    card, package, err_code = card_export_package(card_id, current_user)
+    if err_code == "unauth":
         return jsonify(
             error="请先登录后再复制角色卡",
             login_url=url_for("auth.login"),
         ), 401
-
-    card = db.get_or_404(Card, card_id)
-
-    is_owner = current_user.is_authenticated and current_user.id == card.author_id
-    is_admin = current_user.is_authenticated and current_user.is_super_admin
-    if not (card.is_public or is_owner or is_admin):
+    if err_code in ("not_found", "forbidden"):
         abort(404)
-
-    # 收集复制者上下文，用于版权溯源（cp/pd/up/ct/ci）
-    origin = request.host_url.rstrip("/")
-    copier = current_user.username if current_user.is_authenticated else "anonymous"
-    copier_ip = (
-        (request.headers.get("X-Forwarded-For") or request.remote_addr or "unknown")
-        .split(",")[0]
-        .strip()
-    )
-    package = build_export_package(
-        card,
-        origin=origin,
-        copier=copier,
-        copier_ip=copier_ip,
-        platform_domain=origin,
-    )
-    # 记录复制统计（复制了哪张卡、谁复制的、什么时候、来源 IP）
-    # 失败不应影响正常的复制导出流程
-    try:
-        # 去重：同一用户同一张卡每天（自然日）只累加一次复制量；
-        # 明细溯源（CardCopyStat）仍每次复制都记一条，不受此去重影响。
-        today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-        copied_today = CardCopyStat.query.filter(
-            CardCopyStat.user_id == current_user.id,
-            CardCopyStat.card_id == card.id,
-            CardCopyStat.copied_at >= today_start,
-        ).first()
-        db.session.add(
-            CardCopyStat(
-                card_id=card.id,
-                card_name=card.name,
-                user_id=current_user.id,
-                username=current_user.username,
-                copier_ip=copier_ip,
-            )
-        )
-        if copied_today is None:
-            card.copy_count = (card.copy_count or 0) + 1
-        db.session.commit()
-    except Exception as exc:  # noqa: BLE001
-        db.session.rollback()
-        current_app.logger.warning("记录角色卡复制统计失败: %s", exc)
 
     # 紧凑 JSON：复制到剪贴板时不带缩进，显著减小体积，避免浏览器写入剪贴板失败
     body = json.dumps(package, ensure_ascii=False, separators=(",", ":"))

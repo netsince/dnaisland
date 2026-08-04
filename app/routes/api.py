@@ -42,8 +42,11 @@ from ..routes.main import featured_cards
 from ..routes.teahouse import _visible_query as _teahouse_visible_query
 from ..services.card_service import build_export_package, enrich_cards
 from ..routes.card_lists import (
+    card_detail_core,
+    card_export_package,
     explore_cards,
     profile_cards,
+    recommend_items,
     search_cards,
 )
 from ..routes.card_lists import my_cards as _shared_my_cards
@@ -185,28 +188,8 @@ def _card_light(card: Card) -> dict:
     }
 
 
-def _card_detail(card: Card) -> dict:
-    """卡片详情（含大字段）。"""
-    tags = [t.tag for t in CardTag.query.filter_by(card_id=card.id).all()]
-    dialogue = [
-        {"user": d.user_text, "assistant": d.assistant_text}
-        for d in CardDialogueStyle.query.filter_by(card_id=card.id)
-        .order_by(CardDialogueStyle.turn_index).all()
-    ]
-    images = {}
-    for img in CardImage.query.filter_by(card_id=card.id).all():
-        images[img.slot] = f"/card-image/{card.id}/{img.slot}"
-    like_count = CardLike.query.filter_by(card_id=card.id).count()
-    favorite_count = CardFavorite.query.filter_by(card_id=card.id).count()
-    comment_count = Comment.query.filter_by(card_id=card.id, is_hidden=False).count()
-
-    liked = False
-    favorited = False
-    cu = _ensure_self()
-    if cu.is_authenticated:
-        liked = CardLike.query.filter_by(user_id=cu.id, card_id=card.id).first() is not None
-        favorited = CardFavorite.query.filter_by(user_id=cu.id, card_id=card.id).first() is not None
-
+def _card_detail(card: Card, data: dict) -> dict:
+    """卡片详情 JSON（data 由 card_detail_core 一次取好，无重复查询）。"""
     return {
         "id": card.id,
         "name": card.name,
@@ -217,14 +200,14 @@ def _card_detail(card: Card) -> dict:
         "original_link": card.original_link or "",
         "view_count": card.view_count or 0,
         "copy_count": card.copy_count or 0,
-        "like_count": like_count,
-        "favorite_count": favorite_count,
-        "comment_count": comment_count,
-        "liked": liked,
-        "favorited": favorited,
-        "tags": tags,
-        "dialogue": dialogue,
-        "images": images,
+        "like_count": data["like_count"],
+        "favorite_count": data["favorite_count"],
+        "comment_count": data["comment_count"],
+        "liked": data["liked"],
+        "favorited": data["favorited"],
+        "tags": data["tags"],
+        "dialogue": data["dialogue"],
+        "images": data["images"],
         "cover_focus": card.cover_focus or "",
         "created_at": card.created_at.isoformat() if card.created_at else "",
         "updated_at": card.updated_at.isoformat() if card.updated_at else "",
@@ -361,121 +344,36 @@ def cards_featured():
 
 @api_bp.route("/recommend", methods=["GET"])
 def recommend():
-    """站长推荐：按推荐顺序返回角色卡与创作者交织的列表（公开，无需登录）。
-
-    每条 item: {"kind": "card"|"user", "note": 站长推荐语, "data": ...}
-      - card: 见 _card_light
-      - user: 见 _user_public，并额外带 card_count（拥有的角色卡数量）
-    """
-    recs = SiteRecommendation.query.order_by(
-        SiteRecommendation.sort_order, SiteRecommendation.created_at
-    ).all()
-    user_ids = [
-        int(r.ref_id) for r in recs if r.kind == "user" and str(r.ref_id).isdigit()
-    ]
-    card_counts = (
-        dict(
-            db.session.query(Card.author_id, func.count())
-            .filter(Card.author_id.in_(user_ids))
-            .group_by(Card.author_id)
-            .all()
-        )
-        if user_ids
-        else {}
-    )
-    # 先批量取卡片并 enrich（封面/作者，无 N+1），再轻量序列化。
-    card_objs = []
-    for r in recs:
-        if r.kind == "card":
-            c = db.session.get(Card, r.ref_id)
-            if c and c.status == "approved" and not c.is_hidden:
-                card_objs.append(c)
-    card_map = {c.id: c for c in enrich_cards(card_objs)}
-
+    """站长推荐：与网页版共用 recommend_items 一个函数。"""
+    rec_items = recommend_items()
     items = []
-    for r in recs:
-        if r.kind == "card":
-            c = card_map.get(int(r.ref_id)) if str(r.ref_id).isdigit() else None
-            if c:
-                items.append(
-                    {
-                        "kind": "card",
-                        "note": r.note,
-                        "data": _card_light(c),
-                    }
-                )
-        elif r.kind == "user":
-            if str(r.ref_id).isdigit():
-                u = db.session.get(User, int(r.ref_id))
-                if u and u.status == "active" and not u.active_punishments:
-                    items.append(
-                        {
-                            "kind": "user",
-                            "note": r.note,
-                            "card_count": card_counts.get(u.id, 0),
-                            "data": _user_public(u),
-                        }
-                    )
+    for it in rec_items:
+        if it["kind"] == "card":
+            items.append(
+                {"kind": "card", "note": it["note"], "data": _card_light(it["card"])}
+            )
+        else:
+            items.append(
+                {
+                    "kind": "user",
+                    "note": it["note"],
+                    "card_count": it["card_count"],
+                    "data": _user_public(it["user"]),
+                }
+            )
     return ok({"items": items})
 
 
 @api_bp.route("/cards/<card_id>/export", methods=["GET"])
 @api_login_required
 def cards_export(card_id):
-    """复制角色卡：返回可被 dna-client 识别的导出包（JSON）。
-
-    与 web 端 /card/<card_id>/export 语义一致：
-      - 需登录（JWT）；
-      - 可见性：公开卡、作者本人或管理员可导出；
-      - 调用即记录一次复制统计（同一用户同一卡每天去重累加 copy_count）。
-    """
+    """复制角色卡：与网页版共用 card_export_package 一个函数。"""
     user = _ensure_self()
-    card = db.session.get(Card, card_id)
-    if not card:
+    card, package, err_code = card_export_package(card_id, user)
+    if err_code == "unauth":
+        return err("请先登录后再复制角色卡", 401)
+    if err_code in ("not_found", "forbidden"):
         return err("角色卡不存在", 404)
-    is_owner = user.id == card.author_id
-    is_admin = user.is_super_admin
-    if not (card.is_public or is_owner or is_admin):
-        return err("角色卡不存在", 404)
-
-    origin = request.host_url.rstrip("/")
-    copier = user.username
-    copier_ip = (
-        (request.headers.get("X-Forwarded-For") or request.remote_addr or "unknown")
-        .split(",")[0]
-        .strip()
-    )
-    package = build_export_package(
-        card,
-        origin=origin,
-        copier=copier,
-        copier_ip=copier_ip,
-        platform_domain=origin,
-    )
-    # 记录复制统计（失败不应影响导出）
-    try:
-        today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-        copied_today = CardCopyStat.query.filter(
-            CardCopyStat.user_id == user.id,
-            CardCopyStat.card_id == card.id,
-            CardCopyStat.copied_at >= today_start,
-        ).first()
-        db.session.add(
-            CardCopyStat(
-                card_id=card.id,
-                card_name=card.name,
-                user_id=user.id,
-                username=user.username,
-                copier_ip=copier_ip,
-            )
-        )
-        if copied_today is None:
-            card.copy_count = (card.copy_count or 0) + 1
-        db.session.commit()
-    except Exception as exc:  # noqa: BLE001
-        db.session.rollback()
-        current_app.logger.warning("记录角色卡复制统计失败: %s", exc)
-
     return ok({"package": package, "copy_count": card.copy_count or 0})
 
 
@@ -509,15 +407,11 @@ def cards_search():
 
 @api_bp.route("/cards/<card_id>", methods=["GET"])
 def cards_detail(card_id):
-    """角色卡详情。"""
-    card = db.session.get(Card, card_id)
-    if not card:
+    """角色卡详情：与网页版共用 card_detail_core 一个函数。"""
+    card, data, err_code = card_detail_core(card_id, _ensure_self())
+    if err_code in ("not_found", "forbidden"):
         return err("角色卡不存在", 404)
-    is_owner = _ensure_self().is_authenticated and _ensure_self().id == card.author_id
-    is_admin = _ensure_self().is_authenticated and _ensure_self().is_super_admin
-    if not (card.is_public or is_owner or is_admin):
-        return err("角色卡不存在", 404)
-    return ok(_card_detail(card))
+    return ok(_card_detail(card, data))
 
 
 # ---------------------------------------------------------------------------

@@ -5,8 +5,24 @@ Web 路由与 App API 路由都只调用这些函数，再各自做输出（HTML
 viewer 参数表示「以谁的身份看」（Web 传 current_user，App 传 JWT 用户），
 避免两端可见性口径不一致。
 """
-from ..models import Card, CardFavorite, CardLike, CardTag
-from ..services.card_service import enrich_cards
+from datetime import datetime
+
+from flask import current_app, request
+
+from ..models import (
+    Card,
+    CardCopyStat,
+    CardDialogueStyle,
+    CardFavorite,
+    CardImage,
+    CardLike,
+    CardTag,
+    Comment,
+    SiteRecommendation,
+    User,
+    db,
+)
+from ..services.card_service import build_export_package, enrich_cards
 
 
 def _paginated_cards(query, page, per_page):
@@ -110,3 +126,169 @@ def my_likes(viewer, page=1, per_page=12):
         .order_by(CardLike.created_at.desc())
     )
     return _paginated_cards(q, page, per_page)
+
+
+def recommend_items():
+    """站长推荐：Web 与 App 共用一个函数。
+
+    返回 items 列表，元素为：
+      {"kind": "card", "card": Card, "note": str}（Card 已批量挂封面）
+      {"kind": "user", "user": User, "note": str, "card_count": int}
+    """
+    recs = SiteRecommendation.query.order_by(
+        SiteRecommendation.sort_order, SiteRecommendation.created_at
+    ).all()
+    user_ids = [
+        int(r.ref_id) for r in recs if r.kind == "user" and str(r.ref_id).isdigit()
+    ]
+    card_counts = (
+        dict(
+            db.session.query(Card.author_id, db.func.count())
+            .filter(Card.author_id.in_(user_ids))
+            .group_by(Card.author_id)
+            .all()
+        )
+        if user_ids
+        else {}
+    )
+
+    items = []
+    cover_cards = []
+    for r in recs:
+        if r.kind == "card":
+            c = db.session.get(Card, r.ref_id)
+            if c and c.status == "approved" and not c.is_hidden:
+                items.append({"kind": "card", "card": c, "note": r.note})
+                cover_cards.append(c)
+        elif r.kind == "user":
+            if str(r.ref_id).isdigit():
+                u = db.session.get(User, int(r.ref_id))
+                if u and u.status == "active" and not u.active_punishments:
+                    items.append(
+                        {
+                            "kind": "user",
+                            "user": u,
+                            "note": r.note,
+                            "card_count": card_counts.get(u.id, 0),
+                        }
+                    )
+    enrich_cards(cover_cards)
+    return items
+
+
+def card_export_package(card_id, viewer):
+    """复制/导出角色卡：Web 与 App 共用一个函数。
+
+    返回 (card, package, error_code)；error_code 取值为：
+      None      成功
+      "unauth"  未登录
+      "not_found"/"forbidden"  不存在或无权限
+    核心逻辑（可见性判断、打包、复制统计去重累加）都在这里，两端只做响应包装。
+    """
+    if not getattr(viewer, "is_authenticated", False):
+        return None, None, "unauth"
+    card = db.session.get(Card, card_id)
+    if not card:
+        return None, None, "not_found"
+    is_owner = viewer.id == card.author_id
+    is_admin = bool(getattr(viewer, "is_super_admin", False))
+    if not (card.is_public or is_owner or is_admin):
+        return None, None, "forbidden"
+
+    origin = request.host_url.rstrip("/")
+    copier = viewer.username
+    copier_ip = (
+        (request.headers.get("X-Forwarded-For") or request.remote_addr or "unknown")
+        .split(",")[0]
+        .strip()
+    )
+    package = build_export_package(
+        card,
+        origin=origin,
+        copier=copier,
+        copier_ip=copier_ip,
+        platform_domain=origin,
+    )
+
+    # 复制统计：失败不应影响导出（与原语义一致）。
+    try:
+        today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        copied_today = CardCopyStat.query.filter(
+            CardCopyStat.user_id == viewer.id,
+            CardCopyStat.card_id == card.id,
+            CardCopyStat.copied_at >= today_start,
+        ).first()
+        db.session.add(
+            CardCopyStat(
+                card_id=card.id,
+                card_name=card.name,
+                user_id=viewer.id,
+                username=viewer.username,
+                copier_ip=copier_ip,
+            )
+        )
+        if copied_today is None:
+            card.copy_count = (card.copy_count or 0) + 1
+        db.session.commit()
+    except Exception as exc:  # noqa: BLE001
+        db.session.rollback()
+        current_app.logger.warning("记录角色卡复制统计失败: %s", exc)
+
+    return card, package, None
+
+
+def card_detail_core(card_id, viewer):
+    """角色卡详情核心数据：Web 与 App 共用。
+
+    返回 (card, data, error_code)；data 含：
+      tags / dialogue / images / like_count / favorite_count / comment_count / liked / favorited
+    error_code 为 None | "not_found" | "forbidden"。
+    非作者/管理员访问时浏览量 +1（与原语义一致）。
+    """
+    card = db.session.get(Card, card_id)
+    if not card:
+        return None, None, "not_found"
+    is_owner = bool(viewer.is_authenticated and viewer.id == card.author_id)
+    is_admin = bool(getattr(viewer, "is_super_admin", False))
+    if not (card.is_public or is_owner or is_admin):
+        return None, None, "forbidden"
+
+    if not is_owner and not is_admin:
+        card.view_count = (card.view_count or 0) + 1
+        db.session.commit()
+
+    tags = [t.tag for t in CardTag.query.filter_by(card_id=card.id).all()]
+    dialogue = [
+        {"user": d.user_text, "assistant": d.assistant_text}
+        for d in CardDialogueStyle.query.filter_by(card_id=card.id)
+        .order_by(CardDialogueStyle.turn_index)
+    ]
+    images = {}
+    for img in CardImage.query.filter_by(card_id=card.id).all():
+        images[img.slot] = f"/card-image/{card.id}/{img.slot}"
+    like_count = CardLike.query.filter_by(card_id=card.id).count()
+    favorite_count = CardFavorite.query.filter_by(card_id=card.id).count()
+    comment_count = Comment.query.filter_by(card_id=card.id, is_hidden=False).count()
+
+    liked = False
+    favorited = False
+    if viewer.is_authenticated:
+        liked = (
+            CardLike.query.filter_by(user_id=viewer.id, card_id=card.id).first()
+            is not None
+        )
+        favorited = (
+            CardFavorite.query.filter_by(user_id=viewer.id, card_id=card.id).first()
+            is not None
+        )
+
+    return card, {
+        "tags": tags,
+        "dialogue": dialogue,
+        "images": images,
+        "like_count": like_count,
+        "favorite_count": favorite_count,
+        "comment_count": comment_count,
+        "liked": liked,
+        "favorited": favorited,
+    }, None

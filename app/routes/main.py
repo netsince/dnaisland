@@ -27,7 +27,7 @@ from ..models import (
 from ..models.teahouse import TeaPost
 from ..paging import IdListPagination
 from ..services.card_service import attach_covers, enrich_cards, popular_tags
-from ..routes.card_lists import explore_cards, search_cards
+from ..routes.card_lists import explore_cards, recommend_items, search_cards
 from ..services.image_service import send_webp
 
 main_bp = Blueprint("main", __name__)
@@ -175,48 +175,8 @@ def index():
 
 @main_bp.route("/recommend")
 def recommend():
-    """站长板块（站长推荐）。仅展示仍有效的推荐项：
-    - 角色卡需处于「已通过审核」且未隐藏；
-    - 用户需状态正常、无生效处罚（管理员亦可被展示）。
-    """
-    recs = SiteRecommendation.query.order_by(
-        SiteRecommendation.sort_order, SiteRecommendation.created_at
-    ).all()
-    # 统一成单一有序列表（角色卡与创作者按推荐顺序交织排布）
-    user_ids = [
-        int(r.ref_id) for r in recs if r.kind == "user" and str(r.ref_id).isdigit()
-    ]
-    card_counts = (
-        dict(
-            db.session.query(Card.author_id, db.func.count())
-            .filter(Card.author_id.in_(user_ids))
-            .group_by(Card.author_id)
-            .all()
-        )
-        if user_ids
-        else {}
-    )
-    items = []
-    cover_cards = []
-    for r in recs:
-        if r.kind == "card":
-            c = db.session.get(Card, r.ref_id)
-            if c and c.status == "approved" and not c.is_hidden:
-                items.append({"kind": "card", "card": c, "note": r.note})
-                cover_cards.append(c)
-        elif r.kind == "user":
-            if str(r.ref_id).isdigit():
-                u = db.session.get(User, int(r.ref_id))
-                if u and u.status == "active" and not u.active_punishments:
-                    items.append(
-                        {
-                            "kind": "user",
-                            "user": u,
-                            "note": r.note,
-                            "card_count": card_counts.get(u.id, 0),
-                        }
-                    )
-    attach_covers(cover_cards)
+    """站长板块（站长推荐）。与 App 共用 recommend_items 一个函数。"""
+    items = recommend_items()
     return render_template("recommend/index.html", items=items)
 
 
