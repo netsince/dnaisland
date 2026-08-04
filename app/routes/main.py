@@ -21,13 +21,12 @@ from ..models import (
     CardTag,
     Comment,
     Punishment,
-    SiteRecommendation,
     User,
 )
 from ..models.teahouse import TeaPost
 from ..paging import IdListPagination
-from ..services.card_service import attach_covers, enrich_cards, popular_tags
 from ..routes.card_lists import explore_cards, recommend_items, search_cards
+from ..services.card_service import enrich_cards, popular_tags
 from ..services.image_service import send_webp
 
 main_bp = Blueprint("main", __name__)

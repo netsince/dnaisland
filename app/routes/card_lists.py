@@ -64,10 +64,11 @@ def explore_cards(viewer, page=1, gender="", tag=None, sort="hot", per_page=24):
         q = q.filter(Card.gender == gender)
     if tag:
         q = q.join(CardTag, CardTag.card_id == Card.id).filter(CardTag.tag == tag)
-    if sort == "new":
-        q = q.order_by(Card.created_at.desc())
-    else:  # likes
-        q = _order_by_likes(q)
+    q = (
+        q.order_by(Card.created_at.desc())
+        if sort == "new"
+        else _order_by_likes(q)
+    )
     if tag:
         q = q.distinct()
     return _paginated_cards(q, page, per_page)
@@ -366,8 +367,8 @@ def create_comment(card_id, viewer, content, reply_to_id=None, image_data=None):
       None | "not_found" | "muted" | "empty" | "too_long"
     图片上传的格式转换由两端各自处理后再传入 image_data。
     """
-    from ..services.sticker_service import sanitize_stickers
     from ..services.notification_service import notify
+    from ..services.sticker_service import sanitize_stickers
 
     card = db.session.get(Card, card_id)
     if not card:

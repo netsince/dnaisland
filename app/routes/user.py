@@ -18,13 +18,11 @@ from flask import (
     url_for,
 )
 from flask_login import current_user, login_required
-from sqlalchemy import func
 
 from ..decorators import block_if_muted
 from ..extensions import db
 from ..models import (
     Card,
-    CardCopyStat,
     CardDialogueStyle,
     CardFavorite,
     CardImage,
@@ -48,7 +46,6 @@ from ..models.punishment import (
 from ..services.image_service import raw_bytes_to_webp_data_url
 from ..services.notification_service import notify, notify_super_admins
 from ..services.report_service import describe_report_target
-from ..services.sticker_service import sanitize_stickers
 from ..utils import (
     ensure_owner_or_admin,
     get_user_by_username,
@@ -64,12 +61,6 @@ STATUS_BADGE_HTML = {
     "rejected": '<span class="badge bg-danger">已拒绝</span>',
     "pending": '<span class="badge bg-warning text-dark">审核中</span>',
 }
-from ..services.card_service import (
-    attach_covers,
-    build_export_package,
-    enrich_cards,
-    load_card_images,
-)
 from ..routes.card_lists import (
     card_comments_list,
     card_detail_core,
@@ -80,6 +71,10 @@ from ..routes.card_lists import (
 from ..routes.card_lists import my_cards as shared_my_cards
 from ..routes.card_lists import my_favorites as shared_my_favorites
 from ..routes.card_lists import my_likes as shared_my_likes
+from ..services.card_service import (
+    attach_covers,
+    load_card_images,
+)
 from ..services.image_service import (
     compress_image,
     crop_square_and_compress_bytes,
@@ -680,7 +675,7 @@ def card_comments_api(card_id):
 @block_if_muted(message="你已被禁言，暂时无法评论")
 def card_comment(card_id):
     """发表评论：核心逻辑与 App 共用 create_comment 一个函数。"""
-    card = db.get_or_404(Card, card_id)
+    db.get_or_404(Card, card_id)
     content = (request.form.get("content") or "").strip()
     reply_to_id = request.form.get("reply_to_id", type=int)
 
