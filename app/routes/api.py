@@ -704,6 +704,62 @@ def users_profile(username):
     })
 
 
+@api_bp.route("/users/<username>/followers", methods=["GET"])
+@api_bp.route("/users/<username>/following", methods=["GET"])
+def users_follow_list(username):
+    """某用户的粉丝/关注列表（分页 JSON），按关注时间倒序。
+
+    items 中每个用户附带 is_following（当前登录用户是否已关注对方）。
+    他人访问时过滤掉「禁止主页被访问」的用户。
+    """
+    u = get_user_by_username(username)
+    if not u:
+        return err("用户不存在", 404)
+    cu = _ensure_self()
+    is_self = cu.is_authenticated and cu.id == u.id
+    is_admin = cu.is_authenticated and cu.is_super_admin
+    kind = "followers" if request.path.rstrip("/").endswith("/followers") else "following"
+
+    page = request.args.get("page", 1, type=int)
+    if kind == "followers":
+        link_col = UserFollow.following_id  # 被关注者 = u，展示粉丝
+        join_col = UserFollow.follower_id
+    else:
+        link_col = UserFollow.follower_id  # 关注者 = u，展示已关注的人
+        join_col = UserFollow.following_id
+    pag = (
+        db.session.query(User)
+        .join(UserFollow, join_col == User.id)
+        .filter(link_col == u.id)
+        .order_by(UserFollow.created_at.desc())
+        .paginate(page=page, per_page=20, error_out=False)
+    )
+
+    items = list(pag.items)
+    if not (is_self or is_admin):
+        items = [x for x in items if not x.is_profile_banned]
+
+    ids = [x.id for x in items]
+    following_ids: set = set()
+    if cu.is_authenticated and ids:
+        rows = UserFollow.query.filter(
+            UserFollow.follower_id == cu.id,
+            UserFollow.following_id.in_(ids),
+        ).all()
+        following_ids = {r.following_id for r in rows}
+
+    return ok({
+        "items": [
+            {**_user_public(x), "is_following": x.id in following_ids}
+            for x in items
+        ],
+        "page": pag.page,
+        "pages": pag.pages,
+        "total": pag.total,
+        "has_next": pag.has_next,
+    })
+
+
 @api_bp.route("/users/<username>/follow", methods=["POST"])
 @api_login_required
 def users_follow(username):
