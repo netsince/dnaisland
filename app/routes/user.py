@@ -37,6 +37,11 @@ from ..models.punishment import (
     APPEAL_REJECTED,
     PUNISHMENT_TYPES,
 )
+from ..services.card_edit_service import (
+    resubmit_card,
+    toggle_card_hidden,
+    update_card_from_payload,
+)
 from ..services.comment_service import (
     delete_comment,
     pin_comment,
@@ -82,10 +87,7 @@ from ..services.card_service import (
     attach_covers,
     load_card_images,
 )
-from ..services.image_service import (
-    compress_image,
-    send_webp,
-)
+from ..services.image_service import send_webp
 
 user_bp = Blueprint("user", __name__)
 
@@ -717,11 +719,10 @@ def card_resubmit(card_id):
     card = db.get_or_404(Card, card_id)
     if card.author_id != current_user.id:
         abort(404)
-    if card.status != "rejected":
-        flash("仅被拒绝的角色卡可以重新提审", "warning")
+    error = resubmit_card(current_user, card)
+    if error:
+        flash(error, "warning")
     else:
-        card.status = "pending"
-        db.session.commit()
         flash("已重新提交审核", "success")
     return respond(
         url_for("user.my_cards"),
@@ -737,8 +738,9 @@ def card_toggle_hidden(card_id):
     card = db.get_or_404(Card, card_id)
     if card.author_id != current_user.id:
         abort(404)
-    card.is_hidden = not card.is_hidden
-    db.session.commit()
+    error = toggle_card_hidden(current_user, card)
+    if error:
+        abort(404, description=error)
     return respond(
         url_for("user.my_cards"),
         flash_msg="已隐藏" if card.is_hidden else "已取消隐藏",
@@ -756,39 +758,23 @@ def card_edit(card_id):
         abort(404)
 
     if request.method == "POST":
-        card.name = (request.form.get("name") or "").strip() or card.name
-        card.gender = request.form.get("gender") or card.gender
-        card.persona = request.form.get("persona") or ""
-        card.intro = request.form.get("intro") or ""
-        card.opening = request.form.get("opening") or ""
-        card.original_link = request.form.get("original_link") or None
-        card.cover_focus = request.form.get("cover_focus") or None
-        card.status = "pending"  # 编辑后自动重新提审
-
-        # 标签覆盖式更新
-        CardTag.query.filter_by(card_id=card.id).delete()
-        for t in [t.strip() for t in (request.form.get("tags") or "").split(",") if t.strip()]:
-            db.session.add(CardTag(card_id=card.id, tag=t))
-
-        # 对话风格覆盖式更新
-        CardDialogueStyle.query.filter_by(card_id=card.id).delete()
+        tags = [t.strip() for t in (request.form.get("tags") or "").split(",") if t.strip()]
+        dialogue_style = []
         try:
             ds_list = json.loads(request.form.get("dialogue_style_json") or "[]")
+            if isinstance(ds_list, list):
+                for item in ds_list:
+                    if isinstance(item, dict):
+                        dialogue_style.append(
+                            {
+                                "user": str(item.get("user") or ""),
+                                "assistant": str(item.get("assistant") or ""),
+                            }
+                        )
         except json.JSONDecodeError:
-            ds_list = []
-        for idx, item in enumerate(ds_list):
-            if isinstance(item, dict):
-                db.session.add(
-                    CardDialogueStyle(
-                        card_id=card.id,
-                        turn_index=idx,
-                        user_text=item.get("user") or "",
-                        assistant_text=item.get("assistant") or "",
-                    )
-                )
+            dialogue_style = []
 
-        # 图片覆盖式更新
-        CardImage.query.filter_by(card_id=card.id).delete()
+        images = {}
         try:
             keep = json.loads(request.form.get("images_keep_json") or "{}")
         except (json.JSONDecodeError, TypeError):
@@ -800,24 +786,27 @@ def card_edit(card_id):
             if f and f.filename:
                 raw = f.read()
                 if raw:
-                    db.session.add(
-                        CardImage(
-                            card_id=card.id,
-                            slot=slot,
-                            data=raw_bytes_to_webp_data_url(raw, max_edge=1024, quality=80),
-                        )
-                    )
+                    images[slot] = raw
                     continue
             if keep.get(slot):
-                db.session.add(
-                    CardImage(
-                        card_id=card.id,
-                        slot=slot,
-                        data=compress_image(str(keep[slot])),
-                    )
-                )
+                images[slot] = str(keep[slot])
 
-        db.session.commit()
+        payload = {
+            "name": request.form.get("name"),
+            "gender": request.form.get("gender"),
+            "persona": request.form.get("persona"),
+            "intro": request.form.get("intro"),
+            "opening": request.form.get("opening"),
+            "original_link": request.form.get("original_link"),
+            "cover_focus": request.form.get("cover_focus"),
+            "tags": tags,
+            "dialogue_style": dialogue_style,
+            "images": images,
+        }
+        error = update_card_from_payload(card, payload)
+        if error:
+            flash(error, "warning")
+            return redirect(url_for("user.card_edit", card_id=card.id))
         flash("角色卡已更新，已重新提交审核", "success")
         return redirect(url_for("user.my_cards"))
 

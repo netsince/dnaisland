@@ -60,6 +60,11 @@ from ..routes.teahouse import (
 from ..routes.teahouse import (
     _visible_query as _teahouse_visible_query,
 )
+from ..services.card_edit_service import (
+    resubmit_card,
+    toggle_card_hidden,
+    update_card_from_payload,
+)
 from ..services.card_import_service import parse_export_package
 from ..services.card_publish_service import create_card_from_payload
 from ..services.card_service import enrich_cards
@@ -1087,6 +1092,54 @@ def cards_publish():
         current_app.logger.exception("发布角色卡写入数据库失败")
         return err("提交失败，请稍后重试", 500)
     return ok({"id": card.id, "status": card.status}), 201
+
+
+@api_bp.route("/cards/<card_id>/edit", methods=["POST"])
+@api_login_required
+def cards_edit(card_id):
+    """编辑我的角色卡（覆盖式，编辑后自动重新提审）：与网页 user.card_edit 共用逻辑。
+
+    body = {name?, gender?, persona?, intro?, opening?, original_link?,
+            cover_focus?, tags?:[str], dialogue_style?:[{user,assistant}],
+            images?:{slot: base64_data_url}}。
+    """
+    viewer = _ensure_self()
+    card = db.session.get(Card, card_id)
+    if not card or card.author_id != viewer.id:
+        return err("角色卡不存在", 404)
+    payload = request.get_json(silent=True) or {}
+    error = update_card_from_payload(card, payload)
+    if error:
+        return err(error, 400)
+    return ok({"id": card.id, "status": card.status})
+
+
+@api_bp.route("/cards/<card_id>/resubmit", methods=["POST"])
+@api_login_required
+def cards_resubmit(card_id):
+    """重新提审（仅被拒绝的卡）：与网页 user.card_resubmit 共用逻辑。"""
+    viewer = _ensure_self()
+    card = db.session.get(Card, card_id)
+    if not card or card.author_id != viewer.id:
+        return err("角色卡不存在", 404)
+    error = resubmit_card(viewer, card)
+    if error:
+        return err(error, 400)
+    return ok({"id": card.id, "status": card.status})
+
+
+@api_bp.route("/cards/<card_id>/toggle-hidden", methods=["POST"])
+@api_login_required
+def cards_toggle_hidden(card_id):
+    """切换我的角色卡隐藏状态：与网页 user.card_toggle_hidden 共用逻辑。"""
+    viewer = _ensure_self()
+    card = db.session.get(Card, card_id)
+    if not card or card.author_id != viewer.id:
+        return err("角色卡不存在", 404)
+    error = toggle_card_hidden(viewer, card)
+    if error:
+        return err(error, 404)
+    return ok({"id": card.id, "is_hidden": bool(card.is_hidden)})
 
 
 @api_bp.route("/me/profile", methods=["POST"])

@@ -29,10 +29,11 @@ def _normalize_seed(raw):
     return None
 
 
-def _normalize_images(images):
-    """images: {slot: bytes | data_url_str} → {slot: optimized_data_url_str}。
+def _normalize_images(images, optimize=False):
+    """images: {slot: bytes | data_url_str} → {slot: data_url_str}。
 
     字节视为新上传，转 webp；字符串（data url）视为已有图，重新压缩。
+    optimize=True 时对结果再做 export 专用轻度压缩（发布新建用）。
     """
     out = {}
     for slot in IMAGE_SLOTS:
@@ -40,9 +41,14 @@ def _normalize_images(images):
         if isinstance(val, (bytes, bytearray)):
             if not val:
                 continue
-            out[slot] = raw_bytes_to_webp_data_url(bytes(val), max_edge=1024, quality=80)
+            data_uri = raw_bytes_to_webp_data_url(bytes(val), max_edge=1024, quality=80)
         elif isinstance(val, str) and val.strip():
-            out[slot] = compress_image(val)
+            data_uri = compress_image(val)
+        else:
+            continue
+        if optimize:
+            data_uri = optimize_image_for_export(data_uri)
+        out[slot] = data_uri
     return out
 
 
@@ -69,7 +75,7 @@ def create_card_from_payload(author, payload):
                     }
                 )
 
-    images = _normalize_images(payload.get("images") or {})
+    images = _normalize_images(payload.get("images") or {}, optimize=True)
 
     card = Card(
         id=card_id,
