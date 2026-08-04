@@ -675,6 +675,10 @@ def card_comment(card_id):
         return respond(url_for("user.card_detail", card_id=card_id), ok=False, status=403,
                        flash_msg="你已被禁言，暂时无法评论", flash_cat="warning",
                        error="你已被禁言，暂时无法评论")
+    if err_code == "unauth":
+        return respond(url_for("user.card_detail", card_id=card_id), ok=False, status=401,
+                       flash_msg="请先登录后再评论", flash_cat="warning",
+                       error="请先登录后再评论")
     return respond(url_for("user.card_detail", card_id=card_id),
                    flash_msg="评论成功", flash_cat="success")
 

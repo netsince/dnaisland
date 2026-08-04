@@ -5,8 +5,6 @@ Web 路由与 App API 路由都只调用这些函数，再各自做输出（HTML
 viewer 参数表示「以谁的身份看」（Web 传 current_user，App 传 JWT 用户），
 避免两端可见性口径不一致。
 """
-from datetime import datetime
-
 from flask import current_app, request
 from sqlalchemy import case, func
 from sqlalchemy.orm import joinedload
@@ -77,7 +75,7 @@ def explore_cards(viewer, page=1, gender="", tag=None, sort="hot", per_page=24):
 
 def search_cards(viewer, q, sort="relevance", tag=None, page=1, per_page=12):
     """角色卡搜索（卡片部分）。用户/帖子搜索仍由各端独立处理。"""
-    if not q.strip():
+    if not q or not q.strip():
         return None, []
     from ..routes.main import _card_search_query
 
@@ -149,7 +147,12 @@ def recommend_items():
         int(r.ref_id) for r in recs if r.kind == "user" and str(r.ref_id).isdigit()
     ]
     card_map: dict = (
-        {c.id: c for c in Card.query.filter(Card.id.in_(card_ids)).all()}
+        {
+            c.id: c
+            for c in Card.query.options(joinedload(Card.author))
+            .filter(Card.id.in_(card_ids))
+            .all()
+        }
         if card_ids
         else {}
     )
@@ -228,12 +231,12 @@ def card_export_package(card_id, viewer):
     )
 
     # 复制统计：失败不应影响导出（与原语义一致）。
+    # 「今天」按数据库日期判定，避免应用与数据库时区不一致导致去重边界错位。
     try:
-        today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
         copied_today = CardCopyStat.query.filter(
             CardCopyStat.user_id == viewer.id,
             CardCopyStat.card_id == card.id,
-            CardCopyStat.copied_at >= today_start,
+            db.func.date(CardCopyStat.copied_at) == db.func.date(db.func.now()),
         ).first()
         db.session.add(
             CardCopyStat(
@@ -389,12 +392,14 @@ def create_comment(card_id, viewer, content, reply_to_id=None, image_data=None):
     """发表评论核心：Web 与 App 共用（校验 + 回复验证 + 通知）。
 
     返回 (comment, error_code)；error_code：
-      None | "not_found" | "muted" | "empty" | "too_long"
+      None | "unauth" | "not_found" | "muted" | "empty" | "too_long"
     图片上传的格式转换由两端各自处理后再传入 image_data。
     """
     from ..services.notification_service import notify
     from ..services.sticker_service import sanitize_stickers
 
+    if not getattr(viewer, "is_authenticated", False):
+        return None, "unauth"
     card = db.session.get(Card, card_id)
     if not card:
         return None, "not_found"
@@ -450,8 +455,10 @@ def create_comment(card_id, viewer, content, reply_to_id=None, image_data=None):
 def toggle_card_like(viewer, card_id):
     """切换 viewer 对 card_id 的点赞状态。
 
-    返回 (card, now_active, count)：card 为 None 表示角色卡不存在。
+    返回 (card, now_active, count)：card 为 None 表示角色卡不存在或未登录。
     """
+    if not getattr(viewer, "is_authenticated", False):
+        return None, None, None
     card = db.session.get(Card, card_id)
     if card is None:
         return None, None, None
@@ -466,8 +473,10 @@ def toggle_card_like(viewer, card_id):
 def toggle_card_favorite(viewer, card_id):
     """切换 viewer 对 card_id 的收藏状态。
 
-    返回 (card, now_active, count)：card 为 None 表示角色卡不存在。
+    返回 (card, now_active, count)：card 为 None 表示角色卡不存在或未登录。
     """
+    if not getattr(viewer, "is_authenticated", False):
+        return None, None, None
     card = db.session.get(Card, card_id)
     if card is None:
         return None, None, None

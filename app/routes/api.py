@@ -531,6 +531,8 @@ def cards_comment_post(card_id):
         return err("角色卡不存在", 404)
     if err_code == "muted":
         return err("你已被禁言，暂时无法评论", 403)
+    if err_code == "unauth":
+        return err("请先登录后再评论", 401)
     if err_code == "empty":
         return err("评论内容不能为空")
     if err_code == "too_long":
