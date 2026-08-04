@@ -85,10 +85,14 @@ def static_versioned(filename: str) -> str:
       产出）时自动使用压缩版；未构建则回退原文件，不会 404。
     - 指纹随内容变化而变，配合强缓存可实现「文件更新即自动失效」。
     """
-    fs_path = os.path.join(current_app.static_folder, filename)
+    static_folder = current_app.static_folder
+    if not static_folder:
+        # 未配置静态目录时退化为无指纹 URL，避免 os.path.join(None) 抛错
+        return url_for("static", filename=filename)
+    fs_path = os.path.join(static_folder, filename)
     base, ext = os.path.splitext(filename)
     if ext.lower() in (".css", ".js"):
-        min_path = os.path.join(current_app.static_folder, base + ".min" + ext)
+        min_path = os.path.join(static_folder, base + ".min" + ext)
         if os.path.exists(min_path):
             fs_path = min_path
             filename = base + ".min" + ext

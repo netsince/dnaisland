@@ -72,7 +72,7 @@ def apply_mute(user_id, reason, notify_msg):
     u = db.session.get(User, user_id)
     if not u or u.has_punishment("mute"):
         return
-    u.is_muted = True
+    # 禁言通过下方 Punishment 记录实现；is_muted 为只读 property，不能直接赋值（会抛 AttributeError）
     db.session.add(
         Punishment(
             user_id=u.id,

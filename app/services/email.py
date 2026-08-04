@@ -25,7 +25,7 @@ def send_verification_email(to: str, code: str) -> None:
         f"<p>该验证码 10 分钟内有效，请勿泄露给他人。</p>"
     )
     # 绑定请求期间的 app 对象，后台线程内重建上下文以访问 Flask-Mail 配置
-    app = current_app._get_current_object()
+    app = current_app._get_current_object()  # type: ignore[attr-defined]
     threading.Thread(target=_send_mail, args=(app, msg), daemon=True).start()
 
 

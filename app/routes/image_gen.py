@@ -211,7 +211,7 @@ def generate():
 
     threading.Thread(
         target=process_generation_task,
-        args=(current_app._get_current_object(), task.id),
+        args=(current_app._get_current_object(), task.id),  # type: ignore[attr-defined]
         daemon=True,
     ).start()
 
@@ -225,7 +225,7 @@ def generate():
 @login_required
 def api_tasks():
     """返回当前用户进行中的任务（pending/processing），不含任何历史任务。"""
-    recover_stale_tasks(current_app._get_current_object())
+    recover_stale_tasks(current_app._get_current_object())  # type: ignore[attr-defined]
     tasks = (
         GenerationTask.query.filter(GenerationTask.user_id == current_user.id)
         .filter(GenerationTask.status.in_(["pending", "processing"]))

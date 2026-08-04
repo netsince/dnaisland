@@ -44,6 +44,9 @@ def process_generation_task(app, task_id):
 
         cfg = get_site_config()
         model = db.session.get(GenerationModel, task.model_id)
+        if model is None:
+            _fail_task(task, "生图模型不存在，任务已终止", model)
+            return
         user = db.session.get(User, task.user_id)
         ref_files = _build_reference_files(task)
 
