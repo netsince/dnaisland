@@ -26,6 +26,7 @@ from ..models import (
     db,
 )
 from ..services.card_service import build_export_package, enrich_cards
+from ..utils import toggle_relation
 
 
 def _paginated_cards(query, page, per_page):
@@ -417,3 +418,38 @@ def create_comment(card_id, viewer, content, reply_to_id=None, image_data=None):
         )
     db.session.commit()
     return cm, None
+
+
+# ---------------------------------------------------------------------------
+# 角色卡写操作：点赞 / 收藏（Web 与 App 共用同一开关逻辑）
+# ---------------------------------------------------------------------------
+def toggle_card_like(viewer, card_id):
+    """切换 viewer 对 card_id 的点赞状态。
+
+    返回 (card, now_active, count)：card 为 None 表示角色卡不存在。
+    """
+    card = db.session.get(Card, card_id)
+    if card is None:
+        return None, None, None
+    now_active, count = toggle_relation(
+        CardLike.query.filter_by(user_id=viewer.id, card_id=card_id).first(),
+        CardLike(user_id=viewer.id, card_id=card_id),
+        CardLike.query.filter_by(card_id=card_id),
+    )
+    return card, now_active, count
+
+
+def toggle_card_favorite(viewer, card_id):
+    """切换 viewer 对 card_id 的收藏状态。
+
+    返回 (card, now_active, count)：card 为 None 表示角色卡不存在。
+    """
+    card = db.session.get(Card, card_id)
+    if card is None:
+        return None, None, None
+    now_active, count = toggle_relation(
+        CardFavorite.query.filter_by(user_id=viewer.id, card_id=card_id).first(),
+        CardFavorite(user_id=viewer.id, card_id=card_id),
+        CardFavorite.query.filter_by(card_id=card_id),
+    )
+    return card, now_active, count

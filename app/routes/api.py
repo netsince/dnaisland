@@ -17,8 +17,6 @@ from sqlalchemy import or_
 from ..extensions import db
 from ..models import (
     Card,
-    CardFavorite,
-    CardLike,
     Notification,
     PointTransaction,
     TeaPost,
@@ -39,6 +37,8 @@ from ..routes.card_lists import (
     profile_cards,
     recommend_items,
     search_cards,
+    toggle_card_favorite,
+    toggle_card_like,
 )
 from ..routes.card_lists import my_cards as _shared_my_cards
 from ..routes.card_lists import my_favorites as _shared_my_favorites
@@ -415,28 +415,18 @@ def cards_detail(card_id):
 @api_bp.route("/cards/<card_id>/like", methods=["POST"])
 @api_login_required
 def cards_like(card_id):
-    card = db.session.get(Card, card_id)
-    if not card:
+    card, now_active, count = toggle_card_like(_ensure_self(), card_id)
+    if card is None:
         return err("角色卡不存在", 404)
-    now_active, count = toggle_relation(
-        CardLike.query.filter_by(user_id=_ensure_self().id, card_id=card_id).first(),
-        CardLike(user_id=_ensure_self().id, card_id=card_id),
-        CardLike.query.filter_by(card_id=card_id),
-    )
     return ok({"liked": now_active, "count": count})
 
 
 @api_bp.route("/cards/<card_id>/favorite", methods=["POST"])
 @api_login_required
 def cards_favorite(card_id):
-    card = db.session.get(Card, card_id)
-    if not card:
+    card, now_active, count = toggle_card_favorite(_ensure_self(), card_id)
+    if card is None:
         return err("角色卡不存在", 404)
-    now_active, count = toggle_relation(
-        CardFavorite.query.filter_by(user_id=_ensure_self().id, card_id=card_id).first(),
-        CardFavorite(user_id=_ensure_self().id, card_id=card_id),
-        CardFavorite.query.filter_by(card_id=card_id),
-    )
     return ok({"favorited": now_active, "count": count})
 
 

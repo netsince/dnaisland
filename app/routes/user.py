@@ -24,9 +24,7 @@ from ..extensions import db
 from ..models import (
     Card,
     CardDialogueStyle,
-    CardFavorite,
     CardImage,
-    CardLike,
     CardTag,
     Comment,
     CommentLike,
@@ -67,6 +65,8 @@ from ..routes.card_lists import (
     card_export_package,
     create_comment,
     profile_cards,
+    toggle_card_favorite,
+    toggle_card_like,
 )
 from ..routes.card_lists import my_cards as shared_my_cards
 from ..routes.card_lists import my_favorites as shared_my_favorites
@@ -508,12 +508,9 @@ def my_likes():
 @user_bp.route("/card/<card_id>/like", methods=["POST"])
 @login_required
 def card_like(card_id):
-    db.get_or_404(Card, card_id)
-    now_active, count = toggle_relation(
-        CardLike.query.filter_by(user_id=current_user.id, card_id=card_id).first(),
-        CardLike(user_id=current_user.id, card_id=card_id),
-        CardLike.query.filter_by(card_id=card_id),
-    )
+    card, now_active, count = toggle_card_like(current_user, card_id)
+    if card is None:
+        abort(404)
     return respond(
         url_for("user.card_detail", card_id=card_id),
         flash_msg="已点赞" if now_active else "已取消点赞",
@@ -527,12 +524,9 @@ def card_like(card_id):
 @user_bp.route("/card/<card_id>/favorite", methods=["POST"])
 @login_required
 def card_favorite(card_id):
-    db.get_or_404(Card, card_id)
-    now_active, count = toggle_relation(
-        CardFavorite.query.filter_by(user_id=current_user.id, card_id=card_id).first(),
-        CardFavorite(user_id=current_user.id, card_id=card_id),
-        CardFavorite.query.filter_by(card_id=card_id),
-    )
+    card, now_active, count = toggle_card_favorite(current_user, card_id)
+    if card is None:
+        abort(404)
     return respond(
         url_for("user.card_detail", card_id=card_id),
         flash_msg="已收藏" if now_active else "已取消收藏",
