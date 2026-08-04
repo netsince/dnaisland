@@ -88,13 +88,15 @@ def article_cover(article_id):
     abort(404)
 
 
-def _random_recommend(limit=12, exclude_ids=None):
-    """首页「为你推荐」：与探索页同款加权得分做加权随机，但保留发现感。
+def featured_cards(limit=12, exclude_ids=None):
+    """首页「为你推荐」统一入口：网页版 index 与 API cards_featured 共用。
 
+    与探索页同款加权得分做加权随机，但保留发现感：
     - 每张卡用探索同款得分（互动加权 × 三段年龄权重）作为抽样权重，热门卡被抽中概率更高；
       得分里已含「带图 +1.5」与新鲜度加成，故天然「有图优先」。
     - 预留 1~2 个名额做「纯随机」均匀抽样，注入偶遇感，避免前排总被热门占据。
     - exclude_ids 为已展示过的 id（换一换时传入），从候选池剔除，保证不重复。
+    - 返回带 `cover` 标记的 Card 列表；真实图片由前端按 `/card-image/...` 按需加载。
     """
     exclude = set()
     if exclude_ids:
@@ -142,7 +144,7 @@ def index():
     # 点击「换一换」时 ?fragment=1 仅返回卡片网格片段，并带 ?exclude=已展示id 避免重复。
     exclude = request.args.get("exclude")
     exclude_ids = exclude.split(",") if exclude else None
-    cards = _random_recommend(12, exclude_ids)
+    cards = featured_cards(12, exclude_ids)
     if request.args.get("fragment"):
         return render_template("partials/card_grid_fragment.html", cards=cards)
     return render_template(

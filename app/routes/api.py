@@ -38,7 +38,7 @@ from ..models import (
     User,
     UserFollow,
 )
-from ..routes.main import _random_recommend
+from ..routes.main import featured_cards
 from ..routes.teahouse import _visible_query as _teahouse_visible_query
 from ..services.card_service import build_export_package
 from ..services.notification_service import mark_all_read, unread_count
@@ -343,10 +343,10 @@ def auth_me():
 
 @api_bp.route("/cards/featured", methods=["GET"])
 def cards_featured():
-    """首页推荐：复用 _random_recommend 加 exclude 去重。"""
+    """首页推荐：与网页版共用 featured_cards 统一入口，加 exclude 去重。"""
     exclude_raw = request.args.get("exclude", "")
     exclude_ids = exclude_raw.split(",") if exclude_raw else None
-    cards = _random_recommend(12, exclude_ids)
+    cards = featured_cards(12, exclude_ids)
     return ok([_card_summary(c, current_user) for c in cards])
 
 
