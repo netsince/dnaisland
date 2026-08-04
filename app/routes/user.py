@@ -28,7 +28,6 @@ from ..models import (
     CardTag,
     Comment,
     CommentLike,
-    Notification,
     Punishment,
     Report,
     TeaPost,
@@ -42,7 +41,7 @@ from ..models.punishment import (
     PUNISHMENT_TYPES,
 )
 from ..services.image_service import raw_bytes_to_webp_data_url
-from ..services.notification_service import notify, notify_super_admins
+from ..services.notification_service import notifications_page, notify, notify_super_admins
 from ..services.report_service import describe_report_target
 from ..utils import (
     ensure_owner_or_admin,
@@ -920,11 +919,7 @@ def card_edit(card_id):
 @login_required
 def notifications():
     page = request.args.get("page", 1, type=int)
-    pagination = (
-        Notification.query.filter_by(user_id=current_user.id)
-        .order_by(Notification.created_at.desc())
-        .paginate(page=page, per_page=20, error_out=False)
-    )
+    pagination = notifications_page(current_user.id, page=page)
     unread = sum(1 for n in pagination.items if not n.is_read)
     return render_template(
         "user/notifications.html",

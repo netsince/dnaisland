@@ -46,7 +46,7 @@ from ..routes.card_lists import my_likes as _shared_my_likes
 from ..routes.main import featured_cards
 from ..routes.points import point_balance, point_transactions
 from ..routes.teahouse import _visible_query as _teahouse_visible_query
-from ..services.notification_service import mark_all_read, unread_count
+from ..services.notification_service import mark_all_read, notifications_page, unread_count
 from ..utils import get_user_by_username, toggle_relation
 
 api_bp = Blueprint("api", __name__, url_prefix="/api/v1")
@@ -641,10 +641,15 @@ def my_likes():
 @api_login_required
 def notifications():
     page = request.args.get("page", 1, type=int)
-    q = Notification.query.filter_by(user_id=_ensure_self().id).order_by(Notification.created_at.desc())
-    result = paginated(q, page=page, per_page=20, serialize_fn=_notification_item)
+    pagination = notifications_page(_ensure_self().id, page=page)
+    data = {
+        "items": [_notification_item(n) for n in pagination.items],
+        "page": pagination.page,
+        "pages": pagination.pages,
+        "total": pagination.total,
+        "has_next": pagination.has_next,
+    }
     # 附加未读计数
-    data = result.json.get("data", {})
     data["unread_count"] = unread_count(_ensure_self().id)
     return jsonify(ok=True, data=data)
 

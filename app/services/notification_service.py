@@ -47,3 +47,14 @@ def mark_all_read(user_id: int):
     )
     db.session.commit()
     _unread_cache.pop(user_id, None)
+
+
+def notifications_page(user_id: int, page: int = 1, per_page: int = 20):
+    """返回指定用户的通知明细分页对象（按时间倒序）。Web 与 App 共用。"""
+    if page < 1:
+        page = 1
+    return (
+        Notification.query.filter_by(user_id=user_id)
+        .order_by(Notification.created_at.desc())
+        .paginate(page=page, per_page=per_page, error_out=False)
+    )
