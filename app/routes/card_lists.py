@@ -8,7 +8,7 @@ viewer 参数表示「以谁的身份看」（Web 传 current_user，App 传 JWT
 from datetime import datetime
 
 from flask import current_app, request
-from sqlalchemy import func
+from sqlalchemy import case, func
 from sqlalchemy.orm import joinedload
 
 from ..extensions import db
@@ -284,21 +284,33 @@ def card_detail_core(card_id, viewer):
     images = {}
     for img in CardImage.query.filter_by(card_id=card.id).all():
         images[img.slot] = f"/card-image/{card.id}/{img.slot}"
-    like_count = CardLike.query.filter_by(card_id=card.id).count()
-    favorite_count = CardFavorite.query.filter_by(card_id=card.id).count()
-    comment_count = Comment.query.filter_by(card_id=card.id, is_hidden=False).count()
 
-    liked = False
-    favorited = False
-    if viewer.is_authenticated:
-        liked = (
-            CardLike.query.filter_by(user_id=viewer.id, card_id=card.id).first()
-            is not None
+    # 点赞数 / 收藏数 与「当前用户是否点赞/收藏」各合并为一条聚合查询：
+    # 一次返回总数与当前用户的命中数，避免 count + first 两趟查询。
+    viewer_id = viewer.id if viewer.is_authenticated else None
+    like_row = (
+        db.session.query(
+            func.count(CardLike.card_id).label("cnt"),
+            func.sum(case((CardLike.user_id == viewer_id, 1), else_=0)).label("mine"),
         )
-        favorited = (
-            CardFavorite.query.filter_by(user_id=viewer.id, card_id=card.id).first()
-            is not None
+        .filter(CardLike.card_id == card.id)
+        .one()
+    )
+    like_count = like_row.cnt or 0
+    liked = bool(like_row.mine) if viewer.is_authenticated else False
+
+    fav_row = (
+        db.session.query(
+            func.count(CardFavorite.card_id).label("cnt"),
+            func.sum(case((CardFavorite.user_id == viewer_id, 1), else_=0)).label("mine"),
         )
+        .filter(CardFavorite.card_id == card.id)
+        .one()
+    )
+    favorite_count = fav_row.cnt or 0
+    favorited = bool(fav_row.mine) if viewer.is_authenticated else False
+
+    comment_count = Comment.query.filter_by(card_id=card.id, is_hidden=False).count()
 
     return card, {
         "tags": tags,
