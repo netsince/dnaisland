@@ -99,7 +99,6 @@ def profile_cards(viewer, username, page=1, per_page=12):
         q = Card.query.filter_by(author_id=u.id)
     else:
         q = Card.visible_to(viewer).filter(Card.author_id == u.id)
-        q = q.filter(Card.visibility.in_(["public", "unlisted"]))
     q = q.order_by(Card.created_at.desc())
     pag = q.paginate(page=page, per_page=per_page, error_out=False)
     return u, pag, enrich_cards(pag.items)
