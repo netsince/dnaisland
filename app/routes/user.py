@@ -70,6 +70,7 @@ from ..routes.card_lists import (
 from ..routes.card_lists import my_cards as shared_my_cards
 from ..routes.card_lists import my_favorites as shared_my_favorites
 from ..routes.card_lists import my_likes as shared_my_likes
+from ..routes.follow_lists import toggle_user_follow
 from ..services.card_service import (
     attach_covers,
     load_card_images,
@@ -542,26 +543,18 @@ def user_follow(username):
     target = get_user_by_username(username)
     if not target or target.is_profile_banned:
         abort(404)
-    now_following = None
-    if str(target.id) == str(current_user.get_id()):
+    now_following, error = toggle_user_follow(current_user, target)
+    if error == "self":
         flash("不能关注自己", "warning")
     else:
-        now_following, _ = toggle_relation(
-            UserFollow.query.filter_by(
-                follower_id=current_user.id, following_id=target.id
-            ).first(),
-            UserFollow(follower_id=current_user.id, following_id=target.id),
-            UserFollow.query.filter_by(following_id=target.id),
-        )
+        db.session.commit()
         if now_following:
-            notify(target.id, f"{current_user.nickname} 关注了你", type_="follow")
             flash("已关注", "success")
         else:
             flash("已取消关注", "info")
-        db.session.commit()
     if is_xhr():
         # 局部提交：返回新状态供前端切换按钮，不整页刷新
-        if now_following is None:
+        if error == "self":
             return jsonify({"ok": False, "error": "不能关注自己"})
         return jsonify({
             "ok": True,

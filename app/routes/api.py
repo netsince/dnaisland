@@ -43,6 +43,7 @@ from ..routes.card_lists import (
 from ..routes.card_lists import my_cards as _shared_my_cards
 from ..routes.card_lists import my_favorites as _shared_my_favorites
 from ..routes.card_lists import my_likes as _shared_my_likes
+from ..routes.follow_lists import toggle_user_follow
 from ..routes.main import featured_cards
 from ..routes.points import point_balance, point_transactions
 from ..routes.teahouse import _visible_query as _teahouse_visible_query
@@ -591,16 +592,9 @@ def users_follow(username):
     if not target or target.is_profile_banned:
         return err("用户不存在", 404)
     cu = _ensure_self()
-    if target.id == cu.id:
+    now_following, error = toggle_user_follow(cu, target)
+    if error == "self":
         return err("不能关注自己")
-    now_following, _ = toggle_relation(
-        UserFollow.query.filter_by(follower_id=cu.id, following_id=target.id).first(),
-        UserFollow(follower_id=cu.id, following_id=target.id),
-        UserFollow.query.filter_by(following_id=target.id),
-    )
-    if now_following:
-        from ..services.notification_service import notify
-        notify(target.id, f"{cu.nickname} 关注了你", type_="follow")
     db.session.commit()
     return ok({"following": bool(now_following)})
 
