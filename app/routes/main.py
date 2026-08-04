@@ -26,7 +26,8 @@ from ..models import (
 )
 from ..models.teahouse import TeaPost
 from ..paging import IdListPagination
-from ..services.card_service import attach_covers, popular_tags
+from ..services.card_service import attach_covers, enrich_cards, popular_tags
+from ..routes.card_lists import explore_cards, search_cards
 from ..services.image_service import send_webp
 
 main_bp = Blueprint("main", __name__)
@@ -410,10 +411,14 @@ def _paginate_hot_cards(build_query, signature, order_fn, page, per_page):
     return IdListPagination(cards, page, per_page, total)
 
 
-def _card_search_query(q, sort, tag=None):
-    """构造角色卡检索查询（已包含信息层可见性过滤与相关度排序）。"""
+def _card_search_query(q, sort, tag=None, viewer=None):
+    """构造角色卡检索查询（已包含信息层可见性过滤与相关度排序）。
+
+    viewer 为可选的可见性视角（App 传 JWT 用户，Web 传 current_user），
+    缺省回退到 current_user，保持向后兼容。
+    """
     like = f"%{q}%"
-    base = Card.visible_to(current_user).outerjoin(
+    base = Card.visible_to(viewer if viewer is not None else current_user).outerjoin(
         CardTag, CardTag.card_id == Card.id
     )
     filters = [
@@ -512,14 +517,14 @@ def search():
             cards_count = _card_search_query(q, sort, tag).count()
             users_count = _user_search_query(q, sort).count()
             posts_count = _post_search_query(q).count()
-            cards = attach_covers(_card_search_query(q, sort, tag).limit(4).all())
+            cards = enrich_cards(_card_search_query(q, sort, tag).limit(4).all())
             users = _user_search_query(q, sort).limit(3).all()
             posts = _post_search_query(q).limit(4).all()
         elif search_type == "card":
-            cards_pagination = _card_search_query(q, sort, tag).paginate(
-                page=page, per_page=12, error_out=False
+            # 与 App 共用 search_cards 一个函数。
+            cards_pagination, cards = search_cards(
+                current_user, q, sort=sort, tag=tag, page=page, per_page=12
             )
-            cards = attach_covers(cards_pagination.items)
             cards_count = cards_pagination.total  # 复用分页的 total，避免重复 COUNT
         elif search_type == "user":
             users_pagination = _user_search_query(q, sort).paginate(
@@ -563,33 +568,10 @@ def explore():
     if sort not in ("hot", "new", "likes"):
         sort = "hot"
 
-    q = Card.visible_to(current_user)
-    if gender:
-        q = q.filter(Card.gender == gender)
-    if tag:
-        q = q.join(CardTag, CardTag.card_id == Card.id).filter(CardTag.tag == tag)
-
-    if sort == "hot":
-        # 热门排序结果缓存 60s，分页直接切片（其余排序较轻，走实时查询）。
-        def _base():
-            bq = Card.visible_to(current_user)
-            if gender:
-                bq = bq.filter(Card.gender == gender)
-            if tag:
-                bq = bq.join(CardTag, CardTag.card_id == Card.id).filter(
-                    CardTag.tag == tag
-                ).distinct()
-            return bq
-
-        signature = f"explore|g={gender or ''}|t={tag or ''}"
-        pagination = _paginate_hot_cards(_base, signature, _order_by_hot, page, 24)
-        cards = attach_covers(pagination.items)
-    else:
-        q = q.order_by(Card.created_at.desc()) if sort == "new" else _order_by_likes(q)
-        if tag:
-            q = q.distinct()
-        pagination = q.paginate(page=page, per_page=24, error_out=False)
-        cards = attach_covers(pagination.items)
+    # 与 App 共用 explore_cards 一个函数（含热门缓存 + 批量装配）。
+    pagination, cards = explore_cards(
+        current_user, page=page, gender=gender, tag=tag, sort=sort, per_page=24
+    )
 
     genders = [
         g[0]

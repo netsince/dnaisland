@@ -26,6 +26,7 @@ from ..models import (
     CardLike,
     CardTag,
     Comment,
+    User,
 )
 
 # 针对 AI 的 prompt-injection 版权声明块
@@ -155,6 +156,42 @@ def attach_covers(cards, slot="square"):
     }
     for c in cards:
         c.cover = c.id in present
+    return cards
+
+
+def enrich_cards(cards):
+    """Web 与 App API 共用的卡片批量装配（一次性、无 N+1）。
+
+    - 批量标记封面：写入 `covers`（槽位 → 路径，供 App JSON）与 `cover`（布尔，供模板）。
+    - 批量补作者：未加载 author 的卡片一次性按 id 查回，避免逐卡查询。
+    返回同一批 Card 对象；Web 模板直接渲染，App 再走轻量序列化。
+    """
+    cards = list(cards or [])
+    if not cards:
+        return cards
+
+    ids = [c.id for c in cards]
+
+    covers_by_card: dict[int, dict[str, str]] = {}
+    for img in CardImage.query.filter(CardImage.card_id.in_(ids)).all():
+        covers_by_card.setdefault(img.card_id, {})[img.slot] = (
+            f"/card-image/{img.card_id}/{img.slot}"
+        )
+
+    missing_author_ids = {c.author_id for c in cards if c.author is None and c.author_id}
+    authors: dict[int, User] = {}
+    if missing_author_ids:
+        authors = {
+            u.id: u for u in User.query.filter(User.id.in_(missing_author_ids)).all()
+        }
+
+    for c in cards:
+        covers = covers_by_card.get(c.id, {})
+        c.covers = covers
+        c.cover = "square" in covers
+        if c.author is None and c.author_id in authors:
+            c.author = authors[c.author_id]
+
     return cards
 
 

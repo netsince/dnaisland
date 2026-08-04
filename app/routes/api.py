@@ -40,7 +40,15 @@ from ..models import (
 )
 from ..routes.main import featured_cards
 from ..routes.teahouse import _visible_query as _teahouse_visible_query
-from ..services.card_service import build_export_package
+from ..services.card_service import build_export_package, enrich_cards
+from ..routes.card_lists import (
+    explore_cards,
+    profile_cards,
+    search_cards,
+)
+from ..routes.card_lists import my_cards as _shared_my_cards
+from ..routes.card_lists import my_favorites as _shared_my_favorites
+from ..routes.card_lists import my_likes as _shared_my_likes
 from ..services.notification_service import mark_all_read, unread_count
 from ..utils import get_user_by_username, toggle_relation
 
@@ -128,6 +136,17 @@ def paginated(query, page=1, per_page=20, *, serialize_fn=None):
     })
 
 
+def _cards_response(pag, cards):
+    """把共享函数返回的 (pagination, cards) 序列化成 App JSON。"""
+    return jsonify(ok=True, data={
+        "items": [_card_light(c) for c in cards],
+        "page": pag.page,
+        "pages": pag.pages,
+        "total": pag.total,
+        "has_next": pag.has_next,
+    })
+
+
 # ---------------------------------------------------------------------------
 # 序列化器（模型 → dict）
 # ---------------------------------------------------------------------------
@@ -147,43 +166,10 @@ def _user_public(user: User) -> dict:
     }
 
 
-def _card_summary(card: Card, current_user=None) -> dict:
-    """卡片摘要（列表用，不含大字段）。"""
-    like_count = CardLike.query.filter_by(card_id=card.id).count()
-    favorite_count = CardFavorite.query.filter_by(card_id=card.id).count()
-    comment_count = Comment.query.filter_by(card_id=card.id, is_hidden=False).count()
-    # 封面 URL
-    covers = {}
-    for img in CardImage.query.filter_by(card_id=card.id).all():
-        covers[img.slot] = f"/card-image/{card.id}/{img.slot}"
-    liked = False
-    favorited = False
-    cu = current_user or _ensure_self()
-    if cu.is_authenticated:
-        liked = CardLike.query.filter_by(user_id=cu.id, card_id=card.id).first() is not None
-        favorited = CardFavorite.query.filter_by(user_id=cu.id, card_id=card.id).first() is not None
-    return {
-        "id": card.id,
-        "name": card.name,
-        "gender": card.gender,
-        "intro": (card.intro or "")[:200],
-        "view_count": card.view_count or 0,
-        "copy_count": card.copy_count or 0,
-        "like_count": like_count,
-        "favorite_count": favorite_count,
-        "comment_count": comment_count,
-        "liked": liked,
-        "favorited": favorited,
-        "covers": covers,
-        "created_at": card.created_at.isoformat() if card.created_at else "",
-        "author": _user_public(card.author) if card.author else None,  # type: ignore[arg-type]
-    }
-
-
 def _card_light(card: Card) -> dict:
-    """轻量卡片摘要（「为你推荐」用）。
+    """轻量卡片摘要（卡片列表通用）。
 
-    封面与作者已由 featured_cards 一次性批量预载（card.covers / card.author），
+    封面与作者已由 card_service.enrich_cards 批量预载（card.covers / card.author），
     这里不再逐卡发 count/查询，避免 N+1，使 App 端与网页版同样快。
     """
     return {
@@ -378,7 +364,7 @@ def recommend():
     """站长推荐：按推荐顺序返回角色卡与创作者交织的列表（公开，无需登录）。
 
     每条 item: {"kind": "card"|"user", "note": 站长推荐语, "data": ...}
-      - card: 见 _card_summary
+      - card: 见 _card_light
       - user: 见 _user_public，并额外带 card_count（拥有的角色卡数量）
     """
     recs = SiteRecommendation.query.order_by(
@@ -397,16 +383,25 @@ def recommend():
         if user_ids
         else {}
     )
-    items = []
+    # 先批量取卡片并 enrich（封面/作者，无 N+1），再轻量序列化。
+    card_objs = []
     for r in recs:
         if r.kind == "card":
             c = db.session.get(Card, r.ref_id)
             if c and c.status == "approved" and not c.is_hidden:
+                card_objs.append(c)
+    card_map = {c.id: c for c in enrich_cards(card_objs)}
+
+    items = []
+    for r in recs:
+        if r.kind == "card":
+            c = card_map.get(int(r.ref_id)) if str(r.ref_id).isdigit() else None
+            if c:
                 items.append(
                     {
                         "kind": "card",
                         "note": r.note,
-                        "data": _card_summary(c, current_user),
+                        "data": _card_light(c),
                     }
                 )
         elif r.kind == "user":
@@ -486,47 +481,30 @@ def cards_export(card_id):
 
 @api_bp.route("/cards/explore", methods=["GET"])
 def cards_explore():
-    """探索分页：sort=hot|new|likes, gender, tag, page=1。"""
-    from ..routes.main import _order_by_hot, _order_by_likes
-
+    """探索分页：与网页版共用 explore_cards 一个函数。"""
     page = request.args.get("page", 1, type=int)
     gender = (request.args.get("gender") or "").strip()
     tag = (request.args.get("tag") or "").strip() or None
     sort = request.args.get("sort", "hot")
-    if sort not in ("hot", "new", "likes"):
-        sort = "hot"
-
-    q = Card.visible_to(_ensure_self() if _ensure_self().is_authenticated else None)
-    if gender:
-        q = q.filter(Card.gender == gender)
-    if tag:
-        q = q.join(CardTag, CardTag.card_id == Card.id).filter(CardTag.tag == tag)
-
-    if sort == "hot":
-        q = _order_by_hot(q)
-    elif sort == "new":
-        q = q.order_by(Card.created_at.desc())
-    else:
-        q = _order_by_likes(q)
-
-    if tag:
-        q = q.distinct()
-    return paginated(q, page=page, per_page=24, serialize_fn=lambda c: _card_summary(c, _ensure_self()))
+    pag, cards = explore_cards(
+        _ensure_self(), page=page, gender=gender, tag=tag, sort=sort, per_page=24
+    )
+    return _cards_response(pag, cards)
 
 
 @api_bp.route("/cards/search", methods=["GET"])
 def cards_search():
-    """搜索角色卡：q, sort=relevance|hot|new, tag, page=1。
-    与 search 页面同款逻辑，直接返回 JSON。"""
-    from ..routes.main import _card_search_query
+    """搜索角色卡：与网页版共用 search_cards 一个函数。"""
     q = (request.args.get("q") or "").strip()
+    if not q:
+        return err("请提供搜索词")
     sort = request.args.get("sort", "relevance")
     tag = (request.args.get("tag") or "").strip() or None
     page = request.args.get("page", 1, type=int)
-    if not q:
-        return err("请提供搜索词")
-    query = _card_search_query(q, sort, tag)
-    return paginated(query, page=page, per_page=12, serialize_fn=lambda c: _card_summary(c, _ensure_self()))
+    pag, cards = search_cards(
+        _ensure_self(), q, sort=sort, tag=tag, page=page, per_page=12
+    )
+    return _cards_response(pag, cards)
 
 
 @api_bp.route("/cards/<card_id>", methods=["GET"])
@@ -697,13 +675,9 @@ def users_profile(username):
     if restricted:
         return ok({**(_user_public(u)), "restricted": True})
 
-    # 用户卡片列表
+    # 用户卡片列表：与网页版共用 profile_cards 一个函数（含可见性/隐私过滤）。
     page = request.args.get("page", 1, type=int)
-    if is_self or is_admin:
-        card_query = Card.query.filter_by(author_id=u.id)
-    else:
-        card_query = Card.visible_to(cu if cu.is_authenticated else None).filter(Card.author_id == u.id)
-    cards_pag = card_query.order_by(Card.created_at.desc()).paginate(page=page, per_page=12, error_out=False)
+    _u, cards_pag, cards = profile_cards(cu, username, page=page, per_page=12)
 
     follower_count = UserFollow.query.filter_by(following_id=u.id).count()
     following_count = UserFollow.query.filter_by(follower_id=u.id).count()
@@ -719,7 +693,7 @@ def users_profile(username):
         "following_count": following_count,
         "is_following": is_following,
         "cards": {
-            "items": [_card_summary(c, cu) for c in cards_pag.items],
+            "items": [_card_light(c) for c in cards],
             "page": cards_pag.page,
             "pages": cards_pag.pages,
             "total": cards_pag.total,
@@ -812,34 +786,24 @@ def users_follow(username):
 @api_login_required
 def my_cards():
     page = request.args.get("page", 1, type=int)
-    q = Card.query.filter_by(author_id=_ensure_self().id).order_by(Card.created_at.desc())
-    return paginated(q, page=page, per_page=12, serialize_fn=lambda c: _card_summary(c, _ensure_self()))
+    pag, cards = _shared_my_cards(_ensure_self(), page=page, per_page=12)
+    return _cards_response(pag, cards)
 
 
 @api_bp.route("/my/favorites", methods=["GET"])
 @api_login_required
 def my_favorites():
     page = request.args.get("page", 1, type=int)
-    q = (
-        Card.visible_to(_ensure_self())
-        .join(CardFavorite)
-        .filter(CardFavorite.user_id == _ensure_self().id)
-        .order_by(CardFavorite.created_at.desc())
-    )
-    return paginated(q, page=page, per_page=12, serialize_fn=lambda c: _card_summary(c, _ensure_self()))
+    pag, cards = _shared_my_favorites(_ensure_self(), page=page, per_page=12)
+    return _cards_response(pag, cards)
 
 
 @api_bp.route("/my/likes", methods=["GET"])
 @api_login_required
 def my_likes():
     page = request.args.get("page", 1, type=int)
-    q = (
-        Card.visible_to(_ensure_self())
-        .join(CardLike)
-        .filter(CardLike.user_id == _ensure_self().id)
-        .order_by(CardLike.created_at.desc())
-    )
-    return paginated(q, page=page, per_page=12, serialize_fn=lambda c: _card_summary(c, _ensure_self()))
+    pag, cards = _shared_my_likes(_ensure_self(), page=page, per_page=12)
+    return _cards_response(pag, cards)
 
 
 # ---------------------------------------------------------------------------

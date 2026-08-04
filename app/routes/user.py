@@ -67,8 +67,13 @@ STATUS_BADGE_HTML = {
 from ..services.card_service import (
     attach_covers,
     build_export_package,
+    enrich_cards,
     load_card_images,
 )
+from ..routes.card_lists import profile_cards
+from ..routes.card_lists import my_cards as shared_my_cards
+from ..routes.card_lists import my_favorites as shared_my_favorites
+from ..routes.card_lists import my_likes as shared_my_likes
 from ..services.image_service import (
     compress_image,
     crop_square_and_compress_bytes,
@@ -140,13 +145,9 @@ def profile(username):
     page = request.args.get("page", 1, type=int)
     tab = request.args.get("tab", "cards")
 
-    if is_self or is_admin:
-        card_query = Card.query.filter_by(author_id=u.id)
-    else:
-        # 信息层面过滤：被「屏蔽全部角色卡」作者的卡片对他人不可见
-        card_query = Card.visible_to(current_user).filter(Card.author_id == u.id)
-    pagination = card_query.order_by(Card.created_at.desc()).paginate(
-        page=page, per_page=12, error_out=False
+    # 角色卡列表：与 App 共用 profile_cards 一个函数（含可见性/隐私过滤 + 批量装配）。
+    _u2, pagination, cards = profile_cards(
+        current_user, username, page=page, per_page=12
     )
 
     # 茶馆：我发布的帖子（顶级）/ 回帖（有父级）
@@ -191,7 +192,7 @@ def profile(username):
         u=u,
         deleted=u.is_deleted,
         mourning=u.is_mourning,
-        cards=attach_covers(pagination.items),
+        cards=cards,
         pagination=pagination,
         args={"username": username},
         tab=tab,
@@ -536,15 +537,11 @@ def card_export(card_id):
 @login_required
 def my_cards():
     page = request.args.get("page", 1, type=int)
-    pagination = (
-        Card.query.filter_by(author_id=current_user.id)
-        .order_by(Card.created_at.desc())
-        .paginate(page=page, per_page=12, error_out=False)
-    )
+    pagination, cards = shared_my_cards(current_user, page=page, per_page=12)
     stats = status_counts(Card, Card.query.filter_by(author_id=current_user.id))
     return render_template(
         "user/my_cards.html",
-        cards=attach_covers(pagination.items),
+        cards=cards,
         pagination=pagination,
         args={},
         stats=stats,
@@ -558,16 +555,10 @@ def my_cards():
 @login_required
 def my_favorites():
     page = request.args.get("page", 1, type=int)
-    pagination = (
-        Card.visible_to(current_user)
-        .join(CardFavorite)
-        .filter(CardFavorite.user_id == current_user.id)
-        .order_by(CardFavorite.created_at.desc())
-        .paginate(page=page, per_page=12, error_out=False)
-    )
+    pagination, cards = shared_my_favorites(current_user, page=page, per_page=12)
     return render_template(
         "user/card_list.html",
-        cards=attach_covers(pagination.items),
+        cards=cards,
         pagination=pagination,
         args={},
         title="我的收藏",
@@ -579,16 +570,10 @@ def my_favorites():
 @login_required
 def my_likes():
     page = request.args.get("page", 1, type=int)
-    pagination = (
-        Card.visible_to(current_user)
-        .join(CardLike)
-        .filter(CardLike.user_id == current_user.id)
-        .order_by(CardLike.created_at.desc())
-        .paginate(page=page, per_page=12, error_out=False)
-    )
+    pagination, cards = shared_my_likes(current_user, page=page, per_page=12)
     return render_template(
         "user/card_list.html",
-        cards=attach_covers(pagination.items),
+        cards=cards,
         pagination=pagination,
         args={},
         title="我点赞的",
