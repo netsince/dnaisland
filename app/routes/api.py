@@ -14,6 +14,7 @@ import jwt
 from flask import Blueprint, current_app, g, jsonify, request
 from flask_login import current_user
 from sqlalchemy import or_
+from sqlalchemy.exc import IntegrityError
 
 from ..extensions import db
 from ..models import (
@@ -59,6 +60,8 @@ from ..routes.teahouse import (
 from ..routes.teahouse import (
     _visible_query as _teahouse_visible_query,
 )
+from ..services.card_import_service import parse_export_package
+from ..services.card_publish_service import create_card_from_payload
 from ..services.card_service import enrich_cards
 from ..services.comment_service import (
     delete_comment,
@@ -1043,6 +1046,47 @@ def site_config():
     """站点公开配置（复用现有 /api/site-config）。"""
     from ..services.site_service import public_config
     return jsonify(ok=True, data=public_config())
+
+
+@api_bp.route("/cards/import/parse", methods=["POST"])
+@api_login_required
+def cards_import_parse():
+    """解析客户端导出的角色卡 JSON，返回可用于发布表单预填的字段。
+
+    与网页 /publish/parse 共用 parse_export_package，命中版权保护时返回 400。
+    """
+    data = request.get_json(silent=True) or {}
+    raw = (data.get("json") or "").strip()
+    if not raw:
+        return err("请粘贴 JSON 内容")
+    try:
+        parsed = parse_export_package(raw)
+    except ValueError as exc:
+        return err(str(exc), 400)
+    return ok(parsed)
+
+
+@api_bp.route("/cards/publish", methods=["POST"])
+@api_login_required
+def cards_publish():
+    """发布（新建）一张角色卡：与网页 /publish/edit 共用 create_card_from_payload。
+
+    body = {name?, gender?, persona?, intro?, opening?, original_link?,
+            cover_focus?, seed?, tags?:[str], dialogue_style?:[{user,assistant}],
+            images?:{slot: base64_data_url}}。平台自动分配 id，状态置 pending。
+    """
+    viewer = _ensure_self()
+    payload = request.get_json(silent=True) or {}
+    card, error = create_card_from_payload(viewer, payload)
+    if error:
+        return err(error, 400)
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        current_app.logger.exception("发布角色卡写入数据库失败")
+        return err("提交失败，请稍后重试", 500)
+    return ok({"id": card.id, "status": card.status}), 201
 
 
 @api_bp.route("/me/profile", methods=["POST"])
