@@ -343,6 +343,120 @@ def _set_single_topic(post, topic_raw):
     topic.post_count = (topic.post_count or 0) + 1
 
 
+# ---------------------------------------------------------------------------
+# 共享写操作 / Feed 组装逻辑：Web 路由与 App API 共用
+# ---------------------------------------------------------------------------
+def prepare_teapost_content(content):
+    """清洗并校验茶馆帖子内容。
+
+    返回 (clean, error)：error 为非空字符串表示校验失败（空 / 超长），clean 为已
+    净化的内容（贴纸已处理）。两端发帖/回复统一走此函数，保证校验口径一致。
+    """
+    clean = (content or "").strip()
+    clean, _ = sanitize_stickers(clean, max_count=20)
+    if not clean:
+        return None, "内容不能为空"
+    if len(clean) > TEA_POST_MAX_LEN:
+        return None, f"内容不能超过 {TEA_POST_MAX_LEN} 字"
+    return clean, None
+
+
+def toggle_teapost_like(viewer, post):
+    """切换 viewer 对 post 的点赞状态，并处理点赞通知（含去重与取消清理）。
+
+    返回 (now_liked, count)。仅把变更加入会话，由调用方提交。
+    """
+    now_liked, count = toggle_relation(
+        TeaPostLike.query.filter_by(user_id=viewer.id, post_id=post.id).first(),
+        TeaPostLike(user_id=viewer.id, post_id=post.id),
+        TeaPostLike.query.filter_by(post_id=post.id),
+    )
+    if now_liked:
+        if post.user_id != viewer.id:
+            author = post.author
+            if author and author.notify_like:
+                dup = (
+                    Notification.query.filter_by(
+                        user_id=post.user_id, type="like", is_read=False
+                    )
+                    .filter(Notification.message.contains(f"/teahouse/{post.id}"))
+                    .first()
+                )
+                if not dup:
+                    url = url_for("teahouse.post_detail", post_id=post.id, _external=True)
+                    notify(post.user_id, f"{viewer.nickname} 赞了你在茶馆的帖子：{url}", type_="like")
+    else:
+        Notification.query.filter_by(user_id=post.user_id, type="like", is_read=False).filter(
+            Notification.message.contains(f"/teahouse/{post.id}")
+        ).delete(synchronize_session=False)
+    return now_liked, count
+
+
+def toggle_teapost_favorite(viewer, post):
+    """切换 viewer 对 post 的收藏状态。返回 (now_fav, count)。"""
+    return toggle_relation(
+        TeaPostFavorite.query.filter_by(user_id=viewer.id, post_id=post.id).first(),
+        TeaPostFavorite(user_id=viewer.id, post_id=post.id),
+        TeaPostFavorite.query.filter_by(post_id=post.id),
+    )
+
+
+def notify_teapost_reply(post, parent, actor):
+    """回复后通知：被回复作者（非本人）+ 正文 @提及用户。Web 与 App 共用。"""
+    if parent.user_id != actor.id:
+        notify(
+            parent.user_id,
+            f"{actor.nickname} 回复了你在茶馆的帖子：{post.content[:30]}",
+            type_="teahouse",
+        )
+    _notify_mentions(post.content, post, actor)
+
+
+def teahouse_feed_page(viewer, sort, page, per_page, topic_id=None):
+    """返回 feed 根帖分页：(posts, total, pages, has_next)。
+
+    支持 sort=hot|new 与可选 topic_id 过滤，供 Web 与 App 共用。
+    follow/fans/random 等 Web 专属排序不在此函数内。
+    """
+    q = TeaPost.query.filter(TeaPost.parent_id.is_(None))
+    q = _visible_query(q, viewer)
+    if topic_id:
+        sub = db.session.query(TeaPostTopic.post_id).filter_by(topic_id=topic_id)
+        q = q.filter(TeaPost.id.in_(sub))
+    if sort == "hot":
+        sig = (
+            "teahouse_hot_admin"
+            if (viewer.is_authenticated and viewer.is_super_admin)
+            else "teahouse_hot"
+        )
+        ids = _hot_post_order(
+            sig,
+            lambda: _visible_query(
+                TeaPost.query.filter(TeaPost.parent_id.is_(None)), viewer
+            ),
+        )
+        if page < 1:
+            page = 1
+        start = (page - 1) * per_page
+        slice_ids = ids[start : start + per_page]
+        posts = []
+        if slice_ids:
+            fetched = {
+                p.id: p
+                for p in _visible_query(
+                    TeaPost.query.filter(TeaPost.id.in_(slice_ids)), viewer
+                ).all()
+            }
+            posts = [fetched[pid] for pid in slice_ids if pid in fetched]
+        total = len(ids)
+        pages = max(1, (total + per_page - 1) // per_page)
+        return posts, total, pages, page < pages
+    # new
+    q = q.order_by(TeaPost.created_at.desc())
+    pag = q.paginate(page=page, per_page=per_page, error_out=False)
+    return pag.items, pag.total, pag.pages, pag.has_next
+
+
 # 茶馆「最热」排序结果缓存：每次请求都要对整表做点赞/回复数聚合 + 时间衰减排序 +
 # COUNT 分页；60s 内顺序变化极小，故缓存有序帖子 id 列表，分页直接切片，
 # 免去每请求重算。缓存基于「全局可见」集合（超管可见范围不同，故 key 区分）。
@@ -370,13 +484,14 @@ def index():
     page = request.args.get("page", 1, type=int)
     default_sort = "hot"
     sort = request.args.get("sort", default_sort)
-    q = TeaPost.query.filter(TeaPost.parent_id.is_(None))
-    q = _visible_query(q, current_user)
+    per_page = 20
 
-    # 只看关注 / 只看粉丝：需登录，否则跳登录
+    # Web 专属排序：只看关注 / 只看粉丝 / 随机
     if sort in ("follow", "fans"):
         if not current_user.is_authenticated:
             return redirect(url_for("auth.login"))
+        q = TeaPost.query.filter(TeaPost.parent_id.is_(None))
+        q = _visible_query(q, current_user)
         if sort == "follow":
             sub = db.session.query(UserFollow.following_id).filter(
                 UserFollow.follower_id == current_user.id
@@ -386,47 +501,24 @@ def index():
                 UserFollow.following_id == current_user.id
             )
         q = q.filter(TeaPost.user_id.in_(sub))
-
-    per_page = 20
-    if sort == "random":
+        q = q.order_by(TeaPost.created_at.desc())
+        pagination = q.paginate(page=page, per_page=per_page, error_out=False)
+        posts = pagination.items
+    elif sort == "random":
         # 用「随机起始页」替代 db.func.rand()：RAND() 会触发全表扫描 + filesort，
         # 数据量大时极慢。随机页后仍走正常 paginate，对“随便逛逛”场景足够。
+        q = TeaPost.query.filter(TeaPost.parent_id.is_(None))
+        q = _visible_query(q, current_user)
         total = q.count()
         if total > per_page:
             page = random.randint(1, (total + per_page - 1) // per_page)
-        pagination = q.paginate(page=page, per_page=per_page, error_out=False)
-    elif sort == "hot":
-        # 最热：按 Hacker News 重力时间衰减公式计算热度分降序；结果缓存 60s，
-        # 分页直接切片，避免每请求全表聚合+排序+COUNT。
-        sig = (
-            "teahouse_hot_admin"
-            if (current_user.is_authenticated and current_user.is_super_admin)
-            else "teahouse_hot"
+        pagination = q.order_by(TeaPost.created_at.desc()).paginate(
+            page=page, per_page=per_page, error_out=False
         )
-        ids = _hot_post_order(
-            sig,
-            lambda: _visible_query(
-                TeaPost.query.filter(TeaPost.parent_id.is_(None)), current_user
-            ),
-        )
-        if page < 1:
-            page = 1
-        start = (page - 1) * per_page
-        slice_ids = ids[start : start + per_page]
-        posts = []
-        if slice_ids:
-            fetched = {
-                p.id: p
-                for p in _visible_query(
-                    TeaPost.query.filter(TeaPost.id.in_(slice_ids)), current_user
-                ).all()
-            }
-            posts = [fetched[pid] for pid in slice_ids if pid in fetched]
-        pagination = IdListPagination(posts, page, per_page, len(ids))
-    else:  # new
-        q = q.order_by(TeaPost.created_at.desc())
-        pagination = q.paginate(page=page, per_page=per_page, error_out=False)
-    posts = pagination.items
+        posts = pagination.items
+    else:  # hot / new：与 App 共用同一组装逻辑
+        posts, total, pages, has_next = teahouse_feed_page(current_user, sort, page, per_page)
+        pagination = IdListPagination(posts, page, per_page, total)
     stats = _build_stats(posts)
     return render_template(
         "teahouse/feed.html",
@@ -500,16 +592,10 @@ def topic_detail(topic_id):
 @login_required
 @block_if_muted(message="你已被禁言，暂时无法发帖")
 def create_post():
-    content = (request.form.get("content") or "").strip()
-    content, _ = sanitize_stickers(content, max_count=20)
-    if not content:
+    content, err_msg = prepare_teapost_content(request.form.get("content"))
+    if err_msg:
         return respond(url_for("teahouse.index"), ok=False, status=400,
-                       flash_msg="帖子内容不能为空", flash_cat="warning",
-                       error="帖子内容不能为空")
-    if len(content) > TEA_POST_MAX_LEN:
-        return respond(url_for("teahouse.index"), ok=False, status=400,
-                       flash_msg=f"帖子内容不能超过 {TEA_POST_MAX_LEN} 字", flash_cat="warning",
-                       error=f"帖子内容不能超过 {TEA_POST_MAX_LEN} 字")
+                       flash_msg=err_msg, flash_cat="warning", error=err_msg)
     if _too_frequent(current_user.id):
         return respond(url_for("teahouse.index"), ok=False, status=429,
                        flash_msg="发帖太频繁了，请稍后再试", flash_cat="warning",
@@ -615,16 +701,10 @@ def card_search():
 @block_if_muted(message="你已被禁言，暂时无法回复")
 def reply(post_id):
     p = _require_visible_post(post_id)
-    content = (request.form.get("content") or "").strip()
-    content, _ = sanitize_stickers(content, max_count=20)
-    if not content:
+    content, err_msg = prepare_teapost_content(request.form.get("content"))
+    if err_msg:
         return respond(url_for("teahouse.post_detail", post_id=post_id), ok=False, status=400,
-                       flash_msg="回复内容不能为空", flash_cat="warning",
-                       error="回复内容不能为空")
-    if len(content) > TEA_POST_MAX_LEN:
-        return respond(url_for("teahouse.post_detail", post_id=post_id), ok=False, status=400,
-                       flash_msg=f"回复内容不能超过 {TEA_POST_MAX_LEN} 字", flash_cat="warning",
-                       error=f"回复内容不能超过 {TEA_POST_MAX_LEN} 字")
+                       flash_msg=err_msg, flash_cat="warning", error=err_msg)
     if _too_frequent(current_user.id):
         return respond(url_for("teahouse.post_detail", post_id=post_id), ok=False, status=429,
                        flash_msg="回复太频繁了，请稍后再试", flash_cat="warning",
@@ -641,15 +721,8 @@ def reply(post_id):
         _attach_images(reply_post, images_files)
     _set_single_topic(reply_post, request.form.get("topic"))
     db.session.commit()
-    # 通知被回复帖子的作者（非本人）
-    if p.user_id != current_user.id:
-        notify(
-            p.user_id,
-            f"{current_user.nickname} 回复了你在茶馆的帖子：{content[:30]}",
-            type_="teahouse",
-        )
-    # 解析正文 @提及，通知被提及用户
-    _notify_mentions(content, reply_post, current_user)
+    # 通知被回复作者 + 正文 @提及用户
+    notify_teapost_reply(reply_post, p, current_user)
 
     # 局部提交：渲染新回复 HTML 并刷新回复数，不整页刷新
     stats = {reply_post.id: {"like_count": 0, "liked": False, "reply_count": 0}}
@@ -673,41 +746,7 @@ def like(post_id):
         abort(404)
     if p.is_deleted and not current_user.is_super_admin:
         abort(404)
-    now_liked, count = toggle_relation(
-        TeaPostLike.query.filter_by(
-            user_id=current_user.id, post_id=post_id
-        ).first(),
-        TeaPostLike(user_id=current_user.id, post_id=post_id),
-        TeaPostLike.query.filter_by(post_id=post_id),
-    )
-    if now_liked:
-        # 点赞通知：被点赞者开启偏好、且非本人（可聚合：同帖不重复）
-        if p.user_id != current_user.id:
-            author = p.author
-            if author and author.notify_like:
-                dup = (
-                    Notification.query.filter_by(
-                        user_id=p.user_id, type="like", is_read=False
-                    )
-                    .filter(Notification.message.contains(f"/teahouse/{p.id}"))
-                    .first()
-                )
-                if not dup:
-                    url = url_for(
-                        "teahouse.post_detail", post_id=p.id, _external=True
-                    )
-                    notify(
-                        p.user_id,
-                        f"{current_user.nickname} 赞了你在茶馆的帖子：{url}",
-                        type_="like",
-                    )
-    else:
-        # 聚合：取消点赞时移除该用户对此帖的未读点赞通知，避免重复刷屏
-        Notification.query.filter_by(
-            user_id=p.user_id, type="like", is_read=False
-        ).filter(Notification.message.contains(f"/teahouse/{p.id}")).delete(
-            synchronize_session=False
-        )
+    now_liked, count = toggle_teapost_like(current_user, p)
     db.session.commit()
     return respond(
         request.referrer or url_for("teahouse.post_detail", post_id=post_id),
@@ -725,13 +764,7 @@ def favorite(post_id):
         abort(404)
     if p.is_deleted and not current_user.is_super_admin:
         abort(404)
-    now_fav, count = toggle_relation(
-        TeaPostFavorite.query.filter_by(
-            user_id=current_user.id, post_id=post_id
-        ).first(),
-        TeaPostFavorite(user_id=current_user.id, post_id=post_id),
-        TeaPostFavorite.query.filter_by(post_id=post_id),
-    )
+    now_fav, count = toggle_teapost_favorite(current_user, p)
     return respond(
         request.referrer or url_for("teahouse.post_detail", post_id=post_id),
         action="favorite",

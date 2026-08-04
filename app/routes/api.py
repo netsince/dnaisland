@@ -20,10 +20,7 @@ from ..models import (
     Notification,
     PointTransaction,
     TeaPost,
-    TeaPostFavorite,
     TeaPostImage,
-    TeaPostLike,
-    TeaPostTopic,
     TeaTopic,
     User,
     UserFollow,
@@ -48,7 +45,7 @@ from ..routes.main import featured_cards
 from ..routes.points import point_balance, point_transactions
 from ..routes.teahouse import _visible_query as _teahouse_visible_query
 from ..services.notification_service import mark_all_read, notifications_page, unread_count
-from ..utils import get_user_by_username, toggle_relation
+from ..utils import get_user_by_username
 
 api_bp = Blueprint("api", __name__, url_prefix="/api/v1")
 
@@ -667,79 +664,37 @@ def notifications_unread_count():
 
 @api_bp.route("/teahouse/posts", methods=["GET"])
 def teahouse_posts():
-    """茶馆 Feed：sort=hot|new|random, page=1, topic_id=可选。"""
-    from ..routes.teahouse import _build_stats, _hot_post_order
+    """茶馆 Feed：sort=hot|new, page=1, topic_id=可选。"""
+    from ..routes.teahouse import _build_stats, teahouse_feed_page
 
     page = request.args.get("page", 1, type=int)
     sort = request.args.get("sort", "new")
     topic_id = request.args.get("topic_id", type=int)
     per_page = 20
-
-    q = TeaPost.query.filter(TeaPost.parent_id.is_(None))
-    q = _teahouse_visible_query(q, _ensure_self())
-
-    if topic_id:
-        sub = db.session.query(TeaPostTopic.post_id).filter_by(topic_id=topic_id)
-        q = q.filter(TeaPost.id.in_(sub))
-
-    if sort == "hot":
-        sig = "api_teahouse_hot"
-        ids = _hot_post_order(sig, lambda: _teahouse_visible_query(
-            TeaPost.query.filter(TeaPost.parent_id.is_(None)), _ensure_self()
-        ))
-        if page < 1:
-            page = 1
-        start = (page - 1) * per_page
-        slice_ids = ids[start: start + per_page]
-        posts = []
-        if slice_ids:
-            fetched = {
-                p.id: p for p in _teahouse_visible_query(
-                    TeaPost.query.filter(TeaPost.id.in_(slice_ids)), _ensure_self()
-                ).all()
-            }
-            posts = [fetched[pid] for pid in slice_ids if pid in fetched]
-        total = len(ids)
-        pages = max(1, (total + per_page - 1) // per_page)
-        stats = _build_stats(posts)
-        items = [_teapost_item(p, stats.get(p.id, {})) for p in posts]
-        return ok({"items": items, "page": page, "pages": pages, "total": total, "has_next": page < pages})
-    else:
-        q = q.order_by(TeaPost.created_at.desc())
-        pag = q.paginate(page=page, per_page=per_page, error_out=False)
-        stats = _build_stats(pag.items)
-        items = [_teapost_item(p, stats.get(p.id, {})) for p in pag.items]
-        return ok({
-            "items": items,
-            "page": pag.page,
-            "pages": pag.pages,
-            "total": pag.total,
-            "has_next": pag.has_next,
-        })
+    posts, total, pages, has_next = teahouse_feed_page(_ensure_self(), sort, page, per_page, topic_id)
+    stats = _build_stats(posts)
+    items = [_teapost_item(p, stats.get(p.id, {})) for p in posts]
+    return ok({"items": items, "page": page, "pages": pages, "total": total, "has_next": has_next})
 
 
 @api_bp.route("/teahouse/posts", methods=["POST"])
 @api_login_required
 def teahouse_create_post():
     from ..routes.teahouse import (
-        TEA_POST_MAX_LEN,
         _notify_mentions,
         _resolve_card,
         _set_single_topic,
         _too_frequent,
+        prepare_teapost_content,
     )
-    from ..services.sticker_service import sanitize_stickers
 
     if getattr(_ensure_self(), "is_muted", False):
         return err("你已被禁言", 403)
 
     data = request.get_json(silent=True) or {}
-    content = (data.get("content") or "").strip()
-    content, _ = sanitize_stickers(content, max_count=20)
-    if not content:
-        return err("内容不能为空")
-    if len(content) > TEA_POST_MAX_LEN:
-        return err(f"内容不能超过 {TEA_POST_MAX_LEN} 字")
+    content, err_msg = prepare_teapost_content(data.get("content"))
+    if err_msg:
+        return err(err_msg)
 
     if _too_frequent(_ensure_self().id):
         return err("发帖太频繁了，请稍后再试", 429)
@@ -814,27 +769,22 @@ def teahouse_post_detail(post_id):
 @api_login_required
 def teahouse_reply(post_id):
     from ..routes.teahouse import (
-        TEA_POST_MAX_LEN,
-        _notify_mentions,
         _require_visible_post,
         _resolve_card,
         _set_single_topic,
         _too_frequent,
+        notify_teapost_reply,
+        prepare_teapost_content,
     )
-    from ..services.notification_service import notify
-    from ..services.sticker_service import sanitize_stickers
 
     if getattr(_ensure_self(), "is_muted", False):
         return err("你已被禁言", 403)
 
     parent = _require_visible_post(post_id)
     data = request.get_json(silent=True) or {}
-    content = (data.get("content") or "").strip()
-    content, _ = sanitize_stickers(content, max_count=20)
-    if not content:
-        return err("回复内容不能为空")
-    if len(content) > TEA_POST_MAX_LEN:
-        return err(f"内容不能超过 {TEA_POST_MAX_LEN} 字")
+    content, err_msg = prepare_teapost_content(data.get("content"))
+    if err_msg:
+        return err(err_msg)
     if _too_frequent(_ensure_self().id):
         return err("回复太频繁了，请稍后再试", 429)
 
@@ -851,9 +801,7 @@ def teahouse_reply(post_id):
         _set_single_topic(reply, topic_raw)
     db.session.commit()
 
-    if parent.user_id != _ensure_self().id:
-        notify(parent.user_id, f"{_ensure_self().nickname} 回复了你的茶馆帖子：{content[:30]}", type_="teahouse")
-    _notify_mentions(content, reply, _ensure_self())
+    notify_teapost_reply(reply, parent, _ensure_self())
 
     return ok({"id": reply.id, "message": "回复成功"}), 201
 
@@ -861,21 +809,12 @@ def teahouse_reply(post_id):
 @api_bp.route("/teahouse/posts/<int:post_id>/like", methods=["POST"])
 @api_login_required
 def teahouse_like(post_id):
+    from ..routes.teahouse import toggle_teapost_like
+
     p = db.session.get(TeaPost, post_id)
     if not p or (p.is_deleted and not _ensure_self().is_super_admin):
         return err("帖子不存在", 404)
-    now_liked, count = toggle_relation(
-        TeaPostLike.query.filter_by(user_id=_ensure_self().id, post_id=post_id).first(),
-        TeaPostLike(user_id=_ensure_self().id, post_id=post_id),
-        TeaPostLike.query.filter_by(post_id=post_id),
-    )
-    # 通知（简化版本）
-    if now_liked and p.user_id != _ensure_self().id:
-        from ..services.notification_service import notify
-        dup = Notification.query.filter_by(user_id=p.user_id, type="like", is_read=False)\
-            .filter(Notification.message.contains(f"/teahouse/{p.id}")).first()
-        if not dup:
-            notify(p.user_id, f"{_ensure_self().nickname} 赞了你在茶馆的帖子", type_="like")
+    now_liked, count = toggle_teapost_like(_ensure_self(), p)
     db.session.commit()
     return ok({"liked": now_liked, "count": count})
 
@@ -883,14 +822,12 @@ def teahouse_like(post_id):
 @api_bp.route("/teahouse/posts/<int:post_id>/favorite", methods=["POST"])
 @api_login_required
 def teahouse_favorite(post_id):
+    from ..routes.teahouse import toggle_teapost_favorite
+
     p = db.session.get(TeaPost, post_id)
     if not p or (p.is_deleted and not _ensure_self().is_super_admin):
         return err("帖子不存在", 404)
-    now_fav, count = toggle_relation(
-        TeaPostFavorite.query.filter_by(user_id=_ensure_self().id, post_id=post_id).first(),
-        TeaPostFavorite(user_id=_ensure_self().id, post_id=post_id),
-        TeaPostFavorite.query.filter_by(post_id=post_id),
-    )
+    now_fav, count = toggle_teapost_favorite(_ensure_self(), p)
     db.session.commit()
     return ok({"favorited": now_fav, "count": count})
 
