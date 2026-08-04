@@ -11,6 +11,7 @@ from flask import current_app, request
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 
+from ..extensions import db
 from ..models import (
     Card,
     CardCopyStat,
@@ -23,7 +24,6 @@ from ..models import (
     CommentLike,
     SiteRecommendation,
     User,
-    db,
 )
 from ..services.card_service import build_export_package, enrich_cards
 from ..utils import toggle_relation
