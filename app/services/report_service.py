@@ -13,6 +13,18 @@
 
 from flask import url_for
 
+# 举报目标类型与原因：Web 与 App 共用同一份定义，避免两端口径分叉。
+REPORT_TARGETS = ("card", "comment", "user", "teapost")
+REPORT_REASONS = [
+    ("spam", "垃圾广告 / 刷屏"),
+    ("porn", "色情低俗"),
+    ("violence", "暴力血腥"),
+    ("politics", "违规政治内容"),
+    ("abuse", "人身攻击 / 辱骂"),
+    ("copyright", "侵犯版权"),
+    ("other", "其他"),
+]
+
 
 def describe_report_target(target_type: str, raw_id: str):
     from ..models import Card, Comment, TeaPost
@@ -107,3 +119,39 @@ def resolve_user(raw_id):
         return db.session.get(User, int(raw_id))
     except (ValueError, TypeError):
         return User.query.filter_by(username=raw_id).first()
+
+
+def submit_report(viewer, target_type, canonical_id, reason, detail, display):
+    """提交一条举报（Web 与 App 共用核心逻辑）。
+
+    返回 (ok, error)：ok 为 True 表示提交成功；error 为非空字符串表示校验失败
+    （未选原因 / 重复举报）。调用方需先自行完成「不能举报自己」「目标解析」等前置校验。
+    """
+    valid_reasons = {r[0] for r in REPORT_REASONS}
+    if reason not in valid_reasons:
+        return False, "请选择举报原因"
+    from ..models import Report
+
+    if Report.query.filter_by(
+        reporter_id=viewer.id,
+        target_type=target_type,
+        target_id=canonical_id,
+        status="pending",
+    ).first():
+        return False, "你已经举报过该对象，请勿重复提交"
+    from ..extensions import db
+
+    db.session.add(
+        Report(
+            reporter_id=viewer.id,
+            target_type=target_type,
+            target_id=canonical_id,
+            reason=reason,
+            detail=detail,
+        )
+    )
+    db.session.commit()
+    from ..services.notification_service import notify_super_admins
+
+    notify_super_admins(f"收到一条对{target_type}的举报：{display}", type_="report")
+    return True, None

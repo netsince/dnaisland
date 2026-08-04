@@ -19,6 +19,7 @@ from ..models import (
     Card,
     Notification,
     PointTransaction,
+    Punishment,
     TeaPost,
     TeaPostImage,
     TeaTopic,
@@ -45,6 +46,13 @@ from ..routes.main import featured_cards
 from ..routes.points import point_balance, point_transactions
 from ..routes.teahouse import _visible_query as _teahouse_visible_query
 from ..services.notification_service import mark_all_read, notifications_page, unread_count
+from ..services.punishment_service import my_punishments_list, submit_punishment_appeal
+from ..services.report_service import (
+    REPORT_REASONS,
+    REPORT_TARGETS,
+    describe_report_target,
+    submit_report,
+)
 from ..utils import get_user_by_username
 
 api_bp = Blueprint("api", __name__, url_prefix="/api/v1")
@@ -268,6 +276,24 @@ def _point_tx(tx: PointTransaction) -> dict:
         "reason": tx.reason,
         "source": tx.source,
         "created_at": tx.created_at.isoformat() if tx.created_at else "",
+    }
+
+
+def _punishment_item(p: Punishment) -> dict:
+    return {
+        "id": p.id,
+        "type": p.type,
+        "type_label": p.type_label,
+        "reason": p.reason,
+        "created_at": p.created_at.isoformat() if p.created_at else None,
+        "expires_at": p.expires_at.isoformat() if p.expires_at else None,
+        "status": p.status,
+        "can_appeal": bool(p.can_appeal),
+        "appealed": bool(p.appealed),
+        "appeal_reason": p.appeal_reason,
+        "appeal_status": p.appeal_status,
+        "appeal_at": p.appeal_at.isoformat() if p.appeal_at else None,
+        "appeal_reply": p.appeal_reply,
     }
 
 
@@ -961,3 +987,61 @@ def teahouse_image(image_id):
     if not img:
         return ("", 404)
     return send_webp(img.image_data)
+
+
+# ---------------------------------------------------------------------------
+# 举报与处罚（App 端暴露，与 Web 共用 report_service / punishment_service）
+# ---------------------------------------------------------------------------
+@api_bp.route("/reports/meta", methods=["GET"])
+def reports_meta():
+    """返回举报可用的目标类型与原因列表，供 App 渲染举报表单。"""
+    return ok({"targets": list(REPORT_TARGETS), "reasons": REPORT_REASONS})
+
+
+@api_bp.route("/reports", methods=["POST"])
+@api_login_required
+def reports_create():
+    """提交举报：body = {type, id, reason, detail?}。"""
+    viewer = _ensure_self()
+    data = request.get_json(silent=True) or {}
+    target_type = (data.get("type") or "").strip()
+    raw_id = (data.get("id") or "").strip()
+    if target_type not in REPORT_TARGETS:
+        return err("无效的举报类型", 400)
+    resolved = describe_report_target(target_type, raw_id)
+    if not resolved:
+        return err("举报对象不存在", 404)
+    # 不能举报自己
+    if target_type == "user" and str(resolved["id"]) == str(viewer.id):
+        return err("不能举报自己")
+    reason = (data.get("reason") or "").strip()
+    detail = (data.get("detail") or "").strip()
+    ok_flag, msg = submit_report(
+        viewer, target_type, resolved["id"], reason, detail, resolved["display"]
+    )
+    if not ok_flag:
+        return err(msg)
+    return ok({"message": "举报已提交，管理员会尽快处理"})
+
+
+@api_bp.route("/me/punishments", methods=["GET"])
+@api_login_required
+def me_punishments():
+    """当前用户收到的处罚明细。"""
+    items = my_punishments_list(_ensure_self().id)
+    return ok({"items": [_punishment_item(p) for p in items]})
+
+
+@api_bp.route("/me/punishments/<int:punishment_id>/appeal", methods=["POST"])
+@api_login_required
+def me_punishments_appeal(punishment_id):
+    """对指定处罚提交申诉：body = {appeal_reason}。"""
+    viewer = _ensure_self()
+    p = db.session.get(Punishment, punishment_id)
+    if not p or p.user_id != viewer.id:
+        return err("处罚不存在", 404)
+    data = request.get_json(silent=True) or {}
+    _p, msg = submit_punishment_appeal(viewer, p, data.get("appeal_reason"))
+    if msg:
+        return err(msg)
+    return ok({"punishment": _punishment_item(p)})

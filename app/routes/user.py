@@ -29,7 +29,6 @@ from ..models import (
     Comment,
     CommentLike,
     Punishment,
-    Report,
     TeaPost,
     User,
     UserFollow,
@@ -41,8 +40,14 @@ from ..models.punishment import (
     PUNISHMENT_TYPES,
 )
 from ..services.image_service import raw_bytes_to_webp_data_url
-from ..services.notification_service import notifications_page, notify, notify_super_admins
-from ..services.report_service import describe_report_target
+from ..services.notification_service import notifications_page, notify
+from ..services.punishment_service import my_punishments_list, submit_punishment_appeal
+from ..services.report_service import (
+    REPORT_REASONS,
+    REPORT_TARGETS,
+    describe_report_target,
+    submit_report,
+)
 from ..utils import (
     ensure_owner_or_admin,
     get_user_by_username,
@@ -120,18 +125,6 @@ def card_image(card_id, slot):
     if not img or not img.data:
         abort(404)
     return send_webp(img.data, max_edge=1024, quality=82)
-
-REPORT_TARGETS = ("card", "comment", "user", "teapost")
-REPORT_REASONS = [
-    ("spam", "垃圾广告 / 刷屏"),
-    ("porn", "色情低俗"),
-    ("violence", "暴力血腥"),
-    ("politics", "违规政治内容"),
-    ("abuse", "人身攻击 / 辱骂"),
-    ("copyright", "侵犯版权"),
-    ("other", "其他"),
-]
-
 
 @user_bp.route("/user/<username>")
 def profile(username):
@@ -321,11 +314,7 @@ def profile_edit():
 @login_required
 def my_punishments():
 
-    items = (
-        Punishment.query.filter_by(user_id=current_user.id)
-        .order_by(Punishment.created_at.desc())
-        .all()
-    )
+    items = my_punishments_list(current_user.id)
     return render_template(
         "user/my_punishments.html",
         items=items,
@@ -343,23 +332,12 @@ def punish_appeal(punishment_id):
     p = db.get_or_404(Punishment, punishment_id)
     if p.user_id != current_user.id:
         abort(404)
-    if not p.can_appeal:
-        flash("该处罚不可申诉或你已提交过申诉", "warning")
-        return redirect(url_for("user.my_punishments"))
     reason = (request.form.get("appeal_reason") or "").strip()
-    if not reason:
-        flash("请填写申诉理由", "warning")
-        return redirect(url_for("user.my_punishments"))
-    p.appealed = True
-    p.appeal_reason = reason
-    p.appeal_status = APPEAL_PENDING
-    p.appeal_at = db.func.now()
-    db.session.commit()
-    notify_super_admins(
-        f'用户 {current_user.nickname} 对处罚「{PUNISHMENT_TYPES.get(p.type, p.type)}」提交了申诉，请到「处罚申诉」处理。',
-        type_="punish",
-    )
-    flash("申诉已提交，等待管理员处理（仅可申诉一次）", "success")
+    _p, msg = submit_punishment_appeal(current_user, p, reason)
+    if msg:
+        flash(msg, "warning")
+    else:
+        flash("申诉已提交，等待管理员处理（仅可申诉一次）", "success")
     return redirect(url_for("user.my_punishments"))
 
 
@@ -1010,34 +988,14 @@ def report():
     if request.method == "POST":
         reason = (request.form.get("reason") or "").strip()
         detail = (request.form.get("detail") or "").strip()
-        valid_reasons = {r[0] for r in REPORT_REASONS}
-        if reason not in valid_reasons:
-            flash("请选择举报原因", "warning")
-        elif Report.query.filter_by(
-            reporter_id=current_user.id,
-            target_type=target_type,
-            target_id=canonical_id,
-            status="pending",
-        ).first():
-            flash("你已经举报过该对象，请勿重复提交", "info")
-            return redirect(target_url)
-        else:
-            db.session.add(
-                Report(
-                    reporter_id=current_user.id,
-                    target_type=target_type,
-                    target_id=canonical_id,
-                    reason=reason,
-                    detail=detail,
-                )
-            )
-            db.session.commit()
-            notify_super_admins(
-                f'收到一条对{target_type}的举报：{display}',
-                type_="report",
-            )
+        ok_flag, msg = submit_report(
+            current_user, target_type, canonical_id, reason, detail, display
+        )
+        if ok_flag:
             flash("举报已提交，管理员会尽快处理", "success")
-            return redirect(target_url)
+        else:
+            flash(msg, "info" if "已经举报" in msg else "warning")
+        return redirect(target_url)
 
     return render_template(
         "user/report.html",
