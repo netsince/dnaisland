@@ -98,6 +98,36 @@ def article_cover(article_id):
     abort(404)
 
 
+# 首页「为你推荐」候选池（card_id -> 热度分）缓存。
+# 热度分需要对整表做 4 次聚合 + 加权计算，较昂贵，且 60s 内变化极小；
+# 但分数依赖 viewer 可见性，故按 viewer 身份分 key，并带 TTL 与 LRU 上限。
+# 随机抽样（含「换一换」的排除与纯随机名额）保留在缓存外执行，维持推荐动态性。
+_FEATURED_SCORE_CACHE: "OrderedDict[str, tuple[float, dict]]" = OrderedDict()
+_FEATURED_SCORE_TTL = 60
+_FEATURED_SCORE_MAX = 100
+
+
+def _featured_score_map() -> dict:
+    """返回首页推荐候选池（card_id -> 热度分），带 60s TTL + LRU 上限缓存。"""
+    vid = current_user.id if current_user.is_authenticated else "anon"
+    now = time.time()
+    hit = _FEATURED_SCORE_CACHE.get(vid)
+    if hit is not None and now - hit[0] < _FEATURED_SCORE_TTL:
+        return hit[1]
+    q, score_expr = _apply_hot_score(Card.visible_to(current_user))
+    rows = q.with_entities(Card.id, score_expr).all()
+    score_map: dict = {}
+    for cid, s in rows:
+        try:
+            score_map[cid] = float(s) if s is not None else 0.0
+        except (TypeError, ValueError):
+            score_map[cid] = 0.0
+    _FEATURED_SCORE_CACHE[vid] = (now, score_map)
+    while len(_FEATURED_SCORE_CACHE) > _FEATURED_SCORE_MAX:
+        _FEATURED_SCORE_CACHE.popitem(last=False)
+    return score_map
+
+
 def featured_cards(limit=12, exclude_ids=None):
     """首页「为你推荐」统一入口：网页版 index 与 API cards_featured 共用。
 
@@ -112,17 +142,9 @@ def featured_cards(limit=12, exclude_ids=None):
     if exclude_ids:
         exclude = {int(x) for x in exclude_ids if str(x).strip().isdigit()}
 
-    q, score_expr = _apply_hot_score(Card.visible_to(current_user))
-    rows = q.with_entities(Card.id, score_expr).all()
-    if not rows:
+    score_map = _featured_score_map()
+    if not score_map:
         return []
-
-    score_map = {}
-    for cid, s in rows:
-        try:
-            score_map[cid] = float(s) if s is not None else 0.0
-        except (TypeError, ValueError):
-            score_map[cid] = 0.0
 
     pool = [cid for cid in score_map if cid not in exclude] or list(score_map.keys())
 
