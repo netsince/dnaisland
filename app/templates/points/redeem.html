@@ -49,7 +49,7 @@
       {% for r in results %}
       <tr>
         <td><code>{{ r.code }}</code></td>
-        <td class="{{ 'text-success' if r.ok else 'text-danger' }}">{{ r.msg }}</td>
+        <td class="{{ 'text-success' if r.ok else 'text-danger' }}">{{ r.message }}</td>
       </tr>
       {% endfor %}
     </tbody>

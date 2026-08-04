@@ -44,6 +44,7 @@ from ..routes.card_lists import my_cards as _shared_my_cards
 from ..routes.card_lists import my_favorites as _shared_my_favorites
 from ..routes.card_lists import my_likes as _shared_my_likes
 from ..routes.main import featured_cards
+from ..routes.points import point_balance, point_transactions
 from ..routes.teahouse import _visible_query as _teahouse_visible_query
 from ..services.notification_service import mark_all_read, unread_count
 from ..utils import get_user_by_username, toggle_relation
@@ -920,18 +921,22 @@ def teahouse_topics():
 @api_login_required
 def points():
     page = request.args.get("page", 1, type=int)
-    q = PointTransaction.query.filter_by(user_id=_ensure_self().id).order_by(PointTransaction.created_at.desc())
-    result = paginated(q, page=page, per_page=20, serialize_fn=_point_tx)
-    data = result.json.get("data", {})
-    data["balance"] = _ensure_self().points or 0
+    pagination = point_transactions(_ensure_self(), page=page, per_page=20)
+    data = {
+        "items": [_point_tx(t) for t in pagination.items],
+        "page": pagination.page,
+        "per_page": pagination.per_page,
+        "total": pagination.total,
+        "pages": pagination.pages,
+    }
+    data["balance"] = point_balance(_ensure_self())
     return jsonify(ok=True, data=data)
 
 
 @api_bp.route("/points/redeem", methods=["POST"])
 @api_login_required
 def points_redeem():
-    from ..models import KeyUsageLog, RedemptionKey
-    from ..routes.points import MAX_KEYS_PER_REQUEST, record_redeem, redeem_allowed
+    from ..routes.points import MAX_KEYS_PER_REQUEST, redeem_codes
 
     data = request.get_json(silent=True) or {}
     codes_raw = data.get("codes")
@@ -943,50 +948,9 @@ def points_redeem():
     if len(codes) > MAX_KEYS_PER_REQUEST:
         return err(f"一次最多兑换 {MAX_KEYS_PER_REQUEST} 个")
 
-    ok_flag, msg = redeem_allowed(_ensure_self().id)
+    ok_flag, message, results, success_count = redeem_codes(_ensure_self(), codes)
     if not ok_flag:
-        return err(msg)
-
-    results = []
-    success_count = 0
-    for code in codes:
-        key = RedemptionKey.query.filter_by(code=code).first()
-        if not key:
-            results.append({"code": code, "ok": False, "message": "兑换码不存在"})
-            db.session.add(KeyUsageLog(code=code, user_id=_ensure_self().id, status="fail", note="兑换码不存在"))
-            continue
-        if not key.active:
-            results.append({"code": code, "ok": False, "message": "兑换码已被禁用"})
-            continue
-        if not key.is_valid_now():
-            results.append({"code": code, "ok": False, "message": "兑换码不在有效期内"})
-            continue
-        if key.used_count >= key.max_uses:
-            results.append({"code": code, "ok": False, "message": "已达使用上限"})
-            continue
-        used_by_user = KeyUsageLog.query.filter_by(key_id=key.id, user_id=_ensure_self().id, status="success").count()
-        if used_by_user >= key.per_user_limit:
-            results.append({"code": code, "ok": False, "message": "你已使用过该兑换码"})
-            continue
-
-        _ensure_self().points = (_ensure_self().points or 0) + key.points
-        key.used_count += 1
-        db.session.add(PointTransaction(
-            user_id=_ensure_self().id, delta=key.points,
-            balance_after=_ensure_self().points,
-            reason=f"兑换码 {code}", source="redeem", related_key=code,
-        ))
-        db.session.add(KeyUsageLog(key_id=key.id, code=code, user_id=_ensure_self().id, points_gained=key.points, status="success"))
-        results.append({"code": code, "ok": True, "message": f"+{key.points} 点数"})
-        success_count += 1
-
-    try:
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
-        return err("兑换失败，请稍后重试")
-
-    record_redeem(_ensure_self().id, success_count > 0)
+        return err(message)
     return ok({"results": results, "success_count": success_count, "fail_count": len(codes) - success_count})
 
 
