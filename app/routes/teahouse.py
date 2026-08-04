@@ -536,14 +536,7 @@ def index():
 @login_required
 def favorites():
     page = request.args.get("page", 1, type=int)
-    sub = db.session.query(TeaPostFavorite.post_id).filter(
-        TeaPostFavorite.user_id == current_user.id
-    )
-    q = TeaPost.query.filter(TeaPost.id.in_(sub))
-    q = _visible_query(q, current_user)
-    q = q.join(TeaPostFavorite, TeaPostFavorite.post_id == TeaPost.id)
-    q = q.order_by(TeaPostFavorite.created_at.desc())
-    pagination = q.paginate(page=page, per_page=20, error_out=False)
+    pagination = favorites_page(current_user, page)
     posts = pagination.items
     stats = _build_stats(posts)
     return render_template(
@@ -557,24 +550,10 @@ def favorites():
 
 @teahouse_bp.route("/topic/<int:topic_id>")
 def topic_detail(topic_id):
-    topic = db.session.get(TeaTopic, topic_id)
-    if not topic:
-        abort(404)
     page = request.args.get("page", 1, type=int)
-    # 取带该话题的帖子的「根帖」集合（回复归并到其根帖）
-    topic_post_ids = (
-        db.session.query(TeaPostTopic.post_id).filter_by(topic_id=topic_id).subquery()
-    )
-    roots = (
-        db.session.query(func.coalesce(TeaPost.parent_id, TeaPost.id).label("root_id"))
-        .join(topic_post_ids, TeaPost.id == topic_post_ids.c.post_id)
-        .distinct()
-        .subquery()
-    )
-    q = TeaPost.query.filter(TeaPost.id.in_(db.session.query(roots.c.root_id)))
-    q = _visible_query(q, current_user)
-    q = q.order_by(TeaPost.created_at.desc())
-    pagination = q.paginate(page=page, per_page=20, error_out=False)
+    topic, pagination = topic_posts_page(topic_id, current_user, page)
+    if topic is None:
+        abort(404)
     posts = pagination.items
     stats = _build_stats(posts)
     return render_template(
@@ -778,47 +757,30 @@ def edit_post(post_id):
         abort(404)
     if p.is_deleted and not current_user.is_super_admin:
         abort(404)
-    if not p.can_edit(current_user):
-        abort(403)
     content = (request.form.get("content") or "").strip()
     content, _ = sanitize_stickers(content, max_count=20)
-    if not content:
-        return respond(
-            request.referrer or url_for("teahouse.post_detail", post_id=post_id),
-            ok=False,
-            flash_msg="帖子内容不能为空",
-            flash_cat="warning",
-        )
-    if len(content) > TEA_POST_MAX_LEN:
-        return respond(
-            request.referrer or url_for("teahouse.post_detail", post_id=post_id),
-            ok=False,
-            flash_msg=f"帖子内容不能超过 {TEA_POST_MAX_LEN} 字",
-            flash_cat="warning",
-        )
-    p.content = content
-    p.edited_at = datetime.utcnow()
     # 编辑窗口内允许改/清除关联角色卡（仅当表单显式提交 card_id 时，避免编辑内容时误清）
+    card_action = None
     if "card_id" in request.form:
-        card_removed = request.form.get("card_removed") == "1"
-        if card_removed:
-            p.card_id = None
+        if request.form.get("card_removed") == "1":
+            card_action = ("remove",)
         else:
-            card = _resolve_card(request.form.get("card_id"), current_user)
-            p.card_id = card.id if card else None
+            card_action = ("set", request.form.get("card_id"))
     # 配图：仅当表单显式上传 images 文件或提交 image_removed 时才调整，未改动则保持原样
-    if request.files.get("images") or "image_removed" in request.form:
-        f = request.files.get("images")
-        if f and f.filename:
-            _attach_images(p, [f])
-        elif request.form.get("image_removed") == "1":
-            for old in list(p.images):
-                db.session.delete(old)
-            p.images.clear()
-    # 话题：仅当表单显式提交 topic 字段时才调整
-    if "topic" in request.form:
-        _set_single_topic(p, request.form.get("topic"))
-    db.session.commit()
+    remove_images = False
+    if request.files.get("images"):
+        _attach_images(p, [request.files.get("images")])
+    elif request.form.get("image_removed") == "1":
+        remove_images = True
+    topic_raw = request.form.get("topic") if "topic" in request.form else None
+    p, error = edit_teapost(current_user, p, content, card_action, topic_raw, remove_images)
+    if error:
+        return respond(
+            request.referrer or url_for("teahouse.post_detail", post_id=post_id),
+            ok=False,
+            flash_msg=error,
+            flash_cat="warning",
+        )
     _notify_mentions(content, p, current_user)
     return respond(
         request.referrer or url_for("teahouse.post_detail", post_id=post_id),
@@ -832,20 +794,95 @@ def edit_post(post_id):
 @login_required
 def delete_post(post_id):
     p = _require_visible_post(post_id)
-    if not (current_user.id == p.user_id or current_user.is_super_admin):
-        abort(403)
-    if p.is_deleted:
-        abort(404)
-    # 软删前递减该帖话题的计数（话题聚合页由可见性过滤，这里只修正粗略计数）
-    for tp in TeaPostTopic.query.filter_by(post_id=p.id).all():
-        _dec_topic_count(tp.topic_id)
-    p.is_deleted = True
-    p.deleted_at = datetime.utcnow()
-    db.session.commit()
+    p, error = soft_delete_teapost(current_user, p)
+    if error:
+        abort(403 if "无权限" in error else 404)
     flash("已删除", "success")
     if p.parent_id is None:
         return redirect(url_for("teahouse.index"))
     return redirect(url_for("teahouse.post_detail", post_id=p.parent_id))
+
+
+# ---------------------------------------------------------------------------
+# 以下为 Web 与 App 共用的查询 / 写操作逻辑，避免两端分叉
+# ---------------------------------------------------------------------------
+def favorites_page(viewer, page, per_page=20):
+    """当前 viewer 收藏的茶馆帖子（分页，按收藏时间倒序）。"""
+    sub = db.session.query(TeaPostFavorite.post_id).filter(
+        TeaPostFavorite.user_id == viewer.id
+    )
+    q = TeaPost.query.filter(TeaPost.id.in_(sub))
+    q = _visible_query(q, viewer)
+    q = q.join(TeaPostFavorite, TeaPostFavorite.post_id == TeaPost.id)
+    q = q.order_by(TeaPostFavorite.created_at.desc())
+    return q.paginate(page=page, per_page=per_page, error_out=False)
+
+
+def topic_posts_page(topic_id, viewer, page, per_page=20):
+    """取某话题下的根帖分页（回复归并到根帖）。topic 不存在返回 (None, None)。"""
+    topic = db.session.get(TeaTopic, topic_id)
+    if not topic:
+        return None, None
+    topic_post_ids = (
+        db.session.query(TeaPostTopic.post_id).filter_by(topic_id=topic_id).subquery()
+    )
+    roots = (
+        db.session.query(func.coalesce(TeaPost.parent_id, TeaPost.id).label("root_id"))
+        .join(topic_post_ids, TeaPost.id == topic_post_ids.c.post_id)
+        .distinct()
+        .subquery()
+    )
+    q = TeaPost.query.filter(TeaPost.id.in_(db.session.query(roots.c.root_id)))
+    q = _visible_query(q, viewer)
+    q = q.order_by(TeaPost.created_at.desc())
+    return topic, q.paginate(page=page, per_page=per_page, error_out=False)
+
+
+def edit_teapost(viewer, post, content, card_action=None, topic_raw=None, remove_images=False):
+    """编辑茶馆帖子核心逻辑（Web 与 App 共用）。
+
+    - content: 已清洗后的正文（调用方需先 prepare_teapost_content）。
+    - card_action: None 保持原样；("set", card_id) 关联；("remove",) 清除。
+    - topic_raw: 提供则调整话题（含空串清除），None 保持原样。
+    - remove_images: True 则清空所有配图。
+    返回 (post, error)：error 非空表示校验/权限失败（已 flash 文案可供复用）。
+    """
+    if not post.can_edit(viewer):
+        return post, "无权限编辑该帖子"
+    if not content:
+        return post, "帖子内容不能为空"
+    if len(content) > TEA_POST_MAX_LEN:
+        return post, f"帖子内容不能超过 {TEA_POST_MAX_LEN} 字"
+    post.content = content
+    post.edited_at = datetime.utcnow()
+    if card_action is not None:
+        if card_action[0] == "remove":
+            post.card_id = None
+        elif card_action[0] == "set":
+            card = _resolve_card(card_action[1], viewer)
+            post.card_id = card.id if card else None
+    if topic_raw is not None:
+        _set_single_topic(post, topic_raw)
+    if remove_images:
+        for old in list(post.images):
+            db.session.delete(old)
+        post.images.clear()
+    db.session.commit()
+    return post, None
+
+
+def soft_delete_teapost(viewer, post):
+    """软删一条茶馆帖子（作者或超管）。返回 (post, error)。"""
+    if not (viewer.id == post.user_id or viewer.is_super_admin):
+        return post, "无权限删除该帖子"
+    if post.is_deleted:
+        return post, "帖子已删除"
+    for tp in TeaPostTopic.query.filter_by(post_id=post.id).all():
+        _dec_topic_count(tp.topic_id)
+    post.is_deleted = True
+    post.deleted_at = datetime.utcnow()
+    db.session.commit()
+    return post, None
 
 
 # ---------------- 外链中转（离开本站确认页） ----------------

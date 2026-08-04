@@ -45,8 +45,18 @@ from ..routes.card_lists import my_likes as _shared_my_likes
 from ..routes.follow_lists import toggle_user_follow
 from ..routes.main import _post_search_query, _user_search_query, featured_cards
 from ..routes.points import point_balance, point_transactions
-from ..routes.teahouse import _build_stats
-from ..routes.teahouse import _visible_query as _teahouse_visible_query
+from ..routes.teahouse import (
+    _build_stats,
+    _notify_mentions,
+    edit_teapost,
+    favorites_page,
+    prepare_teapost_content,
+    soft_delete_teapost,
+    topic_posts_page,
+)
+from ..routes.teahouse import (
+    _visible_query as _teahouse_visible_query,
+)
 from ..services.card_service import enrich_cards
 from ..services.notification_service import mark_all_read, notifications_page, unread_count
 from ..services.punishment_service import my_punishments_list, submit_punishment_appeal
@@ -714,7 +724,6 @@ def teahouse_create_post():
         _resolve_card,
         _set_single_topic,
         _too_frequent,
-        prepare_teapost_content,
     )
 
     if getattr(_ensure_self(), "is_muted", False):
@@ -803,7 +812,6 @@ def teahouse_reply(post_id):
         _set_single_topic,
         _too_frequent,
         notify_teapost_reply,
-        prepare_teapost_content,
     )
 
     if getattr(_ensure_self(), "is_muted", False):
@@ -866,6 +874,78 @@ def teahouse_topics():
     """热门话题列表。"""
     topics = TeaTopic.query.order_by(TeaTopic.post_count.desc()).limit(30).all()
     return ok([{"id": t.id, "name": t.name, "post_count": t.post_count} for t in topics])
+
+
+@api_bp.route("/teahouse/favorites", methods=["GET"])
+@api_login_required
+def teahouse_favorites():
+    """我收藏的茶馆帖子（分页，按收藏时间倒序）。与网页 teahouse.favorites 共用查询。"""
+    page = request.args.get("page", 1, type=int)
+    pag = favorites_page(_ensure_self(), page)
+    stats = _build_stats(pag.items)
+    return ok({
+        "items": [_teapost_item(p, stats.get(p.id, {})) for p in pag.items],
+        "page": pag.page,
+        "pages": pag.pages,
+        "total": pag.total,
+        "has_next": pag.has_next,
+    })
+
+
+@api_bp.route("/teahouse/topics/<int:topic_id>", methods=["GET"])
+def teahouse_topic_detail(topic_id):
+    """话题详情：话题信息 + 该话题下的根帖（分页）。与网页 teahouse.topic_detail 共用查询。"""
+    page = request.args.get("page", 1, type=int)
+    topic, pag = topic_posts_page(topic_id, _ensure_self(), page)
+    if topic is None:
+        return err("话题不存在", 404)
+    stats = _build_stats(pag.items)
+    return ok({
+        "topic": {"id": topic.id, "name": topic.name, "post_count": topic.post_count},
+        "items": [_teapost_item(p, stats.get(p.id, {})) for p in pag.items],
+        "page": pag.page,
+        "pages": pag.pages,
+        "total": pag.total,
+        "has_next": pag.has_next,
+    })
+
+
+@api_bp.route("/teahouse/posts/<int:post_id>/edit", methods=["POST"])
+@api_login_required
+def teahouse_edit_post(post_id):
+    """编辑茶馆帖子：body = {content, card_id?, card_removed?, topic?, image_removed?}。"""
+    viewer = _ensure_self()
+    p = db.session.get(TeaPost, post_id)
+    if not p or (p.is_deleted and not viewer.is_super_admin):
+        return err("帖子不存在", 404)
+    data = request.get_json(silent=True) or {}
+    content, err_msg = prepare_teapost_content(data.get("content"))
+    if err_msg:
+        return err(err_msg)
+    card_action = None
+    if "card_id" in data or data.get("card_removed"):
+        card_action = ("remove",) if data.get("card_removed") else ("set", data.get("card_id"))
+    topic_raw = data.get("topic") if "topic" in data else None
+    remove_images = bool(data.get("image_removed"))
+    p, error = edit_teapost(viewer, p, content, card_action, topic_raw, remove_images)
+    if error:
+        return err(error)
+    _notify_mentions(content, p, viewer)
+    return ok({"post": _teapost_item(p, {})})
+
+
+@api_bp.route("/teahouse/posts/<int:post_id>/delete", methods=["POST"])
+@api_login_required
+def teahouse_delete_post(post_id):
+    """软删除茶馆帖子（作者或超管）。"""
+    viewer = _ensure_self()
+    p = db.session.get(TeaPost, post_id)
+    if not p or (p.is_deleted and not viewer.is_super_admin):
+        return err("帖子不存在", 404)
+    p, error = soft_delete_teapost(viewer, p)
+    if error:
+        return err(error, 403 if "无权限" in error else 404)
+    return ok({"id": p.id, "is_deleted": True})
 
 
 # ---------------------------------------------------------------------------
