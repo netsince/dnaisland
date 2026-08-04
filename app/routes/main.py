@@ -6,7 +6,16 @@ from collections import OrderedDict
 from io import BytesIO
 from typing import Any
 
-from flask import Blueprint, abort, jsonify, render_template, request, send_file, url_for
+from flask import (
+    Blueprint,
+    abort,
+    current_app,
+    jsonify,
+    render_template,
+    request,
+    send_file,
+    url_for,
+)
 from flask_login import current_user
 from sqlalchemy import case, func, literal_column, or_
 from sqlalchemy.orm import joinedload
@@ -370,24 +379,45 @@ def _paginate_hot_cards(build_query, signature, order_fn, page, per_page):
     return IdListPagination(cards, page, per_page, total)
 
 
+def _fulltext_enabled() -> bool:
+    """搜索是否启用 MySQL 全文索引（FULLTEXT / ngram）加速。
+
+    仅 MySQL 且配置开启时返回 True；SQLite 等不支持 FULLTEXT 的引擎一律回退
+    到 LIKE，保证开发 / 测试环境行为与原有一致（可回归、可移植）。
+    """
+    return (
+        db.engine.name == "mysql"
+        and current_app.config.get("FULLTEXT_SEARCH", True)
+    )
+
+
 def _card_search_query(q, sort, tag=None, viewer=None):
     """构造角色卡检索查询（已包含信息层可见性过滤与相关度排序）。
 
     viewer 为可选的可见性视角（App 传 JWT 用户，Web 传 current_user），
     缺省回退到 current_user，保持向后兼容。
+
+    MySQL 且开启 FULLTEXT 时，name/intro/persona 的检索走全文索引（MATCH
+    AGAINST），tag 仍用 LIKE（标签表未建全文索引）；否则回退到原有的
+    全表 LIKE，语义不变。
     """
     like = f"%{q}%"
     base = Card.visible_to(viewer if viewer is not None else current_user).outerjoin(
         CardTag, CardTag.card_id == Card.id
     )
-    filters = [
-        or_(
-            Card.name.like(like),
-            Card.intro.like(like),
-            Card.persona.like(like),
-            CardTag.tag.like(like),
-        )
-    ]
+    use_ft = _fulltext_enabled() and bool(q.strip())
+    if use_ft:
+        ft = func.match(Card.name, Card.intro, Card.persona, against=q)
+        filters = [or_(ft, CardTag.tag.like(like))]
+    else:
+        filters = [
+            or_(
+                Card.name.like(like),
+                Card.intro.like(like),
+                Card.persona.like(like),
+                CardTag.tag.like(like),
+            )
+        ]
     if tag:
         filters.append(CardTag.tag == tag)
     base = base.filter(*filters).distinct()
@@ -397,13 +427,21 @@ def _card_search_query(q, sort, tag=None, viewer=None):
     elif sort == "new":
         base = base.order_by(Card.created_at.desc())
     else:  # relevance
-        score = case(
-            (Card.name.like(like), 3),
-            (CardTag.tag.like(like), 2),
-            (or_(Card.intro.like(like), Card.persona.like(like)), 1),
-            else_=0,
-        )
-        base = base.order_by(score.desc(), Card.view_count.desc(), Card.created_at.desc())
+        if use_ft:
+            # 全文检索直接用 MATCH 相关度排序
+            base = base.order_by(
+                func.match(Card.name, Card.intro, Card.persona, against=q).desc(),
+                Card.view_count.desc(),
+                Card.created_at.desc(),
+            )
+        else:
+            score = case(
+                (Card.name.like(like), 3),
+                (CardTag.tag.like(like), 2),
+                (or_(Card.intro.like(like), Card.persona.like(like)), 1),
+                else_=0,
+            )
+            base = base.order_by(score.desc(), Card.view_count.desc(), Card.created_at.desc())
     return base
 
 
@@ -433,12 +471,16 @@ def _user_search_query(q, sort):
 
 
 def _post_search_query(q):
-    return TeaPost.query.filter(
+    base = TeaPost.query.filter(
         TeaPost.parent_id.is_(None),
         TeaPost.is_hidden.is_(False),
         TeaPost.is_deleted.is_(False),
-        TeaPost.content.ilike(f"%{q}%")
-    ).order_by(TeaPost.created_at.desc())
+    )
+    if _fulltext_enabled() and bool(q.strip()):
+        base = base.filter(func.match(TeaPost.content, against=q))
+    else:
+        base = base.filter(TeaPost.content.ilike(f"%{q}%"))
+    return base.order_by(TeaPost.created_at.desc())
 
 
 @main_bp.route("/search")
