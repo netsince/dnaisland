@@ -453,3 +453,19 @@ def toggle_card_favorite(viewer, card_id):
         CardFavorite.query.filter_by(card_id=card_id),
     )
     return card, now_active, count
+
+
+def search_cards_for_linking(viewer, q, limit=12):
+    """发帖时搜索可关联的角色卡：所有已通过且对 viewer 可见、名称命中关键字的卡。
+
+    Web 与 App 共用同一查询，保证「发帖选卡」结果一致。q 为空时返回 []。
+    """
+    if not q:
+        return []
+    return (
+        Card.visible_to(viewer)
+        .filter(Card.name.like(f"%{q}%"))
+        .order_by(Card.view_count.desc())
+        .limit(limit)
+        .all()
+    )

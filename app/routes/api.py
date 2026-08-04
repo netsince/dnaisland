@@ -35,6 +35,7 @@ from ..routes.card_lists import (
     profile_cards,
     recommend_items,
     search_cards,
+    search_cards_for_linking,
     toggle_card_favorite,
     toggle_card_like,
 )
@@ -42,9 +43,11 @@ from ..routes.card_lists import my_cards as _shared_my_cards
 from ..routes.card_lists import my_favorites as _shared_my_favorites
 from ..routes.card_lists import my_likes as _shared_my_likes
 from ..routes.follow_lists import toggle_user_follow
-from ..routes.main import featured_cards
+from ..routes.main import _post_search_query, _user_search_query, featured_cards
 from ..routes.points import point_balance, point_transactions
+from ..routes.teahouse import _build_stats
 from ..routes.teahouse import _visible_query as _teahouse_visible_query
+from ..services.card_service import enrich_cards
 from ..services.notification_service import mark_all_read, notifications_page, unread_count
 from ..services.punishment_service import my_punishments_list, submit_punishment_appeal
 from ..services.report_service import (
@@ -987,6 +990,58 @@ def teahouse_image(image_id):
     if not img:
         return ("", 404)
     return send_webp(img.image_data)
+
+
+# ---------------------------------------------------------------------------
+# 搜索类（App 端暴露，查询逻辑与网页版共用 main.py / card_lists.py 的构建器）
+# ---------------------------------------------------------------------------
+@api_bp.route("/users/search", methods=["GET"])
+def users_search():
+    """用户搜索：sort=relevance|new，分页。与网页 /search?type=user 共用 _user_search_query。"""
+    q = (request.args.get("q") or "").strip()
+    if not q:
+        return err("请提供搜索词")
+    sort = request.args.get("sort", "relevance")
+    page = request.args.get("page", 1, type=int)
+    pag = _user_search_query(q, sort).paginate(page=page, per_page=20, error_out=False)
+    return ok({
+        "items": [_user_public(u) for u in pag.items],
+        "page": pag.page,
+        "pages": pag.pages,
+        "total": pag.total,
+        "has_next": pag.has_next,
+    })
+
+
+@api_bp.route("/teahouse/search", methods=["GET"])
+def teahouse_search():
+    """茶馆帖子搜索：按关键字匹配正文，分页。与网页 /search?type=post 共用 _post_search_query。"""
+    q = (request.args.get("q") or "").strip()
+    if not q:
+        return err("请提供搜索词")
+    page = request.args.get("page", 1, type=int)
+    pag = _post_search_query(q).paginate(page=page, per_page=15, error_out=False)
+    stats = _build_stats(pag.items)
+    items = [_teapost_item(p, stats.get(p.id, {})) for p in pag.items]
+    return ok({
+        "items": items,
+        "page": pag.page,
+        "pages": pag.pages,
+        "total": pag.total,
+        "has_next": pag.has_next,
+    })
+
+
+@api_bp.route("/teahouse/card-search", methods=["GET"])
+@api_login_required
+def teahouse_card_search():
+    """发帖时搜索可关联的角色卡：与网页 teahouse.card_search 共用 search_cards_for_linking。"""
+    q = (request.args.get("q") or "").strip()
+    if not q:
+        return ok({"items": []})
+    cards = search_cards_for_linking(_ensure_self(), q)
+    enrich_cards(cards)
+    return ok({"items": [_card_light(c) for c in cards]})
 
 
 # ---------------------------------------------------------------------------

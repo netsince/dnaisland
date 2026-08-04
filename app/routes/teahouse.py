@@ -667,16 +667,12 @@ def post_detail(post_id):
 @login_required
 def card_search():
     """发帖时搜索可关联的角色卡（所有已通过且对当前用户可见的卡）。"""
+    from ..routes.card_lists import search_cards_for_linking
+
     q = (request.args.get("q") or "").strip()
     if not q:
         return jsonify([])
-    cards = (
-        Card.visible_to(current_user)
-        .filter(Card.name.like(f"%{q}%"))
-        .order_by(Card.view_count.desc())
-        .limit(12)
-        .all()
-    )
+    cards = search_cards_for_linking(current_user, q)
     items = []
     for c in cards:
         cover = c.images[0] if c.images else None
