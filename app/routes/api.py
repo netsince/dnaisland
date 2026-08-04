@@ -180,6 +180,25 @@ def _card_summary(card: Card, current_user=None) -> dict:
     }
 
 
+def _card_light(card: Card) -> dict:
+    """轻量卡片摘要（「为你推荐」用）。
+
+    封面与作者已由 featured_cards 一次性批量预载（card.covers / card.author），
+    这里不再逐卡发 count/查询，避免 N+1，使 App 端与网页版同样快。
+    """
+    return {
+        "id": card.id,
+        "name": card.name,
+        "gender": card.gender,
+        "intro": (card.intro or "")[:200],
+        "view_count": card.view_count or 0,
+        "copy_count": card.copy_count or 0,
+        "covers": getattr(card, "covers", {}) or {},
+        "created_at": card.created_at.isoformat() if card.created_at else "",
+        "author": _user_public(card.author) if card.author else None,  # type: ignore[arg-type]
+    }
+
+
 def _card_detail(card: Card) -> dict:
     """卡片详情（含大字段）。"""
     tags = [t.tag for t in CardTag.query.filter_by(card_id=card.id).all()]
@@ -343,11 +362,15 @@ def auth_me():
 
 @api_bp.route("/cards/featured", methods=["GET"])
 def cards_featured():
-    """首页推荐：与网页版共用 featured_cards 统一入口，加 exclude 去重。"""
+    """首页推荐：与网页版共用 featured_cards 统一入口，加 exclude 去重。
+
+    用轻量序列化 _card_light（封面/作者已由 featured_cards 批量预载），
+    不再逐卡统计，消除 N+1，App 端与网页版同样快。
+    """
     exclude_raw = request.args.get("exclude", "")
     exclude_ids = exclude_raw.split(",") if exclude_raw else None
     cards = featured_cards(12, exclude_ids)
-    return ok([_card_summary(c, current_user) for c in cards])
+    return ok([_card_light(c) for c in cards])
 
 
 @api_bp.route("/recommend", methods=["GET"])

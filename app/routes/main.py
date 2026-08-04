@@ -9,6 +9,7 @@ from typing import Any
 from flask import Blueprint, abort, jsonify, render_template, request, send_file, url_for
 from flask_login import current_user
 from sqlalchemy import case, func, literal_column, or_
+from sqlalchemy.orm import joinedload
 
 from ..extensions import db
 from ..models import (
@@ -134,8 +135,26 @@ def featured_cards(limit=12, exclude_ids=None):
     result_ids = chosen + pure_picks
     random.shuffle(result_ids)
 
-    fetched = {c.id: c for c in Card.query.filter(Card.id.in_(result_ids)).all()}
-    return attach_covers([fetched[cid] for cid in result_ids if cid in fetched])
+    # 预载作者（1 条 LEFT JOIN），避免序列化时逐卡再查作者造成 N+1。
+    card_map = {
+        c.id: c
+        for c in Card.query.filter(Card.id.in_(result_ids))
+        .options(joinedload(Card.author))
+        .all()
+    }
+    cards = [card_map[cid] for cid in result_ids if cid in card_map]
+
+    # 批量加载封面（1 条 IN 查询）：网页用 .cover 布尔；App 用 covers 槽位路径。
+    covers_by_card: dict[int, dict[str, str]] = {}
+    for img in CardImage.query.filter(CardImage.card_id.in_(result_ids)).all():
+        covers_by_card.setdefault(img.card_id, {})[img.slot] = (
+            f"/card-image/{img.card_id}/{img.slot}"
+        )
+    for c in cards:
+        covers = covers_by_card.get(c.id, {})
+        c.covers = covers
+        c.cover = "square" in covers
+    return cards
 
 
 @main_bp.route("/")
