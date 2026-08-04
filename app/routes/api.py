@@ -6,6 +6,7 @@
   - 分页统一为 {"items": [...], "page": int, "pages": int, "total": int, "has_next": bool}
 """
 
+import base64
 import functools
 import time
 
@@ -65,6 +66,7 @@ from ..services.comment_service import (
     toggle_comment_like,
 )
 from ..services.notification_service import mark_all_read, notifications_page, unread_count
+from ..services.profile_service import update_profile
 from ..services.punishment_service import my_punishments_list, submit_punishment_appeal
 from ..services.report_service import (
     REPORT_REASONS,
@@ -1041,6 +1043,50 @@ def site_config():
     """站点公开配置（复用现有 /api/site-config）。"""
     from ..services.site_service import public_config
     return jsonify(ok=True, data=public_config())
+
+
+@api_bp.route("/me/profile", methods=["POST"])
+@api_login_required
+def me_profile_update():
+    """个人资料编辑：与网页 user.profile_edit 共用 update_profile。
+
+    body = {nickname?, bio?, location?, website?, birthday?, notify_like?,
+            avatar_data_url?, remove_avatar?}。
+    - avatar_data_url: base64 data URL，服务端压缩为方形头像；
+    - remove_avatar=true 时清空头像（优先级高于 avatar_data_url）。
+    """
+    viewer = _ensure_self()
+    data = request.get_json(silent=True) or {}
+    avatar_bytes = None
+    data_url = (data.get("avatar_data_url") or "").strip()
+    if data_url and not data.get("remove_avatar"):
+        try:
+            header, payload = data_url.split(",", 1)
+            avatar_bytes = base64.b64decode(payload)
+        except Exception:
+            return err("头像数据格式不正确")
+    error = update_profile(
+        viewer,
+        nickname=data.get("nickname"),
+        bio=data.get("bio"),
+        location=data.get("location"),
+        website=data.get("website"),
+        birthday_raw=data.get("birthday"),
+        notify_like=data.get("notify_like", True),
+        avatar_bytes=avatar_bytes,
+        remove_avatar=bool(data.get("remove_avatar")),
+    )
+    if error:
+        return err(error)
+    return ok({
+        "nickname": viewer.nickname,
+        "bio": viewer.bio,
+        "location": viewer.location,
+        "website": viewer.website,
+        "birthday": viewer.birthday.isoformat() if viewer.birthday else None,
+        "notify_like": bool(viewer.notify_like),
+        "avatar": viewer.avatar,
+    })
 
 
 # ---------------------------------------------------------------------------

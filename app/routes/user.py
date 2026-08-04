@@ -1,8 +1,7 @@
 import html
 import json
 import os
-import re
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from flask import (
     Blueprint,
@@ -45,6 +44,7 @@ from ..services.comment_service import (
 )
 from ..services.image_service import raw_bytes_to_webp_data_url
 from ..services.notification_service import notifications_page
+from ..services.profile_service import update_profile
 from ..services.punishment_service import my_punishments_list, submit_punishment_appeal
 from ..services.report_service import (
     REPORT_REASONS,
@@ -84,7 +84,6 @@ from ..services.card_service import (
 )
 from ..services.image_service import (
     compress_image,
-    crop_square_and_compress_bytes,
     send_webp,
 )
 
@@ -269,43 +268,21 @@ def profile_edit():
         flash("你当前被禁止更改资料", "warning")
         return redirect(url_for("user.profile", username=u.username))
     if request.method == "POST":
-        u.nickname = (request.form.get("nickname") or "").strip() or u.nickname
-        u.bio = (request.form.get("bio") or "").strip()
-        u.location = (request.form.get("location") or "").strip()
-
-        website = (request.form.get("website") or "").strip()
-        if website:
-            if not re.match(r"^https?://", website):
-                website = "https://" + website
-            u.website = website
-        else:
-            u.website = None
-
-        birthday_raw = (request.form.get("birthday") or "").strip()
-        if birthday_raw:
-            try:
-                u.birthday = datetime.strptime(birthday_raw, "%Y-%m-%d").date()
-            except ValueError:
-                flash("生日格式不正确，应为 YYYY-MM-DD", "warning")
-                return render_template("user/profile_edit.html", u=u)
-        else:
-            u.birthday = None
-
-        # 通知偏好：茶馆被点赞时是否通知（可关，防刷屏）
-        u.notify_like = "notify_like" in request.form
-
-        # 头像：移除 / 裁剪后上传（原始文件，服务端压缩）/ 保留原值；彻底去掉 base64 内联
         avatar_file = request.files.get("avatar_file")
-        if request.form.get("remove_avatar"):
-            u.avatar = None
-        elif avatar_file and avatar_file.filename:
-            try:
-                u.avatar = crop_square_and_compress_bytes(avatar_file.read())
-            except Exception:
-                flash("头像处理失败，请重试", "warning")
-                return render_template("user/profile_edit.html", u=u)
-
-        db.session.commit()
+        error = update_profile(
+            u,
+            nickname=request.form.get("nickname"),
+            bio=request.form.get("bio"),
+            location=request.form.get("location"),
+            website=request.form.get("website"),
+            birthday_raw=request.form.get("birthday"),
+            notify_like="notify_like" in request.form,
+            avatar_bytes=avatar_file.read() if avatar_file and avatar_file.filename else None,
+            remove_avatar=bool(request.form.get("remove_avatar")),
+        )
+        if error:
+            flash(error, "warning")
+            return render_template("user/profile_edit.html", u=u)
         flash("个人资料已更新", "success")
         return redirect(url_for("user.profile", username=u.username))
 
