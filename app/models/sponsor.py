@@ -27,4 +27,7 @@ class Sponsor(db.Model):
         db.UniqueConstraint("user_id", name="uq_sponsor_user_id"),
     )
 
-    user = db.relationship("User", backref="sponsors")
+    # sponsors 表有两个外键指向 users（user_id=被赞助者、created_by=录入者），
+    # 必须显式指定 foreign_keys 为 user_id，否则 SQLAlchemy 无法确定连接条件，
+    # 首次 mapper 配置时会抛 AmbiguousForeignKeysError。
+    user = db.relationship("User", foreign_keys=[user_id], backref="sponsors")

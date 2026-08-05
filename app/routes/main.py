@@ -1,6 +1,7 @@
 import base64
 import math
 import random
+from datetime import datetime, timedelta
 from io import BytesIO
 
 from flask import (
@@ -22,6 +23,7 @@ from ..extensions import db
 from ..models import (
     Article,
     Card,
+    CardCopyStat,
     CardFavorite,
     CardImage,
     CardLike,
@@ -48,6 +50,10 @@ HOT_W_COMMENT      = 6.0   # 优先级 1：评论代表讨论度，权重最高
 HOT_W_FAVORITE     = 3.0   # 优先级 3：每个收藏都加一次权
 HOT_W_LIKE         = 2.0   # 优先级 4：每个点赞都加一次权
 HOT_W_VIEW         = 1.0   # 优先级 6：浏览最弱信号
+# 复制数信号（方案 B）：近 30 天复制量经对数压缩后作为独立加权项。
+# 复制 = 强正向意图（用户实际带走使用），含金量高于浏览/点赞、介于收藏与评论之间。
+HOT_W_COPY         = 4.0   # 复制权重（介于收藏 3 与评论 6 之间）
+COPY_WINDOW_DAYS   = 30    # 只统计近 30 天复制，保证信号「当下化」并与 HN 时间衰减协同
 # 浏览量对数压缩：用 log(1+views) 替代线性 views，削弱「被动累加」的浏览主导
 # （几百次浏览不会再以线性方式碾压互动信号），同时保留「看得多 = 略热门」的弱信号。
 HOT_VIEW_LOG_BASE   = 10.0
@@ -210,6 +216,24 @@ def _banned_author_ids():
     ).distinct()
 
 
+def _copies_agg_subquery(days=COPY_WINDOW_DAYS):
+    """近 N 天每张卡的复制次数（card_id -> count），用于把复制数并入热度排序。
+
+    只统计近 days 天内的复制，保证信号「当下化」并与 HN 时间衰减协同；
+    窗口边界用 Python UTC 与库内 copied_at（db.func.now()）近似对齐（项目现状约定）。
+    """
+    since = datetime.utcnow() - timedelta(days=days)
+    return (
+        db.session.query(
+            CardCopyStat.card_id,
+            func.count(CardCopyStat.card_id).label("cp"),
+        )
+        .filter(CardCopyStat.copied_at >= since)
+        .group_by(CardCopyStat.card_id)
+        .subquery("card_copies_agg")
+    )
+
+
 def _likes_agg_subquery():
     """一次聚合出每张卡的赞数（card_id -> count），避免排序时逐行关联子查询。"""
     return (
@@ -259,17 +283,19 @@ def _card_hot_score(interactions_expr, created_at_col):
 def _apply_hot_score(q):
     """对查询 q 做探索热度所需的 outerjoin，并返回 (q, score_expr)。
 
-    score_expr 与探索页排序同款：互动加权（评论6/收藏3/点赞2/带图1.5/浏览1）× 三段年龄权重
+    score_expr 与探索页排序同款：互动加权（评论6/收藏3/复制4/点赞2/带图1.3/浏览1）× 三段年龄权重
     （0~5日上升、6~8日平稳、9日+下降）。供 `_order_by_hot` 排序与首页加权随机复用，确保
-    两处推荐口径一致。
+    两处推荐口径一致。复制数取近 30 天并经对数压缩（HOT_W_COPY / COPY_WINDOW_DAYS）。
     """
     la = _likes_agg_subquery()
     fa = _favorites_agg_subquery()
     ca = _comments_agg_subquery()
+    cpa = _copies_agg_subquery()
     ia = _has_image_subquery()
     q = q.outerjoin(la, la.c.card_id == Card.id)
     q = q.outerjoin(fa, fa.c.card_id == Card.id)
     q = q.outerjoin(ca, ca.c.card_id == Card.id)
+    q = q.outerjoin(cpa, cpa.c.card_id == Card.id)
     q = q.outerjoin(ia, ia.c.card_id == Card.id)
 
     if db.engine.name == "sqlite":
@@ -297,11 +323,16 @@ def _apply_hot_score(q):
     view_term = func.log(
         func.coalesce(Card.view_count, 0) + 1.0
     ) / math.log(HOT_VIEW_LOG_BASE)
+    # 复制数对数压缩：与浏览量同款，log(1 + 近30天复制数)，避免单卡复制被线性放大碾压其他信号。
+    copy_term = func.log(
+        func.coalesce(cpa.c.cp, 0) + 1.0
+    ) / math.log(HOT_VIEW_LOG_BASE)
 
     engagement = (
         func.coalesce(ca.c.cc, 0) * HOT_W_COMMENT
         + func.coalesce(fa.c.fc, 0) * HOT_W_FAVORITE
         + func.coalesce(la.c.lc, 0) * HOT_W_LIKE
+        + copy_term * HOT_W_COPY
         + view_term * HOT_W_VIEW
     )
     # 带图倍数放大：带图卡整体互动得分 ×HOT_IMG_MULT，无图 ×1.0，
