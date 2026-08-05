@@ -15,7 +15,7 @@ from flask import (
     url_for,
 )
 from flask_login import current_user
-from sqlalchemy import case, desc, func, literal_column, or_, text
+from sqlalchemy import case, func, literal_column, or_, text
 from sqlalchemy.orm import joinedload
 
 from ..caching import TimedCache
@@ -529,7 +529,7 @@ def _card_search_query(q, sort, tag=None, viewer=None):
         if use_ft:
             # 全文检索直接用 MATCH 相关度排序
             base = base.order_by(
-                desc(ft),
+                ft.desc(),
                 Card.view_count.desc(),
                 Card.created_at.desc(),
             )
