@@ -25,6 +25,7 @@ def default_public_config():
         "contact_email": "",
         "memorial_banner_url": "",
         "redeem_code_url": "",
+        "sponsor": {"enabled": False, "title": "", "content": "", "url": ""},
     }
 
 
@@ -74,6 +75,12 @@ def public_config():
         "contact_email": cfg.contact_email or "",
         "memorial_banner_url": cfg.memorial_banner_url or "",
         "redeem_code_url": cfg.redeem_code_url or "",
+        "sponsor": {
+            "enabled": bool(cfg.sponsor_enabled),
+            "title": cfg.sponsor_title or "",
+            "content": cfg.sponsor_content or "",
+            "url": cfg.sponsor_url or "",
+        },
     }
     _cfg_cache.set(_CFG_KEY, value)
     return value

@@ -13,7 +13,7 @@ import time
 import jwt
 from flask import Blueprint, current_app, g, jsonify, request
 from flask_login import current_user
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 
 from ..extensions import db
@@ -23,6 +23,7 @@ from ..models import (
     Notification,
     PointTransaction,
     Punishment,
+    Sponsor,
     TeaPost,
     TeaPostImage,
     TeaTopic,
@@ -1056,6 +1057,64 @@ def site_config():
     """站点公开配置（复用现有 /api/site-config）。"""
     from ..services.site_service import public_config
     return jsonify(ok=True, data=public_config())
+
+
+@api_bp.route("/sponsors", methods=["GET"])
+def sponsors():
+    """赞助页面：返回赞助配置（开关/标题/富文本说明/按钮链接）与随机打乱的赞助者列表。
+
+    每个赞助者携带 username，便于 App 端点击跳转到对应用户主页。
+    """
+    from ..services.site_service import get_site_config
+
+    try:
+        cfg = get_site_config()
+    except Exception:
+        cfg = None
+    if cfg is None or not cfg.sponsor_enabled:
+        return ok(
+            {
+                "enabled": False,
+                "title": "",
+                "content": "",
+                "url": "",
+                "sponsors": [],
+            }
+        )
+
+    rows = Sponsor.query.order_by(func.rand()).limit(30).all()
+    users = {}
+    if rows:
+        users = {
+            u.id: u
+            for u in User.query.filter(
+                User.id.in_([s.user_id for s in rows])
+            ).all()
+        }
+    items = []
+    for s in rows:
+        u = users.get(s.user_id)
+        if not u:
+            continue
+        items.append(
+            {
+                "uid": s.user_id,
+                "display_name": s.display_name,
+                "amount": s.amount or "",
+                "username": u.username,
+                "nickname": u.display_name or u.username,
+                "avatar": u.avatar or "",
+            }
+        )
+    return ok(
+        {
+            "enabled": True,
+            "title": cfg.sponsor_title or "",
+            "content": cfg.sponsor_content or "",
+            "url": cfg.sponsor_url or "",
+            "sponsors": items,
+        }
+    )
 
 
 @api_bp.route("/cards/import/parse", methods=["POST"])

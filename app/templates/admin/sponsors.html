@@ -1,0 +1,251 @@
+{% extends "admin/base.html" %}
+{% from "macros/richeditor.html" import rich_editor %}
+
+{% block title %}赞助管理 · DNAISLAND{% endblock %}
+
+{% block admin_content %}
+<h2 class="h4 mb-3">赞助管理</h2>
+<p class="text-muted">
+  配置赞助页面（标题、富文本说明与「前往赞助」按钮链接），并维护赞助者列表。
+  赞助者通过「未被处罚的用户（含管理员）」筛选，可使用下方快速选择器搜索后点选，或直接粘贴用户 UID。
+</p>
+
+<form method="post" action="{{ url_for('admin.sponsors_config') }}" class="card card-body mb-4">
+  <div class="card-header px-0 pt-0 d-flex justify-content-between align-items-center">
+    <span>赞助页面配置</span>
+    <div class="form-check form-switch mb-0">
+      <input class="form-check-input" type="checkbox" role="switch" id="sponsor_enabled"
+             name="sponsor_enabled" value="1" {{ 'checked' if cfg.sponsor_enabled else '' }}>
+      <label class="form-check-label" for="sponsor_enabled">启用赞助页面</label>
+    </div>
+  </div>
+  <div class="mb-3">
+    <label class="form-label" for="sponsor_title">页面标题</label>
+    <input type="text" class="form-control" id="sponsor_title" name="sponsor_title"
+           value="{{ cfg.sponsor_title or '' }}" placeholder="支持 DNAISLAND 运转">
+  </div>
+  <div class="mb-3">
+    <label class="form-label">赞助说明（富文本 / HTML，可插入链接）</label>
+    {{ rich_editor('sponsor_content', cfg.sponsor_content) }}
+    <div class="form-text">建议用简短的段落介绍赞助用途与感谢语，展示在页面标题下方。</div>
+  </div>
+  <div class="mb-3">
+    <label class="form-label" for="sponsor_url">「前往赞助」按钮链接</label>
+    <input type="text" class="form-control" id="sponsor_url" name="sponsor_url"
+           value="{{ cfg.sponsor_url or '' }}" placeholder="https://...">
+    <div class="form-text">填写后，页面将展示「前往赞助」按钮，点击直接跳转到该地址；留空则不显示按钮。</div>
+  </div>
+  <button type="submit" class="btn btn-primary align-self-start">保存配置</button>
+</form>
+
+<h3 class="h5 mb-3">赞助者列表</h3>
+<form method="post" action="{{ url_for('admin.sponsors_add') }}" class="card card-body mb-4">
+  <div class="row g-3">
+    <div class="col-md-4">
+      <label class="form-label">用户 UID</label>
+      <input type="text" class="form-control" id="sponsor-uid" name="user_id"
+             placeholder="可直接粘贴用户 UID">
+      <div class="form-text" id="sponsor-selected"></div>
+    </div>
+    <div class="col-md-5">
+      <label class="form-label">快速选择器（仅显示可选用户）</label>
+      <input type="text" class="form-control" id="sponsor-search" autocomplete="off"
+             placeholder="输入昵称或用户名搜索…">
+      <div id="sponsor-results" class="list-group mt-1" style="position:relative;z-index:20;"></div>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">显示名（留空取昵称）</label>
+      <input type="text" class="form-control" name="display_name" maxlength="64">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">累计赞助数额（可填 ¥66.6）</label>
+      <input type="text" class="form-control" name="amount" maxlength="32">
+    </div>
+    <div class="col-12">
+      <button type="submit" class="btn btn-primary">添加赞助者</button>
+    </div>
+  </div>
+</form>
+
+{% if not items %}
+  <div class="alert alert-info">还没有任何赞助者。</div>
+{% else %}
+  <p class="text-muted small mb-2">拖动每行左侧手柄可调整展示顺序，松手即保存。</p>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle">
+      <thead>
+        <tr><th style="width:2.5rem;"></th><th>#</th><th>用户</th><th>显示名</th><th>累计数额</th><th></th></tr>
+      </thead>
+      <tbody id="sponsorList">
+        {% for it in items %}
+          <tr data-id="{{ it.sponsor.id }}">
+            <td class="drag-handle text-muted" title="拖动排序" style="cursor:grab;">⠿</td>
+            <td>{{ loop.index }}</td>
+            <td>
+              {% if it.user %}
+                <a href="{{ it.user.link }}" target="_blank" rel="noopener">
+                  {{ it.user.nickname }}（UID {{ it.sponsor.user_id }}）
+                </a>
+              {% else %}
+                <span class="text-danger">（用户已失效：UID {{ it.sponsor.user_id }}）</span>
+              {% endif %}
+            </td>
+            <td>{{ it.sponsor.display_name }}</td>
+            <td>{{ it.sponsor.amount or '' }}</td>
+            <td class="text-end">
+              <button type="button" class="btn btn-sm btn-outline-secondary me-1"
+                      data-edit='{{ {"id": it.sponsor.id, "display_name": it.sponsor.display_name, "amount": it.sponsor.amount or ""}|tojson }}'>
+                编辑
+              </button>
+              <form method="post" action="{{ url_for('admin.sponsors_delete', sponsor_id=it.sponsor.id) }}" class="d-inline">
+                <button type="submit" class="btn btn-sm btn-outline-danger"
+                        onclick="return confirm('确认移除该赞助者？');">移除</button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}
+
+<div class="modal fade" id="editModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <form method="post" id="editForm" class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">编辑赞助者</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">显示名（最多 64 字）</label>
+          <input type="text" class="form-control" name="display_name" id="edit-display" maxlength="64">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">累计赞助数额</label>
+          <input type="text" class="form-control" name="amount" id="edit-amount" maxlength="32">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+        <button type="submit" class="btn btn-primary">保存</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="{{ staticv('vendor/sortable.min.js') }}"></script>
+<script>
+(function () {
+  const searchEl = document.getElementById('sponsor-search');
+  const resultsEl = document.getElementById('sponsor-results');
+  const uidEl = document.getElementById('sponsor-uid');
+  const selEl = document.getElementById('sponsor-selected');
+  let timer = null;
+
+  function clearResults() { resultsEl.innerHTML = ''; }
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function thumbHtml(src) {
+    if (src) {
+      return '<img src="' + src + '" alt="" style="width:42px;height:42px;object-fit:cover;border-radius:50%;flex:0 0 auto;">';
+    }
+    return '<div style="width:42px;height:42px;border-radius:50%;background:#e9ecef;flex:0 0 auto;"></div>';
+  }
+
+  function pick(id, label) {
+    uidEl.value = id;
+    selEl.textContent = '已选择：' + label + '（UID ' + id + '）';
+    clearResults();
+    searchEl.value = '';
+  }
+
+  function renderRow(row) {
+    const a = document.createElement('button');
+    a.type = 'button';
+    a.className = 'list-group-item list-group-item-action d-flex align-items-center gap-2';
+    const label = row.nickname || ('@' + row.username);
+    a.innerHTML = thumbHtml(row.avatar)
+      + '<div class="flex-grow-1" style="min-width:0;">'
+      + '<div class="fw-semibold text-truncate">' + escapeHtml(row.nickname || '') + '</div>'
+      + (row.username ? '<div class="small text-muted text-truncate">@' + escapeHtml(row.username) + '</div>' : '')
+      + '<div class="small text-muted">UID ' + row.id + '</div>'
+      + '</div>';
+    a.addEventListener('click', function () { pick(row.id, label); });
+    resultsEl.appendChild(a);
+  }
+
+  searchEl.addEventListener('input', function () {
+    clearTimeout(timer);
+    const q = searchEl.value.trim();
+    if (!q) { clearResults(); return; }
+    timer = setTimeout(function () {
+      fetch('{{ url_for("admin.sponsors_search") }}?q=' + encodeURIComponent(q))
+        .then(r => r.json())
+        .then(function (rows) {
+          resultsEl.innerHTML = '';
+          if (!rows.length) {
+            resultsEl.innerHTML = '<div class="list-group-item text-muted">无匹配结果</div>';
+            return;
+          }
+          rows.forEach(renderRow);
+        });
+    }, 250);
+  });
+
+  document.addEventListener('click', function (e) {
+    if (!resultsEl.contains(e.target) && e.target !== searchEl) clearResults();
+  });
+
+  // ---- 编辑弹窗 ----
+  const editForm = document.getElementById('editForm');
+  if (editForm) {
+    document.querySelectorAll('[data-edit]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const d = JSON.parse(btn.getAttribute('data-edit'));
+        document.getElementById('edit-display').value = d.display_name;
+        document.getElementById('edit-amount').value = d.amount || '';
+        editForm.action =
+          '{{ url_for("admin.sponsors_edit", sponsor_id=0) }}'.replace('/0', '/' + d.id);
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('editModal')).show();
+      });
+    });
+  }
+
+  // ---- 拖拽排序（SortableJS，本地引入） ----
+  const listEl = document.getElementById('sponsorList');
+  if (listEl && typeof Sortable !== 'undefined') {
+    new Sortable(listEl, {
+      draggable: 'tr',
+      handle: '.drag-handle',
+      animation: 150,
+      ghostClass: 'sortable-ghost',
+      onEnd: function (evt) {
+        if (evt.oldIndex === evt.newIndex) return;
+        const ids = Array.prototype.map.call(
+          listEl.querySelectorAll('tr[data-id]'),
+          function (el) { return el.dataset.id; }
+        );
+        fetch('{{ url_for("admin.sponsors_reorder") }}', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids: ids })
+        })
+          .then(function (r) { return r.json(); })
+          .then(function (d) { if (!d.ok) location.reload(); })
+          .catch(function () { location.reload(); });
+      }
+    });
+  }
+})();
+</script>
+<style>
+  .drag-handle { user-select: none; }
+  #sponsorList tr.sortable-ghost { opacity: .4; background: #f8f9fa; }
+</style>
+{% endblock %}

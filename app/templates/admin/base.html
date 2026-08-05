@@ -79,6 +79,10 @@
             <a class="nav-link {% if request.endpoint.startswith('admin.recommend') %}active{% endif %}"
                href="{{ url_for('admin.recommend') }}">站长推荐</a>
           </li>
+          <li class="nav-item">
+            <a class="nav-link {% if request.endpoint.startswith('admin.sponsors') %}active{% endif %}"
+               href="{{ url_for('admin.sponsors') }}">赞助管理</a>
+          </li>
         </ul>
       </div>
     </nav>

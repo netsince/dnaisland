@@ -37,6 +37,7 @@ from ..models import (
     RedemptionKey,
     Report,
     SiteRecommendation,
+    Sponsor,
     Sticker,
     StickerSeries,
     TeaPoll,
@@ -1934,3 +1935,169 @@ def article_toggle_author(article_id):
     db.session.commit()
     flash("已切换发布者显示状态", "success")
     return redirect(url_for("admin.articles"))
+
+
+# ---------------- 赞助页面 ----------------
+@admin_bp.route("/sponsors")
+@super_admin_required
+def sponsors():
+    """赞助管理：配置（开关/标题/富文本说明/按钮链接）+ 赞助者列表。"""
+    cfg = get_site_config()
+    rows = Sponsor.query.order_by(Sponsor.sort_order, Sponsor.created_at).all()
+    uid_map = {}
+    if rows:
+        uid_map = {
+            u.id: u
+            for u in User.query.filter(
+                User.id.in_([s.user_id for s in rows])
+            ).all()
+        }
+    items = []
+    for s in rows:
+        u = uid_map.get(s.user_id)
+        items.append(
+            {
+                "sponsor": s,
+                "user": (
+                    {
+                        "nickname": u.nickname or u.username,
+                        "username": u.username,
+                        "link": url_for("user.profile", username=u.username),
+                    }
+                    if u
+                    else None
+                ),
+            }
+        )
+    return render_template("admin/sponsors.html", items=items, cfg=cfg)
+
+
+@admin_bp.route("/sponsors/config", methods=["POST"])
+@super_admin_required
+def sponsors_config():
+    """保存赞助页面配置。"""
+    cfg = get_site_config()
+    cfg.sponsor_enabled = request.form.get("sponsor_enabled") == "1"
+    cfg.sponsor_title = (request.form.get("sponsor_title") or "").strip() or None
+    cfg.sponsor_content = (
+        request.form.get("sponsor_content") or ""
+    ).strip() or None
+    cfg.sponsor_url = (request.form.get("sponsor_url") or "").strip() or None
+    db.session.commit()
+    flash("赞助配置已保存", "success")
+    return redirect(url_for("admin.sponsors"))
+
+
+@admin_bp.route("/sponsors/add", methods=["POST"])
+@super_admin_required
+def sponsors_add():
+    """添加赞助者：可手动粘贴 UID，也可用下方快速选择器搜索后点选。"""
+    raw_uid = (request.form.get("user_id") or "").strip()
+    if not raw_uid.isdigit():
+        flash("请填写用户 UID 或使用搜索选择器", "danger")
+        return redirect(url_for("admin.sponsors"))
+    u = db.session.get(User, int(raw_uid))
+    # 只接受状态正常、且无生效处罚的用户（管理员亦可加入）
+    if not u or u.status != "active":
+        flash("只能添加状态正常的用户", "danger")
+        return redirect(url_for("admin.sponsors"))
+    if u.active_punishments:
+        flash("不能添加存在生效处罚的用户", "danger")
+        return redirect(url_for("admin.sponsors"))
+    if Sponsor.query.filter_by(user_id=u.id).first():
+        flash("该用户已在赞助列表中", "warning")
+        return redirect(url_for("admin.sponsors"))
+
+    display_name = (request.form.get("display_name") or "").strip()
+    amount = (request.form.get("amount") or "").strip() or None
+    display_name = display_name or (u.nickname or u.username)
+    max_order = db.session.query(
+        db.func.coalesce(db.func.max(Sponsor.sort_order), 0)
+    ).scalar()
+    db.session.add(
+        Sponsor(
+            user_id=u.id,
+            display_name=display_name[:64],
+            amount=amount[:32] if amount else None,
+            sort_order=(max_order + 1),
+            created_by=current_user.id,
+        )
+    )
+    db.session.commit()
+    flash("已添加赞助者", "success")
+    return redirect(url_for("admin.sponsors"))
+
+
+@admin_bp.route("/sponsors/<int:sponsor_id>/edit", methods=["POST"])
+@super_admin_required
+def sponsors_edit(sponsor_id):
+    """编辑赞助者显示名与累计数额（不改变绑定的用户）。"""
+    s = db.session.get(Sponsor, sponsor_id)
+    if not s:
+        flash("赞助者不存在", "danger")
+        return redirect(url_for("admin.sponsors"))
+    display_name = (request.form.get("display_name") or "").strip()
+    amount = (request.form.get("amount") or "").strip() or None
+    fallback = (s.user.nickname or s.user.username) if s.user else s.display_name
+    s.display_name = (display_name or fallback)[:64]
+    s.amount = amount[:32] if amount else None
+    db.session.commit()
+    flash("已更新赞助者", "success")
+    return redirect(url_for("admin.sponsors"))
+
+
+@admin_bp.route("/sponsors/<int:sponsor_id>/delete", methods=["POST"])
+@super_admin_required
+def sponsors_delete(sponsor_id):
+    s = db.session.get(Sponsor, sponsor_id)
+    if s:
+        db.session.delete(s)
+        db.session.commit()
+        flash("已移除赞助者", "success")
+    return redirect(url_for("admin.sponsors"))
+
+
+@admin_bp.route("/sponsors/reorder", methods=["POST"])
+@super_admin_required
+def sponsors_reorder():
+    """拖拽排序：接收排序后的赞助者 ID 列表，批量更新 sort_order。"""
+    data = request.get_json(silent=True) or {}
+    ids = [int(x) for x in (data.get("ids") or []) if str(x).strip().isdigit()]
+    if not ids:
+        return jsonify(ok=True)
+    stmt = update(Sponsor).where(Sponsor.id.in_(ids)).values(
+        sort_order=case({rid: i for i, rid in enumerate(ids)}, value=Sponsor.id)
+    )
+    db.session.execute(stmt)
+    db.session.commit()
+    return jsonify(ok=True)
+
+
+@admin_bp.route("/sponsors/search")
+@super_admin_required
+def sponsors_search():
+    """快速选择器：仅返回状态正常、未被处罚的用户（含管理员），供添加时搜索点选。"""
+    q = (request.args.get("q") or "").strip()
+    punished = db.session.query(Punishment.user_id).filter(
+        Punishment.status == "active"
+    )
+    query = User.query.filter(
+        User.status == "active",
+        User.id.notin_(punished),
+    )
+    if q:
+        query = query.filter(
+            or_(User.nickname.ilike(f"%{q}%"), User.username.ilike(f"%{q}%"))
+        )
+    rows = query.order_by(User.id.desc()).limit(20).all()
+    return jsonify(
+        [
+            {
+                "id": u.id,
+                "nickname": u.nickname or u.username,
+                "username": u.username,
+                "avatar": u.avatar or "",
+            }
+            for u in rows
+        ]
+    )

@@ -53,6 +53,14 @@ class SiteConfig(db.Model):
     # 获取兑换码的跳转地址（可选）；配置后在 /points/ 侧边栏显示「获取积分」
     redeem_code_url = db.Column(db.String(500), nullable=True)
 
+    # —— 赞助页面 ——
+    sponsor_enabled = db.Column(db.Boolean, server_default="0", nullable=False)
+    sponsor_title = db.Column(db.String(200), nullable=True)  # 页面标题
+    # 赞助说明（富文本 / HTML）
+    sponsor_content = db.Column(db.Text, nullable=True)
+    # 「前往赞助」按钮跳转链接
+    sponsor_url = db.Column(db.String(500), nullable=True)
+
     updated_at = db.Column(
         db.DateTime, server_default=db.func.now(), onupdate=db.func.now()
     )

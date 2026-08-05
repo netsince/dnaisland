@@ -16,6 +16,7 @@ from .punishment import Punishment
 from .recommendation import SiteRecommendation
 from .report import Report
 from .site import Article, SiteConfig
+from .sponsor import Sponsor
 from .sticker import Sticker, StickerSeries
 from .teahouse import (
     TeaPoll,
@@ -49,6 +50,7 @@ __all__ = [
     "Report",
     "SiteConfig",
     "Article",
+    "Sponsor",
     "TeaPost",
     "TeaPostLike",
     "TeaPostImage",
