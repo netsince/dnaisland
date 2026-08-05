@@ -21,6 +21,9 @@ class Card(db.Model):
         db.DateTime, server_default=db.func.now(), onupdate=db.func.now()
     )
     status = db.Column(db.String(20), server_default="pending")
+    # 内容指纹（sha256，由规范化后的文本字段生成）。用于同一作者重复提交时
+    # 幂等去重：发现该作者已存在同指纹的「待审核」卡则复用，不再新建。
+    content_hash = db.Column(db.String(64), nullable=True, index=True)
     is_hidden = db.Column(db.Boolean, server_default="0", nullable=False, index=True)
     view_count = db.Column(db.Integer, server_default="0")
     # 复制量：与浏览量统计口径类似，但仅在用户点击“复制角色卡”时记录一次。

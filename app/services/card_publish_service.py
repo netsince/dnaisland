@@ -3,6 +3,8 @@
 Web 端 /publish/edit 与 App 端 /api/v1/cards/publish 都调用 create_card_from_payload，
 保证字段处理、图片压缩、审核状态等完全一致；解析导入直接复用 card_import_service。
 """
+import hashlib
+import json
 import uuid
 
 from ..extensions import db
@@ -14,6 +16,43 @@ from ..services.image_service import (
 )
 
 IMAGE_SLOTS = ("square", "landscape", "portrait")
+
+
+def _content_fingerprint(
+    *,
+    name,
+    gender,
+    persona,
+    intro,
+    opening,
+    original_link,
+    seed,
+    author_note,
+    author_note_interval,
+    tags,
+    dialogue_style,
+):
+    """对规范化后的文本字段生成内容指纹（sha256）。
+
+    图片 base64 因重复编码可能略有差异，故不纳入指纹，只比较决定卡片内容的
+    文本字段。排序后的 tags 与 dialogue_style 保证提交顺序不影响指纹，
+    相同内容的卡无论点击多少次都会得到同一指纹，用于幂等去重。
+    """
+    payload = {
+        "name": name,
+        "gender": gender,
+        "persona": persona,
+        "intro": intro,
+        "opening": opening,
+        "original_link": original_link,
+        "seed": seed,
+        "author_note": author_note,
+        "author_note_interval": author_note_interval,
+        "tags": sorted(tags),
+        "dialogue_style": dialogue_style,
+    }
+    raw = json.dumps(payload, ensure_ascii=False, sort_keys=True)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
 def _normalize_seed(raw):
@@ -104,19 +143,48 @@ def create_card_from_payload(author, payload):
         payload.get("author_note_interval"), has_note=author_note is not None
     )
 
+    name = (payload.get("name") or "").strip()
+    persona = payload.get("persona") or ""
+    intro = payload.get("intro") or ""
+    opening = payload.get("opening") or ""
+    original_link = (payload.get("original_link") or "").strip() or None
+    seed = _normalize_seed(payload.get("seed"))
+
+    # 幂等去重：同一作者若已存在相同内容指纹的「待审核」卡，直接复用，
+    # 避免重复点击 / 网络重试导致产生多份一模一样却各自独立的卡片。
+    content_hash = _content_fingerprint(
+        name=name,
+        gender=gender,
+        persona=persona,
+        intro=intro,
+        opening=opening,
+        original_link=original_link,
+        seed=seed,
+        author_note=author_note,
+        author_note_interval=author_note_interval,
+        tags=tags,
+        dialogue_style=dialogue_style,
+    )
+    existing = Card.query.filter_by(
+        author_id=author.id, content_hash=content_hash, status="pending"
+    ).first()
+    if existing:
+        return existing, None
+
     card = Card(
         id=card_id,
         author_id=author.id,
-        name=(payload.get("name") or "").strip(),
+        name=name,
         gender=gender,
-        persona=payload.get("persona") or "",
-        intro=payload.get("intro") or "",
-        opening=payload.get("opening") or "",
-        original_link=(payload.get("original_link") or "").strip() or None,
+        persona=persona,
+        intro=intro,
+        opening=opening,
+        original_link=original_link,
         cover_focus=payload.get("cover_focus") or None,
-        seed=_normalize_seed(payload.get("seed")),
+        seed=seed,
         author_note=author_note,
         author_note_interval=author_note_interval,
+        content_hash=content_hash,
         status="pending",  # 未审核
     )
     db.session.add(card)

@@ -128,7 +128,7 @@
         </div>
       </div>
 
-      <button type="submit" class="btn btn-primary">提交</button>
+      <button type="submit" id="submitBtn" class="btn btn-primary">提交</button>
     </form>
   </div>
 </div>
@@ -378,8 +378,17 @@
 
   // ---- 提交：将图片作为 multipart 文件直传（不再 base64 内联）----
   const cardForm = document.getElementById('cardForm');
+  const submitBtn = document.getElementById('submitBtn');
+  let submitting = false;
   cardForm.addEventListener('submit', async e => {
     e.preventDefault();
+    // 防重复提交：请求进行中再次触发直接忽略（按钮也已禁用）。
+    if (submitting) return;
+    submitting = true;
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = '提交中…';
+    }
     const fd = new FormData(cardForm);
     const keep = {};
     for (const slot of ['square', 'landscape', 'portrait']) {
@@ -408,11 +417,21 @@
         document.write(html);
         document.close();
       } else {
+        resetSubmit();
         alert('提交失败（' + resp.status + '），请重试');
       }
     } catch (err) {
+      resetSubmit();
       alert('提交失败，请检查网络后重试');
     }
   });
+
+  function resetSubmit() {
+    submitting = false;
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = '提交';
+    }
+  }
 </script>
 {% endblock %}
