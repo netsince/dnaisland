@@ -75,37 +75,38 @@
     padding: 2.6rem 1.75rem 2.2rem;
     text-align: center;
     background:
-      radial-gradient(120% 120% at 15% 0%, color-mix(in srgb, var(--bs-primary) 14%, transparent), transparent 55%),
+      radial-gradient(120% 120% at 15% 0%, color-mix(in srgb, var(--dna-accent) 14%, transparent), transparent 55%),
       var(--dna-surface);
   }
   .dna-sponsor-hero__icon {
     width: 60px; height: 60px; margin: 0 auto 1.1rem;
     display: flex; align-items: center; justify-content: center;
     border-radius: 50%;
-    color: var(--bs-primary);
-    background: color-mix(in srgb, var(--bs-primary) 14%, transparent);
+    color: var(--dna-accent);
+    background: var(--dna-chip-bg);
   }
   .dna-sponsor-hero__icon i { font-size: 1.7rem; }
   .dna-sponsor-hero__title { font-size: 1.85rem; font-weight: 800; color: var(--dna-emphasis); letter-spacing: .02em; margin: 0 0 1rem; }
   .dna-sponsor-hero__content { max-width: 640px; margin: 0 auto; color: var(--dna-muted); font-size: .95rem; line-height: 1.75; }
   .dna-sponsor-hero__content p { margin-bottom: .6rem; }
-  .dna-sponsor-hero__content a { color: var(--bs-primary); }
+  .dna-sponsor-hero__content a { color: var(--dna-link); }
+  /* 主按钮：遵循项目惯例用反向色（暗色=浅底深字，亮色=深底白字），避免随 --bs-primary 反转导致白底白字 */
   .dna-sponsor-btn {
     display: inline-flex; align-items: center; gap: .45rem;
     margin-top: 1.5rem; padding: .8rem 2.4rem;
     border-radius: 999px; text-decoration: none;
     font-weight: 700; font-size: 1.02rem; letter-spacing: .02em;
-    color: #fff; background: var(--bs-primary);
-    transition: transform .2s ease, box-shadow .25s ease, filter .25s ease;
+    color: var(--dna-inverse-text); background: var(--dna-inverse-bg);
+    transition: transform .2s ease, box-shadow .25s ease, background-color .25s ease;
   }
-  .dna-sponsor-btn:hover { color: #fff; transform: translateY(-2px); filter: brightness(1.06); box-shadow: 0 10px 24px color-mix(in srgb, var(--bs-primary) 45%, transparent); }
+  .dna-sponsor-btn:hover { color: var(--dna-inverse-text); background: var(--dna-accent-2); transform: translateY(-2px); box-shadow: 0 10px 24px color-mix(in srgb, var(--dna-accent) 45%, transparent); }
 
   /* 赞助者列表 */
   .dna-sponsor-section__head {
     display: flex; align-items: center; gap: .5rem;
     font-size: 1.15rem; font-weight: 800; color: var(--dna-emphasis);
   }
-  .dna-sponsor-section__head i { color: var(--bs-primary); }
+  .dna-sponsor-section__head i { color: var(--dna-accent); }
   .dna-sponsor-section__sub { color: var(--dna-muted); font-size: .88rem; margin: .4rem 0 0; }
 
   .dna-sponsor-grid { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: 1.1rem; }
@@ -127,7 +128,7 @@
   .dna-sponsor-item__amount {
     font-size: .78rem; font-weight: 700; padding: .15rem .55rem;
     border-radius: 8px;
-    color: var(--bs-primary); background: color-mix(in srgb, var(--bs-primary) 14%, transparent);
+    color: var(--dna-accent); background: var(--dna-chip-bg);
   }
   .dna-sponsor-none {
     margin-top: 1.1rem; padding: 1.8rem; text-align: center;
