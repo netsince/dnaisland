@@ -32,6 +32,14 @@ class Card(db.Model):
     seed = db.Column(db.Integer, nullable=True)
     # 头图封面焦点（脸部位置），格式 "x%,y%" 如 "50,30"，留空则居中
     cover_focus = db.Column(db.String(16), nullable=True)
+    # 角色卡绑定的作者注释（Author's Note，可选）：一段希望模型始终记住/强调的内容。
+    # 导入客户端 JSON 时从 character.authorNote 读取；导出时回写为 authorNote。留空则不启用。
+    author_note = db.Column(db.Text, nullable=True)
+    # 作者注释注入间隔（每多少条历史消息注入一次），0 表示禁用。
+    # 仅当 author_note 非空时生效；为空时导出为 0，客户端会自动回退到全局作者注释。
+    author_note_interval = db.Column(
+        db.Integer, nullable=False, server_default="0"
+    )
 
     author = db.relationship("User", backref="cards")
     images = db.relationship("CardImage", backref="card")

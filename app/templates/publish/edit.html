@@ -107,6 +107,24 @@
               同一 seed 在客户端会复现相同音色。留空表示不固定。
             </div>
           </div>
+          <div class="mb-3">
+            <label class="form-label">作者注释（可选）</label>
+            <textarea class="form-control" name="author_note" rows="3"
+                      placeholder="希望模型始终记住/强调的内容，例如：此刻身处雨夜森林，脚下是湿冷的泥土">{{ (prefill.get('author_note') or '') if prefill else '' }}</textarea>
+            <div class="form-text">
+              可设置一段始终想让模型记住/强调的内容，在对话中按间隔深度注入，而不只放在开头。
+              从客户端 JSON 导入时会自动填入；留空表示未设置（客户端自动回退到全局作者注释）。
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">作者注释注入间隔（可选）</label>
+            <input type="number" class="form-control" name="author_note_interval" min="0"
+                   value="{% set ai = prefill.get('author_note_interval') if prefill else none %}{{ ai if ai is not none else '0' }}"
+                   placeholder="每多少条历史消息注入一次，0 表示禁用">
+            <div class="form-text">
+              仅当填写了作者注释时生效；0 表示禁用。默认 0。
+            </div>
+          </div>
         </div>
       </div>
 

@@ -29,6 +29,28 @@ def _normalize_seed(raw):
     return None
 
 
+def _normalize_author_note(raw_note):
+    """规范化作者注释：仅保留非空字符串，否则置 None（表示未设置）。"""
+    if isinstance(raw_note, str) and raw_note.strip():
+        return raw_note.strip()
+    return None
+
+
+def _normalize_author_note_interval(raw_interval, has_note):
+    """规范化注入间隔：需为正整数，且作者注释已设置，否则视为 0（禁用）。"""
+    if not has_note:
+        return 0
+    if isinstance(raw_interval, int):
+        return raw_interval if raw_interval > 0 else 0
+    if isinstance(raw_interval, str):
+        try:
+            val = int(raw_interval)
+            return val if val > 0 else 0
+        except ValueError:
+            return 0
+    return 0
+
+
 def _normalize_images(images, optimize=False):
     """images: {slot: bytes | data_url_str} → {slot: data_url_str}。
 
@@ -77,6 +99,11 @@ def create_card_from_payload(author, payload):
 
     images = _normalize_images(payload.get("images") or {}, optimize=True)
 
+    author_note = _normalize_author_note(payload.get("author_note"))
+    author_note_interval = _normalize_author_note_interval(
+        payload.get("author_note_interval"), has_note=author_note is not None
+    )
+
     card = Card(
         id=card_id,
         author_id=author.id,
@@ -88,6 +115,8 @@ def create_card_from_payload(author, payload):
         original_link=(payload.get("original_link") or "").strip() or None,
         cover_focus=payload.get("cover_focus") or None,
         seed=_normalize_seed(payload.get("seed")),
+        author_note=author_note,
+        author_note_interval=author_note_interval,
         status="pending",  # 未审核
     )
     db.session.add(card)

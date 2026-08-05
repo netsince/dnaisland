@@ -309,6 +309,11 @@ def build_export_package(
         # 回写语音 seed：客户端以 character.voiceSeed 读取，保证复制后音色一致
         "voiceSeed": card.seed,
     }
+    # 回写作者注释：客户端以 character.authorNote / authorNoteInterval 读取。
+    # 未设置（author_note 为空）时不带 authorNote，客户端自动回退到全局作者注释。
+    if card.author_note:
+        character["authorNote"] = card.author_note
+    character["authorNoteInterval"] = card.author_note_interval or 0
 
     package = {
         "Tips": _COPYRIGHT_TIPS,

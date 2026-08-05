@@ -7,7 +7,11 @@ import json
 
 from ..extensions import db
 from ..models import CardDialogueStyle, CardImage, CardTag
-from ..services.card_publish_service import _normalize_images
+from ..services.card_publish_service import (
+    _normalize_author_note,
+    _normalize_author_note_interval,
+    _normalize_images,
+)
 
 
 def resubmit_card(viewer, card):
@@ -43,6 +47,12 @@ def update_card_from_payload(card, payload):
     card.opening = payload.get("opening") or ""
     card.original_link = (payload.get("original_link") or "").strip() or None
     card.cover_focus = payload.get("cover_focus") or None
+    # 作者注释：覆盖式更新，留空即清除（置 None，客户端自动回退到全局作者注释）
+    card.author_note = _normalize_author_note(payload.get("author_note"))
+    card.author_note_interval = _normalize_author_note_interval(
+        payload.get("author_note_interval"),
+        has_note=card.author_note is not None,
+    )
     card.status = "pending"  # 编辑后自动重新提审
 
     # 标签覆盖式更新

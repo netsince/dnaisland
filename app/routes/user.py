@@ -803,6 +803,8 @@ def card_edit(card_id):
             "opening": request.form.get("opening"),
             "original_link": request.form.get("original_link"),
             "cover_focus": request.form.get("cover_focus"),
+            "author_note": request.form.get("author_note"),
+            "author_note_interval": request.form.get("author_note_interval"),
             "tags": tags,
             "dialogue_style": dialogue_style,
             "images": images,
@@ -832,6 +834,8 @@ def card_edit(card_id):
         "tags": tags,
         "original_link": card.original_link or "",
         "cover_focus": card.cover_focus or "",
+        "author_note": card.author_note or "",
+        "author_note_interval": card.author_note_interval or 0,
     }
     return render_template(
         "publish/edit.html",

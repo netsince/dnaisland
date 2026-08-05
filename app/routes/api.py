@@ -227,6 +227,9 @@ def _card_detail(card: Card, data: dict) -> dict:
         "intro": card.intro or "",
         "opening": card.opening or "",
         "original_link": card.original_link or "",
+        # 角色卡绑定的作者注释（可选）：未设置时为 None，客户端可回退到全局作者注释
+        "authorNote": card.author_note,
+        "authorNoteInterval": card.author_note_interval or 0,
         "view_count": card.view_count or 0,
         "copy_count": card.copy_count or 0,
         "like_count": data["like_count"],

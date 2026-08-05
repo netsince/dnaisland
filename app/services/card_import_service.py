@@ -73,6 +73,19 @@ def parse_export_package(json_str: str) -> dict:
         seed = data.get("voiceSeed")
     seed = seed if isinstance(seed, int) else None
 
+    # 角色卡绑定的作者注释（可选）：从 character.authorNote 读取。
+    # 仅当为非空字符串时启用，否则置 None（表示未设置，客户端自动回退到全局作者注释）。
+    raw_note = character.get("authorNote")
+    author_note = (
+        str(raw_note).strip() if isinstance(raw_note, str) and raw_note.strip() else None
+    )
+    # 注入间隔：仅当作者注释启用时有效；非正整数（或缺失）视为禁用（0）。
+    raw_interval = character.get("authorNoteInterval")
+    if isinstance(raw_interval, int) and raw_interval > 0 and author_note is not None:
+        author_note_interval = raw_interval
+    else:
+        author_note_interval = 0
+
     # 注意：不读取 JSON 中的 id，平台始终自动分配新 id
     return {
         "name": character.get("name") or "",
@@ -84,6 +97,8 @@ def parse_export_package(json_str: str) -> dict:
         "dialogue_style": dialogue_style,
         "images": images,
         "seed": seed,
+        "author_note": author_note,
+        "author_note_interval": author_note_interval,
         # 导入成功后强制清空源链接
         "original_link": "",
     }

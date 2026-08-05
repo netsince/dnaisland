@@ -99,6 +99,8 @@ def edit():
         "original_link": request.form.get("original_link"),
         "cover_focus": request.form.get("cover_focus"),
         "seed": request.form.get("seed"),
+        "author_note": request.form.get("author_note"),
+        "author_note_interval": request.form.get("author_note_interval"),
         "tags": tags,
         "dialogue_style": dialogue_style,
         "images": images,
