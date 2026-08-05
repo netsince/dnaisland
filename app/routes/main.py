@@ -30,6 +30,7 @@ from ..models import (
     CardTag,
     Comment,
     Punishment,
+    Sponsor,
     User,
 )
 from ..models.teahouse import TeaPost
@@ -207,6 +208,49 @@ def recommend():
     """站长板块（站长推荐）。与 App 共用 recommend_items 一个函数。"""
     items = recommend_items()
     return render_template("recommend/index.html", items=items)
+
+
+@main_bp.route("/sponsor")
+def sponsor():
+    """赞助页面：展示赞助配置（标题/富文本说明/按钮链接）与随机打乱的赞助者列表。"""
+    from ..services.site_service import get_site_config
+
+    try:
+        cfg = get_site_config()
+        rows = Sponsor.query.order_by(func.rand()).limit(30).all()
+    except Exception:
+        # 表尚未建立（如迁移未执行）时优雅降级为空
+        cfg = None
+        rows = []
+
+    enabled = bool(cfg and cfg.sponsor_enabled)
+    items = []
+    if enabled and rows:
+        uid_map = {
+            u.id: u
+            for u in User.query.filter(User.id.in_([s.user_id for s in rows])).all()
+        }
+        for s in rows:
+            u = uid_map.get(s.user_id)
+            if not u:
+                continue
+            items.append(
+                {
+                    "uid": s.user_id,
+                    "display_name": s.display_name,
+                    "amount": s.amount or "",
+                    "user": u,
+                }
+            )
+
+    return render_template(
+        "sponsor/index.html",
+        enabled=enabled,
+        title=(cfg.sponsor_title if cfg else "") or "",
+        content=(cfg.sponsor_content if cfg else "") or "",
+        url=(cfg.sponsor_url if cfg else "") or "",
+        items=items,
+    )
 
 
 def _banned_author_ids():

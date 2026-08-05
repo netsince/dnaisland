@@ -212,9 +212,9 @@ data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded=
  {% if site_cfg.announcement.enabled and site_cfg.announcement.content %}
  <a href="#" class="text-decoration-none" data-bs-toggle="modal" data-bs-target="#announcementModal">查看公告</a>
  {% endif %}
- {% if site_cfg.contact_email %}
+{% if site_cfg.contact_email %}
  <a href="mailto:{{ site_cfg.contact_email }}" class="text-decoration-none ms-2">联系客服</a>
- {% endif %}
+{% endif %}
  </div>
  <small>DNAISLAND · 与汝共奏的角色卡社区</small>
  {% endblock %}
@@ -844,6 +844,9 @@ data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded=
 <div class="list-group list-group-flush">
 <a href="{{ url_for('main.articles') }}" class="list-group-item list-group-item-action py-2 border-0 rounded-2">官方公告</a>
 <a href="{{ url_for('main.recommend') }}" class="list-group-item list-group-item-action py-2 border-0 rounded-2">站长推荐</a>
+{% if site_cfg.sponsor.enabled %}
+<a href="{{ url_for('main.sponsor') }}" class="list-group-item list-group-item-action py-2 border-0 rounded-2">赞助我们</a>
+{% endif %}
 <a href="{{ url_for('user.my_punishments') }}" class="list-group-item list-group-item-action py-2 border-0 rounded-2">我的处罚</a>
 </div>
 <hr class="my-3">
@@ -856,6 +859,9 @@ data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded=
 <a href="{{ url_for('auth.register') }}" class="list-group-item list-group-item-action py-2 border-0 rounded-2">注册</a>
 <a href="{{ url_for('auth.login') }}" class="list-group-item list-group-item-action py-2 border-0 rounded-2">登录</a>
 <a href="{{ url_for('main.recommend') }}" class="list-group-item list-group-item-action py-2 border-0 rounded-2">站长推荐</a>
+{% if site_cfg.sponsor.enabled %}
+<a href="{{ url_for('main.sponsor') }}" class="list-group-item list-group-item-action py-2 border-0 rounded-2">赞助我们</a>
+{% endif %}
 <a href="#" id="themeToggle" data-bs-dismiss="offcanvas" class="list-group-item list-group-item-action py-2 border-0 rounded-2"><i class="bi bi-circle-half me-1"></i> 切换深色 / 浅色</a>
 </div>
 {% endif %}

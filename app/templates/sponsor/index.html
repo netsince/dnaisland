@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title or '赞助' }} · DNAISLAND{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  {% if not enabled %}
+    <div class="dna-sponsor-empty">
+      <i class="bi bi-heart"></i>
+      <h1>{{ title or '赞助' }}</h1>
+      <p>{{ content or '赞助功能暂未开放，敬请期待。' }}</p>
+    </div>
+  {% else %}
+    <div class="dna-sponsor-hero">
+      <div class="dna-sponsor-hero__icon"><i class="bi bi-heart-fill"></i></div>
+      <h1 class="dna-sponsor-hero__title">{{ title or '支持 DNAISLAND' }}</h1>
+      {% if content %}
+        <div class="dna-sponsor-hero__content richtext-content">{{ content | richtext }}</div>
+      {% endif %}
+      {% if url %}
+        <a class="dna-sponsor-btn" href="{{ url }}" target="_blank" rel="noopener noreferrer">
+          <i class="bi bi-heart-fill"></i> 前往赞助
+        </a>
+      {% endif %}
+    </div>
+
+    <div class="dna-sponsor-section mt-5">
+      <div class="dna-sponsor-section__head">
+        <i class="bi bi-people-fill"></i> 感谢以下赞助者
+      </div>
+      <p class="dna-sponsor-section__sub">正是他们让这个小岛得以持续运转，我们由衷感谢每一位支持者。</p>
+
+      {% if not items %}
+        <div class="dna-sponsor-none">还没有赞助者，成为第一个支持者吧。</div>
+      {% else %}
+        <div class="dna-sponsor-grid">
+          {% for it in items %}
+            <a class="dna-sponsor-item" href="{{ url_for('user.profile', username=it.user.username) }}">
+              <span class="dna-sponsor-item__avatar">
+                {% if it.user.avatar %}
+                  <img src="{{ url_for('user.avatar', user_id=it.user.id) }}"
+                       alt="{{ it.display_name }}" loading="lazy">
+                {% else %}
+                  <i class="bi bi-person"></i>
+                {% endif %}
+              </span>
+              <span class="dna-sponsor-item__name">{{ it.display_name }}</span>
+              {% if it.amount %}
+                <span class="dna-sponsor-item__amount">{{ it.amount }}</span>
+              {% endif %}
+            </a>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block head %}
+<style>
+  .dna-sponsor-empty {
+    text-align: center; padding: 4rem 1rem;
+    border: 1px solid var(--dna-border); border-radius: var(--dna-radius);
+    background: var(--dna-surface);
+  }
+  .dna-sponsor-empty i { font-size: 2.6rem; color: var(--dna-muted); }
+  .dna-sponsor-empty h1 { font-size: 1.6rem; font-weight: 800; color: var(--dna-emphasis); margin: 1rem 0 .5rem; }
+  .dna-sponsor-empty p { color: var(--dna-muted); margin: 0; }
+
+  /* 头部：柔和渐变 + 边框，标题 / 富文本 / 按钮 */
+  .dna-sponsor-hero {
+    border: 1px solid var(--dna-border);
+    border-radius: 18px;
+    padding: 2.6rem 1.75rem 2.2rem;
+    text-align: center;
+    background:
+      radial-gradient(120% 120% at 15% 0%, color-mix(in srgb, var(--bs-primary) 14%, transparent), transparent 55%),
+      var(--dna-surface);
+  }
+  .dna-sponsor-hero__icon {
+    width: 60px; height: 60px; margin: 0 auto 1.1rem;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%;
+    color: var(--bs-primary);
+    background: color-mix(in srgb, var(--bs-primary) 14%, transparent);
+  }
+  .dna-sponsor-hero__icon i { font-size: 1.7rem; }
+  .dna-sponsor-hero__title { font-size: 1.85rem; font-weight: 800; color: var(--dna-emphasis); letter-spacing: .02em; margin: 0 0 1rem; }
+  .dna-sponsor-hero__content { max-width: 640px; margin: 0 auto; color: var(--dna-muted); font-size: .95rem; line-height: 1.75; }
+  .dna-sponsor-hero__content p { margin-bottom: .6rem; }
+  .dna-sponsor-hero__content a { color: var(--bs-primary); }
+  .dna-sponsor-btn {
+    display: inline-flex; align-items: center; gap: .45rem;
+    margin-top: 1.5rem; padding: .8rem 2.4rem;
+    border-radius: 999px; text-decoration: none;
+    font-weight: 700; font-size: 1.02rem; letter-spacing: .02em;
+    color: #fff; background: var(--bs-primary);
+    transition: transform .2s ease, box-shadow .25s ease, filter .25s ease;
+  }
+  .dna-sponsor-btn:hover { color: #fff; transform: translateY(-2px); filter: brightness(1.06); box-shadow: 0 10px 24px color-mix(in srgb, var(--bs-primary) 45%, transparent); }
+
+  /* 赞助者列表 */
+  .dna-sponsor-section__head {
+    display: flex; align-items: center; gap: .5rem;
+    font-size: 1.15rem; font-weight: 800; color: var(--dna-emphasis);
+  }
+  .dna-sponsor-section__head i { color: var(--bs-primary); }
+  .dna-sponsor-section__sub { color: var(--dna-muted); font-size: .88rem; margin: .4rem 0 0; }
+
+  .dna-sponsor-grid { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: 1.1rem; }
+  .dna-sponsor-item {
+    display: inline-flex; align-items: center; gap: .55rem;
+    padding: .5rem .9rem .5rem .55rem;
+    border: 1px solid var(--dna-border); border-radius: 14px;
+    text-decoration: none; color: var(--dna-text); background: var(--dna-surface);
+    transition: transform .18s ease, border-color .2s ease;
+  }
+  .dna-sponsor-item:hover { transform: translateY(-2px); border-color: var(--dna-border-strong); color: var(--dna-text); }
+  .dna-sponsor-item__avatar {
+    width: 34px; height: 34px; border-radius: 50%; overflow: hidden; flex: 0 0 auto;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--dna-muted); background: var(--dna-bg-2);
+  }
+  .dna-sponsor-item__avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .dna-sponsor-item__name { font-weight: 600; font-size: .92rem; }
+  .dna-sponsor-item__amount {
+    font-size: .78rem; font-weight: 700; padding: .15rem .55rem;
+    border-radius: 8px;
+    color: var(--bs-primary); background: color-mix(in srgb, var(--bs-primary) 14%, transparent);
+  }
+  .dna-sponsor-none {
+    margin-top: 1.1rem; padding: 1.8rem; text-align: center;
+    border: 1px dashed var(--dna-border); border-radius: var(--dna-radius);
+    color: var(--dna-muted);
+  }
+</style>
+{% endblock %}
