@@ -380,15 +380,9 @@
   const cardForm = document.getElementById('cardForm');
   const submitBtn = document.getElementById('submitBtn');
   let submitting = false;
-  cardForm.addEventListener('submit', async e => {
-    e.preventDefault();
-    // 防重复提交：请求进行中再次触发直接忽略（按钮也已禁用）。
-    if (submitting) return;
-    submitting = true;
-    if (submitBtn) {
-      submitBtn.disabled = true;
-      submitBtn.textContent = '提交中…';
-    }
+
+  // FormData 每次请求需重建，故单独抽出构造逻辑。
+  function buildFormData() {
     const fd = new FormData(cardForm);
     const keep = {};
     for (const slot of ['square', 'landscape', 'portrait']) {
@@ -401,28 +395,69 @@
       }
     }
     fd.append('images_keep_json', JSON.stringify(keep));
+    return fd;
+  }
+
+  // 成功响应：跟随重定向或替换为返回的页面；返回是否已成功收尾。
+  async function handleSuccess(resp) {
+    if (resp.redirected) {
+      window.location.href = resp.url;
+      return true;
+    }
+    if (resp.ok) {
+      const html = await resp.text();
+      document.open();
+      document.write(html);
+      document.close();
+      return true;
+    }
+    return false;
+  }
+
+  // 执行一次提交；服务端明确报错或网络异常都会抛错。
+  async function doSubmit() {
+    const resp = await fetch(cardForm.action, {
+      method: 'POST',
+      body: buildFormData(),
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    });
+    const done = await handleSuccess(resp);
+    if (!done) throw new Error('http_' + resp.status);
+  }
+
+  cardForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    // 防重复提交：请求进行中再次触发直接忽略（按钮也已禁用）。
+    if (submitting) return;
+    submitting = true;
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = '提交中…';
+    }
     try {
-      const resp = await fetch(cardForm.action, {
-        method: 'POST',
-        body: fd,
-        headers: { 'X-Requested-With': 'XMLHttpRequest' },
-      });
-      if (resp.redirected) {
-        window.location.href = resp.url;
+      await doSubmit();
+    } catch (err) {
+      const isHttp = String(err && err.message).indexOf('http_') === 0;
+      // 服务端明确返回了错误（如校验失败），可放心提示重试。
+      if (isHttp) {
+        resetSubmit();
+        alert('提交未成功（' + String(err.message).slice(5) + '），请检查后重试');
         return;
       }
-      if (resp.ok) {
-        const html = await resp.text();
-        document.open();
-        document.write(html);
-        document.close();
-      } else {
+      // 网络层失败：结果未知——服务端可能已成功（响应丢失），也可能确实没收到。
+      // 自动重试一次；服务端已按内容指纹去重，重试不会产生重复卡片。
+      try {
+        await doSubmit();
+        return;
+      } catch (retryErr) {
         resetSubmit();
-        alert('提交失败（' + resp.status + '），请重试');
+        const rHttp = String(retryErr && retryErr.message).indexOf('http_') === 0;
+        if (rHttp) {
+          alert('提交未成功（' + String(retryErr.message).slice(5) + '），请检查后重试');
+        } else {
+          alert('网络似乎中断，本次提交结果未知。\n请刷新页面确认：若显示「已提交，等待审核」即表示已成功，无需重复操作。\n系统已做去重，重复提交不会产生重复卡片。');
+        }
       }
-    } catch (err) {
-      resetSubmit();
-      alert('提交失败，请检查网络后重试');
     }
   });
 
