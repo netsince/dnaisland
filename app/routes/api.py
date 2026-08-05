@@ -142,6 +142,20 @@ def _ensure_self():
     return getattr(g, "api_user", current_user)
 
 
+def _soft_auth():
+    """可选登录：若请求带合法 Bearer token 则解析并设置 g.api_user（匿名可继续访问）。
+
+    用于公开的只读接口（如角色卡详情），这样 App 用 token 访问时能取到当前用户的
+    点赞/收藏等个性化状态；无 token 或 token 失效时仍按匿名处理，不阻断访问。
+    """
+    auth = request.headers.get("Authorization", "")
+    if auth.startswith("Bearer "):
+        payload = _decode_token(auth[7:])
+        user = db.session.get(User, payload["user_id"]) if payload else None
+        if user and not user.is_locked:
+            g.api_user = user
+
+
 # ---------------------------------------------------------------------------
 # 统一响应辅助
 # ---------------------------------------------------------------------------
@@ -459,6 +473,8 @@ def cards_search():
 @api_bp.route("/cards/<card_id>", methods=["GET"])
 def cards_detail(card_id):
     """角色卡详情：与网页版共用 card_detail_core 一个函数。"""
+    # 公开只读，但解析 token 以便返回当前用户的点赞/收藏状态。
+    _soft_auth()
     card, data, err_code = card_detail_core(card_id, _ensure_self())
     if err_code in ("not_found", "forbidden"):
         return err("角色卡不存在", 404)
