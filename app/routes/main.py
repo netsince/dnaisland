@@ -15,7 +15,7 @@ from flask import (
     url_for,
 )
 from flask_login import current_user
-from sqlalchemy import case, func, literal_column, or_
+from sqlalchemy import case, func, literal_column, or_, text
 from sqlalchemy.orm import joinedload
 
 from ..caching import TimedCache
@@ -480,14 +480,14 @@ def _fulltext_enabled() -> bool:
 def _ft_match(cols, q):
     """构造 MySQL 全文检索 MATCH ... AGAINST 表达式。
 
-    用 literal_column 手写 SQL 而非 func.match(..., against=q)：后者依赖
+    用 text() 手写 SQL 而非 func.match(..., against=q)：后者依赖
     SQLAlchemy 2.0.23+ 新增的 `against` 关键字，旧版运行环境会抛
     `TypeError: Function.__init__() got an unexpected keyword argument 'against'`。
-    这里改用带绑定参数的原生表达式，兼容各版本 SQLAlchemy。
+    这里改用带绑定参数的原生 text 表达式：TextClause 在 SQLAlchemy 1.x / 2.x
+    都支持 bindparams()，且可放进 or_ 作为布尔条件（不能用不可变的
+    literal_column().bindparams()，2.0 中该写法已失效）。
     """
-    return literal_column(
-        f"MATCH ({cols}) AGAINST (:q IN BOOLEAN MODE)"
-    ).bindparams(q=q)
+    return text(f"MATCH ({cols}) AGAINST (:q IN BOOLEAN MODE)").bindparams(q=q)
 
 
 def _card_search_query(q, sort, tag=None, viewer=None):
