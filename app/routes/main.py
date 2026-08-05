@@ -402,6 +402,19 @@ def _fulltext_enabled() -> bool:
     )
 
 
+def _ft_match(cols, q):
+    """构造 MySQL 全文检索 MATCH ... AGAINST 表达式。
+
+    用 literal_column 手写 SQL 而非 func.match(..., against=q)：后者依赖
+    SQLAlchemy 2.0.23+ 新增的 `against` 关键字，旧版运行环境会抛
+    `TypeError: Function.__init__() got an unexpected keyword argument 'against'`。
+    这里改用带绑定参数的原生表达式，兼容各版本 SQLAlchemy。
+    """
+    return literal_column(
+        f"MATCH ({cols}) AGAINST (:q IN BOOLEAN MODE)"
+    ).bindparams(q=q)
+
+
 def _card_search_query(q, sort, tag=None, viewer=None):
     """构造角色卡检索查询（已包含信息层可见性过滤与相关度排序）。
 
@@ -418,7 +431,7 @@ def _card_search_query(q, sort, tag=None, viewer=None):
     )
     use_ft = _fulltext_enabled() and bool(q.strip())
     if use_ft:
-        ft = func.match(Card.name, Card.intro, Card.persona, against=q)
+        ft = _ft_match("cards.name, cards.intro, cards.persona", q)
         filters = [or_(ft, CardTag.tag.like(like))]
     else:
         filters = [
@@ -441,7 +454,7 @@ def _card_search_query(q, sort, tag=None, viewer=None):
         if use_ft:
             # 全文检索直接用 MATCH 相关度排序
             base = base.order_by(
-                func.match(Card.name, Card.intro, Card.persona, against=q).desc(),
+                ft.desc(),
                 Card.view_count.desc(),
                 Card.created_at.desc(),
             )
@@ -488,7 +501,7 @@ def _post_search_query(q):
         TeaPost.is_deleted.is_(False),
     )
     if _fulltext_enabled() and bool(q.strip()):
-        base = base.filter(func.match(TeaPost.content, against=q))
+        base = base.filter(_ft_match("teahouse_posts.content", q))
     else:
         base = base.filter(TeaPost.content.ilike(f"%{q}%"))
     return base.order_by(TeaPost.created_at.desc())
