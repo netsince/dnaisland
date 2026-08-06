@@ -15,11 +15,13 @@ from flask import Blueprint, current_app, g, jsonify, request
 from flask_login import current_user
 from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import joinedload
 
 from ..extensions import db
 from ..models import (
     Card,
     Comment,
+    CommentLike,
     Notification,
     PointTransaction,
     Punishment,
@@ -264,8 +266,21 @@ def _card_detail(card: Card, data: dict) -> dict:
     }
 
 
-def _comment_item(cm, liked_by_user: bool, like_count: int) -> dict:
-    return {
+def _comment_item(
+    cm,
+    liked_by_user: bool,
+    like_count: int,
+    viewer=None,
+    card=None,
+    replies=None,
+    floor=None,
+) -> dict:
+    """单条评论的 JSON 序列化。
+
+    viewer/card 传入后额外输出 is_mine / is_author；replies 为楼中楼子回复列表；
+    floor 仅在最新排序下为数值，其余场景为 None（客户端据此决定是否展示楼层）。
+    """
+    item = {
         "id": cm.id,
         "content": cm.content,
         "has_image": bool(cm.image_data),
@@ -278,7 +293,14 @@ def _comment_item(cm, liked_by_user: bool, like_count: int) -> dict:
         "like_count": like_count,
         "liked": liked_by_user,
         "is_pinned": bool(cm.is_pinned),
+        "moderated": bool(cm.moderated),
+        "is_mine": bool(viewer is not None and getattr(viewer, "is_authenticated", False) and viewer.id == cm.user_id),
+        "is_author": bool(card is not None and cm.user_id == card.author_id),
+        "floor": floor,
     }
+    if replies is not None:
+        item["replies"] = replies
+    return item
 
 
 def _teapost_item(post: TeaPost, stats: dict) -> dict:
@@ -506,21 +528,85 @@ def cards_favorite(card_id):
 
 @api_bp.route("/cards/<card_id>/comments", methods=["GET"])
 def cards_comments(card_id):
-    """角色卡评论列表：与网页版共用 card_comments_list 一个函数。"""
+    """角色卡评论列表：与网页版共用 card_comments_list 一个函数。
+
+    支持 only_author=1 只看作者；返回楼中楼 replies（直接回复一层）与
+    moderated/is_mine/is_author/floor 字段，与网页版行为一致。
+    """
     page = request.args.get("page", 1, type=int)
+    per_page = 20
     sort = request.args.get("sort", "latest")
+    only_author = request.args.get("only_author") == "1"
+    viewer = _ensure_self()
     card, data, err_code = card_comments_list(
-        card_id, _ensure_self(), page=page, per_page=20, sort=sort
+        card_id, viewer, page=page, per_page=per_page, sort=sort,
+        only_author=only_author,
     )
     if err_code == "not_found":
         return err("角色卡不存在", 404)
     pag = data["pagination"]
     like_counts = data["like_counts"]
     user_liked_ids = data["user_liked_ids"]
-    items = [
-        _comment_item(cm, cm.id in user_liked_ids, like_counts.get(cm.id, 0))
-        for cm in pag.items
-    ]
+
+    # ---- 楼中楼：批量查询当前页评论的直接回复（一层），并统计点赞 ----
+    page_ids = [cm.id for cm in pag.items]
+    replies_by_parent: dict[int, list] = {}
+    reply_like_counts: dict[int, int] = {}
+    reply_liked_ids: set = set()
+    if page_ids:
+        reply_rows = (
+            Comment.query.options(
+                joinedload(Comment.author),
+                joinedload(Comment.reply_to).joinedload(Comment.author),
+            )
+            .filter(Comment.reply_to_id.in_(page_ids), Comment.is_hidden.is_(False))
+            .order_by(Comment.created_at.asc(), Comment.id.asc())
+            .all()
+        )
+        for r in reply_rows:
+            replies_by_parent.setdefault(r.reply_to_id, []).append(r)
+        reply_ids = {r.id for r in reply_rows}
+        if reply_ids:
+            reply_like_counts = dict(
+                db.session.query(CommentLike.comment_id, func.count().label("cnt"))
+                .filter(CommentLike.comment_id.in_(reply_ids))
+                .group_by(CommentLike.comment_id)
+                .all()
+            )
+            if getattr(viewer, "is_authenticated", False):
+                reply_liked_ids = {
+                    row[0]
+                    for row in db.session.query(CommentLike.comment_id)
+                    .filter(
+                        CommentLike.user_id == viewer.id,
+                        CommentLike.comment_id.in_(reply_ids),
+                    )
+                    .all()
+                }
+
+    # 楼层号只在最新排序且未筛选时返回（最热/只看作者下位置无意义）
+    show_floor = (sort == "latest") and not only_author
+    items = []
+    for idx, cm in enumerate(pag.items):
+        replies = [
+            _comment_item(
+                r,
+                r.id in reply_liked_ids,
+                reply_like_counts.get(r.id, 0),
+                viewer=viewer,
+                card=card,
+            )
+            for r in replies_by_parent.get(cm.id, [])
+        ]
+        items.append(_comment_item(
+            cm,
+            cm.id in user_liked_ids,
+            like_counts.get(cm.id, 0),
+            viewer=viewer,
+            card=card,
+            replies=replies,
+            floor=(pag.total - ((page - 1) * per_page + idx)) if show_floor else None,
+        ))
     return ok({
         "items": items,
         "page": pag.page,

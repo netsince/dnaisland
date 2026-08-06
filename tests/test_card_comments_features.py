@@ -112,3 +112,33 @@ def test_comments_floor_rule(client, app):
     # 最热：楼层隐藏
     data2 = client.get("/api/card/c1/comments?sort=hottest").get_json()
     assert all(i["floor"] is None for i in data2["items"])
+
+
+def test_app_api_comments_features(client, app):
+    """App 端 /api/v1 评论接口同步楼中楼、仅看作者与楼层规则。"""
+    _seed(app)
+    res = client.get("/api/v1/cards/c1/comments")
+    assert res.status_code == 200
+    body = res.get_json()
+    assert body["ok"] is True
+    items = body["data"]["items"]
+    assert len(items) == 2
+    top = next(i for i in items if i["content"] == "作者评论")
+    assert len(top["replies"]) == 1
+    assert top["replies"][0]["content"] == "回复内容"
+    # 新增字段与楼层
+    assert top["is_author"] is True
+    assert "moderated" in top and "is_mine" in top
+    assert top["floor"] is not None
+    # 楼中楼子回复不带楼层
+    assert "floor" not in top["replies"][0] or top["replies"][0].get("floor") is None
+    # 仅看作者
+    res2 = client.get("/api/v1/cards/c1/comments?only_author=1")
+    d2 = res2.get_json()["data"]
+    assert len(d2["items"]) == 1
+    assert d2["items"][0]["content"] == "作者评论"
+    assert d2["items"][0]["floor"] is None
+    # 最热排序隐藏楼层
+    res3 = client.get("/api/v1/cards/c1/comments?sort=hottest")
+    d3 = res3.get_json()["data"]
+    assert all(i["floor"] is None for i in d3["items"])
