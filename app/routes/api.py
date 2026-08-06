@@ -19,6 +19,7 @@ from sqlalchemy.orm import joinedload
 
 from ..extensions import db
 from ..models import (
+    Article,
     Card,
     Comment,
     CommentLike,
@@ -349,6 +350,30 @@ def _point_tx(tx: PointTransaction) -> dict:
     }
 
 
+def _article_item(a: Article, *, include_content: bool = False) -> dict:
+    """文章摘要/详情序列化（列表不含正文，详情含正文）。"""
+    cover = ""
+    if a.cover:
+        if a.cover.startswith("data:"):
+            # 上传为 base64/WebP 的走 /article-cover/<id> 端点转码输出
+            cover = f"/api/v1/articles/{a.id}/cover"
+        else:
+            cover = a.cover
+    item = {
+        "id": a.id,
+        "title": a.title,
+        "summary": a.summary or "",
+        "cover": cover,
+        "show_author": bool(a.show_author),
+        "author_name": a.author.nickname if (a.show_author and a.author) else "匿名管理员",
+        "created_at": a.created_at.isoformat() if a.created_at else "",
+        "updated_at": a.updated_at.isoformat() if a.updated_at else "",
+    }
+    if include_content:
+        item["content"] = a.content or ""
+    return item
+
+
 def _punishment_item(p: Punishment) -> dict:
     return {
         "id": p.id,
@@ -450,6 +475,91 @@ def recommend():
                 }
             )
     return ok({"items": items})
+
+
+@api_bp.route("/articles", methods=["GET"])
+def articles_list():
+    """官方公告/文章列表：与网页版共用查询（仅已发布，支持 q/sort 排序与分页）。
+
+    sort: new(默认最新) / old(最早) / updated(最近更新)。
+    """
+    page = request.args.get("page", 1, type=int)
+    q = (request.args.get("q") or "").strip()
+    sort = request.args.get("sort", "new")
+
+    if sort == "old":
+        order = Article.created_at.asc()
+    elif sort == "updated":
+        order = Article.updated_at.desc()
+    else:
+        sort = "new"
+        order = Article.created_at.desc()
+
+    try:
+        query = Article.query.filter_by(is_published=True)
+        if q:
+            like = f"%{q}%"
+            query = query.filter(
+                or_(
+                    Article.title.like(like),
+                    Article.summary.like(like),
+                    Article.content.like(like),
+                )
+            )
+        pag = query.order_by(order).paginate(page=page, per_page=10, error_out=False)
+    except Exception:
+        # 表尚未建立（如迁移未执行）时优雅降级为空列表
+        return ok({
+            "items": [],
+            "page": 1,
+            "pages": 1,
+            "total": 0,
+            "has_next": False,
+        })
+    return ok({
+        "items": [_article_item(a) for a in pag.items],
+        "page": pag.page,
+        "pages": pag.pages,
+        "total": pag.total,
+        "has_next": pag.has_next,
+    })
+
+
+@api_bp.route("/articles/<int:article_id>", methods=["GET"])
+def article_detail(article_id):
+    """文章详情：返回正文 HTML（含封面与作者信息）。"""
+    try:
+        a = db.session.get(Article, article_id)
+    except Exception:
+        a = None
+    if a is None or not a.is_published:
+        return err("文章不存在", 404)
+    return ok(_article_item(a, include_content=True))
+
+
+@api_bp.route("/articles/<int:article_id>/cover", methods=["GET"])
+def article_cover(article_id):
+    """文章封面（base64/WebP 数据转码为可直接显示的图片）。"""
+    try:
+        a = db.session.get(Article, article_id)
+    except Exception:
+        a = None
+    if not a or not a.cover or not a.cover.startswith("data:"):
+        return err("文章封面不存在", 404)
+    try:
+        import base64 as _b64
+
+        if a.cover.startswith("data:image/webp"):
+            raw = _b64.b64decode(a.cover.split(",", 1)[1])
+            return current_app.response_class(
+                raw, mimetype="image/webp"
+            )
+        # 其他 data 类型由网页端转码；App 侧直接透传（base64 原文作为图片数据）
+        raw = _b64.b64decode(a.cover.split(",", 1)[1])
+        mime = a.cover.split(";", 1)[0].split(":", 1)[1] if ";" in a.cover else "image/png"
+        return current_app.response_class(raw, mimetype=mime)
+    except Exception:
+        return err("文章封面解析失败", 400)
 
 
 @api_bp.route("/cards/<card_id>/export", methods=["GET"])
