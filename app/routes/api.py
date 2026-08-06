@@ -70,7 +70,7 @@ from ..services.card_edit_service import (
 )
 from ..services.card_import_service import parse_export_package
 from ..services.card_publish_service import create_card_from_payload
-from ..services.card_service import enrich_cards
+from ..services.card_service import enrich_cards, popular_tags
 from ..services.comment_service import (
     delete_comment,
     pin_comment,
@@ -476,6 +476,24 @@ def cards_explore():
         _ensure_self(), page=page, gender=gender, tag=tag, sort=sort, per_page=24
     )
     return _cards_response(pag, cards)
+
+
+@api_bp.route("/cards/explore/meta", methods=["GET"])
+def cards_explore_meta():
+    """探索页元数据：可见卡片的性别列表 + 热门标签，与网页版同一口径。"""
+    viewer = _ensure_self()
+    genders = [
+        g[0]
+        for g in (
+            Card.visible_to(viewer)
+            .with_entities(Card.gender)
+            .filter(Card.gender.is_not(None), Card.gender != "")
+            .distinct()
+            .all()
+        )
+    ]
+    tags = popular_tags(viewer, limit=30)
+    return ok({"genders": genders, "tags": tags})
 
 
 @api_bp.route("/cards/search", methods=["GET"])
