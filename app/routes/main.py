@@ -32,6 +32,7 @@ from ..models import (
     Punishment,
     Sponsor,
     User,
+    UserFollow,
 )
 from ..models.teahouse import TeaPost
 from ..paging import IdListPagination
@@ -639,6 +640,16 @@ def search():
             posts = posts_pagination.items
             posts_count = posts_pagination.total
 
+    # 当前登录用户已关注的用户 id 集合（供模板渲染关注按钮的初始状态）。
+    following_ids: set = set()
+    if current_user.is_authenticated and users:
+        ids = [u.id for u in users]
+        rows = UserFollow.query.filter(
+            UserFollow.follower_id == current_user.id,
+            UserFollow.following_id.in_(ids),
+        ).all()
+        following_ids = {r.following_id for r in rows}
+
     return render_template(
         "search.html",
         q=q,
@@ -655,6 +666,7 @@ def search():
         posts=posts,
         posts_pagination=posts_pagination,
         posts_count=posts_count,
+        following_ids=following_ids,
         args=args,
     )
 

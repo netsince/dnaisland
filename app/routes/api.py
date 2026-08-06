@@ -468,6 +468,8 @@ def cards_export(card_id):
 @api_bp.route("/cards/explore", methods=["GET"])
 def cards_explore():
     """探索分页：与网页版共用 explore_cards 一个函数。"""
+    # 可见性依赖 viewer（登录用户可见自己的隐藏卡），需解析 token。
+    _soft_auth()
     page = request.args.get("page", 1, type=int)
     gender = (request.args.get("gender") or "").strip()
     tag = (request.args.get("tag") or "").strip() or None
@@ -481,6 +483,8 @@ def cards_explore():
 @api_bp.route("/cards/explore/meta", methods=["GET"])
 def cards_explore_meta():
     """探索页元数据：可见卡片的性别列表 + 热门标签，与网页版同一口径。"""
+    # 可见性/标签过滤依赖 viewer，需解析 token。
+    _soft_auth()
     viewer = _ensure_self()
     genders = [
         g[0]
@@ -499,6 +503,8 @@ def cards_explore_meta():
 @api_bp.route("/cards/search", methods=["GET"])
 def cards_search():
     """搜索角色卡：与网页版共用 search_cards 一个函数。"""
+    # 可见性依赖 viewer，需解析 token。
+    _soft_auth()
     q = (request.args.get("q") or "").strip()
     if not q:
         return err("请提供搜索词")
@@ -551,6 +557,8 @@ def cards_comments(card_id):
     支持 only_author=1 只看作者；返回楼中楼 replies（直接回复一层）与
     moderated/is_mine/is_author/floor 字段，与网页版行为一致。
     """
+    # is_mine / 本人点赞状态依赖 viewer，需解析 token。
+    _soft_auth()
     page = request.args.get("page", 1, type=int)
     per_page = 20
     sort = request.args.get("sort", "latest")
@@ -679,6 +687,8 @@ def cards_comment_delete(card_id, comment_id):
 @api_bp.route("/users/<username>", methods=["GET"])
 def users_profile(username):
     """用户主页。"""
+    # 公开只读，但解析 token 以便返回当前用户的关注状态等个性化字段。
+    _soft_auth()
     u = get_user_by_username(username)
     if not u:
         return err("用户不存在", 404)
@@ -723,6 +733,8 @@ def users_follow_list(username):
     items 中每个用户附带 is_following（当前登录用户是否已关注对方）。
     他人访问时过滤掉「禁止主页被访问」的用户。
     """
+    # is_following 依赖 viewer，需解析 token。
+    _soft_auth()
     u = get_user_by_username(username)
     if not u:
         return err("用户不存在", 404)
@@ -854,6 +866,8 @@ def notifications_unread_count():
 @api_bp.route("/teahouse/posts", methods=["GET"])
 def teahouse_posts():
     """茶馆 Feed：sort=hot|new, page=1, topic_id=可选。"""
+    # 可见性 + liked/favorited 个性化状态依赖 viewer，需解析 token。
+    _soft_auth()
     from ..routes.teahouse import _build_stats, teahouse_feed_page
 
     page = request.args.get("page", 1, type=int)
@@ -920,6 +934,8 @@ def teahouse_create_post():
 
 @api_bp.route("/teahouse/posts/<int:post_id>", methods=["GET"])
 def teahouse_post_detail(post_id):
+    # 可见性（隐藏/删除帖）+ liked/favorited 个性化依赖 viewer，需解析 token。
+    _soft_auth()
     from ..routes.teahouse import _build_stats, _order_by_teahouse_hot, _require_visible_post
 
     p = _require_visible_post(post_id)
@@ -1045,6 +1061,8 @@ def teahouse_favorites():
 @api_bp.route("/teahouse/topics/<int:topic_id>", methods=["GET"])
 def teahouse_topic_detail(topic_id):
     """话题详情：话题信息 + 该话题下的根帖（分页）。与网页 teahouse.topic_detail 共用查询。"""
+    # 可见性 + liked/favorited 个性化依赖 viewer，需解析 token。
+    _soft_auth()
     page = request.args.get("page", 1, type=int)
     topic, pag = topic_posts_page(topic_id, _ensure_self(), page)
     if topic is None:
@@ -1419,14 +1437,30 @@ def teahouse_image(image_id):
 @api_bp.route("/users/search", methods=["GET"])
 def users_search():
     """用户搜索：sort=relevance|new，分页。与网页 /search?type=user 共用 _user_search_query。"""
+    # is_following（当前登录用户是否已关注）依赖 viewer，需解析 token。
+    _soft_auth()
     q = (request.args.get("q") or "").strip()
     if not q:
         return err("请提供搜索词")
     sort = request.args.get("sort", "relevance")
     page = request.args.get("page", 1, type=int)
     pag = _user_search_query(q, sort).paginate(page=page, per_page=20, error_out=False)
+
+    # 附带 is_following（与网页版搜索页一致）。
+    cu = _ensure_self()
+    items = pag.items
+    following_ids: set = set()
+    if cu.is_authenticated and items:
+        rows = UserFollow.query.filter(
+            UserFollow.follower_id == cu.id,
+            UserFollow.following_id.in_([u.id for u in items]),
+        ).all()
+        following_ids = {r.following_id for r in rows}
     return ok({
-        "items": [_user_public(u) for u in pag.items],
+        "items": [
+            {**_user_public(u), "is_following": u.id in following_ids}
+            for u in items
+        ],
         "page": pag.page,
         "pages": pag.pages,
         "total": pag.total,
@@ -1437,6 +1471,8 @@ def users_search():
 @api_bp.route("/teahouse/search", methods=["GET"])
 def teahouse_search():
     """茶馆帖子搜索：按关键字匹配正文，分页。与网页 /search?type=post 共用 _post_search_query。"""
+    # liked/favorited 个性化状态依赖 viewer，需解析 token。
+    _soft_auth()
     q = (request.args.get("q") or "").strip()
     if not q:
         return err("请提供搜索词")

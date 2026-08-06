@@ -9,6 +9,7 @@ from flask import (
     Blueprint,
     abort,
     flash,
+    g,
     get_template_attribute,
     jsonify,
     redirect,
@@ -195,14 +196,20 @@ def _too_frequent(user_id):
     )
 
 
+def _viewer():
+    """当前请求的用户：优先取 API token 用户（g.api_user），回退 session 用户。"""
+    return getattr(g, "api_user", None) or current_user
+
+
 def _require_visible_post(post_id):
     """校验帖子存在且对当前用户可见（未删除/未隐藏）；否则 404。返回 TeaPost 实例。"""
     p = db.get_or_404(TeaPost, post_id)
-    if p.is_deleted and not current_user.is_super_admin:
+    viewer = _viewer()
+    if p.is_deleted and not viewer.is_super_admin:
         abort(404)
     if p.is_hidden and not (
-        current_user.is_authenticated
-        and (current_user.id == p.user_id or current_user.is_super_admin)
+        viewer.is_authenticated
+        and (viewer.id == p.user_id or viewer.is_super_admin)
     ):
         abort(404)
     return p
@@ -291,17 +298,19 @@ def _build_stats(posts):
         _STATS_CACHE[key] = cached
         while len(_STATS_CACHE) > 200:
             _STATS_CACHE.popitem(last=False)
-    for pid, g in cached[1].items():
-        stats[pid].update(g)
-    if current_user.is_authenticated:
+    for pid, gv in cached[1].items():
+        stats[pid].update(gv)
+    # per-user 状态：优先 API token 用户（g.api_user），回退 session 用户。
+    viewer = _viewer()
+    if viewer.is_authenticated:
         liked = TeaPostLike.query.filter(
-            TeaPostLike.user_id == current_user.id,
+            TeaPostLike.user_id == viewer.id,
             TeaPostLike.post_id.in_(ids),
         ).all()
         for like in liked:
             stats[like.post_id]["liked"] = True
         faved = TeaPostFavorite.query.filter(
-            TeaPostFavorite.user_id == current_user.id,
+            TeaPostFavorite.user_id == viewer.id,
             TeaPostFavorite.post_id.in_(ids),
         ).all()
         for f in faved:

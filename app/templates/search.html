@@ -77,11 +77,12 @@
  </div>
  <div class="ms-auto flex-shrink-0 d-flex gap-2">
  {% if current_user.is_authenticated and current_user.id != spotlight_user.id %}
+{% set sfollowing = spotlight_user.id in following_ids %}
 <form method="post" action="{{ url_for('user.user_follow', username=spotlight_user.username) }}" class="d-inline js-toggle">
-<button class="btn btn-sm btn-primary rounded-pill px-3"
+<button class="btn btn-sm btn-{{ 'outline-primary' if sfollowing else 'primary' }} rounded-pill px-3"
         data-on-class="btn-outline-primary" data-off-class="btn-primary"
         data-label-on="取消关注" data-label-off="＋ 关注">
-<span class="js-toggle-label">＋ 关注</span>
+<span class="js-toggle-label">{{ '取消关注' if sfollowing else '＋ 关注' }}</span>
 </button>
 </form>
  {% endif %}
@@ -215,35 +216,45 @@
  {% endif %}
 
  {# 当 search_type == 'user' 时 #}
- {% if search_type == 'user' %}
- <section class="mb-5">
- {% if users %}
- <div class="row g-3">
- {% for u in users %}
- <div class="col-12 col-sm-6 col-lg-4">
- <a class="dna-tile" href="{{ url_for('user.profile', username=u.username) }}" style="flex-direction:row;">
- <div class="d-flex align-items-center gap-3 p-3 w-100">
- {% if u.avatar %}
- <img src="{{ url_for('user.avatar', user_id=u.id) }}" class="dna-avatar flex-shrink-0" alt="{{ u.nickname }}"
- style="width:52px;height:52px;">
- {% else %}
- <div class="dna-avatar-ph flex-shrink-0" style="width:52px;height:52px;font-size:1.3rem;">{{ u.nickname[:1] }}</div>
- {% endif %}
- <div class="overflow-hidden">
- <div class="fw-semibold text-truncate text-light">{{ hl(u.nickname, q) }}{{ badge(u) }}</div>
- <div class="text-muted small text-truncate">@{{ hl(u.username, q) }}</div>
- </div>
- </div>
- </a>
- </div>
- {% endfor %}
- </div>
- {% if users_pagination %}{{ render_pagination(users_pagination, 'main.search', args) }}{% endif %}
- {% else %}
- {{ empty_state('没有找到相关作者。', '') }}
- {% endif %}
- </section>
- {% endif %}
+{% if search_type == 'user' %}
+<section class="mb-5">
+{% if users %}
+<div class="row g-3">
+{% for u in users %}
+<div class="col-12 col-sm-6 col-lg-4">
+<div class="dna-tile p-3 d-flex align-items-center gap-3 h-100">
+<a href="{{ url_for('user.profile', username=u.username) }}" class="d-flex align-items-center gap-3 text-decoration-none text-reset flex-grow-1 min-w-0">
+{% if u.avatar %}
+<img src="{{ url_for('user.avatar', user_id=u.id) }}" class="dna-avatar flex-shrink-0" alt="{{ u.nickname }}"
+style="width:52px;height:52px;">
+{% else %}
+<div class="dna-avatar-ph flex-shrink-0" style="width:52px;height:52px;font-size:1.3rem;">{{ u.nickname[:1] }}</div>
+{% endif %}
+<div class="overflow-hidden">
+<div class="fw-semibold text-truncate text-light">{{ hl(u.nickname, q) }}{{ badge(u) }}</div>
+<div class="text-muted small text-truncate">@{{ hl(u.username, q) }}</div>
+</div>
+</a>
+{% if current_user.is_authenticated and current_user.id != u.id %}
+{% set ufollowing = u.id in following_ids %}
+<form method="post" action="{{ url_for('user.user_follow', username=u.username) }}" class="js-toggle ms-1 flex-shrink-0">
+<button class="btn btn-sm btn-{{ 'outline-secondary' if ufollowing else 'primary' }}"
+        data-on-class="btn-outline-secondary" data-off-class="btn-primary"
+        data-label-on="取消关注" data-label-off="＋ 关注">
+<span class="js-toggle-label">{{ '取消关注' if ufollowing else '＋ 关注' }}</span>
+</button>
+</form>
+{% endif %}
+</div>
+</div>
+{% endfor %}
+</div>
+{% if users_pagination %}{{ render_pagination(users_pagination, 'main.search', args) }}{% endif %}
+{% else %}
+{{ empty_state('没有找到相关作者。', '') }}
+{% endif %}
+</section>
+{% endif %}
 
  {% endif %}
 </div>
