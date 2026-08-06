@@ -1872,6 +1872,105 @@ body.is-mobile-plus-open header {
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
 }
 
+/* 楼中楼（嵌套回复） */
+.dna-comment-replies {
+  margin-top: 8px;
+  margin-left: 44px;
+  padding: 4px 4px 4px 12px;
+  border-left: 2px solid var(--dna-border-strong);
+  background: var(--dna-surface);
+  border-radius: 8px;
+}
+.dna-comment-reply-item {
+  display: flex;
+  gap: 8px;
+  padding: 6px 8px;
+}
+.dna-comment-reply-item + .dna-comment-reply-item {
+  border-top: 1px solid var(--dna-border);
+}
+.dna-comment-reply-item .dna-comment-item__avatar {
+  width: 28px;
+  height: 28px;
+  font-size: 0.8rem;
+}
+.dna-comment-reply-item__body {
+  flex: 1;
+  min-width: 0;
+}
+.dna-comment-replies-more {
+  text-align: center;
+  padding: 4px 0 6px;
+}
+.dna-comment-replies-toggle {
+  background: transparent;
+  border: none;
+  color: var(--bs-link-color, var(--dna-muted));
+  font-size: 0.78rem;
+  cursor: pointer;
+  padding: 2px 8px;
+}
+.dna-comment-replies-toggle:hover {
+  text-decoration: underline;
+}
+@media (max-width: 767.98px) {
+  .dna-comment-replies {
+    margin-left: 8px;
+    padding-left: 8px;
+  }
+}
+
+/* 审核中徽标（先发后审） */
+.dna-comment-moderate-badge {
+  font-size: 0.68rem;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  vertical-align: middle;
+}
+
+/* @提及补全下拉 */
+.dna-comment-mention-wrap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  margin-bottom: 4px;
+  background: var(--dna-surface-solid);
+  border: 1px solid var(--dna-border);
+  border-radius: 10px;
+  overflow: hidden;
+  z-index: 20;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+.dna-comment-mention-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: var(--dna-text);
+  font-size: 0.85rem;
+  padding: 7px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--dna-border);
+}
+.dna-comment-mention-item:last-child {
+  border-bottom: none;
+}
+.dna-comment-mention-item:hover {
+  background: var(--dna-surface-hover);
+}
+
+/* 回到最新（翻页后显示） */
+.dna-comment-jump-latest {
+  padding: 4px 16px;
+  display: flex;
+  justify-content: center;
+  flex-shrink: 0;
+  background: var(--bs-body-bg);
+  border-top: 1px solid var(--dna-border);
+}
+
 /* 表情包（内联 token 渲染） */
 .dna-sticker {
   height: 3em;

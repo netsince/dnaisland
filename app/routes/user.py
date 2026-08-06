@@ -3,6 +3,9 @@ import json
 import os
 from datetime import timedelta
 
+from sqlalchemy import func
+from sqlalchemy.orm import joinedload
+
 from flask import (
     Blueprint,
     Response,
@@ -26,6 +29,7 @@ from ..models import (
     CardImage,
     CardTag,
     Comment,
+    CommentLike,
     Punishment,
     TeaPost,
     User,
@@ -523,15 +527,31 @@ def user_follow(username):
     return redirect(url_for("user.profile", username=username))
 
 
+def _serialize_comment_author(cm):
+    return {
+        "id": cm.author.id,
+        "username": cm.author.username,
+        "display_name": cm.author.display_name,
+        "avatar": cm.author.avatar or "",
+    } if cm.author else {
+        "id": cm.user_id,
+        "username": "deleted",
+        "display_name": "已注销用户",
+        "avatar": "",
+    }
+
+
 @user_bp.route("/api/card/<card_id>/comments", methods=["GET"])
 def card_comments_api(card_id):
     """返回角色卡评论 JSON，供前端抽屉 AJAX 分页加载。与 App 共用 card_comments_list。"""
     page = request.args.get("page", 1, type=int)
     per_page = 20
     sort = request.args.get("sort", "latest")
+    only_author = request.args.get("only_author") == "1"
 
     card, data, err_code = card_comments_list(
-        card_id, current_user, page=page, per_page=per_page, sort=sort
+        card_id, current_user, page=page, per_page=per_page, sort=sort,
+        only_author=only_author,
     )
     if err_code == "not_found":
         return jsonify({"error": "not found"}), 404
@@ -539,24 +559,52 @@ def card_comments_api(card_id):
     like_counts = data["like_counts"]
     user_liked_ids = data["user_liked_ids"]
 
-    items = []
-    for idx, cm in enumerate(pagination.items):
-        items.append({
+    # ---- 楼中楼：批量查询当前页评论的直接回复（一层），并统计点赞 ----
+    page_ids = [cm.id for cm in pagination.items]
+    replies_by_parent: dict[int, list[Comment]] = {}
+    reply_like_counts: dict[int, int] = {}
+    reply_liked_ids: set = set()
+    if page_ids:
+        reply_rows = (
+            Comment.query.options(
+                joinedload(Comment.author),
+                joinedload(Comment.reply_to).joinedload(Comment.author),
+            )
+            .filter(Comment.reply_to_id.in_(page_ids), Comment.is_hidden.is_(False))
+            .order_by(Comment.created_at.asc(), Comment.id.asc())
+            .all()
+        )
+        for r in reply_rows:
+            replies_by_parent.setdefault(r.reply_to_id, []).append(r)
+        reply_ids = {r.id for r in reply_rows}
+        if reply_ids:
+            reply_like_counts = dict(
+                db.session.query(CommentLike.comment_id, func.count().label("cnt"))
+                .filter(CommentLike.comment_id.in_(reply_ids))
+                .group_by(CommentLike.comment_id)
+                .all()
+            )
+            if current_user.is_authenticated:
+                reply_liked_ids = {
+                    row[0]
+                    for row in db.session.query(CommentLike.comment_id)
+                    .filter(
+                        CommentLike.user_id == current_user.id,
+                        CommentLike.comment_id.in_(reply_ids),
+                    )
+                    .all()
+                }
+
+    # 楼层号只在「最新」排序且未筛选时展示（最热/只看作者下位置无意义，隐藏避免误导）
+    show_floor = (sort == "latest") and not only_author
+
+    def _serialize(cm, like_count, liked, idx=None, include_replies=True):
+        item = {
             "id": cm.id,
             "content": cm.content,
             "image_data": cm.image_data,
             "created_at": (cm.created_at + timedelta(hours=8)).strftime("%Y-%m-%d %H:%M") if cm.created_at else "",
-            "author": {
-                "id": cm.author.id,
-                "username": cm.author.username,
-                "display_name": cm.author.display_name,
-                "avatar": cm.author.avatar or "",
-            } if cm.author else {
-                "id": cm.user_id,
-                "username": "deleted",
-                "display_name": "已注销用户",
-                "avatar": "",
-            },
+            "author": _serialize_comment_author(cm),
             "can_report": (
                 current_user.is_authenticated
                 and cm.author is not None
@@ -569,9 +617,9 @@ def card_comments_api(card_id):
                 and (cm.user_id == current_user.id or current_user.is_super_admin)
             ),
             "delete_url": url_for("user.card_comment_delete", card_id=card_id, comment_id=cm.id),
-            "floor": pagination.total - ((page - 1) * per_page + idx),
-            "like_count": like_counts.get(cm.id, 0),
-            "liked": cm.id in user_liked_ids,
+            "floor": (pagination.total - ((page - 1) * per_page + idx)) if (show_floor and idx is not None) else None,
+            "like_count": like_count,
+            "liked": liked,
             "is_pinned": bool(cm.is_pinned),
             "can_pin": (
                 current_user.is_authenticated
@@ -585,7 +633,25 @@ def card_comments_api(card_id):
                 if cm.reply_to
                 else None
             ),
-        })
+            "moderated": bool(cm.moderated),
+            "is_mine": bool(current_user.is_authenticated and cm.user_id == current_user.id),
+        }
+        if include_replies:
+            item["replies"] = [
+                _serialize(
+                    r,
+                    reply_like_counts.get(r.id, 0),
+                    r.id in reply_liked_ids,
+                    include_replies=False,
+                )
+                for r in replies_by_parent.get(cm.id, [])
+            ]
+        return item
+
+    items = [
+        _serialize(cm, like_counts.get(cm.id, 0), cm.id in user_liked_ids, idx=idx)
+        for idx, cm in enumerate(pagination.items)
+    ]
 
     # 定位指定评论所在分页：供「从外部带 comment 参数进入」时自动翻到对应评论
     focus_page = None

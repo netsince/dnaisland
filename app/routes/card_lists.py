@@ -326,11 +326,12 @@ def card_detail_core(card_id, viewer):
     }, None
 
 
-def card_comments_list(card_id, viewer, page=1, per_page=20, sort="latest"):
+def card_comments_list(card_id, viewer, page=1, per_page=20, sort="latest", only_author=False):
     """评论列表核心：Web 与 App 共用（查询 + 批量点赞统计 + 预载作者）。
 
     返回 (card, data, error_code)；data 含：
       pagination / like_counts / user_liked_ids / sort
+    only_author=True 时只返回角色卡作者本人发表的评论（网页版「只看作者」筛选）。
     """
     card = db.session.get(Card, card_id)
     if not card:
@@ -345,6 +346,8 @@ def card_comments_list(card_id, viewer, page=1, per_page=20, sort="latest"):
         joinedload(Comment.author),
         joinedload(Comment.reply_to).joinedload(Comment.author),
     ).filter_by(card_id=card_id, is_hidden=False)
+    if only_author:
+        q = q.filter(Comment.user_id == card.author_id)
     if sort == "hottest":
         q = q.order_by(
             Comment.is_pinned.desc(),
@@ -434,7 +437,7 @@ def create_comment(card_id, viewer, content, reply_to_id=None, image_data=None):
         if parent.user_id != viewer.id:
             notify(
                 parent.user_id,
-                f'{viewer.display_name} 回复了你的评论："{content[:30]}"',
+                f'{viewer.display_name} 回复了你在《{card.name}》下的评论："{content[:30]}"',
                 type_="comment_reply",
                 related_card_id=card.id,
             )
