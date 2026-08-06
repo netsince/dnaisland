@@ -1928,6 +1928,24 @@ body.is-mobile-plus-open header {
   vertical-align: middle;
 }
 
+/* 「回复 @xxx」提示条：显示在评论输入框上方，可关闭，不回写进输入框 */
+.dna-comment-reply-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid var(--bs-secondary-border-subtle, rgba(0, 0, 0, 0.12));
+  border-radius: 6px;
+  background: var(--bs-secondary-bg-subtle, rgba(0, 0, 0, 0.04));
+  font-size: 0.8rem;
+  color: var(--bs-body-color, inherit);
+}
+.dna-comment-reply-hint__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* @提及补全下拉 */
 .dna-comment-mention-wrap {
   position: absolute;

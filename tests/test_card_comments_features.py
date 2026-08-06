@@ -76,21 +76,74 @@ def _seed(app, card_id="c1"):
 
 
 def test_comments_replies_thread(client, app):
-    """回复应作为楼中楼挂在父评论下，并带 moderated/is_mine 字段。"""
+    """回复应作为楼中楼挂在父评论下，不重复出现在顶层列表。"""
     _seed(app)
     res = client.get("/api/card/c1/comments")
     assert res.status_code == 200
     data = res.get_json()
-    # 平铺仍返回 2 条（保持向后兼容）
-    assert len(data["items"]) == 2
-    top = next(i for i in data["items"] if i["content"] == "作者评论")
+    # 顶层只含父评论（子回复不再平铺进 items，避免重复显示）
+    assert len(data["items"]) == 1
+    assert data["items"][0]["content"] == "作者评论"
+    top = data["items"][0]
     assert len(top["replies"]) == 1
     assert top["replies"][0]["content"] == "回复内容"
-    assert top["replies"][0]["id"] == data["items"][0]["id"]
     assert top["is_author"] is True
     assert "moderated" in top and "is_mine" in top
     # 子回复不占楼层、不置顶
     assert "floor" not in top["replies"][0] or top["replies"][0].get("floor") is None
+
+
+def test_comments_nested_reply_thread(client, app):
+    """子回复的子回复应嵌套挂在子回复下，且不进入顶层列表。"""
+    with app.app_context():
+        author = User(username="n_author", nickname="NAuthor", email="na@example.com")
+        author.set_password("pw")
+        u1 = User(username="n_u1", nickname="NU1", email="nu1@example.com")
+        u1.set_password("pw")
+        u2 = User(username="n_u2", nickname="NU2", email="nu2@example.com")
+        u2.set_password("pw")
+        db.session.add_all([author, u1, u2])
+        db.session.commit()
+        card = Card(id="card-nested", author_id=author.id, name="CardN", persona="P")
+        db.session.add(card)
+        db.session.commit()
+        now = datetime.now(UTC)
+        top = Comment(
+            card_id="card-nested", user_id=author.id, content="顶层评论",
+            created_at=now - timedelta(minutes=30),
+        )
+        db.session.add(top)
+        db.session.flush()
+        reply = Comment(
+            card_id="card-nested", user_id=u1.id, content="直接回复",
+            reply_to_id=top.id, created_at=now - timedelta(minutes=20),
+        )
+        db.session.add(reply)
+        db.session.flush()
+        deep = Comment(
+            card_id="card-nested", user_id=u2.id, content="回复的回复",
+            reply_to_id=reply.id, created_at=now - timedelta(minutes=10),
+        )
+        db.session.add(deep)
+        db.session.commit()
+
+    # Web 端接口
+    data = client.get("/api/card/card-nested/comments").get_json()
+    assert len(data["items"]) == 1
+    top_item = data["items"][0]
+    assert top_item["content"] == "顶层评论"
+    assert len(top_item["replies"]) == 1
+    r1 = top_item["replies"][0]
+    assert r1["content"] == "直接回复"
+    assert len(r1["replies"]) == 1
+    assert r1["replies"][0]["content"] == "回复的回复"
+
+    # App 端接口结构一致
+    body = client.get("/api/v1/cards/card-nested/comments").get_json()
+    assert body["ok"] is True
+    items = body["data"]["items"]
+    assert len(items) == 1
+    assert items[0]["replies"][0]["replies"][0]["content"] == "回复的回复"
 
 
 def test_comments_only_author_filter(client, app):
@@ -122,8 +175,10 @@ def test_app_api_comments_features(client, app):
     body = res.get_json()
     assert body["ok"] is True
     items = body["data"]["items"]
-    assert len(items) == 2
-    top = next(i for i in items if i["content"] == "作者评论")
+    # 顶层只含父评论，子回复作为楼中楼（不重复出现）
+    assert len(items) == 1
+    assert items[0]["content"] == "作者评论"
+    top = items[0]
     assert len(top["replies"]) == 1
     assert top["replies"][0]["content"] == "回复内容"
     # 新增字段与楼层

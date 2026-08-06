@@ -336,11 +336,16 @@ def test_card_comment_post_with_reply_to_id(client, app):
     assert res.status_code == 200
     assert res.get_json()["ok"] is True
 
-    # 查询 API 验证 reply_to 结构
+    # 查询 API 验证 reply_to 结构：子回复应挂在父评论的楼中楼里，
+    # 而不是平铺进顶层 items（避免重复显示）。
     res_api = client.get(f"/api/card/{card_id}/comments")
-    items = res_api.get_json()["items"]
-    # 最新发布的回复应该在第一条
-    child_item = items[0]
+    data = res_api.get_json()
+    items = data["items"]
+    assert len(items) == 1
+    assert items[0]["content"] == "Parent comment text"
+    replies = items[0]["replies"]
+    assert len(replies) == 1
+    child_item = replies[0]
     assert child_item["content"] == "Reply to parent text"
     assert child_item["reply_to"] is not None
     assert child_item["reply_to"]["id"] == parent_id

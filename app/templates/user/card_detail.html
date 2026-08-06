@@ -430,6 +430,21 @@
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
+  // 「回复 @xxx」提示条：显示在输入框上方，可关闭，不回写进输入框。
+  function showReplyHint(authorName) {
+    var hint = document.getElementById('cmReplyHint');
+    var text = hint ? hint.querySelector('.dna-comment-reply-hint__text') : null;
+    if (!hint || !text) return;
+    text.textContent = '回复 @' + authorName;
+    hint.style.display = 'flex';
+  }
+  function hideReplyHint() {
+    var hint = document.getElementById('cmReplyHint');
+    var form = document.getElementById('cmForm');
+    if (hint) hint.style.display = 'none';
+    if (form) delete form.dataset.replyToId;
+  }
+
   function commentImgHtml(cm) {
     var u = cm.image_data;
     if (!u) return '';
@@ -487,8 +502,11 @@
     return '<span class="ms-2 opacity-60">' + formatRelativeTime(cm.created_at) + '</span>';
   }
 
-  // 楼中楼单条回复（不嵌套、不占楼层、不置顶）
+  // 楼中楼单条回复（可递归嵌套、不占楼层、不置顶）
   function renderReply(r) {
+    var nested = (r.replies && r.replies.length)
+      ? '<div class="dna-comment-replies">' + r.replies.map(renderReply).join('') + '</div>'
+      : '';
     return '<div class="dna-comment-reply-item" id="comment-' + r.id + '" data-comment-id="' + r.id + '">'
       + avatarEl(r.author)
       + '<div class="dna-comment-reply-item__body">'
@@ -506,6 +524,7 @@
       + commentReportHtml(r)
       + commentDeleteHtml(r)
       + '</div>'
+      + nested
       + '</div></div>';
   }
 
@@ -695,7 +714,8 @@
       return;
     }
 
-    // 4. 回复评论
+    // 4. 回复评论：在输入框上方显示「回复 @xxx」提示条（可关闭），
+    //    不把 @xxx 写进输入框内容。
     var replyBtn = e.target.closest('.dna-comment-reply-btn');
     if (replyBtn) {
       var replyId = replyBtn.dataset.replyId;
@@ -704,7 +724,7 @@
       var input = document.getElementById('cmInput');
       if (form && input) {
         form.dataset.replyToId = replyId;
-        input.value = '@' + authorName + ' ';
+        showReplyHint(authorName);
         input.dispatchEvent(new Event('input'));
         input.focus();
       }
@@ -928,6 +948,10 @@
       return;
     }
     footer.innerHTML = '<form id="cmForm" class="d-flex flex-column gap-2">'
+      + '<div id="cmReplyHint" class="dna-comment-reply-hint align-items-center" style="display:none;">'
+      + '<span class="dna-comment-reply-hint__text"></span>'
+      + '<button type="button" class="btn-close ms-auto p-1" style="font-size:0.7rem;" id="cmReplyHintClose" aria-label="取消回复" title="取消回复"></button>'
+      + '</div>'
       + '<div class="position-relative">'
       + '<textarea class="form-control" id="cmInput" rows="2" placeholder="说点什么…（@ 可提及评论中的用户）" style="resize:none;"></textarea>'
       + '<div id="cmMentionWrap" class="dna-comment-mention-wrap" style="display:none;"></div>'
@@ -956,6 +980,13 @@
     var previewBox = document.getElementById('cmImagePreviewBox');
 
     if (!form || !input || !charCountEl || !submitBtn || !imageBtn || !fileInput || !previewBox) return;
+
+    // 「回复 @xxx」提示条：显示在输入框上方，可关闭，不回写进输入框。
+    // showReplyHint / hideReplyHint 定义在顶层（供回复按钮事件与提交成功共用）。
+    var replyHintClose = document.getElementById('cmReplyHintClose');
+    if (replyHintClose) {
+      replyHintClose.addEventListener('click', hideReplyHint);
+    }
 
     var currentReader = null;
 
@@ -1085,7 +1116,7 @@
         submitBtn.disabled = false;
         if (data.ok) {
           input.value = '';
-          delete form.dataset.replyToId;
+          hideReplyHint();
           resetImageSelection();
           updateCharCount();
           // 重置并重新加载评论列表

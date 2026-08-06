@@ -330,8 +330,13 @@ def card_comments_list(card_id, viewer, page=1, per_page=20, sort="latest", only
     """评论列表核心：Web 与 App 共用（查询 + 批量点赞统计 + 预载作者）。
 
     返回 (card, data, error_code)；data 含：
-      pagination / like_counts / user_liked_ids / sort
+      pagination / like_counts / user_liked_ids / sort /
+      replies_by_parent / reply_like_counts / reply_liked_ids
     only_author=True 时只返回角色卡作者本人发表的评论（网页版「只看作者」筛选）。
+
+    分页只取顶层评论（reply_to_id IS NULL）；所有层级的子回复按回复链
+    归并到各自顶层评论下（replies_by_parent: 顶层id -> [Comment,...]），
+    避免子回复既出现在列表顶部、又出现在楼中楼里而重复显示。
     """
     card = db.session.get(Card, card_id)
     if not card:
@@ -348,6 +353,8 @@ def card_comments_list(card_id, viewer, page=1, per_page=20, sort="latest", only
     ).filter_by(card_id=card_id, is_hidden=False)
     if only_author:
         q = q.filter(Comment.user_id == card.author_id)
+    # 分页只保留顶层评论，子回复通过楼中楼挂在顶层下。
+    q = q.filter(Comment.reply_to_id.is_(None))
     if sort == "hottest":
         q = q.order_by(
             Comment.is_pinned.desc(),
@@ -361,13 +368,13 @@ def card_comments_list(card_id, viewer, page=1, per_page=20, sort="latest", only
         )
     pag = q.paginate(page=page, per_page=per_page, error_out=False)
 
-    comment_ids = [cm.id for cm in pag.items]
+    top_ids = [cm.id for cm in pag.items]
     like_counts: dict[int, int] = {}
     user_liked_ids: set = set()
-    if comment_ids:
+    if top_ids:
         rows = (
             db.session.query(CommentLike.comment_id, func.count().label("cnt"))
-            .filter(CommentLike.comment_id.in_(comment_ids))
+            .filter(CommentLike.comment_id.in_(top_ids))
             .group_by(CommentLike.comment_id)
             .all()
         )
@@ -377,17 +384,71 @@ def card_comments_list(card_id, viewer, page=1, per_page=20, sort="latest", only
                 db.session.query(CommentLike.comment_id)
                 .filter(
                     CommentLike.user_id == viewer.id,
-                    CommentLike.comment_id.in_(comment_ids),
+                    CommentLike.comment_id.in_(top_ids),
                 )
                 .all()
             )
             user_liked_ids = {r[0] for r in ul}
+
+    # ---- 楼中楼：逐层收集当前页顶层评论的后代回复，保持直接父子关系 ----
+    # replies_by_parent 为「父评论id -> 直接子回复」，序列化时递归嵌套，
+    # 子评论的子评论显示在子评论下面；不参与顶层分页，避免重复显示。
+    replies_by_parent: dict[int, list] = {}
+    reply_like_counts: dict[int, int] = {}
+    reply_liked_ids: set = set()
+    if top_ids:
+        descendants: list = []
+        frontier = list(top_ids)
+        seen = set(top_ids)
+        while frontier:
+            rows = (
+                Comment.query.options(
+                    joinedload(Comment.author),
+                    joinedload(Comment.reply_to).joinedload(Comment.author),
+                )
+                .filter(
+                    Comment.reply_to_id.in_(frontier),
+                    Comment.is_hidden.is_(False),
+                )
+                .order_by(Comment.created_at.asc(), Comment.id.asc())
+                .all()
+            )
+            next_frontier: list = []
+            for r in rows:
+                if r.id in seen:
+                    continue
+                seen.add(r.id)
+                descendants.append(r)
+                replies_by_parent.setdefault(r.reply_to_id, []).append(r)
+                next_frontier.append(r.id)
+            frontier = next_frontier
+        all_reply_ids = {r.id for r in descendants}
+        if all_reply_ids:
+            reply_like_counts = dict(
+                db.session.query(CommentLike.comment_id, func.count().label("cnt"))
+                .filter(CommentLike.comment_id.in_(all_reply_ids))
+                .group_by(CommentLike.comment_id)
+                .all()
+            )
+            if getattr(viewer, "is_authenticated", False):
+                reply_liked_ids = {
+                    row[0]
+                    for row in db.session.query(CommentLike.comment_id)
+                    .filter(
+                        CommentLike.user_id == viewer.id,
+                        CommentLike.comment_id.in_(all_reply_ids),
+                    )
+                    .all()
+                }
 
     return card, {
         "pagination": pag,
         "like_counts": like_counts,
         "user_liked_ids": user_liked_ids,
         "sort": sort,
+        "replies_by_parent": replies_by_parent,
+        "reply_like_counts": reply_like_counts,
+        "reply_liked_ids": reply_liked_ids,
     }, None
 
 

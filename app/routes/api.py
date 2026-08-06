@@ -565,57 +565,27 @@ def cards_comments(card_id):
     pag = data["pagination"]
     like_counts = data["like_counts"]
     user_liked_ids = data["user_liked_ids"]
-
-    # ---- 楼中楼：批量查询当前页评论的直接回复（一层），并统计点赞 ----
-    page_ids = [cm.id for cm in pag.items]
-    replies_by_parent: dict[int, list] = {}
-    reply_like_counts: dict[int, int] = {}
-    reply_liked_ids: set = set()
-    if page_ids:
-        reply_rows = (
-            Comment.query.options(
-                joinedload(Comment.author),
-                joinedload(Comment.reply_to).joinedload(Comment.author),
-            )
-            .filter(Comment.reply_to_id.in_(page_ids), Comment.is_hidden.is_(False))
-            .order_by(Comment.created_at.asc(), Comment.id.asc())
-            .all()
-        )
-        for r in reply_rows:
-            replies_by_parent.setdefault(r.reply_to_id, []).append(r)
-        reply_ids = {r.id for r in reply_rows}
-        if reply_ids:
-            reply_like_counts = dict(
-                db.session.query(CommentLike.comment_id, func.count().label("cnt"))
-                .filter(CommentLike.comment_id.in_(reply_ids))
-                .group_by(CommentLike.comment_id)
-                .all()
-            )
-            if getattr(viewer, "is_authenticated", False):
-                reply_liked_ids = {
-                    row[0]
-                    for row in db.session.query(CommentLike.comment_id)
-                    .filter(
-                        CommentLike.user_id == viewer.id,
-                        CommentLike.comment_id.in_(reply_ids),
-                    )
-                    .all()
-                }
+    replies_by_parent = data["replies_by_parent"]
+    reply_like_counts = data["reply_like_counts"]
+    reply_liked_ids = data["reply_liked_ids"]
 
     # 楼层号只在最新排序且未筛选时返回（最热/只看作者下位置无意义）
     show_floor = (sort == "latest") and not only_author
+
+    # 递归嵌套序列化：子回复的 replies 是其直接子回复（楼中楼多级）。
+    def _reply_item(r):
+        return _comment_item(
+            r,
+            r.id in reply_liked_ids,
+            reply_like_counts.get(r.id, 0),
+            viewer=viewer,
+            card=card,
+            replies=[_reply_item(x) for x in replies_by_parent.get(r.id, [])],
+        )
+
     items = []
     for idx, cm in enumerate(pag.items):
-        replies = [
-            _comment_item(
-                r,
-                r.id in reply_liked_ids,
-                reply_like_counts.get(r.id, 0),
-                viewer=viewer,
-                card=card,
-            )
-            for r in replies_by_parent.get(cm.id, [])
-        ]
+        replies = [_reply_item(r) for r in replies_by_parent.get(cm.id, [])]
         items.append(_comment_item(
             cm,
             cm.id in user_liked_ids,
