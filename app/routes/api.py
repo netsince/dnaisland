@@ -259,6 +259,7 @@ def _card_detail(card: Card, data: dict) -> dict:
         "created_at": card.created_at.isoformat() if card.created_at else "",
         "updated_at": card.updated_at.isoformat() if card.updated_at else "",
         "status": card.status,
+        "is_hidden": bool(card.is_hidden),
         "author": _user_public(card.author) if card.author else None,  # type: ignore[arg-type]
     }
 
