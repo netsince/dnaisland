@@ -1,0 +1,44 @@
+.....F                                                                   [100%]
+================================== FAILURES ===================================
+_______________________ test_api_user_profile_comments ________________________
+
+app = <Flask 'app'>, client = <FlaskClient <Flask 'app'>>
+
+    def test_api_user_profile_comments(app, client):
+        """GET /api/v1/users/<username>/comments �����û����ۼ�������Ƭ��"""
+        with app.app_context():
+            author = User(username="pc_author", nickname="����", email="pc_a@example.com")
+            author.set_password("pass123")
+            u1 = User(username="pc_u1", nickname="������", email="pc_u1@example.com")
+            u1.set_password("pass123")
+            u2 = User(username="pc_u2", nickname="���ظ�", email="pc_u2@example.com")
+            u2.set_password("pass123")
+            db.session.add_all([author, u1, u2])
+            db.session.commit()
+            card = Card(id="card-comments-tab", author_id=author.id, name="���ۿ�", persona="P")
+            db.session.add(card)
+            db.session.commit()
+            top = Comment(card_id=card.id, user_id=u1.id, content="�ҵ�����")
+            db.session.add(top)
+            db.session.flush()
+            top_id = top.id
+            reply = Comment(
+                card_id=card.id, user_id=u1.id, content="�ҵĻظ�", reply_to_id=top_id,
+            )
+            db.session.add(reply)
+            db.session.commit()
+    
+        body = client.get("/api/v1/users/pc_u1/comments").get_json()
+        assert body["ok"] is True
+        items = body["data"]["items"]
+        # ��ʱ�䵹�򣺺󷢵Ļظ���ǰ��
+>       assert [i["content"] for i in items] == ["�ҵĻظ�", "�ҵ�����"]
+E       AssertionError: assert ['�ҵ�����', '�ҵĻظ�'] == ['�ҵĻظ�', '�ҵ�����']
+E         
+E         At index 0 diff: '�ҵ�����' != '�ҵĻظ�'
+E         Use -v to get more diff
+
+tests\test_card_comments_p2.py:343: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_card_comments_p2.py::test_api_user_profile_comments - Asser...
+1 failed, 5 passed in 11.61s

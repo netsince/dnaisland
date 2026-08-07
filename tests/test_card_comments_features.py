@@ -94,7 +94,10 @@ def test_comments_replies_thread(client, app):
 
 
 def test_comments_nested_reply_thread(client, app):
-    """子回复的子回复应嵌套挂在子回复下，且不进入顶层列表。"""
+    """楼中楼最多两层：子回复的子回复不再展开，且不进入顶层列表。
+
+    库里即使存在第三层数据（历史数据），序列化也只输出两层。
+    """
     with app.app_context():
         author = User(username="n_author", nickname="NAuthor", email="na@example.com")
         author.set_password("pw")
@@ -127,7 +130,7 @@ def test_comments_nested_reply_thread(client, app):
         db.session.add(deep)
         db.session.commit()
 
-    # Web 端接口
+    # Web 端接口：只输出两层，第三层数据不再展开。
     data = client.get("/api/card/card-nested/comments").get_json()
     assert len(data["items"]) == 1
     top_item = data["items"][0]
@@ -135,15 +138,14 @@ def test_comments_nested_reply_thread(client, app):
     assert len(top_item["replies"]) == 1
     r1 = top_item["replies"][0]
     assert r1["content"] == "直接回复"
-    assert len(r1["replies"]) == 1
-    assert r1["replies"][0]["content"] == "回复的回复"
+    assert r1["replies"] == []  # 最多两层：回复不再嵌套
 
     # App 端接口结构一致
     body = client.get("/api/v1/cards/card-nested/comments").get_json()
     assert body["ok"] is True
     items = body["data"]["items"]
     assert len(items) == 1
-    assert items[0]["replies"][0]["replies"][0]["content"] == "回复的回复"
+    assert items[0]["replies"][0]["replies"] == []
 
 
 def test_comments_only_author_filter(client, app):

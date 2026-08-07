@@ -71,7 +71,7 @@ from ..services.card_edit_service import (
 )
 from ..services.card_import_service import parse_export_package
 from ..services.card_publish_service import create_card_from_payload
-from ..services.card_service import enrich_cards, popular_tags
+from ..services.card_service import attach_covers, enrich_cards, popular_tags
 from ..services.comment_service import (
     delete_comment,
     pin_comment,
@@ -690,7 +690,7 @@ def cards_comments(card_id):
     # 楼层号只在最新排序且未筛选时返回（最热/只看作者下位置无意义）
     show_floor = (sort == "latest") and not only_author
 
-    # 递归嵌套序列化：子回复的 replies 是其直接子回复（楼中楼多级）。
+    # 楼中楼最多两层：子回复不再向下嵌套（replies 为空）。
     def _reply_item(r):
         return _comment_item(
             r,
@@ -698,7 +698,7 @@ def cards_comments(card_id):
             reply_like_counts.get(r.id, 0),
             viewer=viewer,
             card=card,
-            replies=[_reply_item(x) for x in replies_by_parent.get(r.id, [])],
+            replies=[],
         )
 
     items = []
@@ -832,6 +832,77 @@ def users_profile(username):
             "pages": cards_pag.pages,
             "total": cards_pag.total,
         },
+    })
+
+
+@api_bp.route("/users/<username>/comments", methods=["GET"])
+def users_profile_comments(username):
+    """用户主页：角色卡评论列表（分页），复用单条评论序列化。"""
+    _soft_auth()
+    u = get_user_by_username(username)
+    if not u:
+        return err("用户不存在", 404)
+    cu = _ensure_self()
+    is_self = cu.is_authenticated and cu.id == u.id
+    is_admin = cu.is_authenticated and cu.is_super_admin
+    restricted = (not is_self) and (not is_admin) and u.is_profile_banned
+    if restricted:
+        return ok({"items": [], "page": 1, "pages": 0, "total": 0, "has_next": False})
+
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", 12, type=int)
+    pagination = (
+        Comment.query.filter_by(user_id=u.id)
+        .order_by(Comment.created_at.desc())
+        .paginate(page=page, per_page=per_page, error_out=False)
+    )
+    cm_items = pagination.items
+
+    # 批量点赞统计与当前用户已赞列表
+    ids = [c.id for c in cm_items]
+    like_counts = {}
+    liked_ids = set()
+    if ids:
+        like_counts = dict(
+            db.session.query(CommentLike.comment_id, func.count().label("cnt"))
+            .filter(CommentLike.comment_id.in_(ids))
+            .group_by(CommentLike.comment_id)
+            .all()
+        )
+        if cu.is_authenticated:
+            liked_rows = db.session.query(CommentLike.comment_id).filter(
+                CommentLike.user_id == cu.id,
+                CommentLike.comment_id.in_(ids),
+            ).all()
+            liked_ids = {row[0] for row in liked_rows}
+
+    # 批量附加评论所属角色卡（含方形封面标记）
+    comment_cards = {}
+    card_ids = [c.card_id for c in cm_items if c.card_id]
+    if card_ids:
+        cards = Card.query.filter(Card.id.in_(card_ids)).all()
+        attach_covers(cards, slot="square")
+        comment_cards = {c.id: c for c in cards}
+
+    items = []
+    for cm in cm_items:
+        card = comment_cards.get(cm.card_id)
+        item = _comment_item(
+            cm,
+            cm.id in liked_ids,
+            like_counts.get(cm.id, 0),
+            viewer=cu,
+            card=card,
+        )
+        item["card"] = {"id": card.id, "name": card.name} if card else None
+        items.append(item)
+
+    return ok({
+        "items": items,
+        "page": pagination.page,
+        "pages": pagination.pages,
+        "total": pagination.total,
+        "has_next": pagination.has_next,
     })
 
 

@@ -604,15 +604,19 @@ def card_comments_api(card_id):
             "is_mine": bool(current_user.is_authenticated and cm.user_id == current_user.id),
         }
         if include_replies:
+            # 楼中楼最多两层：子回复不再向下嵌套。
             item["replies"] = [
                 _serialize(
                     r,
                     reply_like_counts.get(r.id, 0),
                     r.id in reply_liked_ids,
-                    include_replies=True,
+                    include_replies=False,
                 )
                 for r in replies_by_parent.get(cm.id, [])
             ]
+        else:
+            # 子回复保持结构一致：replies 恒为 []。
+            item["replies"] = []
         return item
 
     items = [

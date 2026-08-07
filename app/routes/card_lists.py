@@ -481,6 +481,13 @@ def create_comment(card_id, viewer, content, reply_to_id=None, image_data=None):
     if reply_to_id:
         parent = db.session.get(Comment, reply_to_id)
         if parent and parent.card_id == card_id:
+            # 楼中楼最多两层：若目标本身是回复，则把回复挂到它的顶层父评论下，
+            # 避免产生第三层嵌套（历史深层数据也沿链回退到根）。
+            while parent.reply_to_id is not None:
+                ancestor = db.session.get(Comment, parent.reply_to_id)
+                if ancestor is None:
+                    break
+                parent = ancestor
             valid_reply_id = parent.id
         else:
             parent = None

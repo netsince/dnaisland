@@ -260,3 +260,94 @@ def test_comment_image_upload(app, client):
     assert item["image_data"] == cm.image_data
 
 
+def test_comment_reply_flatten_to_top_level(app, client):
+    """楼中楼最多两层：回复第二层时自动提升为对顶层评论的回复。"""
+    with app.app_context():
+        author = User(username="f_author", nickname="作者", email="fa@example.com")
+        author.set_password("pass123")
+        u1 = User(username="f_u1", nickname="用户一", email="fu1@example.com")
+        u1.set_password("pass123")
+        u2 = User(username="f_u2", nickname="用户二", email="fu2@example.com")
+        u2.set_password("pass123")
+        db.session.add_all([author, u1, u2])
+        db.session.commit()
+
+        card = Card(id="card-flat", author_id=author.id, name="两层卡", persona="P")
+        db.session.add(card)
+        db.session.commit()
+
+        top = Comment(card_id=card.id, user_id=u1.id, content="顶层评论")
+        db.session.add(top)
+        db.session.flush()
+        top_id = top.id
+        reply = Comment(
+            card_id=card.id, user_id=u2.id, content="第二层回复",
+            reply_to_id=top_id,
+        )
+        db.session.add(reply)
+        db.session.flush()
+        reply_id = reply.id
+        db.session.commit()
+
+    # u1 回复「第二层回复」→ 应提升为对顶层评论的回复，不产生第三层。
+    client.post("/auth/login", data={"identifier": "f_u1", "password": "pass123"})
+    res = client.post(
+        "/card/card-flat/comment",
+        data={"content": "回复第二层", "reply_to_id": reply_id},
+    )
+    assert res.status_code in (200, 302)
+
+    with app.app_context():
+        new_cm = Comment.query.filter_by(card_id="card-flat", content="回复第二层").first()
+        assert new_cm is not None
+        assert new_cm.reply_to_id == top_id  # 提升到顶层
+        assert new_cm.reply_to_id != reply_id
+
+    # 序列化仍只有两层：顶层 replies 含两条第二层，且不再嵌套。
+    data = client.get("/api/card/card-flat/comments").get_json()
+    assert len(data["items"]) == 1
+    top_item = data["items"][0]
+    assert len(top_item["replies"]) == 2
+    for r in top_item["replies"]:
+        assert r["replies"] == []
+
+
+def test_api_user_profile_comments(app, client):
+    """GET /api/v1/users/<username>/comments 返回用户评论及所属卡片。"""
+    with app.app_context():
+        author = User(username="pc_author", nickname="作者", email="pc_a@example.com")
+        author.set_password("pass123")
+        u1 = User(username="pc_u1", nickname="评论者", email="pc_u1@example.com")
+        u1.set_password("pass123")
+        u2 = User(username="pc_u2", nickname="被回复", email="pc_u2@example.com")
+        u2.set_password("pass123")
+        db.session.add_all([author, u1, u2])
+        db.session.commit()
+        card = Card(id="card-comments-tab", author_id=author.id, name="评论卡", persona="P")
+        db.session.add(card)
+        db.session.commit()
+        top = Comment(card_id=card.id, user_id=u1.id, content="我的评论")
+        db.session.add(top)
+        db.session.flush()
+        top_id = top.id
+        reply = Comment(
+            card_id=card.id, user_id=u1.id, content="我的回复", reply_to_id=top_id,
+        )
+        db.session.add(reply)
+        db.session.commit()
+
+    body = client.get("/api/v1/users/pc_u1/comments").get_json()
+    assert body["ok"] is True
+    items = body["data"]["items"]
+    # 两条评论都返回（同毫秒创建，顺序不保证）。
+    assert {i["content"] for i in items} == {"我的回复", "我的评论"}
+    reply_item = next(i for i in items if i["content"] == "我的回复")
+    assert reply_item["author"]["username"] == "pc_u1"
+    assert reply_item["reply_to"]["author_name"] == "评论者"  # 回复对象是顶层评论作者
+    assert reply_item["card"]["id"] == "card-comments-tab"
+    assert reply_item["card"]["name"] == "评论卡"
+
+    # 用户不存在返回 404。
+    assert client.get("/api/v1/users/nobody/comments").status_code == 404
+
+
