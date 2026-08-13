@@ -1,6 +1,6 @@
 import json
 
-SUPPORTED_VERSION = 1
+SUPPORTED_VERSION = 2
 IMAGE_SLOTS = ("square", "landscape", "portrait")
 
 
