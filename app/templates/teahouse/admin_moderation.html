@@ -1,44 +1,259 @@
 {% extends "admin/base.html" %}
 {% from "macros/pagination.html" import render_pagination %}
 
-{% block title %}茶馆审核 · DNAISLAND{% endblock %}
+{% block title %}茶馆审核 · 管理控制台{% endblock %}
+
 {% block admin_content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <h2 class="h4 mb-0">茶馆帖子审核（先发后审）</h2>
-  <span class="badge bg-warning">待审核：{{ pending }}</span>
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div>
+    <h1 class="h4 fw-bold mb-1">茶馆帖子审核（先发后审）</h1>
+    <p class="small text-muted mb-0">用户发表动态后进入此队列，点击同意保留可见，点击拒绝隐藏并通知作者。</p>
+  </div>
+  <div>
+    <span class="badge bg-warning text-dark rounded-pill px-3 py-2">待审核：<strong id="pending-tea-count">{{ pending }}</strong></span>
+  </div>
+</div>
+
+<!-- 批量操作悬浮工具栏 -->
+<div id="batch-toolbar" class="card border-0 shadow-lg rounded-4 p-2 px-3 mb-3 bg-primary text-white d-none position-sticky" style="top: 76px; z-index: 1020;">
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <div class="d-flex align-items-center gap-2">
+      <i class="bi bi-check2-square fs-5"></i>
+      <span>已选择 <strong id="batch-count" class="text-warning">0</strong> 项帖子</span>
+    </div>
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <button type="button" class="btn btn-sm btn-success rounded-pill px-3" onclick="executeBatchTea('approve')">
+        <i class="bi bi-check-lg me-1"></i>批量同意
+      </button>
+      <button type="button" class="btn btn-sm btn-danger rounded-pill px-3" onclick="executeBatchTea('reject', false)">
+        <i class="bi bi-x-lg me-1"></i>批量拒绝
+      </button>
+      <button type="button" class="btn btn-sm btn-outline-warning rounded-pill px-2" onclick="executeBatchTea('reject', true)">
+        拒绝并禁言
+      </button>
+      <button type="button" class="btn btn-sm btn-outline-light rounded-pill px-2" onclick="deselectAllTea()">
+        取消选择
+      </button>
+    </div>
+  </div>
 </div>
 
 {% if items %}
+<div class="d-flex justify-content-between align-items-center mb-2 px-1">
+  <div class="form-check">
+    <input class="form-check-input" type="checkbox" id="select-all-tea">
+    <label class="form-check-label small fw-semibold" for="select-all-tea">全选当前页</label>
+  </div>
+</div>
+
+<div class="row g-3 mb-4" id="tea-cards-container">
   {% for it in items %}
-  <div class="card mb-3">
-    <div class="card-body">
-      <div class="d-flex justify-content-between small text-muted mb-2">
-        <span>@{{ it.post.author.username }}（{{ it.post.author.nickname }}）</span>
-        <span>{{ it.post.created_at|cst }}</span>
+  {% set p = it.post %}
+  <div class="col-12" id="tea-row-{{ p.id }}">
+    <div class="card border-0 shadow-sm rounded-4 p-3 tea-card">
+      <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+        <div class="d-flex align-items-center gap-2">
+          <input class="form-check-input row-select-tea" type="checkbox" value="{{ p.id }}">
+          <span class="fw-bold small">{{ p.author.nickname if p.author else p.user_id }}</span>
+          <span class="text-muted small">@{{ p.author.username if p.author else p.user_id }}</span>
+          {% if it.parent %}
+          <span class="badge bg-secondary rounded-pill" style="font-size: 0.7rem;">回复帖</span>
+          {% endif %}
+        </div>
+        <span class="small text-muted">{{ p.created_at.strftime('%Y-%m-%d %H:%M') if p.created_at else '-' }}</span>
       </div>
+
       {% if it.parent %}
-      <div class="small text-muted mb-1">
-        回复对象：<a href="{{ url_for('teahouse.post_detail', post_id=it.parent.id) }}" target="_blank">@{{ it.parent.author.username }} 的帖子</a>
+      <div class="small text-muted mb-2 p-2 bg-body-tertiary rounded-3 border-start border-3 border-secondary">
+        回复对象：<a href="{{ url_for('teahouse.post_detail', post_id=it.parent.id) }}" target="_blank" class="text-decoration-none">@{{ it.parent.author.username if it.parent.author else it.parent.user_id }} 的原帖</a>
       </div>
       {% endif %}
-      <div class="border rounded p-2 mb-2" style="white-space:pre-wrap;word-break:break-word;">{{ it.post.content | teahouse_linkify }}</div>
-      <div class="d-flex flex-wrap gap-2 align-items-center">
-        <form method="post" action="{{ url_for('admin.tea_post_approve', post_id=it.post.id) }}">
-          <button class="btn btn-sm btn-success">同意</button>
-        </form>
-        <form method="post" action="{{ url_for('admin.tea_post_reject', post_id=it.post.id) }}" class="d-flex align-items-center gap-2">
-          <button class="btn btn-sm btn-danger">拒绝并隐藏</button>
-          <div class="form-check mb-0">
-            <input class="form-check-input" type="checkbox" name="mute" value="1" id="mute{{ it.post.id }}">
-            <label class="form-check-label small" for="mute{{ it.post.id }}">同时禁言</label>
-          </div>
-        </form>
+
+      <div class="p-3 bg-body-tertiary rounded-3 mb-3 small" style="white-space: pre-wrap; word-break: break-word;">
+        {{ p.content | teahouse_linkify }}
+      </div>
+
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <a href="{{ url_for('teahouse.post_detail', post_id=p.id) }}" target="_blank" class="btn btn-sm btn-link text-decoration-none p-0">
+          <i class="bi bi-box-arrow-up-right me-1"></i>在茶馆中查看
+        </a>
+        <div class="btn-group btn-group-sm">
+          <button type="button" class="btn btn-success" onclick="ajaxApproveTea({{ p.id }})" title="同意保留">
+            <i class="bi bi-check-lg me-1"></i>同意
+          </button>
+          <button type="button" class="btn btn-outline-danger" onclick="ajaxRejectTea({{ p.id }}, false)" title="拒绝并隐藏">
+            <i class="bi bi-x-lg me-1"></i>拒绝
+          </button>
+          <button type="button" class="btn btn-outline-warning" onclick="ajaxRejectTea({{ p.id }}, true)" title="拒绝并禁言作者">
+            <i class="bi bi-slash-circle me-1"></i>拒绝+禁言
+          </button>
+        </div>
       </div>
     </div>
   </div>
   {% endfor %}
-  {{ render_pagination(pagination, 'admin.tea_moderation', args) }}
+</div>
+{{ render_pagination(pagination, 'admin.tea_moderation', args) }}
 {% else %}
-  <div class="alert alert-success">暂无待审核的茶馆帖子。</div>
+<div class="card border-0 shadow-sm rounded-4 text-center py-5">
+  <div class="py-3 text-muted">
+    <i class="bi bi-cup-hot fs-1 text-success d-block mb-2"></i>
+    <div class="fw-semibold">审核队列已清空</div>
+    <div class="small">暂无待审核的茶馆帖子。</div>
+  </div>
+</div>
 {% endif %}
+
+<script>
+function updateTeaBadges(delta) {
+  var countEl = document.getElementById('pending-tea-count');
+  if (countEl) {
+    var val = parseInt(countEl.textContent, 10);
+    if (!isNaN(val)) countEl.textContent = Math.max(0, val - delta);
+  }
+}
+
+function removeTeaRow(id) {
+  var row = document.getElementById('tea-row-' + id);
+  if (row) {
+    row.style.transition = 'all 0.3s ease';
+    row.style.opacity = '0';
+    row.style.transform = 'scale(0.98)';
+    setTimeout(function() {
+      if (row.parentNode) row.parentNode.removeChild(row);
+      updateTeaSelection();
+      var remaining = document.querySelectorAll('.tea-card');
+      if (remaining.length === 0) {
+        var container = document.getElementById('tea-cards-container');
+        if (container) {
+          container.innerHTML = '<div class="col-12"><div class="card border-0 shadow-sm rounded-4 text-center py-5 text-muted"><i class="bi bi-check2-circle fs-2 text-success d-block mb-2"></i>当前茶馆审核队列已全部处理完毕</div></div>';
+        }
+      }
+    }, 300);
+  }
+}
+
+function ajaxApproveTea(id) {
+  fetch('/admin/teahouse/' + id + '/approve', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest',
+      'Accept': 'application/json'
+    }
+  }).then(function(res) { return res.json(); }).then(function(data) {
+    if (data.ok) {
+      showToast('已通过茶馆帖子', 'success');
+      removeTeaRow(id);
+      updateTeaBadges(1);
+    } else {
+      showToast('操作失败', 'danger');
+    }
+  }).catch(function() { showToast('网络异常', 'danger'); });
+}
+
+function ajaxRejectTea(id, mute) {
+  fetch('/admin/teahouse/' + id + '/reject', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest',
+      'Accept': 'application/json'
+    },
+    body: JSON.stringify({ mute: mute })
+  }).then(function(res) { return res.json(); }).then(function(data) {
+    if (data.ok) {
+      showToast(mute ? '已拒绝该帖子并禁言用户' : '已拒绝该帖子', 'warning');
+      removeTeaRow(id);
+      updateTeaBadges(1);
+    } else {
+      showToast('操作失败', 'danger');
+    }
+  }).catch(function() { showToast('网络异常', 'danger'); });
+}
+
+function getSelectedTeaIds() {
+  var ids = [];
+  document.querySelectorAll('.row-select-tea:checked').forEach(function(cb) {
+    ids.push(cb.value);
+  });
+  return ids;
+}
+
+function updateTeaSelection() {
+  var ids = getSelectedTeaIds();
+  var toolbar = document.getElementById('batch-toolbar');
+  var countEl = document.getElementById('batch-count');
+  var selectAllCb = document.getElementById('select-all-tea');
+
+  if (countEl) countEl.textContent = ids.length;
+  if (ids.length > 0) {
+    if (toolbar) toolbar.classList.remove('d-none');
+  } else {
+    if (toolbar) toolbar.classList.add('d-none');
+  }
+
+  var allCbs = document.querySelectorAll('.row-select-tea');
+  if (selectAllCb) {
+    selectAllCb.checked = allCbs.length > 0 && ids.length === allCbs.length;
+  }
+}
+
+function deselectAllTea() {
+  document.querySelectorAll('.row-select-tea, #select-all-tea').forEach(function(cb) {
+    cb.checked = false;
+  });
+  updateTeaSelection();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  var selectAllCb = document.getElementById('select-all-tea');
+  if (selectAllCb) {
+    selectAllCb.addEventListener('change', function() {
+      var checked = this.checked;
+      document.querySelectorAll('.row-select-tea').forEach(function(cb) {
+        cb.checked = checked;
+      });
+      updateTeaSelection();
+    });
+  }
+
+  document.addEventListener('change', function(e) {
+    if (e.target && e.target.classList.contains('row-select-tea')) {
+      updateTeaSelection();
+    }
+  });
+});
+
+function executeBatchTea(action, mute) {
+  var ids = getSelectedTeaIds();
+  if (ids.length === 0) {
+    showToast('请先勾选需要操作的帖子', 'warning');
+    return;
+  }
+
+  fetch('/admin/teahouse/batch', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest',
+      'Accept': 'application/json'
+    },
+    body: JSON.stringify({
+      action: action,
+      post_ids: ids,
+      mute: mute
+    })
+  }).then(function(res) { return res.json(); }).then(function(data) {
+    if (data.ok) {
+      showToast('已批量处理 ' + data.count + ' 个帖子', 'success');
+      ids.forEach(function(id) { removeTeaRow(id); });
+      updateTeaBadges(data.count);
+      deselectAllTea();
+    } else {
+      showToast('批量操作失败', 'danger');
+    }
+  }).catch(function() { showToast('网络异常', 'danger'); });
+}
+</script>
 {% endblock %}

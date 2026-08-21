@@ -89,6 +89,15 @@ def apply_mute(user_id, reason, notify_msg):
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
 
+def _is_ajax():
+    """判断当前请求是否为 AJAX / 期望 JSON 响应。"""
+    return (
+        request.is_json
+        or request.headers.get("X-Requested-With") == "XMLHttpRequest"
+        or request.accept_mimetypes.best == "application/json"
+    )
+
+
 @admin_bp.context_processor
 def inject_admin_badges():
     """向所有 admin 模板注入待办审核与处理数量角标。"""
@@ -1295,6 +1304,8 @@ def review_detail(card_id):
 def review_approve(card_id):
     card = db.session.get(Card, card_id)
     if not card or card.status == "approved":
+        if _is_ajax():
+            return jsonify(ok=True, card_id=card_id)
         return redirect(url_for("admin.review"))
     card.status = "approved"
     db.session.commit()
@@ -1305,6 +1316,8 @@ def review_approve(card_id):
         related_card_id=card.id,
     )
     db.session.commit()
+    if _is_ajax():
+        return jsonify(ok=True, card_id=card.id, name=card.name)
     flash(f'已通过："{card.name}"', "success")
     return redirect(url_for("admin.review"))
 
@@ -1314,8 +1327,10 @@ def review_approve(card_id):
 def review_reject(card_id):
     card = db.session.get(Card, card_id)
     if not card or card.status == "rejected":
+        if _is_ajax():
+            return jsonify(ok=True, card_id=card_id)
         return redirect(url_for("admin.review"))
-    reason = request.form.get("reason", "").strip()
+    reason = (request.form.get("reason") or (request.json.get("reason") if request.is_json else "") or "").strip()
     card.status = "rejected"
     db.session.commit()
     msg = f'你的角色卡"{card.name}"未通过审核'
@@ -1330,7 +1345,57 @@ def review_reject(card_id):
         related_card_id=card.id,
     )
     db.session.commit()
+    if _is_ajax():
+        return jsonify(ok=True, card_id=card.id, name=card.name)
     flash(f'已拒绝："{card.name}"', "success")
+    return redirect(url_for("admin.review"))
+
+
+@admin_bp.route("/review/batch", methods=["POST"])
+@super_admin_required
+def review_batch():
+    data = request.get_json(silent=True) or request.form
+    action = data.get("action")
+    card_ids = data.getlist("card_ids") if hasattr(data, "getlist") else data.get("card_ids", [])
+    if isinstance(card_ids, str):
+        card_ids = [c.strip() for c in card_ids.split(",") if c.strip()]
+    reason = (data.get("reason") or "").strip()
+
+    count = 0
+    for cid in card_ids:
+        card = db.session.get(Card, cid)
+        if not card:
+            continue
+        if action == "approve":
+            if card.status != "approved":
+                card.status = "approved"
+                notify(
+                    card.author_id,
+                    f'你的角色卡"{card.name}"已通过审核并发布。',
+                    type_="review",
+                    related_card_id=card.id,
+                )
+                count += 1
+        elif action == "reject":
+            if card.status != "rejected":
+                card.status = "rejected"
+                msg = f'你的角色卡"{card.name}"未通过审核'
+                if reason:
+                    msg += f'，原因：{reason}。可修改后重新提交。'
+                else:
+                    msg += '，可修改后重新提交。'
+                notify(
+                    card.author_id,
+                    msg,
+                    type_="review",
+                    related_card_id=card.id,
+                )
+                count += 1
+
+    db.session.commit()
+    if _is_ajax():
+        return jsonify(ok=True, count=count)
+    flash(f"已批量处理 {count} 张角色卡", "success")
     return redirect(url_for("admin.review"))
 
 
@@ -1525,6 +1590,8 @@ def comment_approve(comment_id):
     c = db.get_or_404(Comment, comment_id)
     c.moderated = True  # 同意：保持可见
     db.session.commit()
+    if _is_ajax():
+        return jsonify(ok=True, comment_id=comment_id)
     flash("已通过该评论，继续可见", "success")
     return redirect(url_for("admin.comment_moderation"))
 
@@ -1547,7 +1614,10 @@ def comment_reject(comment_id):
     )
 
     # 可选：拒绝的同时禁言该用户（复用 mute 处罚）
-    mute = request.form.get("mute") == "1"
+    mute = (
+        request.form.get("mute") == "1"
+        or (request.is_json and request.json.get("mute"))
+    )
     if mute:
         apply_mute(
             c.user_id,
@@ -1555,10 +1625,55 @@ def comment_reject(comment_id):
             "你已被平台禁言，暂时无法发表评论。",
         )
 
+    if _is_ajax():
+        return jsonify(ok=True, comment_id=comment_id)
     flash(
         "已拒绝该评论（已隐藏并通知用户）" + ("，并禁言该用户" if mute else ""),
         "success",
     )
+    return redirect(url_for("admin.comment_moderation"))
+
+
+@admin_bp.route("/comments/batch", methods=["POST"])
+@super_admin_required
+def comment_moderation_batch():
+    data = request.get_json(silent=True) or request.form
+    action = data.get("action")
+    comment_ids = data.getlist("comment_ids") if hasattr(data, "getlist") else data.get("comment_ids", [])
+    if isinstance(comment_ids, str):
+        comment_ids = [int(c.strip()) for c in comment_ids.split(",") if c.strip().isdigit()]
+    mute = str(data.get("mute", "")).lower() in ("1", "true", "yes")
+
+    count = 0
+    for cid in comment_ids:
+        c = db.session.get(Comment, cid)
+        if not c or c.moderated:
+            continue
+        if action == "approve":
+            c.moderated = True
+            count += 1
+        elif action == "reject":
+            c.is_hidden = True
+            c.moderated = True
+            card = db.session.get(Card, c.card_id)
+            card_name = card.name if card else "未知角色卡"
+            notify(
+                c.user_id,
+                f'你发布在角色卡《{card_name}》下的评论因违反社区规范已被移除。',
+                type_="comment",
+            )
+            if mute:
+                apply_mute(
+                    c.user_id,
+                    "评论被拒绝时管理员施加禁言",
+                    "你已被平台禁言，暂时无法发表评论。",
+                )
+            count += 1
+
+    db.session.commit()
+    if _is_ajax():
+        return jsonify(ok=True, count=count)
+    flash(f"已批量处理 {count} 条评论", "success")
     return redirect(url_for("admin.comment_moderation"))
 
 
@@ -1673,6 +1788,8 @@ def tea_post_approve(post_id):
     p = db.get_or_404(TeaPost, post_id)
     p.moderated = True  # 同意：保持可见
     db.session.commit()
+    if _is_ajax():
+        return jsonify(ok=True, post_id=post_id)
     flash("已通过该茶馆帖子，继续可见", "success")
     return redirect(url_for("admin.tea_moderation"))
 
@@ -1688,17 +1805,59 @@ def tea_post_reject(post_id):
     notify(p.user_id, "你在茶馆发布的帖子因违反社区规范已被移除。", type_="teahouse")
 
     # 可选：拒绝的同时禁言该用户（复用 mute 处罚）
-    mute = request.form.get("mute") == "1"
+    mute = (
+        request.form.get("mute") == "1"
+        or (request.is_json and request.json.get("mute"))
+    )
     if mute:
         apply_mute(
             p.user_id,
             "茶馆帖子被拒绝时管理员施加禁言",
             "你已被平台禁言，暂时无法在茶馆发言。",
         )
+    if _is_ajax():
+        return jsonify(ok=True, post_id=post_id)
     flash(
         "已拒绝该茶馆帖子（已隐藏并通知用户）" + ("，并禁言该用户" if mute else ""),
         "success",
     )
+    return redirect(url_for("admin.tea_moderation"))
+
+
+@admin_bp.route("/teahouse/batch", methods=["POST"])
+@super_admin_required
+def tea_moderation_batch():
+    data = request.get_json(silent=True) or request.form
+    action = data.get("action")
+    post_ids = data.getlist("post_ids") if hasattr(data, "getlist") else data.get("post_ids", [])
+    if isinstance(post_ids, str):
+        post_ids = [int(p.strip()) for p in post_ids.split(",") if p.strip().isdigit()]
+    mute = str(data.get("mute", "")).lower() in ("1", "true", "yes")
+
+    count = 0
+    for pid in post_ids:
+        p = db.session.get(TeaPost, pid)
+        if not p or p.moderated:
+            continue
+        if action == "approve":
+            p.moderated = True
+            count += 1
+        elif action == "reject":
+            p.is_hidden = True
+            p.moderated = True
+            notify(p.user_id, "你在茶馆发布的帖子因违反社区规范已被移除。", type_="teahouse")
+            if mute:
+                apply_mute(
+                    p.user_id,
+                    "茶馆帖子被拒绝时管理员施加禁言",
+                    "你已被平台禁言，暂时无法在茶馆发言。",
+                )
+            count += 1
+
+    db.session.commit()
+    if _is_ajax():
+        return jsonify(ok=True, count=count)
+    flash(f"已批量处理 {count} 个茶馆帖子", "success")
     return redirect(url_for("admin.tea_moderation"))
 
 

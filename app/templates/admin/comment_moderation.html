@@ -1,53 +1,269 @@
 {% extends "admin/base.html" %}
 {% from "macros/pagination.html" import render_pagination %}
 
-{% block title %}评论审核 · DNAISLAND{% endblock %}
+{% block title %}评论审核 · 管理控制台{% endblock %}
 
 {% block admin_content %}
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
- <h2 class="h4 mb-0">评论审核（先发后审）</h2>
- <span class="badge bg-warning text-dark">待审核：{{ pending }}</span>
+  <div>
+    <h1 class="h4 fw-bold mb-1">评论审核（先发后审）</h1>
+    <p class="small text-muted mb-0">评论发布后自动进入队列，点击同意保留可见，点击拒绝即刻隐藏并通知作者。</p>
+  </div>
+  <div>
+    <span class="badge bg-warning text-dark rounded-pill px-3 py-2">待审核：<strong id="pending-count">{{ pending }}</strong></span>
+  </div>
 </div>
 
-<div class="text-muted small mb-3">
- 评论发布后直接进入此队列。点击「同意」保留可见；点击「拒绝」隐藏该评论并通知用户，可同时禁言。
+<!-- 批量操作悬浮工具栏 -->
+<div id="batch-toolbar" class="card border-0 shadow-lg rounded-4 p-2 px-3 mb-3 bg-primary text-white d-none position-sticky" style="top: 76px; z-index: 1020;">
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <div class="d-flex align-items-center gap-2">
+      <i class="bi bi-check2-square fs-5"></i>
+      <span>已选择 <strong id="batch-count" class="text-warning">0</strong> 项评论</span>
+    </div>
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <button type="button" class="btn btn-sm btn-success rounded-pill px-3" onclick="executeBatchComments('approve')">
+        <i class="bi bi-check-lg me-1"></i>批量同意
+      </button>
+      <button type="button" class="btn btn-sm btn-danger rounded-pill px-3" onclick="executeBatchComments('reject', false)">
+        <i class="bi bi-x-lg me-1"></i>批量拒绝
+      </button>
+      <button type="button" class="btn btn-sm btn-outline-warning rounded-pill px-2" onclick="executeBatchComments('reject', true)">
+        拒绝并禁言
+      </button>
+      <button type="button" class="btn btn-sm btn-outline-light rounded-pill px-2" onclick="deselectAllComments()">
+        取消选择
+      </button>
+    </div>
+  </div>
 </div>
 
 {% if items %}
-<div class="list-group">
- {% for it in items %}
- {% set c = it.comment %}
- <div class="list-group-item bg-transparent">
- <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
- <div class="flex-grow-1 min-w-0">
- <div class="small text-muted mb-1">
- <a class="text-decoration-none" href="{{ url_for('user.profile', username=c.author.username) if c.author else '#' }}">{{ c.author.nickname if c.author else c.user_id }}</a>
- {% if it.card %}· 评论于 <a class="text-decoration-none" href="{{ url_for('user.card_detail', card_id=it.card.id) }}">{{ it.card.name }}</a>{% endif %}
- · {{ c.created_at|cst }}
- </div>
- <div style="white-space:pre-wrap;">{{ c.content }}</div>
- </div>
- <div class="d-flex flex-column gap-2 align-items-end">
- <form method="post" action="{{ url_for('admin.comment_approve', comment_id=c.id) }}">
- <button class="btn btn-sm btn-success">同意</button>
- </form>
- <form method="post" action="{{ url_for('admin.comment_reject', comment_id=c.id) }}">
- <div class="form-check mb-1">
- <input class="form-check-input" type="checkbox" name="mute" id="mute-{{ c.id }}" value="1">
- <label class="form-check-label small" for="mute-{{ c.id }}">同时禁言</label>
- </div>
- <button class="btn btn-sm btn-danger">拒绝</button>
- </form>
- </div>
- </div>
- </div>
- {% endfor %}
+<div class="card border-0 shadow-sm rounded-4 overflow-hidden mb-4">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0" id="comments-table">
+      <thead class="table-light">
+        <tr>
+          <th style="width: 44px;" class="text-center">
+            <input class="form-check-input" type="checkbox" id="select-all-comments" title="全选">
+          </th>
+          <th style="width: 160px;">发布用户</th>
+          <th style="width: 180px;">关联角色卡</th>
+          <th>评论内容</th>
+          <th style="width: 140px;">发布时间</th>
+          <th style="width: 170px;" class="text-end">操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for it in items %}
+        {% set c = it.comment %}
+        <tr id="comment-row-{{ c.id }}" class="comment-row" data-comment-id="{{ c.id }}">
+          <td class="text-center">
+            <input class="form-check-input row-select-comment" type="checkbox" value="{{ c.id }}">
+          </td>
+          <td>
+            <div class="small fw-semibold text-truncate" style="max-width: 140px;">
+              {{ c.author.nickname if c.author else c.user_id }}
+            </div>
+            <div class="text-muted" style="font-size: 0.75rem;">@{{ c.author.username if c.author else c.user_id }}</div>
+          </td>
+          <td>
+            {% if it.card %}
+            <a class="small text-decoration-none text-truncate d-block" style="max-width: 160px;" href="{{ url_for('user.card_detail', card_id=it.card.id) }}" target="_blank">
+              {{ it.card.name }}
+            </a>
+            {% else %}
+            <span class="text-muted small">未知角色卡</span>
+            {% endif %}
+          </td>
+          <td>
+            <div class="small" style="white-space: pre-wrap; word-break: break-word; max-height: 4.5em; overflow: hidden;">
+              {{ c.content }}
+            </div>
+          </td>
+          <td>
+            <span class="small text-muted">{{ c.created_at.strftime('%m-%d %H:%M') if c.created_at else '-' }}</span>
+          </td>
+          <td class="text-end">
+            <div class="btn-group btn-group-sm">
+              <button type="button" class="btn btn-success" onclick="ajaxApproveComment({{ c.id }})" title="同意保留">
+                <i class="bi bi-check-lg"></i>
+              </button>
+              <button type="button" class="btn btn-outline-danger" onclick="ajaxRejectComment({{ c.id }}, false)" title="拒绝隐藏">
+                <i class="bi bi-x-lg"></i>
+              </button>
+              <button type="button" class="btn btn-outline-warning" onclick="ajaxRejectComment({{ c.id }}, true)" title="拒绝并禁言">
+                <i class="bi bi-slash-circle"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 {{ render_pagination(pagination, 'admin.comment_moderation', args) }}
 {% else %}
-<div class="dna-empty">
- <div class="dna-empty__icon"></div>
- <div>审核队列已清空，暂无待审核评论。</div>
+<div class="card border-0 shadow-sm rounded-4 text-center py-5">
+  <div class="py-3 text-muted">
+    <i class="bi bi-chat-heart fs-1 text-success d-block mb-2"></i>
+    <div class="fw-semibold">审核队列已清空</div>
+    <div class="small">暂无待审核评论。</div>
+  </div>
 </div>
 {% endif %}
+
+<script>
+function updateCommentBadges(delta) {
+  var countEl = document.getElementById('pending-count');
+  if (countEl) {
+    var val = parseInt(countEl.textContent, 10);
+    if (!isNaN(val)) countEl.textContent = Math.max(0, val - delta);
+  }
+}
+
+function removeCommentRow(id) {
+  var row = document.getElementById('comment-row-' + id);
+  if (row) {
+    row.style.transition = 'all 0.3s ease';
+    row.style.opacity = '0';
+    row.style.transform = 'scale(0.98)';
+    setTimeout(function() {
+      if (row.parentNode) row.parentNode.removeChild(row);
+      updateCommentSelection();
+      var remaining = document.querySelectorAll('.comment-row');
+      if (remaining.length === 0) {
+        var tbody = document.querySelector('#comments-table tbody');
+        if (tbody) {
+          tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-5"><i class="bi bi-check2-circle fs-2 text-success d-block mb-2"></i>当前评论审核队列已全部处理完毕</td></tr>';
+        }
+      }
+    }, 300);
+  }
+}
+
+function ajaxApproveComment(id) {
+  fetch('/admin/comments/' + id + '/approve', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest',
+      'Accept': 'application/json'
+    }
+  }).then(function(res) { return res.json(); }).then(function(data) {
+    if (data.ok) {
+      showToast('已通过评论', 'success');
+      removeCommentRow(id);
+      updateCommentBadges(1);
+    } else {
+      showToast('操作失败', 'danger');
+    }
+  }).catch(function() { showToast('网络异常', 'danger'); });
+}
+
+function ajaxRejectComment(id, mute) {
+  fetch('/admin/comments/' + id + '/reject', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest',
+      'Accept': 'application/json'
+    },
+    body: JSON.stringify({ mute: mute })
+  }).then(function(res) { return res.json(); }).then(function(data) {
+    if (data.ok) {
+      showToast(mute ? '已拒绝该评论并禁言用户' : '已拒绝该评论', 'warning');
+      removeCommentRow(id);
+      updateCommentBadges(1);
+    } else {
+      showToast('操作失败', 'danger');
+    }
+  }).catch(function() { showToast('网络异常', 'danger'); });
+}
+
+function getSelectedCommentIds() {
+  var ids = [];
+  document.querySelectorAll('.row-select-comment:checked').forEach(function(cb) {
+    ids.push(cb.value);
+  });
+  return ids;
+}
+
+function updateCommentSelection() {
+  var ids = getSelectedCommentIds();
+  var toolbar = document.getElementById('batch-toolbar');
+  var countEl = document.getElementById('batch-count');
+  var selectAllCb = document.getElementById('select-all-comments');
+
+  if (countEl) countEl.textContent = ids.length;
+  if (ids.length > 0) {
+    if (toolbar) toolbar.classList.remove('d-none');
+  } else {
+    if (toolbar) toolbar.classList.add('d-none');
+  }
+
+  var allCbs = document.querySelectorAll('.row-select-comment');
+  if (selectAllCb) {
+    selectAllCb.checked = allCbs.length > 0 && ids.length === allCbs.length;
+  }
+}
+
+function deselectAllComments() {
+  document.querySelectorAll('.row-select-comment, #select-all-comments').forEach(function(cb) {
+    cb.checked = false;
+  });
+  updateCommentSelection();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  var selectAllCb = document.getElementById('select-all-comments');
+  if (selectAllCb) {
+    selectAllCb.addEventListener('change', function() {
+      var checked = this.checked;
+      document.querySelectorAll('.row-select-comment').forEach(function(cb) {
+        cb.checked = checked;
+      });
+      updateCommentSelection();
+    });
+  }
+
+  document.addEventListener('change', function(e) {
+    if (e.target && e.target.classList.contains('row-select-comment')) {
+      updateCommentSelection();
+    }
+  });
+});
+
+function executeBatchComments(action, mute) {
+  var ids = getSelectedCommentIds();
+  if (ids.length === 0) {
+    showToast('请先勾选需要操作的评论', 'warning');
+    return;
+  }
+
+  fetch('/admin/comments/batch', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest',
+      'Accept': 'application/json'
+    },
+    body: JSON.stringify({
+      action: action,
+      comment_ids: ids,
+      mute: mute
+    })
+  }).then(function(res) { return res.json(); }).then(function(data) {
+    if (data.ok) {
+      showToast('已批量处理 ' + data.count + ' 条评论', 'success');
+      ids.forEach(function(id) { removeCommentRow(id); });
+      updateCommentBadges(data.count);
+      deselectAllComments();
+    } else {
+      showToast('批量操作失败', 'danger');
+    }
+  }).catch(function() { showToast('网络异常', 'danger'); });
+}
+</script>
 {% endblock %}

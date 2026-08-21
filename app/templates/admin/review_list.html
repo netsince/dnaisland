@@ -8,39 +8,94 @@
   <div>
     <h1 class="h4 fw-bold mb-1">角色卡审核队列</h1>
     <div class="small text-muted">
-      待审核 <span class="badge bg-danger rounded-pill">{{ stats.get('pending', 0) }}</span> · 
+      待审核 <span class="badge bg-danger rounded-pill badge-cards-count">{{ stats.get('pending', 0) }}</span> · 
       已通过 <span class="badge bg-success rounded-pill">{{ stats.get('approved', 0) }}</span> · 
       已拒绝 <span class="badge bg-secondary rounded-pill">{{ stats.get('rejected', 0) }}</span>
     </div>
   </div>
-  <div class="btn-group btn-group-sm rounded-pill shadow-sm" role="group">
-    <a class="btn btn-outline-secondary {% if status == 'pending' %}active fw-bold{% endif %}"
-       href="{{ url_for('admin.review', status='pending') }}">待审核</a>
-    <a class="btn btn-outline-secondary {% if status == 'approved' %}active fw-bold{% endif %}"
-       href="{{ url_for('admin.review', status='approved') }}">已通过</a>
-    <a class="btn btn-outline-secondary {% if status == 'rejected' %}active fw-bold{% endif %}"
-       href="{{ url_for('admin.review', status='rejected') }}">已拒绝</a>
-    <a class="btn btn-outline-secondary {% if status == 'all' %}active fw-bold{% endif %}"
-       href="{{ url_for('admin.review', status='all') }}">全部</a>
+  <div class="d-flex align-items-center gap-2">
+    <div class="small text-muted d-none d-lg-block bg-body-tertiary px-3 py-1 rounded-pill border">
+      快捷键：<kbd>J</kbd>/<kbd>K</kbd> 移动 · <kbd>A</kbd> 通过 · <kbd>R</kbd> 驳回 · <kbd>X</kbd> 勾选
+    </div>
+    <div class="btn-group btn-group-sm rounded-pill shadow-sm" role="group">
+      <a class="btn btn-outline-secondary {% if status == 'pending' %}active fw-bold{% endif %}"
+         href="{{ url_for('admin.review', status='pending') }}">待审核</a>
+      <a class="btn btn-outline-secondary {% if status == 'approved' %}active fw-bold{% endif %}"
+         href="{{ url_for('admin.review', status='approved') }}">已通过</a>
+      <a class="btn btn-outline-secondary {% if status == 'rejected' %}active fw-bold{% endif %}"
+         href="{{ url_for('admin.review', status='rejected') }}">已拒绝</a>
+      <a class="btn btn-outline-secondary {% if status == 'all' %}active fw-bold{% endif %}"
+         href="{{ url_for('admin.review', status='all') }}">全部</a>
+    </div>
+  </div>
+</div>
+
+<!-- 批量操作悬浮工具栏（选中项 >= 1 时自动弹出） -->
+<div id="batch-toolbar" class="card border-0 shadow-lg rounded-4 p-2 px-3 mb-3 bg-primary text-white d-none position-sticky" style="top: 76px; z-index: 1020;">
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <div class="d-flex align-items-center gap-2">
+      <i class="bi bi-check2-square fs-5"></i>
+      <span>已选择 <strong id="batch-count" class="text-warning">0</strong> 项</span>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      <button type="button" class="btn btn-sm btn-success rounded-pill px-3" onclick="executeBatch('approve')">
+        <i class="bi bi-check-lg me-1"></i>批量通过
+      </button>
+      <button type="button" class="btn btn-sm btn-danger rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#batchRejectModal">
+        <i class="bi bi-x-lg me-1"></i>批量驳回
+      </button>
+      <button type="button" class="btn btn-sm btn-outline-light rounded-pill px-2" onclick="deselectAll()">
+        取消选择
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- 批量驳回原因模态框 -->
+<div class="modal fade" id="batchRejectModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content rounded-4 text-start">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title fw-bold">批量驳回选中的角色卡</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted mb-2">将同时拒绝所有已勾选的角色卡，作者均会收到系统通知。</p>
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">统一驳回原因（可选）：</label>
+          <input type="text" id="batch-reject-reason" class="form-control form-control-sm rounded-3" placeholder="例如：存在违规内容 / 封面涉嫌违规">
+        </div>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn btn-sm btn-secondary rounded-pill px-3" data-bs-dismiss="modal">取消</button>
+        <button type="button" class="btn btn-sm btn-danger rounded-pill px-3" onclick="executeBatch('reject')">确认批量拒绝</button>
+      </div>
+    </div>
   </div>
 </div>
 
 <div class="card border-0 shadow-sm rounded-4 overflow-hidden mb-4">
   <div class="table-responsive">
-    <table class="table table-hover align-middle mb-0">
+    <table class="table table-hover align-middle mb-0" id="review-table">
       <thead class="table-light">
         <tr>
-          <th style="width: 280px;">角色卡信息</th>
+          <th style="width: 44px;" class="text-center">
+            <input class="form-check-input" type="checkbox" id="select-all" title="全选/取消全选">
+          </th>
+          <th style="width: 260px;">角色卡信息</th>
           <th>人设与简介摘要</th>
           <th style="width: 130px;">作者</th>
           <th style="width: 100px;">状态</th>
           <th style="width: 140px;">提交时间</th>
-          <th style="width: 180px;" class="text-end">操作</th>
+          <th style="width: 170px;" class="text-end">操作</th>
         </tr>
       </thead>
       <tbody>
         {% for card in cards %}
-        <tr>
+        <tr id="card-row-{{ card.id }}" class="review-row" data-card-id="{{ card.id }}" data-card-name="{{ card.name }}">
+          <td class="text-center">
+            <input class="form-check-input row-select" type="checkbox" value="{{ card.id }}">
+          </td>
           <td>
             <div class="d-flex align-items-center gap-2">
               <div class="rounded-3 bg-secondary bg-opacity-25 d-flex align-items-center justify-content-center" style="width: 42px; height: 42px; flex-shrink: 0;">
@@ -55,7 +110,7 @@
             </div>
           </td>
           <td>
-            <div class="small text-muted text-truncate-2" style="max-width: 400px; max-height: 2.8em; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">
+            <div class="small text-muted text-truncate-2" style="max-width: 380px; max-height: 2.8em; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">
               {{ card.intro or card.persona or '暂无人设或简介' }}
             </div>
           </td>
@@ -66,11 +121,11 @@
           </td>
           <td>
             {% if card.status == 'approved' %}
-            <span class="badge bg-success rounded-pill">已通过</span>
+            <span class="badge bg-success rounded-pill status-badge">已通过</span>
             {% elif card.status == 'rejected' %}
-            <span class="badge bg-danger rounded-pill">已拒绝</span>
+            <span class="badge bg-danger rounded-pill status-badge">已拒绝</span>
             {% else %}
-            <span class="badge bg-warning text-dark rounded-pill">待审核</span>
+            <span class="badge bg-warning text-dark rounded-pill status-badge">待审核</span>
             {% endif %}
           </td>
           <td>
@@ -84,33 +139,31 @@
                 详情
               </a>
               {% if card.status != 'approved' %}
-              <form action="{{ url_for('admin.review_approve', card_id=card.id) }}" method="post" class="d-inline">
-                <button type="submit" class="btn btn-success" title="一键通过">
-                  <i class="bi bi-check-lg"></i>
-                </button>
-              </form>
+              <button type="button" class="btn btn-success btn-approve" onclick="ajaxApprove('{{ card.id }}')" title="一键通过 (快捷键 A)">
+                <i class="bi bi-check-lg"></i>
+              </button>
               {% endif %}
               {% if card.status != 'rejected' %}
-              <button type="button" class="btn btn-outline-danger" title="驳回" data-bs-toggle="modal" data-bs-target="#rejectModal-{{ card.id }}">
+              <button type="button" class="btn btn-outline-danger btn-reject" title="驳回 (快捷键 R)" data-bs-toggle="modal" data-bs-target="#rejectModal-{{ card.id }}">
                 <i class="bi bi-x-lg"></i>
               </button>
               {% endif %}
             </div>
 
-            <!-- 驳回理由模态框 -->
-            <div class="modal fade" id="rejectModal-{{ card.id }}" tabindex="-1" aria-hidden="true">
+            <!-- 单条驳回理由模态框 -->
+            <div class="modal fade reject-modal" id="rejectModal-{{ card.id }}" tabindex="-1" aria-hidden="true">
               <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content rounded-4 text-start">
-                  <form action="{{ url_for('admin.review_reject', card_id=card.id) }}" method="post">
+                  <form onsubmit="event.preventDefault(); ajaxReject('{{ card.id }}');">
                     <div class="modal-header border-0 pb-0">
                       <h5 class="modal-title fw-bold">拒绝通过角色卡</h5>
                       <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
-                      <p class="small text-muted mb-2">确认拒绝角色卡 <strong>"{{ card.name }}"</strong> 吗？拒绝后作者会收到系统通知。</p>
+                      <p class="small text-muted mb-2">确认拒绝角色卡 <strong>"{{ card.name }}"</strong> 吗？</p>
                       <div class="mb-3">
                         <label class="form-label small fw-semibold">驳回原因（可选）：</label>
-                        <input type="text" name="reason" class="form-control form-control-sm rounded-3" placeholder="例如：存在违规内容 / 封面涉嫌违规 / 请完善人设">
+                        <input type="text" id="reason-{{ card.id }}" class="form-control form-control-sm rounded-3 reject-reason-input" placeholder="例如：存在违规内容 / 封面涉嫌违规">
                       </div>
                     </div>
                     <div class="modal-footer border-0 pt-0">
@@ -124,8 +177,8 @@
           </td>
         </tr>
         {% else %}
-        <tr>
-          <td colspan="6" class="text-center text-muted py-5">
+        <tr id="empty-row">
+          <td colspan="7" class="text-center text-muted py-5">
             <i class="bi bi-inbox fs-2 text-muted d-block mb-2"></i>
             当前队列暂无角色卡
           </td>
@@ -137,4 +190,255 @@
 </div>
 
 {{ render_pagination(pagination, 'admin.review', args) }}
+
+<script>
+// ---------------- 异步 AJAX 审批与批量操作逻辑 ----------------
+var focusedIndex = -1;
+
+function updateBadges(delta) {
+  document.querySelectorAll('.badge-cards-count, .sidebar .badge.bg-danger').forEach(function(el) {
+    var val = parseInt(el.textContent, 10);
+    if (!isNaN(val)) {
+      var newVal = Math.max(0, val - delta);
+      el.textContent = newVal;
+      if (newVal === 0) el.classList.add('d-none');
+    }
+  });
+}
+
+function removeRow(cardId, isApprove) {
+  var row = document.getElementById('card-row-' + cardId);
+  if (row) {
+    row.style.transition = 'all 0.35s ease';
+    row.style.backgroundColor = isApprove ? 'rgba(25, 135, 84, 0.15)' : 'rgba(220, 53, 69, 0.15)';
+    row.style.opacity = '0';
+    row.style.transform = 'scale(0.98)';
+    setTimeout(function() {
+      if (row.parentNode) row.parentNode.removeChild(row);
+      updateSelection();
+      var remaining = document.querySelectorAll('.review-row');
+      if (remaining.length === 0) {
+        var tbody = document.querySelector('#review-table tbody');
+        if (tbody) {
+          tbody.innerHTML = '<tr id="empty-row"><td colspan="7" class="text-center text-muted py-5"><i class="bi bi-check2-circle fs-2 text-success d-block mb-2"></i>当前队列已全部处理完毕</td></tr>';
+        }
+      }
+    }, 350);
+  }
+}
+
+function ajaxApprove(cardId) {
+  fetch('/admin/review/' + cardId + '/approve', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest',
+      'Accept': 'application/json'
+    }
+  }).then(function(res) { return res.json(); }).then(function(data) {
+    if (data.ok) {
+      showToast('已通过角色卡', 'success');
+      removeRow(cardId, true);
+      updateBadges(1);
+    } else {
+      showToast(data.error || '操作失败', 'danger');
+    }
+  }).catch(function(err) {
+    showToast('网络请求异常', 'danger');
+  });
+}
+
+function ajaxReject(cardId) {
+  var reasonInput = document.getElementById('reason-' + cardId);
+  var reason = reasonInput ? reasonInput.value : '';
+  var modalEl = document.getElementById('rejectModal-' + cardId);
+  if (modalEl) {
+    var modal = bootstrap.Modal.getInstance(modalEl);
+    if (modal) modal.hide();
+  }
+
+  fetch('/admin/review/' + cardId + '/reject', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest',
+      'Accept': 'application/json'
+    },
+    body: JSON.stringify({ reason: reason })
+  }).then(function(res) { return res.json(); }).then(function(data) {
+    if (data.ok) {
+      showToast('已拒绝角色卡', 'warning');
+      removeRow(cardId, false);
+      updateBadges(1);
+    } else {
+      showToast(data.error || '操作失败', 'danger');
+    }
+  }).catch(function(err) {
+    showToast('网络请求异常', 'danger');
+  });
+}
+
+// ---------------- 批量勾选逻辑 ----------------
+function getSelectedIds() {
+  var ids = [];
+  document.querySelectorAll('.row-select:checked').forEach(function(cb) {
+    ids.push(cb.value);
+  });
+  return ids;
+}
+
+function updateSelection() {
+  var ids = getSelectedIds();
+  var toolbar = document.getElementById('batch-toolbar');
+  var countEl = document.getElementById('batch-count');
+  var selectAllCb = document.getElementById('select-all');
+
+  if (countEl) countEl.textContent = ids.length;
+  if (ids.length > 0) {
+    if (toolbar) toolbar.classList.remove('d-none');
+  } else {
+    if (toolbar) toolbar.classList.add('d-none');
+  }
+
+  var allCbs = document.querySelectorAll('.row-select');
+  if (selectAllCb) {
+    selectAllCb.checked = allCbs.length > 0 && ids.length === allCbs.length;
+  }
+}
+
+function deselectAll() {
+  document.querySelectorAll('.row-select, #select-all').forEach(function(cb) {
+    cb.checked = false;
+  });
+  updateSelection();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  var selectAllCb = document.getElementById('select-all');
+  if (selectAllCb) {
+    selectAllCb.addEventListener('change', function() {
+      var checked = this.checked;
+      document.querySelectorAll('.row-select').forEach(function(cb) {
+        cb.checked = checked;
+      });
+      updateSelection();
+    });
+  }
+
+  document.addEventListener('change', function(e) {
+    if (e.target && e.target.classList.contains('row-select')) {
+      updateSelection();
+    }
+  });
+});
+
+function executeBatch(action) {
+  var ids = getSelectedIds();
+  if (ids.length === 0) {
+    showToast('请先勾选需要操作的角色卡', 'warning');
+    return;
+  }
+
+  var reason = '';
+  if (action === 'reject') {
+    var reasonInput = document.getElementById('batch-reject-reason');
+    reason = reasonInput ? reasonInput.value : '';
+    var modalEl = document.getElementById('batchRejectModal');
+    if (modalEl) {
+      var modal = bootstrap.Modal.getInstance(modalEl);
+      if (modal) modal.hide();
+    }
+  }
+
+  fetch('/admin/review/batch', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest',
+      'Accept': 'application/json'
+    },
+    body: JSON.stringify({
+      action: action,
+      card_ids: ids,
+      reason: reason
+    })
+  }).then(function(res) { return res.json(); }).then(function(data) {
+    if (data.ok) {
+      showToast('已批量处理 ' + data.count + ' 项', 'success');
+      ids.forEach(function(id) {
+        removeRow(id, action === 'approve');
+      });
+      updateBadges(data.count);
+      deselectAll();
+    } else {
+      showToast(data.error || '批量操作失败', 'danger');
+    }
+  }).catch(function(err) {
+    showToast('网络请求异常', 'danger');
+  });
+}
+
+// ---------------- 快捷键监听 (J/K 移动, A 通过, R 驳回, X 勾选) ----------------
+function highlightRow(index) {
+  var rows = document.querySelectorAll('.review-row');
+  rows.forEach(function(r, i) {
+    if (i === index) {
+      r.classList.add('table-primary');
+      r.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } else {
+      r.classList.remove('table-primary');
+    }
+  });
+}
+
+document.addEventListener('keydown', function(e) {
+  // 如果处于输入框中，不触发快捷键
+  if (['INPUT', 'TEXTAREA', 'SELECT'].indexOf(e.target.tagName) !== -1) {
+    return;
+  }
+
+  var rows = document.querySelectorAll('.review-row');
+  if (rows.length === 0) return;
+
+  var key = e.key.toLowerCase();
+  if (key === 'j' || key === 'arrowdown') {
+    e.preventDefault();
+    focusedIndex = Math.min(rows.length - 1, focusedIndex + 1);
+    highlightRow(focusedIndex);
+  } else if (key === 'k' || key === 'arrowup') {
+    e.preventDefault();
+    focusedIndex = Math.max(0, focusedIndex - 1);
+    highlightRow(focusedIndex);
+  } else if (key === 'x') {
+    e.preventDefault();
+    if (focusedIndex >= 0 && focusedIndex < rows.length) {
+      var cb = rows[focusedIndex].querySelector('.row-select');
+      if (cb) {
+        cb.checked = !cb.checked;
+        updateSelection();
+      }
+    }
+  } else if (key === 'a') {
+    e.preventDefault();
+    if (focusedIndex >= 0 && focusedIndex < rows.length) {
+      var cardId = rows[focusedIndex].getAttribute('data-card-id');
+      if (cardId) ajaxApprove(cardId);
+    }
+  } else if (key === 'r') {
+    e.preventDefault();
+    if (focusedIndex >= 0 && focusedIndex < rows.length) {
+      var cardId = rows[focusedIndex].getAttribute('data-card-id');
+      var modalEl = document.getElementById('rejectModal-' + cardId);
+      if (modalEl) {
+        var modal = new bootstrap.Modal(modalEl);
+        modal.show();
+        setTimeout(function() {
+          var input = document.getElementById('reason-' + cardId);
+          if (input) input.focus();
+        }, 300);
+      }
+    }
+  }
+});
+</script>
 {% endblock %}
