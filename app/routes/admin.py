@@ -89,11 +89,100 @@ def apply_mute(user_id, reason, notify_msg):
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
 
+@admin_bp.context_processor
+def inject_admin_badges():
+    """向所有 admin 模板注入待办审核与处理数量角标。"""
+    try:
+        pending_cards = Card.query.filter_by(status="pending").count()
+        pending_reports = Report.query.filter_by(status="pending").count()
+        pending_comments = Comment.query.filter_by(status="pending").count()
+        pending_tea = TeaPost.query.filter_by(status="pending").count()
+        pending_appeals = Punishment.query.filter_by(appeal_status="pending").count()
+        total = (
+            pending_cards
+            + pending_reports
+            + pending_comments
+            + pending_tea
+            + pending_appeals
+        )
+    except Exception:
+        pending_cards = pending_reports = pending_comments = pending_tea = pending_appeals = total = 0
+
+    return {
+        "admin_badges": {
+            "cards": pending_cards,
+            "reports": pending_reports,
+            "comments": pending_comments,
+            "tea": pending_tea,
+            "appeals": pending_appeals,
+            "total": total,
+        }
+    }
+
+
 # ---------------- 仪表盘 / 入口 ----------------
 @admin_bp.route("/")
+@admin_bp.route("/dashboard")
 @super_admin_required
 def index():
-    return redirect(url_for("admin.review"))
+    today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+
+    # 核心指标统计
+    total_users = User.query.count()
+    today_users = User.query.filter(User.created_at >= today_start).count()
+
+    total_cards = Card.query.filter_by(status="approved").count()
+    today_cards = Card.query.filter(Card.created_at >= today_start).count()
+
+    total_comments = Comment.query.count()
+    total_tea_posts = TeaPost.query.count()
+
+    total_gen_logs = GenerationLog.query.count()
+    today_gen_logs = GenerationLog.query.filter(GenerationLog.created_at >= today_start).count()
+
+    # 待办与最新动态列表
+    pending_cards_list = (
+        Card.query.filter_by(status="pending")
+        .order_by(Card.created_at.desc())
+        .limit(6)
+        .all()
+    )
+    pending_reports_list = (
+        Report.query.filter_by(status="pending")
+        .order_by(Report.created_at.desc())
+        .limit(6)
+        .all()
+    )
+    recent_users_list = (
+        User.query.order_by(User.created_at.desc())
+        .limit(6)
+        .all()
+    )
+    recent_gen_logs = (
+        GenerationLog.query.order_by(GenerationLog.created_at.desc())
+        .limit(6)
+        .all()
+    )
+
+    stats = {
+        "total_users": total_users,
+        "today_users": today_users,
+        "total_cards": total_cards,
+        "today_cards": today_cards,
+        "total_comments": total_comments,
+        "total_tea_posts": total_tea_posts,
+        "total_gen_logs": total_gen_logs,
+        "today_gen_logs": today_gen_logs,
+    }
+
+    return render_template(
+        "admin/dashboard.html",
+        stats=stats,
+        pending_cards=pending_cards_list,
+        pending_reports=pending_reports_list,
+        recent_users=recent_users_list,
+        recent_gen_logs=recent_gen_logs,
+    )
 
 
 # ---------------- 用户管理 ----------------
@@ -1226,11 +1315,17 @@ def review_reject(card_id):
     card = db.session.get(Card, card_id)
     if not card or card.status == "rejected":
         return redirect(url_for("admin.review"))
+    reason = request.form.get("reason", "").strip()
     card.status = "rejected"
     db.session.commit()
+    msg = f'你的角色卡"{card.name}"未通过审核'
+    if reason:
+        msg += f'，原因：{reason}。可修改后重新提交。'
+    else:
+        msg += '，可修改后重新提交。'
     notify(
         card.author_id,
-        f'你的角色卡"{card.name}"未通过审核，可修改后重新提交。',
+        msg,
         type_="review",
         related_card_id=card.id,
     )

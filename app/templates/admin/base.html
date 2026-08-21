@@ -1,92 +1,189 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="container-fluid">
-  <div class="row">
-    <nav class="col-md-3 col-lg-2 d-md-block bg-light sidebar py-3" style="min-height: calc(100vh - 56px);">
-      <div class="position-sticky">
-        <div class="px-3 mb-3 text-muted small text-uppercase">管理后台</div>
-        <ul class="nav flex-column nav-pills">
-          <li class="nav-item">
-            <a class="nav-link {% if request.endpoint.startswith('admin.users') %}active{% endif %}"
-               href="{{ url_for('admin.users') }}">用户管理</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link {% if request.endpoint.startswith('admin.cards') %}active{% endif %}"
-               href="{{ url_for('admin.cards') }}">角色卡管理</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link {% if request.endpoint.startswith('admin.review') %}active{% endif %}"
-               href="{{ url_for('admin.review') }}">审核</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link {% if request.endpoint.startswith('admin.reports') %}active{% endif %}"
-               href="{{ url_for('admin.reports') }}">举报管理</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link {% if request.endpoint.startswith('admin.comment_moderation') %}active{% endif %}"
-               href="{{ url_for('admin.comment_moderation') }}">评论审核</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link {% if request.endpoint.startswith('admin.comments') %}active{% endif %}"
-               href="{{ url_for('admin.comments') }}">评论管理</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link {% if request.endpoint.startswith('admin.tea_moderation') %}active{% endif %}"
-               href="{{ url_for('admin.tea_moderation') }}">茶馆审核</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link {% if request.endpoint.startswith('admin.tea_posts') %}active{% endif %}"
-               href="{{ url_for('admin.tea_posts') }}">茶馆管理</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link {% if request.endpoint.startswith('admin.notify_send') %}active{% endif %}"
-               href="{{ url_for('admin.notify_send') }}">发送通知</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link {% if request.endpoint.startswith('admin.punish_appeals') %}active{% endif %}"
-               href="{{ url_for('admin.punish_appeals') }}">处罚申诉</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link {% if request.endpoint.startswith('admin.articles') %}active{% endif %}"
-               href="{{ url_for('admin.articles') }}">文章管理</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link {% if request.endpoint.startswith('admin.keys') %}active{% endif %}"
-               href="{{ url_for('admin.keys_list') }}">兑换码管理</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link {% if request.endpoint.startswith('admin.image_models') %}active{% endif %}"
-               href="{{ url_for('admin.image_models') }}">生图模型</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link {% if request.endpoint == 'admin.image_logs' %}active{% endif %}"
-               href="{{ url_for('admin.image_logs') }}">生图记录</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link {% if request.endpoint == 'admin.copy_stats' %}active{% endif %}"
-               href="{{ url_for('admin.copy_stats') }}">复制统计</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link {% if request.endpoint == 'admin.stickers' %}active{% endif %}"
-               href="{{ url_for('admin.stickers') }}">表情包</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link {% if request.endpoint == 'admin.system_config' %}active{% endif %}"
-               href="{{ url_for('admin.system_config') }}">系统配置</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link {% if request.endpoint.startswith('admin.recommend') %}active{% endif %}"
-               href="{{ url_for('admin.recommend') }}">站长推荐</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link {% if request.endpoint.startswith('admin.sponsors') %}active{% endif %}"
-               href="{{ url_for('admin.sponsors') }}">赞助管理</a>
-          </li>
-        </ul>
+<div class="container-fluid px-lg-4 py-3">
+  <div class="row g-4">
+    <!-- 侧边栏导航 -->
+    <nav class="col-12 col-md-4 col-lg-3 col-xl-2">
+      <div class="card border-0 shadow-sm rounded-4 p-3 sticky-top" style="top: 72px; z-index: 100;">
+        <div class="d-flex align-items-center justify-content-between pb-3 mb-2 border-bottom">
+          <span class="fw-bold fs-6 tracking-wide text-uppercase">管理控制台</span>
+          {% if admin_badges.total > 0 %}
+          <span class="badge bg-danger rounded-pill" title="未处理待办总数">{{ admin_badges.total }} 待办</span>
+          {% endif %}
+        </div>
+
+        <div class="admin-sidebar-nav overflow-y-auto" style="max-height: calc(100vh - 160px);">
+          <!-- 1. 总览与大盘 -->
+          <div class="text-muted small fw-semibold px-2 pt-2 pb-1 text-uppercase">总览与大盘</div>
+          <ul class="nav nav-pills flex-column gap-1 mb-3">
+            <li class="nav-item">
+              <a class="nav-link py-2 px-3 rounded-3 d-flex align-items-center justify-content-between {% if request.endpoint in ['admin.index', 'admin.dashboard'] %}active fw-semibold{% endif %}"
+                 href="{{ url_for('admin.index') }}">
+                <span><i class="bi bi-speedometer2 me-2"></i>仪表盘</span>
+              </a>
+            </li>
+          </ul>
+
+          <!-- 2. 审核与风控 -->
+          <div class="text-muted small fw-semibold px-2 pt-1 pb-1 text-uppercase d-flex justify-content-between align-items-center">
+            <span>审核与风控</span>
+            {% if (admin_badges.cards + admin_badges.reports + admin_badges.comments + admin_badges.tea + admin_badges.appeals) > 0 %}
+            <span class="badge bg-danger rounded-pill" style="font-size: 0.7rem;">{{ admin_badges.cards + admin_badges.reports + admin_badges.comments + admin_badges.tea + admin_badges.appeals }}</span>
+            {% endif %}
+          </div>
+          <ul class="nav nav-pills flex-column gap-1 mb-3">
+            <li class="nav-item">
+              <a class="nav-link py-2 px-3 rounded-3 d-flex align-items-center justify-content-between {% if request.endpoint.startswith('admin.review') %}active fw-semibold{% endif %}"
+                 href="{{ url_for('admin.review') }}">
+                <span><i class="bi bi-person-badge me-2"></i>角色卡审核</span>
+                {% if admin_badges.cards > 0 %}
+                <span class="badge bg-danger rounded-pill">{{ admin_badges.cards }}</span>
+                {% endif %}
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link py-2 px-3 rounded-3 d-flex align-items-center justify-content-between {% if request.endpoint.startswith('admin.reports') %}active fw-semibold{% endif %}"
+                 href="{{ url_for('admin.reports') }}">
+                <span><i class="bi bi-shield-exclamation me-2"></i>举报管理</span>
+                {% if admin_badges.reports > 0 %}
+                <span class="badge bg-warning text-dark rounded-pill">{{ admin_badges.reports }}</span>
+                {% endif %}
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link py-2 px-3 rounded-3 d-flex align-items-center justify-content-between {% if request.endpoint.startswith('admin.comment_moderation') %}active fw-semibold{% endif %}"
+                 href="{{ url_for('admin.comment_moderation') }}">
+                <span><i class="bi bi-chat-left-dots me-2"></i>评论审核</span>
+                {% if admin_badges.comments > 0 %}
+                <span class="badge bg-secondary rounded-pill">{{ admin_badges.comments }}</span>
+                {% endif %}
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link py-2 px-3 rounded-3 d-flex align-items-center justify-content-between {% if request.endpoint.startswith('admin.tea_moderation') %}active fw-semibold{% endif %}"
+                 href="{{ url_for('admin.tea_moderation') }}">
+                <span><i class="bi bi-cup-hot me-2"></i>茶馆审核</span>
+                {% if admin_badges.tea > 0 %}
+                <span class="badge bg-secondary rounded-pill">{{ admin_badges.tea }}</span>
+                {% endif %}
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link py-2 px-3 rounded-3 d-flex align-items-center justify-content-between {% if request.endpoint.startswith('admin.punish_appeals') %}active fw-semibold{% endif %}"
+                 href="{{ url_for('admin.punish_appeals') }}">
+                <span><i class="bi bi-slash-circle me-2"></i>处罚申诉</span>
+                {% if admin_badges.appeals > 0 %}
+                <span class="badge bg-danger rounded-pill">{{ admin_badges.appeals }}</span>
+                {% endif %}
+              </a>
+            </li>
+          </ul>
+
+          <!-- 3. 用户与社区 -->
+          <div class="text-muted small fw-semibold px-2 pt-1 pb-1 text-uppercase">用户与社区</div>
+          <ul class="nav nav-pills flex-column gap-1 mb-3">
+            <li class="nav-item">
+              <a class="nav-link py-2 px-3 rounded-3 d-flex align-items-center {% if request.endpoint.startswith('admin.users') or request.endpoint.startswith('admin.user_') %}active fw-semibold{% endif %}"
+                 href="{{ url_for('admin.users') }}">
+                <i class="bi bi-people me-2"></i>用户管理
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link py-2 px-3 rounded-3 d-flex align-items-center {% if request.endpoint.startswith('admin.comments') %}active fw-semibold{% endif %}"
+                 href="{{ url_for('admin.comments') }}">
+                <i class="bi bi-chat-square-text me-2"></i>全部评论
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link py-2 px-3 rounded-3 d-flex align-items-center {% if request.endpoint.startswith('admin.tea_posts') %}active fw-semibold{% endif %}"
+                 href="{{ url_for('admin.tea_posts') }}">
+                <i class="bi bi-journal-text me-2"></i>茶馆管理
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link py-2 px-3 rounded-3 d-flex align-items-center {% if request.endpoint.startswith('admin.notify_send') %}active fw-semibold{% endif %}"
+                 href="{{ url_for('admin.notify_send') }}">
+                <i class="bi bi-bell me-2"></i>全站通知
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link py-2 px-3 rounded-3 d-flex align-items-center {% if request.endpoint.startswith('admin.articles') or request.endpoint.startswith('admin.article_') %}active fw-semibold{% endif %}"
+                 href="{{ url_for('admin.articles') }}">
+                <i class="bi bi-file-earmark-richtext me-2"></i>文章管理
+              </a>
+            </li>
+          </ul>
+
+          <!-- 4. 内容与生图 -->
+          <div class="text-muted small fw-semibold px-2 pt-1 pb-1 text-uppercase">内容与生图</div>
+          <ul class="nav nav-pills flex-column gap-1 mb-3">
+            <li class="nav-item">
+              <a class="nav-link py-2 px-3 rounded-3 d-flex align-items-center {% if request.endpoint.startswith('admin.cards') or request.endpoint.startswith('admin.card_') %}active fw-semibold{% endif %}"
+                 href="{{ url_for('admin.cards') }}">
+                <i class="bi bi-collection me-2"></i>角色卡管理
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link py-2 px-3 rounded-3 d-flex align-items-center {% if request.endpoint.startswith('admin.recommend') %}active fw-semibold{% endif %}"
+                 href="{{ url_for('admin.recommend') }}">
+                <i class="bi bi-star me-2"></i>站长推荐
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link py-2 px-3 rounded-3 d-flex align-items-center {% if request.endpoint.startswith('admin.image_models') %}active fw-semibold{% endif %}"
+                 href="{{ url_for('admin.image_models') }}">
+                <i class="bi bi-cpu me-2"></i>生图模型
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link py-2 px-3 rounded-3 d-flex align-items-center {% if request.endpoint == 'admin.image_logs' %}active fw-semibold{% endif %}"
+                 href="{{ url_for('admin.image_logs') }}">
+                <i class="bi bi-images me-2"></i>生图记录
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link py-2 px-3 rounded-3 d-flex align-items-center {% if request.endpoint == 'admin.stickers' %}active fw-semibold{% endif %}"
+                 href="{{ url_for('admin.stickers') }}">
+                <i class="bi bi-emoji-smile me-2"></i>表情包
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link py-2 px-3 rounded-3 d-flex align-items-center {% if request.endpoint.startswith('admin.sponsors') %}active fw-semibold{% endif %}"
+                 href="{{ url_for('admin.sponsors') }}">
+                <i class="bi bi-heart me-2"></i>赞助管理
+              </a>
+            </li>
+          </ul>
+
+          <!-- 5. 系统与运营 -->
+          <div class="text-muted small fw-semibold px-2 pt-1 pb-1 text-uppercase">系统与运营</div>
+          <ul class="nav nav-pills flex-column gap-1 mb-1">
+            <li class="nav-item">
+              <a class="nav-link py-2 px-3 rounded-3 d-flex align-items-center {% if request.endpoint.startswith('admin.keys') %}active fw-semibold{% endif %}"
+                 href="{{ url_for('admin.keys_list') }}">
+                <i class="bi bi-key me-2"></i>兑换码管理
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link py-2 px-3 rounded-3 d-flex align-items-center {% if request.endpoint == 'admin.copy_stats' %}active fw-semibold{% endif %}"
+                 href="{{ url_for('admin.copy_stats') }}">
+                <i class="bi bi-graph-up me-2"></i>复制统计
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link py-2 px-3 rounded-3 d-flex align-items-center {% if request.endpoint == 'admin.system_config' %}active fw-semibold{% endif %}"
+                 href="{{ url_for('admin.system_config') }}">
+                <i class="bi bi-gear me-2"></i>系统配置
+              </a>
+            </li>
+          </ul>
+        </div>
       </div>
     </nav>
-    <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-3">
+
+    <!-- 主工作区 -->
+    <main class="col-12 col-md-8 col-lg-9 col-xl-10">
       {% block admin_content %}{% endblock %}
     </main>
   </div>

@@ -1,0 +1,250 @@
+{% extends "admin/base.html" %}
+
+{% block title %}仪表盘 · 管理控制台{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+  <div>
+    <h1 class="h3 fw-bold mb-1">控制台概览</h1>
+    <p class="text-muted small mb-0">实时数据监控与待办处理中心</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('admin.review') }}" class="btn btn-primary btn-sm rounded-pill px-3 shadow-sm">
+      <i class="bi bi-person-badge me-1"></i>进入审核队列
+    </a>
+    <a href="{{ url_for('admin.notify_send') }}" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
+      <i class="bi bi-bell me-1"></i>发送通知
+    </a>
+    <a href="{{ url_for('admin.system_config') }}" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
+      <i class="bi bi-gear me-1"></i>系统配置
+    </a>
+  </div>
+</div>
+
+<!-- 核心数据指标卡片 -->
+<div class="row g-3 mb-4">
+  <!-- 待办待审卡片 -->
+  <div class="col-12 col-sm-6 col-xl-3">
+    <div class="card border-0 shadow-sm rounded-4 h-100 p-3 bg-opacity-10 {% if admin_badges.total > 0 %}bg-danger border-start border-danger border-4{% else %}bg-success border-start border-success border-4{% endif %}">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <div class="text-muted small fw-semibold text-uppercase">待办事项总数</div>
+          <div class="fs-2 fw-bold my-1 {% if admin_badges.total > 0 %}text-danger{% else %}text-success{% endif %}">
+            {{ admin_badges.total }}
+          </div>
+          <div class="small text-muted">
+            卡片 {{ admin_badges.cards }} · 举报 {{ admin_badges.reports }} · 评论 {{ admin_badges.comments }}
+          </div>
+        </div>
+        <div class="p-2 rounded-circle {% if admin_badges.total > 0 %}bg-danger text-white{% else %}bg-success text-white{% endif %} bg-opacity-75">
+          <i class="bi bi-shield-exclamation fs-5"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 用户统计卡片 -->
+  <div class="col-12 col-sm-6 col-xl-3">
+    <div class="card border-0 shadow-sm rounded-4 h-100 p-3 bg-opacity-10 bg-primary border-start border-primary border-4">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <div class="text-muted small fw-semibold text-uppercase">用户总数</div>
+          <div class="fs-2 fw-bold text-primary my-1">{{ stats.total_users }}</div>
+          <div class="small text-muted">今日新增 <span class="text-primary fw-semibold">+{{ stats.today_users }}</span></div>
+        </div>
+        <div class="p-2 rounded-circle bg-primary text-white bg-opacity-75">
+          <i class="bi bi-people fs-5"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 角色卡统计卡片 -->
+  <div class="col-12 col-sm-6 col-xl-3">
+    <div class="card border-0 shadow-sm rounded-4 h-100 p-3 bg-opacity-10 bg-info border-start border-info border-4">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <div class="text-muted small fw-semibold text-uppercase">角色卡库</div>
+          <div class="fs-2 fw-bold text-info my-1">{{ stats.total_cards }}</div>
+          <div class="small text-muted">今日提交 <span class="text-info fw-semibold">+{{ stats.today_cards }}</span></div>
+        </div>
+        <div class="p-2 rounded-circle bg-info text-white bg-opacity-75">
+          <i class="bi bi-collection fs-5"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 生图调用统计卡片 -->
+  <div class="col-12 col-sm-6 col-xl-3">
+    <div class="card border-0 shadow-sm rounded-4 h-100 p-3 bg-opacity-10 bg-warning border-start border-warning border-4">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <div class="text-muted small fw-semibold text-uppercase">AI 生图调用</div>
+          <div class="fs-2 fw-bold text-warning my-1">{{ stats.total_gen_logs }}</div>
+          <div class="small text-muted">今日调用 <span class="text-warning fw-semibold">+{{ stats.today_gen_logs }}</span> 次</div>
+        </div>
+        <div class="p-2 rounded-circle bg-warning text-dark bg-opacity-75">
+          <i class="bi bi-cpu fs-5"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- 左侧：待办中心 -->
+  <div class="col-12 col-lg-7">
+    <!-- 待审核角色卡 -->
+    <div class="card border-0 shadow-sm rounded-4 mb-4">
+      <div class="card-header bg-transparent border-0 pt-3 px-3 d-flex justify-content-between align-items-center">
+        <h2 class="h6 fw-bold mb-0">
+          <i class="bi bi-person-badge text-danger me-2"></i>待审核角色卡
+          {% if admin_badges.cards > 0 %}
+          <span class="badge bg-danger rounded-pill ms-1">{{ admin_badges.cards }}</span>
+          {% endif %}
+        </h2>
+        <a href="{{ url_for('admin.review') }}" class="btn btn-sm btn-link text-decoration-none">查看全部</a>
+      </div>
+      <div class="card-body p-0">
+        {% if pending_cards %}
+        <div class="list-group list-group-flush">
+          {% for card in pending_cards %}
+          <div class="list-group-item p-3 d-flex justify-content-between align-items-center gap-3">
+            <div class="d-flex align-items-center gap-3 min-w-0">
+              <div class="rounded-3 bg-secondary bg-opacity-25 d-flex align-items-center justify-content-center" style="width: 44px; height: 44px; flex-shrink: 0;">
+                <i class="bi bi-person fs-4 text-muted"></i>
+              </div>
+              <div class="text-truncate">
+                <a href="{{ url_for('admin.review_detail', card_id=card.id) }}" class="fw-bold text-decoration-none d-block text-truncate">
+                  {{ card.name }}
+                </a>
+                <span class="text-muted small">作者：{{ card.author.username if card.author else card.author_id }} · {{ card.created_at.strftime('%m-%d %H:%M') if card.created_at else '' }}</span>
+              </div>
+            </div>
+            <div class="d-flex align-items-center gap-2 flex-shrink-0">
+              <a href="{{ url_for('admin.review_detail', card_id=card.id) }}" class="btn btn-sm btn-outline-primary rounded-pill px-3">
+                审核
+              </a>
+              <form action="{{ url_for('admin.review_approve', card_id=card.id) }}" method="post" class="d-inline">
+                <button type="submit" class="btn btn-sm btn-success rounded-pill px-2" title="快速通过">
+                  <i class="bi bi-check-lg"></i>
+                </button>
+              </form>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-4">
+          <i class="bi bi-check2-circle fs-3 text-success d-block mb-1"></i>
+          暂无待审核角色卡
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- 待处理举报 -->
+    <div class="card border-0 shadow-sm rounded-4">
+      <div class="card-header bg-transparent border-0 pt-3 px-3 d-flex justify-content-between align-items-center">
+        <h2 class="h6 fw-bold mb-0">
+          <i class="bi bi-shield-exclamation text-warning me-2"></i>待处理举报
+          {% if admin_badges.reports > 0 %}
+          <span class="badge bg-warning text-dark rounded-pill ms-1">{{ admin_badges.reports }}</span>
+          {% endif %}
+        </h2>
+        <a href="{{ url_for('admin.reports') }}" class="btn btn-sm btn-link text-decoration-none">查看全部</a>
+      </div>
+      <div class="card-body p-0">
+        {% if pending_reports %}
+        <div class="list-group list-group-flush">
+          {% for r in pending_reports %}
+          <div class="list-group-item p-3 d-flex justify-content-between align-items-center gap-2">
+            <div class="text-truncate">
+              <div class="fw-semibold small text-truncate">
+                <span class="badge bg-secondary me-1">{{ r.target_type }}</span>
+                {{ r.reason }}
+              </div>
+              <span class="text-muted small">举报人：{{ r.reporter.username if r.reporter else r.reporter_id }} · {{ r.created_at.strftime('%m-%d %H:%M') if r.created_at else '' }}</span>
+            </div>
+            <a href="{{ url_for('admin.report_detail', report_id=r.id) }}" class="btn btn-sm btn-outline-warning rounded-pill px-3 flex-shrink-0">
+              处理
+            </a>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-4">
+          <i class="bi bi-shield-check fs-3 text-success d-block mb-1"></i>
+          暂无待处理举报
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- 右侧：最近动态与日志 -->
+  <div class="col-12 col-lg-5">
+    <!-- 最新注册用户 -->
+    <div class="card border-0 shadow-sm rounded-4 mb-4">
+      <div class="card-header bg-transparent border-0 pt-3 px-3 d-flex justify-content-between align-items-center">
+        <h2 class="h6 fw-bold mb-0"><i class="bi bi-person-plus text-primary me-2"></i>最新注册用户</h2>
+        <a href="{{ url_for('admin.users') }}" class="btn btn-sm btn-link text-decoration-none">查看全部</a>
+      </div>
+      <div class="card-body p-0">
+        {% if recent_users %}
+        <div class="list-group list-group-flush">
+          {% for u in recent_users %}
+          <div class="list-group-item p-2 px-3 d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center gap-2 text-truncate">
+              <div class="rounded-circle bg-primary bg-opacity-25 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; flex-shrink: 0;">
+                <span class="small fw-bold text-primary">{{ u.username[:1].upper() if u.username else 'U' }}</span>
+              </div>
+              <div class="text-truncate">
+                <a href="{{ url_for('admin.user_edit', user_id=u.id) }}" class="fw-semibold text-decoration-none small d-block text-truncate">
+                  {{ u.nickname or u.username }}
+                </a>
+                <span class="text-muted" style="font-size: 0.75rem;">@{{ u.username }}</span>
+              </div>
+            </div>
+            <span class="badge {% if u.role == 'super_admin' %}bg-danger{% elif u.role == 'admin' %}bg-warning text-dark{% else %}bg-secondary{% endif %} rounded-pill" style="font-size: 0.7rem;">
+              {{ u.role }}
+            </span>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-4">暂无新用户</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- 最近生图记录 -->
+    <div class="card border-0 shadow-sm rounded-4">
+      <div class="card-header bg-transparent border-0 pt-3 px-3 d-flex justify-content-between align-items-center">
+        <h2 class="h6 fw-bold mb-0"><i class="bi bi-images text-warning me-2"></i>生图调用动态</h2>
+        <a href="{{ url_for('admin.image_logs') }}" class="btn btn-sm btn-link text-decoration-none">查看全部</a>
+      </div>
+      <div class="card-body p-0">
+        {% if recent_gen_logs %}
+        <div class="list-group list-group-flush">
+          {% for log in recent_gen_logs %}
+          <div class="list-group-item p-2 px-3 d-flex justify-content-between align-items-center gap-2">
+            <div class="text-truncate">
+              <div class="small fw-semibold text-truncate">{{ log.model_id or '默认模型' }}</div>
+              <span class="text-muted" style="font-size: 0.75rem;">用户 #{{ log.user_id }} · {{ log.created_at.strftime('%H:%M:%S') if log.created_at else '' }}</span>
+            </div>
+            <span class="badge {% if log.status == 'succeeded' %}bg-success{% elif log.status == 'failed' %}bg-danger{% else %}bg-secondary{% endif %} rounded-pill" style="font-size: 0.7rem;">
+              {{ log.status }}
+            </span>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-4">暂无生图记录</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
