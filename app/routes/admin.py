@@ -345,6 +345,216 @@ def user_points(user_id):
     )
 
 
+@admin_bp.route("/users/<int:user_id>/profile-drawer")
+@super_admin_required
+def user_profile_drawer(user_id):
+    """返回供管理端右侧 360 画像抽屉渲染的完整用户档案与风控数据。"""
+    u = db.session.get(User, user_id)
+    if not u:
+        return jsonify(ok=False, error="用户不存在"), 404
+
+    # 角色卡创作统计与最近卡片
+    cards_query = Card.query.filter_by(author_id=u.id)
+    total_cards = cards_query.count()
+    approved_cards = cards_query.filter_by(status="approved").count()
+    pending_cards = cards_query.filter_by(status="pending").count()
+    rejected_cards = cards_query.filter_by(status="rejected").count()
+    recent_cards = [
+        {
+            "id": c.id,
+            "name": c.name,
+            "status": c.status,
+            "created_at": c.created_at.strftime("%Y-%m-%d %H:%M") if c.created_at else "",
+        }
+        for c in cards_query.order_by(Card.created_at.desc()).limit(6).all()
+    ]
+
+    # 互动与调用统计
+    total_comments = Comment.query.filter_by(user_id=u.id).count()
+    total_tea_posts = TeaPost.query.filter_by(user_id=u.id).count()
+    total_gen_logs = GenerationLog.query.filter_by(user_id=u.id).count()
+
+    # 处罚历史
+    punishments = (
+        Punishment.query.filter_by(user_id=u.id)
+        .order_by(Punishment.created_at.desc())
+        .all()
+    )
+    punishments_data = [
+        {
+            "id": p.id,
+            "type": p.type,
+            "type_label": p.type_label,
+            "reason": p.reason or "",
+            "status": p.status,
+            "is_active": p.is_active,
+            "created_at": p.created_at.strftime("%Y-%m-%d %H:%M") if p.created_at else "",
+        }
+        for p in punishments
+    ]
+
+    # 被举报记录
+    user_reports = (
+        Report.query.filter_by(target_type="user", target_id=str(u.id))
+        .order_by(Report.created_at.desc())
+        .all()
+    )
+    reports_data = [
+        {
+            "id": r.id,
+            "reason": r.reason,
+            "status": r.status,
+            "created_at": r.created_at.strftime("%Y-%m-%d %H:%M") if r.created_at else "",
+        }
+        for r in user_reports
+    ]
+
+    data = {
+        "id": u.id,
+        "username": u.username,
+        "nickname": u.nickname,
+        "email": u.email,
+        "email_verified": u.email_verified,
+        "role": u.role,
+        "status": u.status,
+        "points": u.points or 0,
+        "created_at": u.created_at.strftime("%Y-%m-%d %H:%M") if u.created_at else "",
+        "bio": u.bio or "",
+        "location": u.location or "",
+        "verified": u.verified,
+        "verified_label": u.verified_label or "",
+        "avatar": u.avatar,
+        "stats": {
+            "total_cards": total_cards,
+            "approved_cards": approved_cards,
+            "pending_cards": pending_cards,
+            "rejected_cards": rejected_cards,
+            "total_comments": total_comments,
+            "total_tea_posts": total_tea_posts,
+            "total_gen_logs": total_gen_logs,
+            "report_count": len(user_reports),
+            "punish_count": len(punishments),
+        },
+        "recent_cards": recent_cards,
+        "punishments": punishments_data,
+        "reports": reports_data,
+        "punishment_types": PUNISHMENT_TYPES,
+    }
+    return jsonify(ok=True, data=data)
+
+
+@admin_bp.route("/users/<int:user_id>/quick-action", methods=["POST"])
+@super_admin_required
+def user_quick_action(user_id):
+    """抽屉内快捷治理操作（处罚/解罚/积分/状态变更）。"""
+    u = db.session.get(User, user_id)
+    if not u:
+        return jsonify(ok=False, error="用户不存在"), 404
+
+    data = request.get_json(silent=True) or request.form
+    action = data.get("action")
+
+    if action == "punish":
+        selected = data.get("types", [])
+        if isinstance(selected, str):
+            selected = [t.strip() for t in selected.split(",") if t.strip()]
+        reason = (data.get("reason") or "").strip()
+        valid = [t for t in selected if t in PUNISHMENT_TYPES]
+        if not valid:
+            return jsonify(ok=False, error="请至少选择一项有效处罚"), 400
+
+        active = {p.type for p in u.active_punishments}
+        applied = []
+        for ptype in valid:
+            if ptype in active:
+                continue
+            p = Punishment(
+                user_id=u.id,
+                type=ptype,
+                reason=reason,
+                handled_by=current_user.id,
+            )
+            db.session.add(p)
+            applied.append(ptype)
+        for ptype in valid:
+            if ptype == "reset_profile":
+                u.nickname = f"UID{u.id}"
+                u.bio = None
+                u.location = None
+                u.website = None
+                u.birthday = None
+            elif ptype == "clear_avatar":
+                u.avatar = None
+        db.session.commit()
+
+        if applied:
+            summary = "、".join(PUNISHMENT_TYPES[t] for t in applied)
+            notify(
+                u.id,
+                f"你被平台施加了以下处罚：{summary}。可在「我的处罚」中查看与申诉。",
+                type_="punish",
+            )
+            db.session.commit()
+            return jsonify(ok=True, message=f"已对用户施加处罚：{summary}")
+        return jsonify(ok=True, message="所选处罚已在生效中")
+
+    elif action == "revoke_punishment":
+        punish_id = data.get("punishment_id")
+        p = db.session.get(Punishment, punish_id)
+        if not p or p.user_id != u.id:
+            return jsonify(ok=False, error="处罚记录不存在"), 404
+        if p.is_active:
+            p.status = "revoked"
+            db.session.commit()
+            notify(
+                u.id,
+                f"你的处罚「{p.type_label}」已被管理员撤销。",
+                type_="punish",
+            )
+            db.session.commit()
+        return jsonify(ok=True, message=f"已撤销处罚「{p.type_label}」")
+
+    elif action == "adjust_points":
+        try:
+            amount = int(data.get("amount", 0))
+        except (ValueError, TypeError):
+            return jsonify(ok=False, error="请输入有效的积分数值"), 400
+        if amount == 0:
+            return jsonify(ok=False, error="调整积分不能为 0"), 400
+        reason = (data.get("reason") or "管理员在控制台快捷调整").strip()
+
+        u.points = (u.points or 0) + amount
+        if u.points < 0:
+            u.points = 0
+
+        tx = PointTransaction(
+            user_id=u.id,
+            amount=amount,
+            balance_after=u.points,
+            type="admin_adjust",
+            description=reason,
+        )
+        db.session.add(tx)
+        db.session.commit()
+        notify(
+            u.id,
+            f"管理员调整了你的积分：{'+' if amount > 0 else ''}{amount}。原因：{reason}。当前余额：{u.points}。",
+            type_="points",
+        )
+        db.session.commit()
+        return jsonify(ok=True, message=f"积分已调整，当前余额为 {u.points}", points=u.points)
+
+    elif action == "change_status":
+        new_status = data.get("status")
+        if new_status not in ("active", "admin_del", "mourning"):
+            return jsonify(ok=False, error="无效的状态值"), 400
+        u.status = new_status
+        db.session.commit()
+        return jsonify(ok=True, message=f"用户状态已变更为 {new_status}")
+
+    return jsonify(ok=False, error="未知的操作指令"), 400
+
+
 # ---------------- 兑换码（Key）管理 ----------------
 _KEY_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # 去歧义字符
 

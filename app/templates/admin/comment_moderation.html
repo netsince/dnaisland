@@ -62,9 +62,9 @@
             <input class="form-check-input row-select-comment" type="checkbox" value="{{ c.id }}">
           </td>
           <td>
-            <div class="small fw-semibold text-truncate" style="max-width: 140px;">
-              {{ c.author.nickname if c.author else c.user_id }}
-            </div>
+            <a href="javascript:void(0)" data-user-drawer="{{ c.user_id }}" class="small fw-semibold text-decoration-none text-truncate d-block" style="max-width: 140px;" title="点击查看用户画像与风控">
+              {{ c.author.nickname if (c.author and c.author.nickname) else (c.author.username if c.author else c.user_id) }}
+            </a>
             <div class="text-muted" style="font-size: 0.75rem;">@{{ c.author.username if c.author else c.user_id }}</div>
           </td>
           <td>

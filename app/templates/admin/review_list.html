@@ -115,9 +115,12 @@
             </div>
           </td>
           <td>
-            <span class="small fw-semibold text-truncate d-block" style="max-width: 120px;">
-              {{ card.author.username if card.author else card.author_id }}
-            </span>
+            <a href="javascript:void(0)" data-user-drawer="{{ card.author_id }}" class="small fw-semibold text-decoration-none text-truncate d-block" title="点击查看用户画像与风控">
+              {{ card.author.nickname if (card.author and card.author.nickname) else (card.author.username if card.author else card.author_id) }}
+            </a>
+            {% if card.author %}
+            <span class="text-muted" style="font-size: 0.7rem;">@{{ card.author.username }}</span>
+            {% endif %}
           </td>
           <td>
             {% if card.status == 'approved' %}

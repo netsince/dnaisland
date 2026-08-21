@@ -188,4 +188,437 @@
     </main>
   </div>
 </div>
+
+<!-- 全局用户 360 画像侧边抽屉 -->
+<div class="offcanvas offcanvas-end border-0 shadow-lg" tabindex="-1" id="adminUserDrawer" style="width: 520px; max-width: 90vw;" aria-labelledby="adminUserDrawerLabel">
+  <div class="offcanvas-header border-bottom py-3">
+    <div class="d-flex align-items-center gap-2 min-w-0">
+      <div id="drawer-avatar-wrap" class="rounded-circle bg-primary bg-opacity-25 d-flex align-items-center justify-content-center overflow-hidden flex-shrink-0" style="width: 44px; height: 44px;">
+        <span id="drawer-avatar-text" class="fw-bold fs-5 text-primary">U</span>
+      </div>
+      <div class="text-truncate">
+        <h5 class="offcanvas-title fw-bold text-truncate mb-0" id="drawer-user-name">用户档案</h5>
+        <div class="small text-muted" id="drawer-user-sub">@username · UID: 0</div>
+      </div>
+    </div>
+    <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+
+  <div class="offcanvas-body p-0" id="drawer-content">
+    <!-- 加载中动画 -->
+    <div id="drawer-loading" class="text-center py-5 text-muted">
+      <div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div>
+      <div class="small">正在加载用户 360 画像数据...</div>
+    </div>
+
+    <!-- 数据呈现主体 -->
+    <div id="drawer-body" class="d-none">
+      <!-- 标签页导航 -->
+      <ul class="nav nav-tabs nav-fill border-bottom px-3 pt-2 bg-body-tertiary" id="drawerTab" role="tablist">
+        <li class="nav-item" role="presentation">
+          <button class="nav-link active small py-2 fw-semibold" id="tab-overview-btn" data-bs-toggle="tab" data-bs-target="#tab-overview" type="button" role="tab">
+            <i class="bi bi-person-lines-fill me-1"></i>画像概览
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link small py-2 fw-semibold text-danger" id="tab-risk-btn" data-bs-toggle="tab" data-bs-target="#tab-risk" type="button" role="tab">
+            <i class="bi bi-shield-exclamation me-1"></i>风控处罚 <span class="badge bg-danger rounded-pill d-none" id="drawer-risk-badge">0</span>
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link small py-2 fw-semibold" id="tab-content-btn" data-bs-toggle="tab" data-bs-target="#tab-content" type="button" role="tab">
+            <i class="bi bi-collection me-1"></i>创作内容
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link small py-2 fw-semibold text-primary" id="tab-action-btn" data-bs-toggle="tab" data-bs-target="#tab-action" type="button" role="tab">
+            <i class="bi bi-sliders me-1"></i>快捷治理
+          </button>
+        </li>
+      </ul>
+
+      <div class="tab-content p-3" id="drawerTabContent">
+        <!-- 1. 画像概览 -->
+        <div class="tab-pane fade show active" id="tab-overview" role="tabpanel">
+          <!-- 统计数据磁贴 -->
+          <div class="row g-2 mb-3">
+            <div class="col-6 col-sm-3">
+              <div class="p-2 rounded-3 bg-body-tertiary border text-center">
+                <div class="text-muted" style="font-size: 0.75rem;">角色卡</div>
+                <div class="fw-bold fs-5 text-primary" id="stat-cards">0</div>
+                <div class="text-muted" style="font-size: 0.7rem;" id="stat-cards-sub">过审 0</div>
+              </div>
+            </div>
+            <div class="col-6 col-sm-3">
+              <div class="p-2 rounded-3 bg-body-tertiary border text-center">
+                <div class="text-muted" style="font-size: 0.75rem;">积分余额</div>
+                <div class="fw-bold fs-5 text-warning" id="stat-points">0</div>
+                <div class="text-muted" style="font-size: 0.7rem;">点数</div>
+              </div>
+            </div>
+            <div class="col-6 col-sm-3">
+              <div class="p-2 rounded-3 bg-body-tertiary border text-center">
+                <div class="text-muted" style="font-size: 0.75rem;">互动总数</div>
+                <div class="fw-bold fs-5 text-info" id="stat-interact">0</div>
+                <div class="text-muted" style="font-size: 0.7rem;" id="stat-interact-sub">评论+茶馆</div>
+              </div>
+            </div>
+            <div class="col-6 col-sm-3">
+              <div class="p-2 rounded-3 bg-body-tertiary border text-center">
+                <div class="text-muted" style="font-size: 0.75rem;">被举报/违规</div>
+                <div class="fw-bold fs-5 text-danger" id="stat-risk">0</div>
+                <div class="text-muted" style="font-size: 0.7rem;" id="stat-risk-sub">举报+处罚</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 用户基本属性列表 -->
+          <div class="card border-0 bg-body-tertiary rounded-3 p-3 mb-3">
+            <div class="row g-2 small">
+              <div class="col-6"><span class="text-muted">注册邮箱：</span><span id="user-email" class="fw-semibold">-</span></div>
+              <div class="col-6"><span class="text-muted">邮箱状态：</span><span id="user-email-verified">-</span></div>
+              <div class="col-6"><span class="text-muted">权限角色：</span><span id="user-role">-</span></div>
+              <div class="col-6"><span class="text-muted">账号状态：</span><span id="user-status">-</span></div>
+              <div class="col-6"><span class="text-muted">注册时间：</span><span id="user-created">-</span></div>
+              <div class="col-6"><span class="text-muted">认证标识：</span><span id="user-verified">-</span></div>
+              <div class="col-12"><span class="text-muted">个人简介：</span><span id="user-bio" class="text-muted">-</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. 风控与处罚 -->
+        <div class="tab-pane fade" id="tab-risk" role="tabpanel">
+          <div class="mb-3">
+            <div class="fw-bold small mb-2 d-flex justify-content-between align-items-center">
+              <span>当前生效中处罚</span>
+              <button class="btn btn-sm btn-outline-danger rounded-pill py-0 px-2" style="font-size: 0.75rem;" onclick="switchDrawerTab('tab-action')">
+                <i class="bi bi-plus-lg me-1"></i>新增处罚
+              </button>
+            </div>
+            <div id="active-punishments-list"></div>
+          </div>
+
+          <div class="mb-3">
+            <div class="fw-bold small mb-2 text-muted">历史处罚记录</div>
+            <div id="history-punishments-list"></div>
+          </div>
+
+          <div>
+            <div class="fw-bold small mb-2 text-muted">被举报历史</div>
+            <div id="reports-list"></div>
+          </div>
+        </div>
+
+        <!-- 3. 创作内容 -->
+        <div class="tab-pane fade" id="tab-content" role="tabpanel">
+          <div class="fw-bold small mb-2">名下角色卡列表</div>
+          <div id="user-cards-list" class="mb-3"></div>
+        </div>
+
+        <!-- 4. 快捷治理操作 -->
+        <div class="tab-pane fade" id="tab-action" role="tabpanel">
+          <!-- 施加处罚 -->
+          <div class="card border-0 bg-body-tertiary rounded-3 p-3 mb-3">
+            <div class="fw-bold small text-danger mb-2"><i class="bi bi-shield-slash me-1"></i>施加封禁或限制</div>
+            <div class="row g-2 mb-2" id="punish-types-options"></div>
+            <div class="mb-2">
+              <input type="text" id="quick-punish-reason" class="form-control form-control-sm rounded-3" placeholder="填写处罚原因（如：发布违规低俗内容）">
+            </div>
+            <button type="button" class="btn btn-sm btn-danger rounded-pill px-3" onclick="submitQuickPunish()">
+              确认施加处罚
+            </button>
+          </div>
+
+          <!-- 积分增减 -->
+          <div class="card border-0 bg-body-tertiary rounded-3 p-3 mb-3">
+            <div class="fw-bold small text-warning mb-2"><i class="bi bi-coin me-1"></i>调整用户积分</div>
+            <div class="row g-2 mb-2">
+              <div class="col-5">
+                <input type="number" id="quick-point-amount" class="form-control form-control-sm rounded-3" placeholder="例如: 100 或 -50">
+              </div>
+              <div class="col-7">
+                <input type="text" id="quick-point-reason" class="form-control form-control-sm rounded-3" placeholder="调整原因说明">
+              </div>
+            </div>
+            <button type="button" class="btn btn-sm btn-warning rounded-pill px-3" onclick="submitQuickPoints()">
+              确认调整积分
+            </button>
+          </div>
+
+          <!-- 变更状态与权限 -->
+          <div class="card border-0 bg-body-tertiary rounded-3 p-3">
+            <div class="fw-bold small text-primary mb-2"><i class="bi bi-person-gear me-1"></i>账号状态变更</div>
+            <div class="d-flex gap-2 flex-wrap">
+              <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-2" onclick="submitStatusChange('admin_del')">
+                一键封禁账号 (软删除)
+              </button>
+              <button type="button" class="btn btn-sm btn-outline-success rounded-pill px-2" onclick="submitStatusChange('active')">
+                解封恢复正常
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="offcanvas-footer border-top p-3 bg-body-tertiary d-flex justify-content-between align-items-center" id="drawer-footer">
+    <span class="small text-muted">管理操作直通</span>
+    <div class="d-flex gap-2">
+      <a href="#" id="drawer-link-points" class="btn btn-sm btn-outline-secondary rounded-pill px-2">积分明细</a>
+      <a href="#" id="drawer-link-edit" class="btn btn-sm btn-primary rounded-pill px-3">完整编辑</a>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---------------- 全局用户 360 画像抽屉控制器 ----------------
+var currentDrawerUserId = null;
+var cachedPunishmentTypes = {};
+
+function switchDrawerTab(tabId) {
+  var triggerEl = document.querySelector('#drawerTab button[data-bs-target="#' + tabId + '"]');
+  if (triggerEl) {
+    var tab = bootstrap.Tab.getOrCreateInstance(triggerEl);
+    tab.show();
+  }
+}
+
+function openUserDrawer(userId) {
+  currentDrawerUserId = userId;
+  var drawerEl = document.getElementById('adminUserDrawer');
+  if (!drawerEl) return;
+
+  var offcanvas = bootstrap.Offcanvas.getOrCreateInstance(drawerEl);
+  offcanvas.show();
+
+  // 重置状态
+  document.getElementById('drawer-loading').classList.remove('d-none');
+  document.getElementById('drawer-body').classList.add('d-none');
+  switchDrawerTab('tab-overview');
+
+  fetch('/admin/users/' + userId + '/profile-drawer', {
+    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+  }).then(function(res) { return res.json(); }).then(function(res) {
+    if (!res.ok) {
+      showToast(res.error || '获取用户档案失败', 'danger');
+      return;
+    }
+    renderUserDrawer(res.data);
+  }).catch(function(err) {
+    showToast('网络加载异常', 'danger');
+  });
+}
+
+function renderUserDrawer(d) {
+  document.getElementById('drawer-loading').classList.add('d-none');
+  document.getElementById('drawer-body').classList.remove('d-none');
+  cachedPunishmentTypes = d.punishment_types || {};
+
+  // 顶栏信息
+  document.getElementById('drawer-user-name').textContent = d.nickname || d.username;
+  document.getElementById('drawer-user-sub').textContent = '@' + d.username + ' · UID: ' + d.id;
+
+  var avatarWrap = document.getElementById('drawer-avatar-wrap');
+  if (d.avatar) {
+    avatarWrap.innerHTML = '<img src="' + d.avatar + '" class="w-100 h-100 object-fit-cover">';
+  } else {
+    avatarWrap.innerHTML = '<span class="fw-bold fs-5 text-primary">' + (d.username ? d.username[0].toUpperCase() : 'U') + '</span>';
+  }
+
+  // 统计磁贴
+  document.getElementById('stat-cards').textContent = d.stats.total_cards;
+  document.getElementById('stat-cards-sub').textContent = '过审 ' + d.stats.approved_cards + ' · 待审 ' + d.stats.pending_cards;
+  document.getElementById('stat-points').textContent = d.points;
+  document.getElementById('stat-interact').textContent = d.stats.total_comments + d.stats.total_tea_posts;
+  document.getElementById('stat-interact-sub').textContent = '评论 ' + d.stats.total_comments + ' · 帖子 ' + d.stats.total_tea_posts;
+  document.getElementById('stat-risk').textContent = d.stats.report_count + d.stats.punish_count;
+  document.getElementById('stat-risk-sub').textContent = '举报 ' + d.stats.report_count + ' · 处罚 ' + d.stats.punish_count;
+
+  // 基础属性
+  document.getElementById('user-email').textContent = d.email;
+  document.getElementById('user-email-verified').innerHTML = d.email_verified ? '<span class="badge bg-success-subtle text-success">已验证</span>' : '<span class="badge bg-secondary-subtle text-secondary">未验证</span>';
+  document.getElementById('user-role').innerHTML = '<span class="badge ' + (d.role === 'super_admin' ? 'bg-danger' : 'bg-primary') + '">' + d.role + '</span>';
+  document.getElementById('user-status').innerHTML = '<span class="badge ' + (d.status === 'active' ? 'bg-success' : 'bg-danger') + '">' + d.status + '</span>';
+  document.getElementById('user-created').textContent = d.created_at || '-';
+  document.getElementById('user-verified').textContent = d.verified ? (d.verified_label || '已认证') : '未认证';
+  document.getElementById('user-bio').textContent = d.bio || '未填写';
+
+  // 底部链接
+  document.getElementById('drawer-link-edit').href = '/admin/users/' + d.id + '/edit';
+  document.getElementById('drawer-link-points').href = '/admin/users/' + d.id + '/points';
+
+  // 风控与处罚列表
+  var activeListEl = document.getElementById('active-punishments-list');
+  var historyListEl = document.getElementById('history-punishments-list');
+  var activePunishments = d.punishments.filter(function(p) { return p.is_active; });
+  var historyPunishments = d.punishments.filter(function(p) { return !p.is_active; });
+
+  var riskBadge = document.getElementById('drawer-risk-badge');
+  if (activePunishments.length > 0) {
+    riskBadge.textContent = activePunishments.length;
+    riskBadge.classList.remove('d-none');
+  } else {
+    riskBadge.classList.add('d-none');
+  }
+
+  if (activePunishments.length > 0) {
+    activeListEl.innerHTML = activePunishments.map(function(p) {
+      return '<div class="p-2 rounded-3 bg-danger bg-opacity-10 border border-danger border-opacity-25 d-flex justify-content-between align-items-center mb-2">' +
+        '<div><span class="badge bg-danger me-1">' + p.type_label + '</span><span class="small">' + (p.reason || '无理由说明') + '</span><div class="text-muted" style="font-size:0.7rem;">施加于 ' + p.created_at + '</div></div>' +
+        '<button class="btn btn-sm btn-outline-danger rounded-pill px-2 py-0" style="font-size:0.75rem;" onclick="revokePunish(' + p.id + ')">撤销</button>' +
+      '</div>';
+    }).join('');
+  } else {
+    activeListEl.innerHTML = '<div class="text-muted small py-2">当前无生效中的处罚限制。</div>';
+  }
+
+  if (historyPunishments.length > 0) {
+    historyListEl.innerHTML = historyPunishments.map(function(p) {
+      return '<div class="p-2 rounded-3 bg-body-tertiary border mb-1 small d-flex justify-content-between">' +
+        '<div><span class="badge bg-secondary me-1">' + p.type_label + '</span><span>' + (p.reason || '-') + '</span></div>' +
+        '<span class="text-muted" style="font-size:0.7rem;">已撤销</span>' +
+      '</div>';
+    }).join('');
+  } else {
+    historyListEl.innerHTML = '<div class="text-muted small py-1">无历史处罚。</div>';
+  }
+
+  // 举报列表
+  var reportsListEl = document.getElementById('reports-list');
+  if (d.reports && d.reports.length > 0) {
+    reportsListEl.innerHTML = d.reports.map(function(r) {
+      return '<div class="p-2 rounded-3 bg-body-tertiary border mb-1 small d-flex justify-content-between align-items-center">' +
+        '<div class="text-truncate me-2"><span class="badge bg-warning text-dark me-1">' + r.status + '</span>' + r.reason + '</div>' +
+        '<span class="text-muted flex-shrink-0" style="font-size:0.7rem;">' + r.created_at + '</span>' +
+      '</div>';
+    }).join('');
+  } else {
+    reportsListEl.innerHTML = '<div class="text-muted small py-1">无针对该用户的举报记录。</div>';
+  }
+
+  // 角色卡创作列表
+  var cardsListEl = document.getElementById('user-cards-list');
+  if (d.recent_cards && d.recent_cards.length > 0) {
+    cardsListEl.innerHTML = d.recent_cards.map(function(c) {
+      var badgeClass = c.status === 'approved' ? 'bg-success' : (c.status === 'rejected' ? 'bg-danger' : 'bg-warning text-dark');
+      return '<div class="p-2 rounded-3 bg-body-tertiary border mb-2 d-flex justify-content-between align-items-center">' +
+        '<div class="text-truncate me-2"><span class="badge ' + badgeClass + ' rounded-pill me-1" style="font-size:0.7rem;">' + c.status + '</span><span class="fw-semibold small">' + c.name + '</span></div>' +
+        '<a href="/admin/cards/' + c.id + '/edit" class="btn btn-sm btn-link text-decoration-none p-0 flex-shrink-0" style="font-size:0.75rem;">编辑</a>' +
+      '</div>';
+    }).join('');
+  } else {
+    cardsListEl.innerHTML = '<div class="text-muted small py-3 text-center">暂未创建角色卡。</div>';
+  }
+
+  // 快捷处罚复选框选项
+  var punishOptsEl = document.getElementById('punish-types-options');
+  punishOptsEl.innerHTML = Object.keys(cachedPunishmentTypes).map(function(k) {
+    return '<div class="col-6">' +
+      '<div class="form-check">' +
+        '<input class="form-check-input drawer-punish-type" type="checkbox" value="' + k + '" id="ptype-' + k + '">' +
+        '<label class="form-check-label small" for="ptype-' + k + '">' + cachedPunishmentTypes[k] + '</label>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+// ---------------- 抽屉快捷治理 API 调用 ----------------
+function revokePunish(punishId) {
+  if (!currentDrawerUserId) return;
+  fetch('/admin/users/' + currentDrawerUserId + '/quick-action', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+    body: JSON.stringify({ action: 'revoke_punishment', punishment_id: punishId })
+  }).then(function(res) { return res.json(); }).then(function(res) {
+    if (res.ok) {
+      showToast(res.message || '已撤销处罚', 'success');
+      openUserDrawer(currentDrawerUserId);
+    } else {
+      showToast(res.error || '操作失败', 'danger');
+    }
+  }).catch(function() { showToast('网络异常', 'danger'); });
+}
+
+function submitQuickPunish() {
+  if (!currentDrawerUserId) return;
+  var types = [];
+  document.querySelectorAll('.drawer-punish-type:checked').forEach(function(cb) {
+    types.push(cb.value);
+  });
+  if (types.length === 0) {
+    showToast('请至少勾选一项处罚类型', 'warning');
+    return;
+  }
+  var reason = document.getElementById('quick-punish-reason').value;
+
+  fetch('/admin/users/' + currentDrawerUserId + '/quick-action', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+    body: JSON.stringify({ action: 'punish', types: types, reason: reason })
+  }).then(function(res) { return res.json(); }).then(function(res) {
+    if (res.ok) {
+      showToast(res.message || '处罚已施加', 'success');
+      document.getElementById('quick-punish-reason').value = '';
+      openUserDrawer(currentDrawerUserId);
+    } else {
+      showToast(res.error || '操作失败', 'danger');
+    }
+  }).catch(function() { showToast('网络异常', 'danger'); });
+}
+
+function submitQuickPoints() {
+  if (!currentDrawerUserId) return;
+  var amount = document.getElementById('quick-point-amount').value;
+  var reason = document.getElementById('quick-point-reason').value;
+  if (!amount || parseInt(amount, 10) === 0) {
+    showToast('请输入有效的积分调整数值', 'warning');
+    return;
+  }
+
+  fetch('/admin/users/' + currentDrawerUserId + '/quick-action', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+    body: JSON.stringify({ action: 'adjust_points', amount: amount, reason: reason })
+  }).then(function(res) { return res.json(); }).then(function(res) {
+    if (res.ok) {
+      showToast(res.message || '积分已调整', 'success');
+      document.getElementById('quick-point-amount').value = '';
+      document.getElementById('quick-point-reason').value = '';
+      openUserDrawer(currentDrawerUserId);
+    } else {
+      showToast(res.error || '操作失败', 'danger');
+    }
+  }).catch(function() { showToast('网络异常', 'danger'); });
+}
+
+function submitStatusChange(newStatus) {
+  if (!currentDrawerUserId) return;
+  var label = newStatus === 'admin_del' ? '封禁该用户' : '解封该用户';
+  if (!confirm('确认要' + label + '吗？')) return;
+
+  fetch('/admin/users/' + currentDrawerUserId + '/quick-action', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+    body: JSON.stringify({ action: 'change_status', status: newStatus })
+  }).then(function(res) { return res.json(); }).then(function(res) {
+    if (res.ok) {
+      showToast(res.message || '用户状态已变更', 'success');
+      openUserDrawer(currentDrawerUserId);
+    } else {
+      showToast(res.error || '操作失败', 'danger');
+    }
+  }).catch(function() { showToast('网络异常', 'danger'); });
+}
+
+// 自动拦截带有 data-user-drawer 的点击事件
+document.addEventListener('click', function(e) {
+  var target = e.target.closest('[data-user-drawer]');
+  if (target) {
+    e.preventDefault();
+    var uid = target.getAttribute('data-user-drawer');
+    if (uid) openUserDrawer(uid);
+  }
+});
+</script>
 {% endblock %}

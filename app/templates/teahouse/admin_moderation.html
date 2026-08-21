@@ -54,7 +54,9 @@
       <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
         <div class="d-flex align-items-center gap-2">
           <input class="form-check-input row-select-tea" type="checkbox" value="{{ p.id }}">
-          <span class="fw-bold small">{{ p.author.nickname if p.author else p.user_id }}</span>
+          <a href="javascript:void(0)" data-user-drawer="{{ p.user_id }}" class="fw-bold small text-decoration-none" title="点击查看用户画像与风控">
+            {{ p.author.nickname if (p.author and p.author.nickname) else (p.author.username if p.author else p.user_id) }}
+          </a>
           <span class="text-muted small">@{{ p.author.username if p.author else p.user_id }}</span>
           {% if it.parent %}
           <span class="badge bg-secondary rounded-pill" style="font-size: 0.7rem;">回复帖</span>

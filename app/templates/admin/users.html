@@ -75,9 +75,12 @@
           {% endif %}
         </td>
         <td>
-          <a class="btn btn-sm btn-outline-info" href="{{ url_for('admin.cards', author=u.username) }}">查看他发布的角色</a>
+          <button type="button" class="btn btn-sm btn-outline-primary" data-user-drawer="{{ u.id }}">
+            <i class="bi bi-person-lines-fill me-1"></i>360画像
+          </button>
+          <a class="btn btn-sm btn-outline-info" href="{{ url_for('admin.cards', author=u.username) }}">角色</a>
           <a class="btn btn-sm btn-outline-dark" href="{{ url_for('admin.user_points', user_id=u.id) }}">积分</a>
-          <a class="btn btn-sm btn-outline-primary" href="{{ url_for('admin.user_edit', user_id=u.id) }}">编辑</a>
+          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin.user_edit', user_id=u.id) }}">编辑</a>
           <a class="btn btn-sm btn-outline-warning" href="{{ url_for('admin.user_punish', user_id=u.id) }}">
             处罚{% if u.active_punishments %} <span class="badge bg-dark">{{ u.active_punishments|length }}</span>{% endif %}
           </a>
