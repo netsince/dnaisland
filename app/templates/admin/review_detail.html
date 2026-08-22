@@ -3,77 +3,306 @@
 {% block title %}审核 · {{ card.name }} · DNAISLAND{% endblock %}
 
 {% block admin_content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <h2 class="h4 mb-0">审核：{{ card.name }}</h2>
-  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin.review') }}">← 返回队列</a>
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div class="d-flex align-items-center gap-2">
+    <a class="btn btn-sm btn-outline-secondary rounded-pill" href="{{ url_for('admin.review') }}">
+      <i class="bi bi-arrow-left me-1"></i>返回队列
+    </a>
+    <h1 class="h4 mb-0 fw-bold">角色卡审核：{{ card.name }}</h1>
+    {% if card.status == 'approved' %}
+    <span class="badge bg-success rounded-pill">已通过</span>
+    {% elif card.status == 'rejected' %}
+    <span class="badge bg-danger rounded-pill">已拒绝</span>
+    {% else %}
+    <span class="badge bg-warning text-dark rounded-pill">待审核</span>
+    {% endif %}
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin.card_edit', card_id=card.id) }}">
+      <i class="bi bi-pencil me-1"></i>编辑内容
+    </a>
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('user.card_detail', card_id=card.id) }}" target="_blank">
+      <i class="bi bi-box-arrow-up-right me-1"></i>前台预览
+    </a>
+  </div>
 </div>
 
-<div class="row">
-  {# 左侧大区域：模拟角色卡信息 #}
-  <div class="col-12 col-lg-9">
-    <div class="card mb-3">
-      {% if images.square %}
-      <img src="{{ url_for('user.card_image', card_id=card.id, slot='square') }}" class="card-img-top" style="max-height:320px;object-fit:cover;" alt="square">
+<div class="row g-3">
+  {# 左侧大区域：角色卡全量人设与内容 #}
+  <div class="col-12 col-lg-8">
+    <div class="card border-0 shadow-sm rounded-4 overflow-hidden mb-3">
+      {% if 'square' in slots %}
+      <div class="position-relative bg-body-tertiary text-center">
+        <img src="{{ url_for('user.card_image', card_id=card.id, slot='square') }}"
+             class="img-fluid" style="max-height:360px;width:100%;object-fit:contain;" alt="{{ card.name }} 头像">
+        <span class="position-absolute bottom-0 start-0 m-2 badge bg-dark bg-opacity-75">主头像 (Square)</span>
+      </div>
       {% endif %}
-      <div class="card-body">
-        <h5 class="card-title">{{ card.name }}</h5>
-        <p class="text-muted mb-1">作者：{{ author.nickname if author else card.author_id }}（@{{ author.username if author else '' }}）</p>
-        <p class="text-muted mb-2">性别：{{ card.gender }} · 状态：{{ card.status }}</p>
 
-        <h6>标签</h6>
-        <p>
-          {% for t in tags %}<span class="badge bg-info text-dark me-1">{{ t }}</span>{% else %}<span class="text-muted">无</span>{% endfor %}
-        </p>
+      <div class="card-body p-4">
+        <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
+          <div>
+            <h3 class="h4 fw-bold mb-1">{{ card.name }}</h3>
+            <div class="text-muted small">
+              作者：
+              <a href="javascript:void(0)" data-user-drawer="{{ card.author_id }}" class="fw-semibold text-decoration-none" title="点击查看 360 用户画像与风控">
+                {{ author.nickname if author else card.author_id }} (@{{ author.username if author else '' }})
+              </a>
+              · 性别：<span class="badge bg-secondary">{{ card.gender }}</span>
+              {% if card.seed %}
+              · 语音种子：<code>{{ card.seed }}</code>
+              {% endif %}
+            </div>
+          </div>
+          <div class="text-end text-muted small">
+            <div>提交：{{ card.created_at.strftime('%Y-%m-%d %H:%M') if card.created_at else '-' }}</div>
+            {% if card.updated_at and card.updated_at != card.created_at %}
+            <div>更新：{{ card.updated_at.strftime('%Y-%m-%d %H:%M') }}</div>
+            {% endif %}
+          </div>
+        </div>
 
-        <h6>人设</h6>
-        <p class="card-text" style="white-space:pre-wrap;">{{ card.persona }}</p>
+        {# 标签列表 #}
+        <div class="mb-4">
+          <label class="form-label small fw-bold text-muted text-uppercase mb-2 d-block">标签分类</label>
+          <div class="d-flex flex-wrap gap-1">
+            {% for t in tags %}
+            <span class="badge bg-secondary rounded-pill px-2 py-1">#{{ t }}</span>
+            {% else %}
+            <span class="text-muted small">未设置任何标签</span>
+            {% endfor %}
+          </div>
+        </div>
 
-        <h6>介绍</h6>
-        <p class="card-text" style="white-space:pre-wrap;">{{ card.intro }}</p>
+        {# 简介 (Intro) #}
+        <div class="mb-4">
+          <div class="d-flex justify-content-between align-items-center mb-1">
+            <label class="form-label small fw-bold text-muted text-uppercase mb-0">卡片简介 (Intro)</label>
+            <span class="badge bg-body-tertiary text-muted border">{{ stats_len.intro }} 字符</span>
+          </div>
+          <div class="p-3 bg-body-tertiary rounded-3 small" style="white-space: pre-wrap; word-break: break-word;">
+            {{ card.intro or '（无简介）' }}
+          </div>
+        </div>
 
-        <h6>开场白</h6>
-        <p class="card-text" style="white-space:pre-wrap;">{{ card.opening }}</p>
+        {# 人设设定 (Persona) #}
+        <div class="mb-4">
+          <div class="d-flex justify-content-between align-items-center mb-1">
+            <label class="form-label small fw-bold text-muted text-uppercase mb-0">核心人设设定 (Persona / Description)</label>
+            <span class="badge bg-body-tertiary text-muted border">{{ stats_len.persona }} 字符</span>
+          </div>
+          <div class="p-3 bg-body-tertiary rounded-3 small" style="white-space: pre-wrap; word-break: break-word; font-family: monospace, sans-serif;">
+            {{ card.persona or '（无人设描述）' }}
+          </div>
+        </div>
 
-        {% if images.landscape or images.portrait %}
-        <h6 class="mt-3">其他图片</h6>
-        <div class="d-flex gap-2 flex-wrap">
-          {% if images.landscape %}<img src="{{ url_for('user.card_image', card_id=card.id, slot='landscape') }}" class="img-fluid rounded" style="max-height:160px;" alt="landscape">{% endif %}
-          {% if images.portrait %}<img src="{{ url_for('user.card_image', card_id=card.id, slot='portrait') }}" class="img-fluid rounded" style="max-height:160px;" alt="portrait">{% endif %}
+        {# 开场白 (Opening Message) #}
+        <div class="mb-4">
+          <div class="d-flex justify-content-between align-items-center mb-1">
+            <label class="form-label small fw-bold text-muted text-uppercase mb-0">首条消息 / 开场白 (First Message)</label>
+            <span class="badge bg-body-tertiary text-muted border">{{ stats_len.opening }} 字符</span>
+          </div>
+          <div class="p-3 bg-body-tertiary rounded-3 small" style="white-space: pre-wrap; word-break: break-word;">
+            {{ card.opening or '（无开场白）' }}
+          </div>
+        </div>
+
+        {# 作者注释 (Author's Note) #}
+        {% if card.author_note %}
+        <div class="mb-4 p-3 bg-body-tertiary rounded-3 border-start border-3 border-warning">
+          <div class="d-flex justify-content-between align-items-center mb-1">
+            <label class="form-label small fw-bold text-warning mb-0">
+              <i class="bi bi-pin-angle-fill me-1"></i>作者注释 (Author's Note)
+            </label>
+            <span class="badge bg-warning text-dark">注入间隔：每 {{ card.author_note_interval }} 条</span>
+          </div>
+          <div class="small mt-2" style="white-space: pre-wrap; word-break: break-word;">
+            {{ card.author_note }}
+          </div>
         </div>
         {% endif %}
 
+        {# 对话风格示例 (Dialogue Style) #}
         {% if dialogue %}
-        <h6 class="mt-3">对话风格</h6>
-        {% for d in dialogue %}
-        <div class="border rounded p-2 mb-2 small">
-          <div><strong>用户：</strong>{{ d.user_text }}</div>
-          <div><strong>角色：</strong>{{ d.assistant_text }}</div>
+        <div class="mb-4">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <label class="form-label small fw-bold text-muted text-uppercase mb-0">示例对话 (Dialogue Style)</label>
+            <span class="badge bg-body-tertiary text-muted border">共 {{ dialogue|length }} 轮</span>
+          </div>
+          <div class="d-flex flex-column gap-2">
+            {% for d in dialogue %}
+            <div class="p-3 bg-body-tertiary rounded-3 border">
+              <div class="mb-2"><strong class="text-primary"><i class="bi bi-person-fill me-1"></i>用户：</strong><span class="small">{{ d.user_text }}</span></div>
+              <div><strong class="text-success"><i class="bi bi-robot me-1"></i>角色：</strong><span class="small">{{ d.assistant_text }}</span></div>
+            </div>
+            {% endfor %}
+          </div>
         </div>
-        {% endfor %}
         {% endif %}
 
+        {# 其他立绘/插图插槽 (Landscape / Portrait) #}
+        {% if 'landscape' in slots or 'portrait' in slots %}
+        <div class="mb-4">
+          <label class="form-label small fw-bold text-muted text-uppercase mb-2 d-block">其他立绘与背景图片</label>
+          <div class="row g-2">
+            {% if 'landscape' in slots %}
+            <div class="col-6">
+              <div class="border rounded-3 p-2 bg-body-tertiary text-center">
+                <span class="badge bg-dark mb-1 d-inline-block">横版背景 (Landscape)</span>
+                <img src="{{ url_for('user.card_image', card_id=card.id, slot='landscape') }}" class="img-fluid rounded" style="max-height:180px;width:100%;object-fit:cover;" alt="landscape">
+              </div>
+            </div>
+            {% endif %}
+            {% if 'portrait' in slots %}
+            <div class="col-6">
+              <div class="border rounded-3 p-2 bg-body-tertiary text-center">
+                <span class="badge bg-dark mb-1 d-inline-block">竖版立绘 (Portrait)</span>
+                <img src="{{ url_for('user.card_image', card_id=card.id, slot='portrait') }}" class="img-fluid rounded" style="max-height:180px;width:100%;object-fit:cover;" alt="portrait">
+              </div>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+
+        {# 原始链接 #}
         {% if card.original_link %}
-        <p class="mt-3"><a href="{{ card.original_link }}" target="_blank" rel="noopener">原始链接</a></p>
+        <div class="pt-2 border-top">
+          <span class="text-muted small">外部来源：</span>
+          <a href="{{ card.original_link }}" target="_blank" rel="noopener" class="small text-decoration-none">
+            {{ card.original_link }} <i class="bi bi-box-arrow-up-right"></i>
+          </a>
+        </div>
         {% endif %}
       </div>
     </div>
   </div>
 
-  {# 右侧侧边栏：通过 / 拒绝 #}
-  <div class="col-12 col-lg-3">
-    <div class="position-sticky" style="top:1rem;">
-      <div class="card">
-        <div class="card-header">审核操作</div>
-        <div class="card-body d-grid gap-2">
+  {# 右侧侧边栏：审核操作 + 作者风控画像 + 元数据指纹 #}
+  <div class="col-12 col-lg-4">
+    <div class="d-flex flex-column gap-3 position-sticky" style="top: 1rem;">
+      {# 1. 审核操作卡片 #}
+      <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-header bg-transparent fw-bold border-0 pt-3 pb-1">
+          <i class="bi bi-shield-check me-1"></i>审核处理
+        </div>
+        <div class="card-body pt-2 d-grid gap-2">
+          {% if card.status != 'approved' %}
           <form method="post" action="{{ url_for('admin.review_approve', card_id=card.id) }}">
-            <button class="btn btn-success w-100" {% if card.status == 'approved' %}disabled{% endif %}>通过</button>
+            <button type="submit" class="btn btn-success w-100 py-2 fw-semibold">
+              <i class="bi bi-check-lg me-1"></i>批准并公开发布
+            </button>
           </form>
-          <form method="post" action="{{ url_for('admin.review_reject', card_id=card.id) }}">
-            <button class="btn btn-danger w-100" {% if card.status == 'rejected' %}disabled{% endif %}>拒绝</button>
-          </form>
-          <a class="btn btn-outline-secondary" href="{{ url_for('admin.card_edit', card_id=card.id) }}">编辑内容</a>
+          {% else %}
+          <div class="alert alert-success py-2 px-3 small mb-1">
+            <i class="bi bi-check-circle-fill me-1"></i>当前卡片处于【已通过】状态
+          </div>
+          {% endif %}
+
+          {% if card.status != 'rejected' %}
+          <button type="button" class="btn btn-outline-danger w-100 py-2" data-bs-toggle="modal" data-bs-target="#detailRejectModal">
+            <i class="bi bi-x-lg me-1"></i>驳回 / 拒绝通过
+          </button>
+          {% else %}
+          <div class="alert alert-danger py-2 px-3 small mb-1">
+            <i class="bi bi-x-circle-fill me-1"></i>当前卡片处于【已拒绝】状态
+          </div>
+          {% endif %}
         </div>
       </div>
+
+      {# 2. 作者信誉与风控概览 #}
+      <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-header bg-transparent fw-bold border-0 pt-3 pb-1 d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-person-badge me-1"></i>作者信誉画像</span>
+          <a href="javascript:void(0)" data-user-drawer="{{ card.author_id }}" class="small text-decoration-none">查看360画像</a>
+        </div>
+        <div class="card-body pt-2">
+          <div class="d-flex align-items-center gap-2 mb-3">
+            <div class="rounded-circle bg-secondary bg-opacity-25 d-flex align-items-center justify-content-center" style="width:36px;height:36px;flex-shrink:0;">
+              <i class="bi bi-person text-muted fs-5"></i>
+            </div>
+            <div class="min-w-0">
+              <div class="fw-bold small text-truncate">{{ author.nickname if author else '未知' }}</div>
+              <div class="text-muted" style="font-size: 0.75rem;">@{{ author.username if author else card.author_id }}</div>
+            </div>
+          </div>
+          <div class="row g-2 text-center small mb-2">
+            <div class="col-6">
+              <div class="p-2 bg-body-tertiary rounded-3 border">
+                <div class="text-muted" style="font-size: 0.75rem;">名下卡片总数</div>
+                <div class="fw-bold fs-6">{{ author_risk.card_count }}</div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="p-2 bg-body-tertiary rounded-3 border">
+                <div class="text-muted" style="font-size: 0.75rem;">历史被举报数</div>
+                <div class="fw-bold fs-6 {{ 'text-danger' if author_risk.report_count > 0 else '' }}">{{ author_risk.report_count }}</div>
+              </div>
+            </div>
+          </div>
+          {% if author_risk.active_punishments %}
+          <div class="alert alert-danger py-1 px-2 small mb-0 mt-2">
+            <i class="bi bi-exclamation-triangle-fill me-1"></i>当前处于处罚中：
+            {% for p in author_risk.active_punishments %}
+            <span class="badge bg-danger me-1">{{ p.type }}</span>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div class="text-muted small"><i class="bi bi-check-circle text-success me-1"></i>账号信誉良好，无当前处罚</div>
+          {% endif %}
+        </div>
+      </div>
+
+      {# 3. 元数据与指纹信息 #}
+      <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-header bg-transparent fw-bold border-0 pt-3 pb-1">
+          <i class="bi bi-info-circle me-1"></i>技术元数据
+        </div>
+        <div class="card-body pt-2 small">
+          <div class="d-flex justify-content-between py-1 border-bottom">
+            <span class="text-muted">卡片 ID</span>
+            <code class="text-truncate ms-2" style="max-width: 170px;">{{ card.id }}</code>
+          </div>
+          <div class="d-flex justify-content-between py-1 border-bottom">
+            <span class="text-muted">查重指纹 (Hash)</span>
+            <code class="text-truncate ms-2" style="max-width: 170px;" title="{{ card.content_hash or '无' }}">{{ card.content_hash or '无' }}</code>
+          </div>
+          <div class="d-flex justify-content-between py-1 border-bottom">
+            <span class="text-muted">头图焦点</span>
+            <span>{{ card.cover_focus or '默认居中' }}</span>
+          </div>
+          <div class="d-flex justify-content-between py-1">
+            <span class="text-muted">总字符数</span>
+            <span class="fw-bold">{{ stats_len.persona + stats_len.intro + stats_len.opening + stats_len.author_note }} 字</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 驳回模态框 -->
+<div class="modal fade" id="detailRejectModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content rounded-4 text-start">
+      <form method="post" action="{{ url_for('admin.review_reject', card_id=card.id) }}">
+        <div class="modal-header border-0 pb-0">
+          <h5 class="modal-title fw-bold">驳回角色卡</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="small text-muted mb-2">确认拒绝角色卡 <strong>"{{ card.name }}"</strong> 吗？</p>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">驳回原因（将通知作者）：</label>
+            <input type="text" name="reason" class="form-control form-control-sm rounded-3" placeholder="例如：存在违规内容 / 封面涉嫌违规 / 人设不完整">
+          </div>
+        </div>
+        <div class="modal-footer border-0 pt-0">
+          <button type="button" class="btn btn-sm btn-secondary rounded-pill px-3" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-sm btn-danger rounded-pill px-3">确认驳回</button>
+        </div>
+      </form>
     </div>
   </div>
 </div>

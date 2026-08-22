@@ -52,32 +52,78 @@
   <div class="col-12" id="tea-row-{{ p.id }}">
     <div class="card border-0 shadow-sm rounded-4 p-3 tea-card">
       <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
-        <div class="d-flex align-items-center gap-2">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
           <input class="form-check-input row-select-tea" type="checkbox" value="{{ p.id }}">
           <a href="javascript:void(0)" data-user-drawer="{{ p.user_id }}" class="fw-bold small text-decoration-none" title="点击查看用户画像与风控">
             {{ p.author.nickname if (p.author and p.author.nickname) else (p.author.username if p.author else p.user_id) }}
           </a>
           <span class="text-muted small">@{{ p.author.username if p.author else p.user_id }}</span>
+          {% if p.author and p.author.active_punishments %}
+          <span class="badge bg-danger" style="font-size: 0.65rem;">处罚中</span>
+          {% endif %}
           {% if it.parent %}
-          <span class="badge bg-secondary rounded-pill" style="font-size: 0.7rem;">回复帖</span>
+          <span class="badge bg-secondary rounded-pill" style="font-size: 0.7rem;"><i class="bi bi-reply-fill me-1"></i>回复帖</span>
           {% endif %}
         </div>
         <span class="small text-muted">{{ p.created_at.strftime('%Y-%m-%d %H:%M') if p.created_at else '-' }}</span>
       </div>
 
+      {# 被回复原帖上下文摘要 #}
       {% if it.parent %}
       <div class="small text-muted mb-2 p-2 bg-body-tertiary rounded-3 border-start border-3 border-secondary">
-        回复对象：<a href="{{ url_for('teahouse.post_detail', post_id=it.parent.id) }}" target="_blank" class="text-decoration-none">@{{ it.parent.author.username if it.parent.author else it.parent.user_id }} 的原帖</a>
+        <div class="d-flex justify-content-between align-items-center mb-1">
+          <span class="fw-semibold"><i class="bi bi-chat-quote-fill me-1"></i>被回复的原帖（@{{ it.parent.author.nickname or it.parent.author.username or it.parent.user_id }}）：</span>
+          <a href="{{ url_for('teahouse.post_detail', post_id=it.parent.id) }}" target="_blank" class="text-decoration-none" style="font-size: 0.72rem;">查看原帖 <i class="bi bi-box-arrow-up-right"></i></a>
+        </div>
+        <div style="white-space: pre-wrap; word-break: break-word; font-size: 0.8rem;">{{ it.parent.content }}</div>
       </div>
       {% endif %}
 
-      <div class="p-3 bg-body-tertiary rounded-3 mb-3 small" style="white-space: pre-wrap; word-break: break-word;">
+      {# 帖子正文 #}
+      <div class="p-3 bg-body-tertiary rounded-3 mb-2 small" style="white-space: pre-wrap; word-break: break-word;">
         {{ p.content | teahouse_linkify }}
       </div>
 
-      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+      {# 帖子配图 #}
+      {% if p.images %}
+      <div class="d-flex flex-wrap gap-2 mb-2">
+        {% for img in p.images %}
+        <a href="{{ img.image_data }}" target="_blank" class="border rounded-3 p-1 bg-body-tertiary d-inline-block" title="点击新窗口查看原图">
+          <img src="{{ img.image_data }}" class="rounded" style="max-height: 140px; max-width: 220px; object-fit: contain;" alt="帖子配图">
+        </a>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {# 关联角色卡 #}
+      {% if p.card %}
+      <div class="p-2 mb-2 bg-body-tertiary rounded-3 border d-flex align-items-center gap-2 small">
+        <i class="bi bi-person-badge fs-5 text-primary"></i>
+        <div>
+          关联角色卡：
+          <a href="{{ url_for('user.card_detail', card_id=p.card.id) }}" target="_blank" class="fw-semibold text-decoration-none">
+            {{ p.card.name }}
+          </a>
+          <span class="text-muted ms-1">（作者：@{{ p.card.author.username if p.card.author else p.card.author_id }}）</span>
+        </div>
+      </div>
+      {% endif %}
+
+      {# 投票调查 #}
+      {% if p.poll %}
+      <div class="p-2 mb-2 bg-body-tertiary rounded-3 border small">
+        <div class="fw-bold mb-1"><i class="bi bi-bar-chart-fill me-1"></i>投票：{{ p.poll.title or '无题调查' }}</div>
+        <ul class="mb-0 ps-3">
+          {% for opt in p.poll.options %}
+          <li>{{ opt.option_text }} ({{ opt.vote_count }}票)</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-2">
         <a href="{{ url_for('teahouse.post_detail', post_id=p.id) }}" target="_blank" class="btn btn-sm btn-link text-decoration-none p-0">
-          <i class="bi bi-box-arrow-up-right me-1"></i>在茶馆中查看
+          <i class="bi bi-box-arrow-up-right me-1"></i>在前台茶馆中查看
         </a>
         <div class="btn-group btn-group-sm">
           <button type="button" class="btn btn-success" onclick="ajaxApproveTea({{ p.id }})" title="同意保留">

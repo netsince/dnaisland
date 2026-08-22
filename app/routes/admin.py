@@ -17,6 +17,7 @@ from flask import (
 )
 from flask_login import current_user
 from sqlalchemy import case, func, or_, update
+from sqlalchemy.orm import joinedload
 
 from ..decorators import super_admin_required
 from ..extensions import db
@@ -1468,13 +1469,41 @@ def card_delete(card_id):
 @super_admin_required
 def review():
     status = request.args.get("status", "pending").strip() or "pending"
-    query = Card.query
+    query = Card.query.options(joinedload(Card.author))
     if status != "all":
         query = query.filter(Card.status == status)
     page = request.args.get("page", 1, type=int)
     pagination = query.order_by(Card.created_at.asc()).paginate(
         page=page, per_page=20, error_out=False
     )
+    card_ids = [c.id for c in pagination.items]
+
+    # 批量查询标签
+    tags_map = {}
+    if card_ids:
+        all_tags = CardTag.query.filter(CardTag.card_id.in_(card_ids)).all()
+        for t in all_tags:
+            tags_map.setdefault(t.card_id, []).append(t.tag)
+
+    # 批量查询已有图片插槽（只查 slot，不读取 Base64 LONGTEXT 大数据）
+    slots_map = {}
+    if card_ids:
+        all_slots = db.session.query(CardImage.card_id, CardImage.slot).filter(CardImage.card_id.in_(card_ids)).all()
+        for cid, slot in all_slots:
+            slots_map.setdefault(cid, set()).add(slot)
+
+    # 批量查询对话条数
+    dialogue_count_map = {}
+    if card_ids:
+        d_counts = (
+            db.session.query(CardDialogueStyle.card_id, func.count(CardDialogueStyle.id))
+            .filter(CardDialogueStyle.card_id.in_(card_ids))
+            .group_by(CardDialogueStyle.card_id)
+            .all()
+        )
+        for cid, cnt in d_counts:
+            dialogue_count_map[cid] = cnt
+
     # 统计各状态数量
     stats = status_counts(Card)
     return render_template(
@@ -1484,28 +1513,53 @@ def review():
         args={"status": status},
         status=status,
         stats=stats,
+        tags_map=tags_map,
+        slots_map=slots_map,
+        dialogue_count_map=dialogue_count_map,
     )
 
 
 @admin_bp.route("/review/<card_id>")
 @super_admin_required
 def review_detail(card_id):
-    card = db.get_or_404(Card, card_id)
-    author = db.session.get(User, card.author_id)
+    card = Card.query.options(joinedload(Card.author)).filter_by(id=card_id).first_or_404()
+    author = card.author
     tags = [t.tag for t in CardTag.query.filter_by(card_id=card.id).all()]
     dialogue = (
         CardDialogueStyle.query.filter_by(card_id=card.id)
         .order_by(CardDialogueStyle.turn_index)
         .all()
     )
-    images = {i.slot: i.data for i in CardImage.query.filter_by(card_id=card.id).all()}
+    # 优化：只读取已有插槽集合，避免跨公网载入整个 Base64 LONGTEXT 造成卡顿
+    existing_slots = {
+        row[0]
+        for row in db.session.query(CardImage.slot).filter_by(card_id=card.id).all()
+    }
+
+    # 作者风控画像
+    author_risk = {
+        "active_punishments": author.active_punishments if author else [],
+        "report_count": Report.query.filter_by(target_type="user", target_id=str(author.id)).count() if author else 0,
+        "card_count": Card.query.filter_by(author_id=author.id).count() if author else 0,
+    }
+
+    # 各核心字段字数统计
+    stats_len = {
+        "persona": len(card.persona or ""),
+        "intro": len(card.intro or ""),
+        "opening": len(card.opening or ""),
+        "author_note": len(card.author_note or ""),
+    }
+
     return render_template(
         "admin/review_detail.html",
         card=card,
         author=author,
         tags=tags,
         dialogue=dialogue,
-        images=images,
+        slots=existing_slots,
+        author_risk=author_risk,
+        stats_len=stats_len,
     )
 
 
@@ -1778,13 +1832,28 @@ def report_action(report_id):
 def comment_moderation():
     page = request.args.get("page", 1, type=int)
     pagination = (
-        Comment.query.filter_by(moderated=False)
+        Comment.query.options(
+            joinedload(Comment.author),
+            joinedload(Comment.reply_to).joinedload(Comment.author),
+        )
+        .filter_by(moderated=False)
         .order_by(Comment.created_at.desc())
         .paginate(page=page, per_page=20, error_out=False)
     )
+    card_ids = list({c.card_id for c in pagination.items if c.card_id})
+    cards_map = {}
+    if card_ids:
+        cards = Card.query.options(joinedload(Card.author)).filter(Card.id.in_(card_ids)).all()
+        for card in cards:
+            cards_map[card.id] = card
+
     items = []
     for c in pagination.items:
-        items.append({"comment": c, "card": db.session.get(Card, c.card_id)})
+        items.append({
+            "comment": c,
+            "card": cards_map.get(c.card_id),
+            "parent": c.reply_to,
+        })
     return render_template(
         "admin/comment_moderation.html",
         items=items,
@@ -1975,14 +2044,25 @@ def notify_send():
 def tea_moderation():
     page = request.args.get("page", 1, type=int)
     pagination = (
-        TeaPost.query.filter_by(moderated=False)
+        TeaPost.query.options(
+            joinedload(TeaPost.author),
+            joinedload(TeaPost.parent).joinedload(TeaPost.author),
+            joinedload(TeaPost.card),
+            joinedload(TeaPost.poll),
+            joinedload(TeaPost.images),
+        )
+        .filter_by(moderated=False)
         .order_by(TeaPost.created_at.desc())
         .paginate(page=page, per_page=20, error_out=False)
     )
     items = []
     for p in pagination.items:
-        parent = db.session.get(TeaPost, p.parent_id) if p.parent_id else None
-        items.append({"post": p, "parent": parent})
+        items.append({
+            "post": p,
+            "parent": p.parent,
+            "card": p.card,
+            "poll": p.poll,
+        })
     return render_template(
         "teahouse/admin_moderation.html",
         items=items,

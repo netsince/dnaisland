@@ -47,11 +47,11 @@
           <th style="width: 44px;" class="text-center">
             <input class="form-check-input" type="checkbox" id="select-all-comments" title="全选">
           </th>
-          <th style="width: 160px;">发布用户</th>
-          <th style="width: 180px;">关联角色卡</th>
-          <th>评论内容</th>
-          <th style="width: 140px;">发布时间</th>
-          <th style="width: 170px;" class="text-end">操作</th>
+          <th style="width: 170px;">发布用户</th>
+          <th style="width: 200px;">关联角色卡</th>
+          <th>评论内容与上下文</th>
+          <th style="width: 130px;">发布时间</th>
+          <th style="width: 160px;" class="text-end">操作</th>
         </tr>
       </thead>
       <tbody>
@@ -62,35 +62,70 @@
             <input class="form-check-input row-select-comment" type="checkbox" value="{{ c.id }}">
           </td>
           <td>
-            <a href="javascript:void(0)" data-user-drawer="{{ c.user_id }}" class="small fw-semibold text-decoration-none text-truncate d-block" style="max-width: 140px;" title="点击查看用户画像与风控">
+            <a href="javascript:void(0)" data-user-drawer="{{ c.user_id }}" class="small fw-semibold text-decoration-none text-truncate d-block" style="max-width: 150px;" title="点击查看用户画像与风控">
               {{ c.author.nickname if (c.author and c.author.nickname) else (c.author.username if c.author else c.user_id) }}
             </a>
             <div class="text-muted" style="font-size: 0.75rem;">@{{ c.author.username if c.author else c.user_id }}</div>
-          </td>
-          <td>
-            {% if it.card %}
-            <a class="small text-decoration-none text-truncate d-block" style="max-width: 160px;" href="{{ url_for('user.card_detail', card_id=it.card.id) }}" target="_blank">
-              {{ it.card.name }}
-            </a>
-            {% else %}
-            <span class="text-muted small">未知角色卡</span>
+            {% if c.author and c.author.active_punishments %}
+            <span class="badge bg-danger mt-1" style="font-size: 0.65rem;">处罚中</span>
             {% endif %}
           </td>
           <td>
-            <div class="small" style="white-space: pre-wrap; word-break: break-word; max-height: 4.5em; overflow: hidden;">
-              {{ c.content }}
+            {% if it.card %}
+            <div class="d-flex align-items-center gap-2">
+              <a class="small fw-semibold text-decoration-none text-truncate d-block" style="max-width: 180px;" href="{{ url_for('user.card_detail', card_id=it.card.id) }}" target="_blank" title="{{ it.card.name }}">
+                {{ it.card.name }}
+              </a>
             </div>
+            <div class="text-muted" style="font-size: 0.72rem;">作者：@{{ it.card.author.username if it.card.author else it.card.author_id }}</div>
+            {% else %}
+            <span class="text-muted small">未知角色卡 (ID: {{ c.card_id }})</span>
+            {% endif %}
           </td>
           <td>
-            <span class="small text-muted">{{ c.created_at.strftime('%m-%d %H:%M') if c.created_at else '-' }}</span>
+            {# 楼中楼被回复原评论上下文 #}
+            {% if it.parent %}
+            <div class="p-2 mb-2 bg-body-tertiary rounded-3 border-start border-3 border-secondary small text-muted">
+              <div class="fw-semibold mb-1" style="font-size: 0.75rem;">
+                <i class="bi bi-reply-fill me-1"></i>回复 <strong>@{{ it.parent.author.nickname or it.parent.author.username or it.parent.user_id }}</strong>：
+              </div>
+              <div style="white-space: pre-wrap; word-break: break-word; font-size: 0.78rem;">{{ it.parent.content }}</div>
+            </div>
+            {% endif %}
+
+            {# 评论正文 #}
+            <div id="comment-short-{{ c.id }}" class="small" style="white-space: pre-wrap; word-break: break-word; max-height: 4.5em; overflow: hidden;">
+              {{ c.content }}
+            </div>
+            <div id="comment-full-{{ c.id }}" class="small d-none p-2 bg-body-tertiary rounded-3 border mt-1" style="white-space: pre-wrap; word-break: break-word;">
+              {{ c.content }}
+            </div>
+            {% if c.content and c.content|length > 80 %}
+            <a href="javascript:void(0)" onclick="toggleCommentText({{ c.id }})" id="comment-toggle-btn-{{ c.id }}" class="small text-decoration-none mt-1 d-inline-block" style="font-size: 0.72rem;">
+              <i class="bi bi-chevron-down me-1"></i>展开全文
+            </a>
+            {% endif %}
+
+            {# 评论配图 #}
+            {% if c.image_data %}
+            <div class="mt-2">
+              <a href="{{ c.image_data }}" target="_blank" class="d-inline-block border rounded-3 overflow-hidden p-1 bg-body-tertiary" title="点击新窗口查看原图">
+                <img src="{{ c.image_data }}" class="rounded" style="max-height: 110px; max-width: 180px; object-fit: contain;" alt="评论配图">
+              </a>
+              <div class="text-muted" style="font-size: 0.68rem;"><i class="bi bi-image me-1"></i>评论包含图片附件</div>
+            </div>
+            {% endif %}
+          </td>
+          <td>
+            <span class="small text-muted">{{ c.created_at.strftime('%Y-%m-%d %H:%M') if c.created_at else '-' }}</span>
           </td>
           <td class="text-end">
             <div class="btn-group btn-group-sm">
               <button type="button" class="btn btn-success" onclick="ajaxApproveComment({{ c.id }})" title="同意保留">
-                <i class="bi bi-check-lg"></i>
+                <i class="bi bi-check-lg me-1"></i>同意
               </button>
               <button type="button" class="btn btn-outline-danger" onclick="ajaxRejectComment({{ c.id }}, false)" title="拒绝隐藏">
-                <i class="bi bi-x-lg"></i>
+                <i class="bi bi-x-lg me-1"></i>拒绝
               </button>
               <button type="button" class="btn btn-outline-warning" onclick="ajaxRejectComment({{ c.id }}, true)" title="拒绝并禁言">
                 <i class="bi bi-slash-circle"></i>
@@ -115,6 +150,22 @@
 {% endif %}
 
 <script>
+function toggleCommentText(id) {
+  var shortEl = document.getElementById('comment-short-' + id);
+  var fullEl = document.getElementById('comment-full-' + id);
+  var btnEl = document.getElementById('comment-toggle-btn-' + id);
+  if (!shortEl || !fullEl) return;
+  if (fullEl.classList.contains('d-none')) {
+    fullEl.classList.remove('d-none');
+    shortEl.classList.add('d-none');
+    if (btnEl) btnEl.innerHTML = '<i class="bi bi-chevron-up me-1"></i>收起全文';
+  } else {
+    fullEl.classList.add('d-none');
+    shortEl.classList.remove('d-none');
+    if (btnEl) btnEl.innerHTML = '<i class="bi bi-chevron-down me-1"></i>展开全文';
+  }
+}
+
 function updateCommentBadges(delta) {
   var countEl = document.getElementById('pending-count');
   if (countEl) {
