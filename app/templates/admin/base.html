@@ -45,7 +45,7 @@
 
         <div class="admin-sidebar-nav overflow-y-auto d-flex flex-column gap-1" style="max-height: calc(100vh - 160px);">
           <!-- 1. 仪表盘（单项直达） -->
-          <a class="nav-link py-2 px-3 rounded-3 d-flex align-items-center justify-content-between mb-1 {% if request.endpoint in ['admin.index', 'admin.dashboard'] %}active fw-semibold bg-primary text-white{% endif %}"
+          <a class="nav-link py-2 px-3 rounded-3 d-flex align-items-center justify-content-between mb-1 {% if request.endpoint in ['admin.index', 'admin.dashboard'] %}active fw-semibold{% endif %}"
              href="{{ url_for('admin.index') }}">
             <span><i class="bi bi-speedometer2 me-2"></i>仪表盘总览</span>
           </a>

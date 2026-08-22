@@ -2697,3 +2697,196 @@ main.dna-page-loading {
 .gd-detail { padding-bottom: 72px; }
 }
 
+/* ============================================================
+   管理控制台（Admin Console）明暗双主题全面适配
+   ============================================================ */
+
+/* ---------- 通用卡片与容器 ---------- */
+main .card,
+nav .card {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+[data-bs-theme="dark"] main .card,
+[data-bs-theme="dark"] nav .card {
+  background-color: var(--dna-surface-solid, #18181b) !important;
+  border: 1px solid var(--dna-border, #27272a) !important;
+  color: var(--dna-text, #f4f4f5);
+}
+
+[data-bs-theme="light"] main .card,
+[data-bs-theme="light"] nav .card {
+  background-color: #ffffff !important;
+  border: 1px solid var(--dna-border, #e4e4e7) !important;
+  color: var(--dna-text, #09090b);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+/* ---------- 表格与表头 (Tables) ---------- */
+[data-bs-theme="dark"] .table {
+  --bs-table-bg: transparent;
+  --bs-table-color: var(--dna-text, #f4f4f5);
+  --bs-table-border-color: var(--dna-border, #27272a);
+  --bs-table-hover-bg: rgba(255, 255, 255, 0.04);
+  --bs-table-hover-color: var(--dna-text, #f4f4f5);
+}
+
+[data-bs-theme="dark"] .table-light,
+[data-bs-theme="dark"] .table thead.table-light,
+[data-bs-theme="dark"] .table thead {
+  --bs-table-bg: rgba(255, 255, 255, 0.04) !important;
+  --bs-table-color: var(--dna-muted, #a1a1aa) !important;
+  --bs-table-border-color: var(--dna-border, #27272a) !important;
+}
+
+[data-bs-theme="light"] .table {
+  --bs-table-bg: transparent;
+  --bs-table-color: var(--dna-text, #09090b);
+  --bs-table-border-color: var(--dna-border, #e4e4e7);
+  --bs-table-hover-bg: rgba(0, 0, 0, 0.03);
+  --bs-table-hover-color: var(--dna-text, #09090b);
+}
+
+[data-bs-theme="light"] .table-light,
+[data-bs-theme="light"] .table thead.table-light,
+[data-bs-theme="light"] .table thead {
+  --bs-table-bg: #f4f4f5 !important;
+  --bs-table-color: #52525b !important;
+  --bs-table-border-color: #e4e4e7 !important;
+}
+
+/* ---------- 侧边栏折叠项与导航 (Sidebar Accordion & Nav) ---------- */
+[data-bs-theme="dark"] .admin-group-btn {
+  color: var(--dna-text, #f4f4f5);
+}
+[data-bs-theme="dark"] .admin-group-btn:hover {
+  background-color: rgba(255, 255, 255, 0.06);
+}
+[data-bs-theme="dark"] .admin-sidebar-nav .nav-link {
+  color: var(--dna-muted, #a1a1aa);
+}
+[data-bs-theme="dark"] .admin-sidebar-nav .nav-link:hover {
+  color: var(--dna-text, #f4f4f5);
+  background-color: rgba(255, 255, 255, 0.05);
+}
+[data-bs-theme="dark"] .admin-sidebar-nav .nav-link.active {
+  background-color: var(--dna-accent, #6366f1) !important;
+  color: #ffffff !important;
+}
+
+[data-bs-theme="light"] .admin-group-btn {
+  color: #18181b;
+}
+[data-bs-theme="light"] .admin-group-btn:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+[data-bs-theme="light"] .admin-sidebar-nav .nav-link {
+  color: #52525b;
+}
+[data-bs-theme="light"] .admin-sidebar-nav .nav-link:hover {
+  color: #09090b;
+  background-color: rgba(0, 0, 0, 0.04);
+}
+[data-bs-theme="light"] .admin-sidebar-nav .nav-link.active {
+  background-color: #09090b !important;
+  color: #ffffff !important;
+}
+
+/* ---------- 抽屉面板 (User 360 Drawer) & 弹窗 (Modals) ---------- */
+[data-bs-theme="dark"] .offcanvas,
+[data-bs-theme="dark"] .modal-content {
+  background-color: var(--dna-surface-solid, #18181b) !important;
+  color: var(--dna-text, #f4f4f5) !important;
+  border: 1px solid var(--dna-border, #27272a) !important;
+}
+
+[data-bs-theme="light"] .offcanvas,
+[data-bs-theme="light"] .modal-content {
+  background-color: #ffffff !important;
+  color: var(--dna-text, #09090b) !important;
+  border: 1px solid var(--dna-border, #e4e4e7) !important;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+[data-bs-theme="dark"] .offcanvas-header,
+[data-bs-theme="dark"] .offcanvas-footer,
+[data-bs-theme="dark"] .modal-header,
+[data-bs-theme="dark"] .modal-footer,
+[data-bs-theme="dark"] #drawerTab {
+  border-color: var(--dna-border, #27272a) !important;
+}
+
+[data-bs-theme="light"] .offcanvas-header,
+[data-bs-theme="light"] .offcanvas-footer,
+[data-bs-theme="light"] .modal-header,
+[data-bs-theme="light"] .modal-footer,
+[data-bs-theme="light"] #drawerTab {
+  border-color: var(--dna-border, #e4e4e7) !important;
+}
+
+[data-bs-theme="dark"] .bg-body-tertiary {
+  background-color: rgba(255, 255, 255, 0.04) !important;
+  color: var(--dna-text, #f4f4f5);
+}
+
+[data-bs-theme="light"] .bg-body-tertiary {
+  background-color: #f4f4f5 !important;
+  color: var(--dna-text, #09090b);
+}
+
+/* ---------- 悬浮批量操作条 (#batch-toolbar) ---------- */
+[data-bs-theme="dark"] #batch-toolbar {
+  background-color: #27272a !important;
+  border: 1px solid var(--dna-border, #3f3f46) !important;
+  color: #ffffff !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5) !important;
+}
+
+[data-bs-theme="light"] #batch-toolbar {
+  background-color: #18181b !important;
+  border: 1px solid #27272a !important;
+  color: #ffffff !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18) !important;
+}
+
+/* ---------- 列表与分组 (List Groups) ---------- */
+[data-bs-theme="dark"] .list-group-item {
+  background-color: transparent !important;
+  border-color: var(--dna-border, #27272a) !important;
+  color: var(--dna-text, #f4f4f5) !important;
+}
+
+[data-bs-theme="light"] .list-group-item {
+  background-color: transparent !important;
+  border-color: var(--dna-border, #e4e4e7) !important;
+  color: var(--dna-text, #09090b) !important;
+}
+
+/* ---------- 表单控件与输入框 ---------- */
+[data-bs-theme="dark"] .form-control,
+[data-bs-theme="dark"] .form-select {
+  background-color: #18181b !important;
+  border-color: var(--dna-border, #27272a) !important;
+  color: var(--dna-text, #f4f4f5) !important;
+}
+
+[data-bs-theme="dark"] .form-control:focus,
+[data-bs-theme="dark"] .form-select:focus {
+  border-color: #6366f1 !important;
+  box-shadow: 0 0 0 0.2rem rgba(99, 102, 241, 0.25) !important;
+}
+
+[data-bs-theme="light"] .form-control,
+[data-bs-theme="light"] .form-select {
+  background-color: #ffffff !important;
+  border-color: #d4d4d8 !important;
+  color: #09090b !important;
+}
+
+[data-bs-theme="light"] .form-control:focus,
+[data-bs-theme="light"] .form-select:focus {
+  border-color: #09090b !important;
+  box-shadow: 0 0 0 0.2rem rgba(9, 9, 11, 0.12) !important;
+}
+
+
