@@ -27,9 +27,15 @@ def create_app(config_object=None):
 
     # 环境变量可覆盖关键配置
     app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", app.config["SECRET_KEY"])
-    app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
-        "DATABASE_URL", app.config["SQLALCHEMY_DATABASE_URI"]
-    )
+    db_uri = os.environ.get("DATABASE_URL", app.config.get("SQLALCHEMY_DATABASE_URI", ""))
+    app.config["SQLALCHEMY_DATABASE_URI"] = db_uri
+
+    # 动态构建健壮的连接池与网络超时参数（自动防御远程 MySQL 断连与丢包）
+    if db_uri.startswith("sqlite"):
+        app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {"pool_pre_ping": True}
+    else:
+        app.config["SQLALCHEMY_ENGINE_OPTIONS"] = config.build_engine_options(db_uri)
+
     app.config["MAIL_SERVER"] = os.environ.get("MAIL_SERVER", app.config["MAIL_SERVER"])
     app.config["MAIL_PORT"] = int(os.environ.get("MAIL_PORT", app.config["MAIL_PORT"]))
     app.config["MAIL_USE_TLS"] = os.environ.get("MAIL_USE_TLS", "true").lower() == "true"
