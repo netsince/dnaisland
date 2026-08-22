@@ -2698,24 +2698,27 @@ main.dna-page-loading {
 }
 
 /* ============================================================
-   管理控制台（Admin Console）明暗双主题全面适配
+   管理控制台与通用组件（黑白灰双主题自适应设计系统）
    ============================================================ */
 
 /* ---------- 通用卡片与容器 ---------- */
 main .card,
-nav .card {
+nav .card,
+.admin-card {
   transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
 }
 
 [data-bs-theme="dark"] main .card,
-[data-bs-theme="dark"] nav .card {
+[data-bs-theme="dark"] nav .card,
+[data-bs-theme="dark"] .admin-card {
   background-color: var(--dna-surface-solid, #18181b) !important;
   border: 1px solid var(--dna-border, #27272a) !important;
   color: var(--dna-text, #f4f4f5);
 }
 
 [data-bs-theme="light"] main .card,
-[data-bs-theme="light"] nav .card {
+[data-bs-theme="light"] nav .card,
+[data-bs-theme="light"] .admin-card {
   background-color: #ffffff !important;
   border: 1px solid var(--dna-border, #e4e4e7) !important;
   color: var(--dna-text, #09090b);
@@ -2755,6 +2758,15 @@ nav .card {
   --bs-table-border-color: #e4e4e7 !important;
 }
 
+[data-bs-theme="dark"] .table-primary {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  color: #ffffff !important;
+}
+[data-bs-theme="light"] .table-primary {
+  background-color: #f4f4f5 !important;
+  color: #09090b !important;
+}
+
 /* ---------- 侧边栏折叠项与导航 (Sidebar Accordion & Nav) ---------- */
 [data-bs-theme="dark"] .admin-group-btn {
   color: var(--dna-text, #f4f4f5);
@@ -2770,7 +2782,8 @@ nav .card {
   background-color: rgba(255, 255, 255, 0.05);
 }
 [data-bs-theme="dark"] .admin-sidebar-nav .nav-link.active {
-  background-color: var(--dna-accent, #6366f1) !important;
+  background-color: #27272a !important;
+  border: 1px solid #3f3f46 !important;
   color: #ffffff !important;
 }
 
@@ -2862,7 +2875,7 @@ nav .card {
   color: var(--dna-text, #09090b) !important;
 }
 
-/* ---------- 表单控件与输入框 ---------- */
+/* ---------- 表单控件与输入框 (Forms) ---------- */
 [data-bs-theme="dark"] .form-control,
 [data-bs-theme="dark"] .form-select {
   background-color: #18181b !important;
@@ -2872,8 +2885,8 @@ nav .card {
 
 [data-bs-theme="dark"] .form-control:focus,
 [data-bs-theme="dark"] .form-select:focus {
-  border-color: #6366f1 !important;
-  box-shadow: 0 0 0 0.2rem rgba(99, 102, 241, 0.25) !important;
+  border-color: #a1a1aa !important;
+  box-shadow: 0 0 0 0.2rem rgba(255, 255, 255, 0.12) !important;
 }
 
 [data-bs-theme="light"] .form-control,
@@ -2888,5 +2901,238 @@ nav .card {
   border-color: #09090b !important;
   box-shadow: 0 0 0 0.2rem rgba(9, 9, 11, 0.12) !important;
 }
+
+[data-bs-theme="dark"] .form-check-input {
+  background-color: #27272a;
+  border-color: #3f3f46;
+}
+[data-bs-theme="dark"] .form-check-input:checked {
+  background-color: #f4f4f5;
+  border-color: #f4f4f5;
+}
+
+[data-bs-theme="light"] .form-check-input {
+  background-color: #ffffff;
+  border-color: #d4d4d8;
+}
+[data-bs-theme="light"] .form-check-input:checked {
+  background-color: #09090b;
+  border-color: #09090b;
+}
+
+/* ---------- 按钮系统 (Buttons) ---------- */
+[data-bs-theme="dark"] .btn-primary {
+  background-color: #f4f4f5 !important;
+  color: #09090b !important;
+  border-color: #f4f4f5 !important;
+}
+[data-bs-theme="dark"] .btn-primary:hover {
+  background-color: #e4e4e7 !important;
+  color: #09090b !important;
+}
+
+[data-bs-theme="light"] .btn-primary {
+  background-color: #09090b !important;
+  color: #ffffff !important;
+  border-color: #09090b !important;
+}
+[data-bs-theme="light"] .btn-primary:hover {
+  background-color: #27272a !important;
+  color: #ffffff !important;
+}
+
+[data-bs-theme="dark"] .btn-outline-secondary {
+  border-color: #3f3f46 !important;
+  color: #d4d4d8 !important;
+  background: transparent !important;
+}
+[data-bs-theme="dark"] .btn-outline-secondary:hover {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  color: #ffffff !important;
+}
+
+[data-bs-theme="light"] .btn-outline-secondary {
+  border-color: #d4d4d8 !important;
+  color: #52525b !important;
+  background: transparent !important;
+}
+[data-bs-theme="light"] .btn-outline-secondary:hover {
+  background-color: #f4f4f5 !important;
+  color: #09090b !important;
+}
+
+[data-bs-theme="dark"] .btn-outline-primary {
+  border-color: #52525b !important;
+  color: #f4f4f5 !important;
+}
+[data-bs-theme="dark"] .btn-outline-primary:hover {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  color: #ffffff !important;
+}
+
+[data-bs-theme="light"] .btn-outline-primary {
+  border-color: #09090b !important;
+  color: #09090b !important;
+}
+[data-bs-theme="light"] .btn-outline-primary:hover {
+  background-color: #09090b !important;
+  color: #ffffff !important;
+}
+
+[data-bs-theme="dark"] .btn-outline-dark {
+  border-color: #3f3f46 !important;
+  color: #d4d4d8 !important;
+}
+[data-bs-theme="dark"] .btn-outline-dark:hover {
+  background-color: #27272a !important;
+  color: #ffffff !important;
+}
+
+[data-bs-theme="light"] .btn-outline-dark {
+  border-color: #e4e4e7 !important;
+  color: #18181b !important;
+}
+[data-bs-theme="light"] .btn-outline-dark:hover {
+  background-color: #f4f4f5 !important;
+  color: #09090b !important;
+}
+
+/* ---------- 徽章系统 (Badges) ---------- */
+[data-bs-theme="dark"] .badge.bg-secondary {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  color: #d4d4d8 !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+}
+[data-bs-theme="light"] .badge.bg-secondary {
+  background-color: #f4f4f5 !important;
+  color: #52525b !important;
+  border: 1px solid #e4e4e7 !important;
+}
+
+[data-bs-theme="dark"] .badge.bg-dark {
+  background-color: #27272a !important;
+  color: #f4f4f5 !important;
+  border: 1px solid #3f3f46 !important;
+}
+[data-bs-theme="light"] .badge.bg-dark {
+  background-color: #18181b !important;
+  color: #ffffff !important;
+  border: 1px solid #27272a !important;
+}
+
+[data-bs-theme="dark"] .badge.bg-success {
+  background-color: rgba(34, 197, 94, 0.15) !important;
+  color: #4ade80 !important;
+  border: 1px solid rgba(34, 197, 94, 0.3) !important;
+}
+[data-bs-theme="light"] .badge.bg-success {
+  background-color: #dcfce7 !important;
+  color: #15803d !important;
+  border: 1px solid #bbf7d0 !important;
+}
+
+[data-bs-theme="dark"] .badge.bg-danger {
+  background-color: rgba(239, 68, 68, 0.15) !important;
+  color: #f87171 !important;
+  border: 1px solid rgba(239, 68, 68, 0.3) !important;
+}
+[data-bs-theme="light"] .badge.bg-danger {
+  background-color: #fee2e2 !important;
+  color: #b91c1c !important;
+  border: 1px solid #fecaca !important;
+}
+
+[data-bs-theme="dark"] .badge.bg-warning {
+  background-color: rgba(245, 158, 11, 0.15) !important;
+  color: #fbbf24 !important;
+  border: 1px solid rgba(245, 158, 11, 0.3) !important;
+}
+[data-bs-theme="light"] .badge.bg-warning {
+  background-color: #fef3c7 !important;
+  color: #b45309 !important;
+  border: 1px solid #fde68a !important;
+}
+
+[data-bs-theme="dark"] .badge.bg-info {
+  background-color: rgba(6, 182, 212, 0.15) !important;
+  color: #38bdf8 !important;
+  border: 1px solid rgba(6, 182, 212, 0.3) !important;
+}
+[data-bs-theme="light"] .badge.bg-info {
+  background-color: #e0f2fe !important;
+  color: #0369a1 !important;
+  border: 1px solid #bae6fd !important;
+}
+
+/* ---------- 快捷键与图标底块 (Kbd & Avatars) ---------- */
+[data-bs-theme="dark"] kbd {
+  background-color: #27272a;
+  color: #f4f4f5;
+  border: 1px solid #3f3f46;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+[data-bs-theme="light"] kbd {
+  background-color: #f4f4f5;
+  color: #18181b;
+  border: 1px solid #d4d4d8;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.1);
+}
+
+[data-bs-theme="dark"] .bg-secondary.bg-opacity-25,
+[data-bs-theme="dark"] .bg-primary.bg-opacity-25 {
+  background-color: #27272a !important;
+  color: #d4d4d8 !important;
+}
+[data-bs-theme="light"] .bg-secondary.bg-opacity-25,
+[data-bs-theme="light"] .bg-primary.bg-opacity-25 {
+  background-color: #f4f4f5 !important;
+  color: #52525b !important;
+}
+
+/* ---------- 分页组件 (Pagination) ---------- */
+[data-bs-theme="dark"] .page-link {
+  background-color: #18181b;
+  border-color: #27272a;
+  color: #f4f4f5;
+}
+[data-bs-theme="dark"] .page-link:hover {
+  background-color: #27272a;
+  color: #ffffff;
+  border-color: #3f3f46;
+}
+[data-bs-theme="dark"] .page-item.active .page-link {
+  background-color: #f4f4f5 !important;
+  border-color: #f4f4f5 !important;
+  color: #09090b !important;
+  font-weight: 600;
+}
+[data-bs-theme="dark"] .page-item.disabled .page-link {
+  background-color: rgba(24, 24, 27, 0.5);
+  border-color: #27272a;
+  color: #71717a;
+}
+
+[data-bs-theme="light"] .page-link {
+  background-color: #ffffff;
+  border-color: #e4e4e7;
+  color: #09090b;
+}
+[data-bs-theme="light"] .page-link:hover {
+  background-color: #f4f4f5;
+  color: #09090b;
+  border-color: #d4d4d8;
+}
+[data-bs-theme="light"] .page-item.active .page-link {
+  background-color: #09090b !important;
+  border-color: #09090b !important;
+  color: #ffffff !important;
+  font-weight: 600;
+}
+[data-bs-theme="light"] .page-item.disabled .page-link {
+  background-color: #fafafa;
+  border-color: #e4e4e7;
+  color: #a1a1aa;
+}
+
 
 
