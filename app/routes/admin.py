@@ -34,6 +34,7 @@ from ..models import (
     KeyUsageLog,
     Notification,
     PointTransaction,
+    ProxyLog,
     Punishment,
     RedemptionKey,
     Report,
@@ -1000,6 +1001,67 @@ def image_logs():
     return render_template(
         "admin/image_logs.html", pagination=pagination, logs=logs
     )
+
+
+@admin_bp.route("/proxy-logs")
+@super_admin_required
+def proxy_logs():
+    """转发 API 审计日志（只读）：请求体 + 响应体成对查看。"""
+    page = request.args.get("page", 1, type=int)
+    q = request.args.get("q", "").strip()
+    status = request.args.get("status", "").strip()
+    query = ProxyLog.query
+
+    if q:
+        user_ids = [
+            u.id
+            for u in User.query.filter(
+                User.nickname.ilike(f"%{q}%")
+            ).all()
+        ]
+        query = query.filter(
+            ProxyLog.user_id.in_(user_ids)
+            | ProxyLog.token.ilike(f"%{q}%")
+            | ProxyLog.path.ilike(f"%{q}%")
+        )
+    if status:
+        if status == "success":
+            query = query.filter(ProxyLog.status_code == 200)
+        elif status == "error":
+            query = query.filter(
+                ProxyLog.status_code.is_(None) | (ProxyLog.status_code != 200)
+            )
+
+    pagination = query.order_by(
+        ProxyLog.created_at.desc(), ProxyLog.id.desc()
+    ).paginate(page=page, per_page=20, error_out=False)
+    logs = pagination.items
+    user_ids = [log.user_id for log in logs if log.user_id]
+    users_map = (
+        {u.id: u.nickname for u in User.query.filter(User.id.in_(user_ids)).all()}
+        if user_ids
+        else {}
+    )
+    for log in logs:
+        log.nickname = users_map.get(log.user_id, "未认证" if log.user_id is None else f"UID{log.user_id}")
+    return render_template(
+        "admin/proxy_logs.html", pagination=pagination, logs=logs
+    )
+
+
+@admin_bp.route("/proxy-logs/<int:log_id>")
+@super_admin_required
+def proxy_log_detail(log_id):
+    """转发审计日志详情：请求体 / 响应体对照。"""
+    log = db.session.get(ProxyLog, log_id)
+    if log is None:
+        abort(404)
+    nickname = "未认证"
+    if log.user_id:
+        u = db.session.get(User, log.user_id)
+        nickname = u.nickname if u else f"UID{log.user_id}"
+    log.nickname = nickname
+    return render_template("admin/proxy_log_detail.html", log=log)
 
 
 @admin_bp.route("/copy-stats")

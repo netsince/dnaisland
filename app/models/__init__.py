@@ -12,6 +12,7 @@ from .card import (
 from .image_gen import GenerationLog, GenerationModel, GenerationTask
 from .notification import Notification
 from .points import KeyUsageLog, PointTransaction, RedemptionKey
+from .proxy import ProxyConfig, ProxyLog
 from .punishment import Punishment
 from .recommendation import SiteRecommendation
 from .report import Report
@@ -67,6 +68,8 @@ __all__ = [
     "GenerationModel",
     "GenerationLog",
     "GenerationTask",
+    "ProxyConfig",
+    "ProxyLog",
     "Sticker",
     "StickerSeries",
 ]

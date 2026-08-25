@@ -1,0 +1,72 @@
+{% extends "admin/base.html" %}
+{% from "macros/pagination.html" import render_pagination %}
+
+{% block title %}转发日志 · DNAISLAND{% endblock %}
+
+{% block admin_content %}
+<h2 class="h4 mb-3">转发 API 审计日志</h2>
+
+<div class="card border-0 shadow-sm rounded-4 mb-3">
+  <div class="card-body py-3">
+    <form class="row g-2 align-items-end mb-0" method="get">
+      <div class="col-12 col-sm-auto flex-grow-1">
+        <label class="form-label small text-muted mb-1">关键词</label>
+        <input type="text" class="form-control form-control-sm" name="q" value="{{ request.args.get('q', '') }}" placeholder="用户昵称 / 令牌 / 路径">
+      </div>
+      <div class="col-6 col-sm-auto">
+        <label class="form-label small text-muted mb-1">状态</label>
+        <select class="form-select form-select-sm" name="status">
+          <option value="" {% if not request.args.get('status') %}selected{% endif %}>全部</option>
+          <option value="success" {% if request.args.get('status') == 'success' %}selected{% endif %}>成功 (200)</option>
+          <option value="error" {% if request.args.get('status') == 'error' %}selected{% endif %}>失败 / 非 200</option>
+        </select>
+      </div>
+      <div class="col-auto d-flex gap-2">
+        <button class="btn btn-sm btn-primary" type="submit">
+          <i class="bi bi-search me-1"></i>筛选
+        </button>
+        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin.proxy_logs') }}">重置</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if logs %}
+<div class="table-responsive">
+  <table class="table table-hover align-middle">
+    <thead>
+      <tr>
+        <th>用户</th><th>方法 / 路径</th><th>状态</th><th>耗时</th><th>令牌</th><th>时间</th><th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for l in logs %}
+      <tr>
+        <td>{{ l.nickname }}</td>
+        <td>
+          <span class="badge bg-secondary me-1">{{ l.method }}</span>
+          <span class="text-truncate d-inline-block align-middle" style="max-width: 260px;">{{ l.path or '' }}</span>
+        </td>
+        <td>
+          {% if l.status_code %}
+          <span class="badge bg-{{ 'success' if l.status_code == 200 else 'danger' }}">{{ l.status_code }}</span>
+          {% else %}
+          <span class="badge bg-warning">错误</span>
+          {% endif %}
+        </td>
+        <td class="small text-muted">{{ '—' if l.duration_ms is none else l.duration_ms ~ 'ms' }}</td>
+        <td class="small text-muted text-truncate" style="max-width: 120px;">{{ l.token or '—' }}</td>
+        <td class="small text-muted">{{ l.created_at|cst }}</td>
+        <td>
+          <a class="btn btn-sm btn-outline-info" href="{{ url_for('admin.proxy_log_detail', log_id=l.id) }}">查看</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{{ render_pagination(pagination, 'admin.proxy_logs', {}) }}
+{% else %}
+<p class="text-muted">暂无转发日志。</p>
+{% endif %}
+{% endblock %}

@@ -6,6 +6,42 @@
 {% block admin_content %}
 <h2 class="h4 mb-3">生图记录审阅</h2>
 
+<div class="card border-0 shadow-sm rounded-4 mb-3">
+  <div class="card-body py-3">
+    <form class="row g-2 align-items-end mb-0" method="get">
+      <div class="col-12 col-sm-auto flex-grow-1">
+        <label class="form-label small text-muted mb-1">用户昵称</label>
+        <input type="text" class="form-control form-control-sm" name="q" value="{{ request.args.get('q', '') }}" placeholder="用户昵称搜索">
+      </div>
+      <div class="col-6 col-sm-auto">
+        <label class="form-label small text-muted mb-1">生成状态</label>
+        <select class="form-select form-select-sm" name="status">
+          <option value="" {% if not request.args.get('status') %}selected{% endif %}>全部</option>
+          <option value="success" {% if request.args.get('status') == 'success' %}selected{% endif %}>成功</option>
+          <option value="partial" {% if request.args.get('status') == 'partial' %}selected{% endif %}>部分成功</option>
+          <option value="failed" {% if request.args.get('status') == 'failed' %}selected{% endif %}>失败</option>
+        </select>
+      </div>
+      <div class="col-auto d-flex gap-2">
+        <button class="btn btn-sm btn-primary" type="submit">
+          <i class="bi bi-search me-1"></i>筛选
+        </button>
+        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin.image_logs') }}">重置</a>
+      </div>
+    </form>
+    {% if request.args.get('q') or request.args.get('status') %}
+    <div class="mt-2 pt-2 border-top d-flex align-items-center gap-2 flex-wrap" style="font-size:0.78rem;">
+      <span class="text-muted">当前筛选：</span>
+      {% if request.args.get('q') %}<span class="badge bg-secondary">用户: {{ request.args.get('q') }}</span>{% endif %}
+      {% if request.args.get('status') %}<span class="badge bg-secondary">状态: {{ {'success':'成功','partial':'部分成功','failed':'失败'}.get(request.args.get('status'), request.args.get('status')) }}</span>{% endif %}
+      <a href="{{ url_for('admin.image_logs') }}" class="text-decoration-none text-danger" style="font-size:0.78rem;">
+        <i class="bi bi-x-circle me-1"></i>清除
+      </a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
 {% if logs %}
 <div class="table-responsive">
   <table class="table table-hover align-middle">

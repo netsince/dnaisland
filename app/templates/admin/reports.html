@@ -8,28 +8,50 @@
   <h2 class="h4 mb-0">举报管理</h2>
 </div>
 
-<form class="row g-2 mb-3 align-items-end" method="get">
-  <div class="col-auto">
-    <label class="form-label small text-muted mb-1">状态</label>
-    <select class="form-select" name="status">
-      <option value="pending" {% if status == 'pending' %}selected{% endif %}>待处理</option>
-      <option value="all" {% if status == 'all' %}selected{% endif %}>全部</option>
-      <option value="resolved" {% if status == 'resolved' %}selected{% endif %}>已处理</option>
-    </select>
+<div class="card border-0 shadow-sm rounded-4 mb-3">
+  <div class="card-body py-3">
+    <form class="row g-2 align-items-end mb-0" method="get">
+      <div class="col-12 col-sm-auto flex-grow-1">
+        <label class="form-label small text-muted mb-1">搜索举报原因</label>
+        <input type="text" class="form-control form-control-sm" name="q" value="{{ request.args.get('q', '') }}" placeholder="原因关键词">
+      </div>
+      <div class="col-6 col-sm-auto">
+        <label class="form-label small text-muted mb-1">处理状态</label>
+        <select class="form-select form-select-sm" name="status">
+          <option value="" {% if not status or status == '' %}selected{% endif %}>全部</option>
+          <option value="pending" {% if status == 'pending' %}selected{% endif %}>待处理</option>
+          <option value="resolved" {% if status == 'resolved' %}selected{% endif %}>已处理</option>
+        </select>
+      </div>
+      <div class="col-6 col-sm-auto">
+        <label class="form-label small text-muted mb-1">举报类型</label>
+        <select class="form-select form-select-sm" name="type">
+          <option value="" {% if not target_type %}selected{% endif %}>全部类型</option>
+          <option value="card" {% if target_type == 'card' %}selected{% endif %}>角色卡</option>
+          <option value="comment" {% if target_type == 'comment' %}selected{% endif %}>评论</option>
+          <option value="user" {% if target_type == 'user' %}selected{% endif %}>用户</option>
+        </select>
+      </div>
+      <div class="col-auto d-flex gap-2">
+        <button class="btn btn-sm btn-primary" type="submit">
+          <i class="bi bi-search me-1"></i>筛选
+        </button>
+        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin.reports') }}">重置</a>
+      </div>
+    </form>
+    {% if status or target_type or request.args.get('q') %}
+    <div class="mt-2 pt-2 border-top d-flex align-items-center gap-2 flex-wrap" style="font-size:0.78rem;">
+      <span class="text-muted">当前筛选：</span>
+      {% if request.args.get('q') %}<span class="badge bg-secondary">原因: {{ request.args.get('q') }}</span>{% endif %}
+      {% if status %}<span class="badge bg-secondary">状态: {{ '待处理' if status == 'pending' else '已处理' }}</span>{% endif %}
+      {% if target_type %}<span class="badge bg-secondary">类型: {{ {'card':'角色卡','comment':'评论','user':'用户'}.get(target_type, target_type) }}</span>{% endif %}
+      <a href="{{ url_for('admin.reports') }}" class="text-decoration-none text-danger" style="font-size:0.78rem;">
+        <i class="bi bi-x-circle me-1"></i>清除
+      </a>
+    </div>
+    {% endif %}
   </div>
-  <div class="col-auto">
-    <label class="form-label small text-muted mb-1">类型</label>
-    <select class="form-select" name="type">
-      <option value="" {% if not target_type %}selected{% endif %}>全部</option>
-      <option value="card" {% if target_type == 'card' %}selected{% endif %}>角色卡</option>
-      <option value="comment" {% if target_type == 'comment' %}selected{% endif %}>评论</option>
-      <option value="user" {% if target_type == 'user' %}selected{% endif %}>用户</option>
-    </select>
-  </div>
-  <div class="col-auto">
-    <button class="btn btn-outline-secondary" type="submit">筛选</button>
-  </div>
-</form>
+</div>
 
 <div class="text-muted small mb-3">
   待处理：{{ stats.get('pending', 0) }} · 已处理：{{ stats.get('resolved', 0) }}

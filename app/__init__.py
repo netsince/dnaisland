@@ -27,7 +27,10 @@ def create_app(config_object=None):
 
     # 环境变量可覆盖关键配置
     app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", app.config["SECRET_KEY"])
-    db_uri = os.environ.get("DATABASE_URL", app.config.get("SQLALCHEMY_DATABASE_URI", ""))
+    # 注意：db_uri 优先取 config 对象的已有值，不再从环境变量 DATABASE_URL 读取，
+    # 这样测试代码传入 TestConfig（SQLALCHEMY_DATABASE_URI=sqlite）才能正确生效。
+    # 如果仍想用环境变量覆盖，请直接在 config.py 中设置，或传自定义 Config 对象。
+    db_uri = app.config.get("SQLALCHEMY_DATABASE_URI", "")
     app.config["SQLALCHEMY_DATABASE_URI"] = db_uri
 
     # 动态构建健壮的连接池与网络超时参数（自动防御远程 MySQL 断连与丢包）
@@ -88,6 +91,7 @@ def create_app(config_object=None):
         image_gen_bp,
         main_bp,
         points_bp,
+        proxy_bp,
         publish_bp,
         sticker_bp,
         system_bp,
@@ -105,6 +109,7 @@ def create_app(config_object=None):
     app.register_blueprint(points_bp)
     app.register_blueprint(image_gen_bp)
     app.register_blueprint(sticker_bp)
+    app.register_blueprint(proxy_bp)
     app.register_blueprint(api_bp)
 
     from .commands import init_commands

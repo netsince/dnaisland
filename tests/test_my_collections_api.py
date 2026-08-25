@@ -22,11 +22,13 @@ class TestConfig(Config):
 def app(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
     app = create_app(TestConfig)
+    assert app.config["SQLALCHEMY_DATABASE_URI"].startswith("sqlite"), \
+        f"🧨 测试连到了非 SQLite 数据库！{app.config['SQLALCHEMY_DATABASE_URI']}"
     with app.app_context():
         db.create_all()
         yield app
         db.session.remove()
-        db.drop_all()
+        db.metadata.drop_all(bind=db.engine, checkfirst=True)
 
 
 @pytest.fixture

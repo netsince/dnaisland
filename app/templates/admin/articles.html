@@ -9,15 +9,40 @@
   <a class="btn btn-primary btn-sm" href="{{ url_for('admin.article_create') }}">＋ 发布文章</a>
 </div>
 
-<form class="row g-2 mb-3 align-items-end" method="get">
-  <div class="col-auto flex-grow-1">
-    <label class="form-label small text-muted mb-1">关键词</label>
-    <input type="text" class="form-control" name="q" value="{{ q }}" placeholder="标题">
+<div class="card border-0 shadow-sm rounded-4 mb-3">
+  <div class="card-body py-3">
+    <form class="row g-2 align-items-end mb-0" method="get">
+      <div class="col-12 col-sm-auto flex-grow-1">
+        <label class="form-label small text-muted mb-1">标题关键词</label>
+        <input type="text" class="form-control form-control-sm" name="q" value="{{ q }}" placeholder="搜索标题">
+      </div>
+      <div class="col-6 col-sm-auto">
+        <label class="form-label small text-muted mb-1">发布状态</label>
+        <select class="form-select form-select-sm" name="published">
+          <option value="" {% if not request.args.get('published') %}selected{% endif %}>全部</option>
+          <option value="1" {% if request.args.get('published') == '1' %}selected{% endif %}>已发布</option>
+          <option value="0" {% if request.args.get('published') == '0' %}selected{% endif %}>草稿</option>
+        </select>
+      </div>
+      <div class="col-auto d-flex gap-2">
+        <button class="btn btn-sm btn-primary" type="submit">
+          <i class="bi bi-search me-1"></i>筛选
+        </button>
+        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin.articles') }}">重置</a>
+      </div>
+    </form>
+    {% if q or request.args.get('published') %}
+    <div class="mt-2 pt-2 border-top d-flex align-items-center gap-2 flex-wrap" style="font-size:0.78rem;">
+      <span class="text-muted">当前筛选：</span>
+      {% if q %}<span class="badge bg-secondary">标题: {{ q }}</span>{% endif %}
+      {% if request.args.get('published') == '1' %}<span class="badge bg-success">已发布</span>{% elif request.args.get('published') == '0' %}<span class="badge bg-secondary">草稿</span>{% endif %}
+      <a href="{{ url_for('admin.articles') }}" class="text-decoration-none text-danger" style="font-size:0.78rem;">
+        <i class="bi bi-x-circle me-1"></i>清除
+      </a>
+    </div>
+    {% endif %}
   </div>
-  <div class="col-auto">
-    <button class="btn btn-outline-secondary" type="submit">搜索</button>
-  </div>
-</form>
+</div>
 
 <div class="table-responsive">
   <table class="table table-hover align-middle">

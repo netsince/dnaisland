@@ -1,0 +1,86 @@
+{% extends "admin/base.html" %}
+
+{% block title %}转发日志详情 · DNAISLAND{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex align-items-center gap-2 mb-3">
+  <a href="{{ url_for('admin.proxy_logs') }}" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1"></i>返回列表
+  </a>
+  <h2 class="h4 mb-0">转发日志 #{{ log.id }}</h2>
+</div>
+
+<div class="card border-0 shadow-sm rounded-4 mb-3">
+  <div class="card-body">
+    <div class="row g-3 small text-muted">
+      <div class="col-6 col-sm-4 col-md-3">
+        <div class="fw-semibold text-dark">用户</div>
+        <div>{{ log.nickname }}</div>
+      </div>
+      <div class="col-6 col-sm-4 col-md-3">
+        <div class="fw-semibold text-dark">方法 / 路径</div>
+        <div><span class="badge bg-secondary">{{ log.method }}</span> {{ log.path or '—' }}</div>
+      </div>
+      <div class="col-6 col-sm-4 col-md-3">
+        <div class="fw-semibold text-dark">状态码</div>
+        <div>{{ log.status_code or '—' }}</div>
+      </div>
+      <div class="col-6 col-sm-4 col-md-3">
+        <div class="fw-semibold text-dark">耗时</div>
+        <div>{{ '—' if log.duration_ms is none else log.duration_ms ~ 'ms' }}</div>
+      </div>
+      <div class="col-6 col-sm-4 col-md-3">
+        <div class="fw-semibold text-dark">令牌</div>
+        <div class="text-truncate">{{ log.token or '—' }}</div>
+      </div>
+      <div class="col-6 col-sm-4 col-md-3">
+        <div class="fw-semibold text-dark">上游 URL</div>
+        <div class="text-truncate">{{ log.upstream_url or '—' }}</div>
+      </div>
+      <div class="col-6 col-sm-4 col-md-3">
+        <div class="fw-semibold text-dark">时间</div>
+        <div>{{ log.created_at|cst }}</div>
+      </div>
+      {% if log.error %}
+      <div class="col-12">
+        <div class="fw-semibold text-dark">错误信息</div>
+        <div class="text-danger">{{ log.error }}</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% if log.request_body is not none %}
+<div class="card border-0 shadow-sm rounded-4 mb-3">
+  <div class="card-header bg-transparent py-2">
+    <span class="small fw-semibold">请求体</span>
+  </div>
+  <div class="card-body p-0">
+    <pre class="small m-0 p-3" style="max-height:400px;overflow:auto;white-space:pre-wrap;word-break:break-word;">{{ log.request_body }}</pre>
+  </div>
+</div>
+{% endif %}
+
+{% if log.response_body is not none %}
+<div class="card border-0 shadow-sm rounded-4 mb-3">
+  <div class="card-header bg-transparent py-2">
+    <span class="small fw-semibold">响应体</span>
+  </div>
+  <div class="card-body p-0">
+    <pre class="small m-0 p-3" style="max-height:400px;overflow:auto;white-space:pre-wrap;word-break:break-word;">{{ log.response_body }}</pre>
+  </div>
+</div>
+{% endif %}
+
+{% if log.error %}
+<div class="card border-0 shadow-sm rounded-4 mb-3">
+  <div class="card-header bg-transparent py-2">
+    <span class="small fw-semibold text-danger">错误信息</span>
+  </div>
+  <div class="card-body p-0">
+    <pre class="small m-0 p-3 text-danger" style="white-space:pre-wrap;">{{ log.error }}</pre>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

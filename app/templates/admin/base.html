@@ -39,7 +39,7 @@
 
         {% set is_review_active = request.endpoint and (request.endpoint.startswith('admin.review') or request.endpoint.startswith('admin.reports') or request.endpoint.startswith('admin.comment_moderation') or request.endpoint.startswith('admin.tea_moderation') or request.endpoint.startswith('admin.punish_appeals')) %}
         {% set is_community_active = request.endpoint and (request.endpoint.startswith('admin.users') or request.endpoint.startswith('admin.user_') or request.endpoint.startswith('admin.comments') or request.endpoint.startswith('admin.tea_posts') or request.endpoint.startswith('admin.notify_send') or request.endpoint.startswith('admin.articles') or request.endpoint.startswith('admin.article_')) %}
-        {% set is_content_active = request.endpoint and (request.endpoint.startswith('admin.cards') or request.endpoint.startswith('admin.card_') or request.endpoint.startswith('admin.recommend') or request.endpoint.startswith('admin.image_models') or request.endpoint == 'admin.image_logs' or request.endpoint == 'admin.stickers' or request.endpoint.startswith('admin.sponsors')) %}
+        {% set is_content_active = request.endpoint and (request.endpoint.startswith('admin.cards') or request.endpoint.startswith('admin.card_') or request.endpoint.startswith('admin.recommend') or request.endpoint.startswith('admin.image_models') or request.endpoint == 'admin.image_logs' or request.endpoint == 'admin.stickers' or request.endpoint.startswith('admin.sponsors') or request.endpoint.startswith('admin.proxy_logs')) %}
         {% set is_system_active = request.endpoint and (request.endpoint.startswith('admin.keys') or request.endpoint == 'admin.copy_stats' or request.endpoint == 'admin.system_config') %}
         {% set review_badges_total = admin_badges.cards + admin_badges.reports + admin_badges.comments + admin_badges.tea + admin_badges.appeals %}
 
@@ -187,6 +187,12 @@
                   <a class="nav-link rounded-3 d-flex align-items-center {% if request.endpoint == 'admin.image_logs' %}active fw-semibold{% endif %}"
                      href="{{ url_for('admin.image_logs') }}">
                     <i class="bi bi-images me-2"></i>生图记录
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link rounded-3 d-flex align-items-center {% if request.endpoint.startswith('admin.proxy_logs') %}active fw-semibold{% endif %}"
+                     href="{{ url_for('admin.proxy_logs') }}">
+                    <i class="bi bi-shuffle me-2"></i>转发日志
                   </a>
                 </li>
                 <li class="nav-item">
