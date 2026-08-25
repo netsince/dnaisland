@@ -12,7 +12,7 @@
       <div class="col-md-4">
         <label class="form-label">调用名</label>
         <input type="text" class="form-control" name="name" placeholder="如 gpt-image-1" required>
-        <div class="form-text">传给生图接口 model 字段的值。</div>
+        <div class="form-text">传给生图接口 model 字段的值。同一调用名可添加多条（例如活动免费版，仅展示名/积分不同）。</div>
       </div>
       <div class="col-md-4">
         <label class="form-label">展示名</label>
@@ -28,6 +28,18 @@
           <label class="form-check-label" for="enabled">启用</label>
         </div>
       </div>
+      <div class="col-md-6">
+        <label class="form-label">API Base URL <span class="text-muted">（选填）</span></label>
+        <input type="text" class="form-control" name="api_base_url"
+               placeholder="留空则使用全局配置，如 https://api.openai.com/v1">
+        <div class="form-text">兼容 OpenAI 生图接口的地址（不含末尾 /images/...）。留空表示走系统配置里的全局通道。</div>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">API Key <span class="text-muted">（选填）</span></label>
+        <input type="password" class="form-control" name="api_key" autocomplete="new-password"
+               placeholder="留空则使用全局配置的密钥">
+        <div class="form-text">该模型专用密钥，仅当与全局通道不同（例如接入另一家生图服务）时才需要填写。</div>
+      </div>
       <div class="col-12">
         <button type="submit" class="btn btn-primary">添加</button>
       </div>
@@ -41,7 +53,7 @@
     <table class="table table-hover mb-0">
       <thead>
         <tr>
-          <th>调用名</th><th>展示名</th><th>每图积分</th><th>状态</th><th>操作</th>
+          <th>调用名</th><th>展示名</th><th>每图积分</th><th>API 端点</th><th>状态</th><th>操作</th>
         </tr>
       </thead>
       <tbody>
@@ -51,11 +63,22 @@
           <td>{{ m.display_name }}</td>
           <td>{{ m.points_per_image }}</td>
           <td>
+            {% if m.api_base_url %}
+              <code>{{ m.api_base_url }}</code>
+              <span class="badge bg-info">单独通道</span>
+            {% else %}
+              <span class="text-muted">全局配置</span>
+            {% endif %}
+            {% if m.api_key %}<span class="badge bg-light text-dark">已配密钥</span>{% endif %}
+          </td>
+          <td>
             <span class="badge bg-{{ 'success' if m.enabled else 'secondary' }}">
               {{ '启用' if m.enabled else '禁用' }}
             </span>
           </td>
           <td>
+            <a class="btn btn-sm btn-outline-primary"
+               href="{{ url_for('admin.image_model_edit', model_id=m.id) }}">编辑</a>
             <form method="post" action="{{ url_for('admin.image_model_toggle', model_id=m.id) }}" class="d-inline">
               <button class="btn btn-sm btn-outline-secondary">{{ '禁用' if m.enabled else '启用' }}</button>
             </form>
@@ -66,10 +89,20 @@
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="5" class="text-muted text-center">暂无模型</td></tr>
+        <tr><td colspan="6" class="text-muted text-center">暂无模型</td></tr>
         {% endfor %}
       </tbody>
     </table>
+  </div>
+</div>
+
+<div class="card mt-3">
+  <div class="card-body">
+    <p class="mb-1 text-muted small">
+      提示：未填「API Base URL / API Key」的模型统一走
+      <a href="{{ url_for('admin.system_config') }}">系统配置</a> 里的全局生图通道；
+      填入后该模型独立使用自己的通道。<code>0</code> 积分模型不扣点，可用于限时免费活动。
+    </p>
   </div>
 </div>
 {% endblock %}

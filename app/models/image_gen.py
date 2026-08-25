@@ -17,7 +17,8 @@ class GenerationModel(db.Model):
     __tablename__ = "generation_models"
 
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(120), nullable=False, unique=True)  # 调用名，如 gpt-image-1
+    # 调用名，如 gpt-image-1。不唯一：同一调用名可配置多条（例如活动免费版，仅展示名/积分不同）。
+    name = db.Column(db.String(120), nullable=False, index=True)
     display_name = db.Column(db.String(120), nullable=False)  # 前端展示名
     points_per_image = db.Column(
         db.Integer, nullable=False, server_default="0", default=0
@@ -25,6 +26,10 @@ class GenerationModel(db.Model):
     enabled = db.Column(
         db.Boolean, nullable=False, server_default="1", default=True
     )
+    # 模型级 API 配置（OpenAI 格式通道）：为空时回退全局 SiteConfig.image_base_url / image_api_key。
+    # 每个模型可独立指向不同生图服务（如不同厂商），密钥不在模板中回显。
+    api_base_url = db.Column(db.Text, nullable=True)
+    api_key = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, server_default=db.func.now())
 
     def __repr__(self):

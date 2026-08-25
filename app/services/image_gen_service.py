@@ -23,6 +23,23 @@ def _build_url(base_url, path):
     return f"{base}{path}"
 
 
+def effective_credentials(model, site_cfg):
+    """解析某模型实际使用的生图 API 凭证，返回 (base_url, api_key)。
+
+    模型级配置（GenerationModel.api_base_url / api_key）优先，
+    缺失时回退全局 SiteConfig 的 image_base_url / image_api_key。
+    """
+    base = (
+        (getattr(model, "api_base_url", "") or "").strip()
+        or (site_cfg.image_base_url or "").strip()
+    )
+    key = (
+        (getattr(model, "api_key", "") or "").strip()
+        or (site_cfg.image_api_key or "").strip()
+    )
+    return base, key
+
+
 def _auth_headers(api_key):
     return {"Authorization": f"Bearer {api_key}"}
 

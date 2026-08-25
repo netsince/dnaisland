@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 
 from ..extensions import db
 from ..models import GenerationLog, GenerationModel, GenerationTask, PointTransaction, User
-from ..services.image_gen_service import generate_images
+from ..services.image_gen_service import effective_credentials, generate_images
 from ..services.site_service import get_site_config
 
 
@@ -50,10 +50,15 @@ def process_generation_task(app, task_id):
         user = db.session.get(User, task.user_id)
         ref_files = _build_reference_files(task)
 
+        base_url, api_key = effective_credentials(model, cfg)
+        if not base_url or not api_key:
+            _fail_task(task, "生图服务未配置 API（该模型与全局均未配置）", model)
+            return
+
         try:
             images = generate_images(
-                base_url=cfg.image_base_url,
-                api_key=cfg.image_api_key,
+                base_url=base_url,
+                api_key=api_key,
                 model=model.name,
                 prompt=task.prompt,
                 size=task.size,

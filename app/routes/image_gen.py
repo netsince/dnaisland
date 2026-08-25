@@ -25,6 +25,7 @@ from flask_login import current_user, login_required
 from ..extensions import db
 from ..models import GenerationLog, GenerationModel, GenerationTask
 from ..services.generation_worker import process_generation_task, recover_stale_tasks
+from ..services.image_gen_service import effective_credentials
 from ..services.image_service import send_webp
 from ..services.site_service import get_site_config
 from ..utils import ensure_owner_or_admin, is_xhr
@@ -129,13 +130,16 @@ def generate():
         return redirect(url_for("image_gen.workbench"))
 
     cfg = get_site_config()
-    if not cfg.image_base_url or not cfg.image_api_key:
-        return early("生图服务尚未配置，请联系管理员")
 
     model_id = request.form.get("model", type=int)
     model = db.session.get(GenerationModel, model_id) if model_id else None
     if not model or not model.enabled:
         return early("请选择有效的生图模型")
+
+    # 凭证以模型级配置优先，缺失回退全局；两者皆无则拒绝
+    base_url, api_key = effective_credentials(model, cfg)
+    if not base_url or not api_key:
+        return early("生图服务尚未配置，请联系管理员")
 
     prompt = (request.form.get("prompt") or "").strip()
     if not prompt:

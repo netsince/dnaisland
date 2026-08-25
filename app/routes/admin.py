@@ -695,15 +695,18 @@ def image_models():
             points_per_image = 0
         if not name or not display_name:
             flash("调用名与展示名均必填", "warning")
-        elif GenerationModel.query.filter_by(name=name).first():
-            flash("该调用名已存在", "warning")
         else:
+            # 同一调用名可配置多条（例如活动免费版）；API 配置为空时回退全局配置
+            base_url = (request.form.get("api_base_url") or "").strip() or None
+            api_key = (request.form.get("api_key") or "").strip() or None
             db.session.add(
                 GenerationModel(
                     name=name,
                     display_name=display_name,
                     points_per_image=points_per_image,
                     enabled=request.form.get("enabled") == "1",
+                    api_base_url=base_url,
+                    api_key=api_key,
                 )
             )
             db.session.commit()
@@ -722,6 +725,40 @@ def image_model_toggle(model_id):
     db.session.commit()
     flash("模型状态已更新", "success")
     return redirect(url_for("admin.image_models"))
+
+
+@admin_bp.route("/image-models/<int:model_id>/edit", methods=["GET", "POST"])
+@super_admin_required
+def image_model_edit(model_id):
+    m = db.get_or_404(GenerationModel, model_id)
+    if request.method == "POST":
+        name = (request.form.get("name") or "").strip()
+        display_name = (request.form.get("display_name") or "").strip()
+        try:
+            points_per_image = int(request.form.get("points_per_image", 0))
+        except ValueError:
+            points_per_image = 0
+        if not name or not display_name:
+            flash("调用名与展示名均必填", "warning")
+        else:
+            m.name = name
+            m.display_name = display_name
+            m.points_per_image = points_per_image
+            m.enabled = request.form.get("enabled") == "1"
+            # 模型级 API 配置：勾选「清除」则置空回退全局；
+            # 否则仅在有值时更新，避免误清空密钥（与系统配置的密钥处理一致）
+            if request.form.get("clear_api_base_url") == "1":
+                m.api_base_url = None
+            elif request.form.get("api_base_url", "").strip():
+                m.api_base_url = request.form.get("api_base_url").strip()
+            if request.form.get("clear_api_key") == "1":
+                m.api_key = None
+            elif request.form.get("api_key", "").strip():
+                m.api_key = request.form.get("api_key").strip()
+            db.session.commit()
+            flash("生图模型已更新", "success")
+            return redirect(url_for("admin.image_models"))
+    return render_template("admin/image_model_edit.html", m=m)
 
 
 @admin_bp.route("/image-models/<int:model_id>/delete", methods=["POST"])
