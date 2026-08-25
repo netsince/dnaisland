@@ -125,14 +125,41 @@
 </div>
 {% endblock %}
 
-{% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+{% block scripts %}
 <script>
-// ---------- 全局配置 ----------
-Chart.defaults.font.family = "'Segoe UI', system-ui, -apple-system, sans-serif";
-Chart.defaults.font.size = 11;
-Chart.defaults.color = '#6c757d';
-
+// ---------- Chart.js 多 CDN 回退加载（加载失败时数字卡片仍正常显示） ----------
+(function () {
+  var CDNS = [
+    'https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js',
+    'https://cdn.staticfile.net/Chart.js/4.4.7/chart.umd.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.7/chart.umd.min.js',
+    'https://unpkg.com/chart.js@4.4.7/dist/chart.umd.min.js'
+  ];
+  window.__chartLibReady = false;
+  window.__chartLibCallbacks = [];
+  function tryLoad(i) {
+    if (i >= CDNS.length) {
+      console.error('Chart.js 所有 CDN 均加载失败，仅显示数字统计');
+      document.querySelectorAll('.period-label').forEach(function (el) {
+        el.textContent += '（图表库加载失败）';
+      });
+      window.__chartLibCallbacks.forEach(function (cb) { cb(false); });
+      return;
+    }
+    var s = document.createElement('script');
+    s.src = CDNS[i];
+    s.onload = function () {
+      window.__chartLibReady = true;
+      window.__chartLibCallbacks.forEach(function (cb) { cb(true); });
+    };
+    s.onerror = function () { tryLoad(i + 1); };
+    document.head.appendChild(s);
+  }
+  tryLoad(0);
+})();
+</script>
+<script>
+// ---------- 全局配置（Chart 就绪后才初始化） ----------
 const COLORS = {
   blue:   { bg: 'rgba(13,110,253,0.10)', border: 'rgba(13,110,253,0.8)', point: 'rgba(13,110,253,1)' },
   green:  { bg: 'rgba(25,135,84,0.10)',  border: 'rgba(25,135,84,0.8)',  point: 'rgba(25,135,84,1)' },
@@ -144,6 +171,8 @@ const COLORS = {
 };
 let charts = {};
 let currentPeriod = 7;
+let latestData = null;      // 缓存 API 数据，图表库就绪后补画
+let chartLibDone = false;   // 图表库加载流程已结束（成功或失败）
 
 // ---------- 通用折线图工厂 ----------
 function createLineChart(ctx, label, data, color, opts = {}) {
@@ -233,7 +262,7 @@ function renderSnapshot(totals) {
   });
 }
 
-// ---------- 加载数据并渲染 ----------
+// ---------- 加载数据并渲染（数字不依赖图表库） ----------
 function loadData(days) {
   currentPeriod = days;
   document.querySelectorAll('[data-period]').forEach(btn => {
@@ -244,49 +273,74 @@ function loadData(days) {
   fetch(`/admin/api/stats/trends?days=${days}`)
     .then(r => r.json())
     .then(d => {
-      // 填充总量卡片
+      // 数字卡片与快照：无 Chart.js 也照常显示
       renderTotals(d.totals);
       renderSnapshot(d.totals);
 
-      // 销毁旧图表
-      Object.values(charts).forEach(c => c.destroy());
-      charts = {};
-
-      // 构建各图表
-      charts.users = createLineChart(
-        document.getElementById('usersChart'), '新注册用户',
-        { labels: d.labels, values: d.users }, COLORS.blue
-      );
-      charts.cumul = createLineChart(
-        document.getElementById('cumulUsersChart'), '累计用户',
-        { labels: d.labels, values: d.cumul_users }, COLORS.green
-      );
-      charts.cards = createLineChart(
-        document.getElementById('cardsChart'), '新卡片',
-        { labels: d.labels, values: d.cards }, COLORS.cyan
-      );
-      charts.copies = createLineChart(
-        document.getElementById('copiesChart'), '复制次数',
-        { labels: d.labels, values: d.copies }, COLORS.green
-      );
-      charts.gen = createLineChart(
-        document.getElementById('genChart'), 'AI 生图',
-        { labels: d.labels, values: d.generation }, COLORS.orange
-      );
-      charts.comments = createLineChart(
-        document.getElementById('commentsChart'), '评论',
-        { labels: d.labels, values: d.comments }, COLORS.gray
-      );
-      charts.notif = createLineChart(
-        document.getElementById('notifChart'), '通知',
-        { labels: d.labels, values: d.notifications }, COLORS.red
-      );
-      charts.points = createLineChart(
-        document.getElementById('pointsChart'), '积分交易',
-        { labels: d.labels, values: d.points }, COLORS.purple
-      );
-    });
+      // 缓存数据，等图表库就绪后画图
+      latestData = d;
+      drawChartsIfReady();
+    })
+    .catch(() => showToast('统计数据加载失败，请刷新重试', 'danger'));
 }
+
+// ---------- 图表库就绪后统一绘制 ----------
+function drawChartsIfReady() {
+  if (!chartLibDone || !latestData) return;           // 任一未就绪则等待
+  if (typeof Chart === 'undefined') return;            // 库加载失败：仅数字
+  Chart.defaults.font.family = "'Segoe UI', system-ui, -apple-system, sans-serif";
+  Chart.defaults.font.size = 11;
+  Chart.defaults.color = '#6c757d';
+
+  const d = latestData;
+  Object.values(charts).forEach(c => c.destroy());
+  charts = {};
+
+  charts.users = createLineChart(
+    document.getElementById('usersChart'), '新注册用户',
+    { labels: d.labels, values: d.users }, COLORS.blue
+  );
+  charts.cumul = createLineChart(
+    document.getElementById('cumulUsersChart'), '累计用户',
+    { labels: d.labels, values: d.cumul_users }, COLORS.green
+  );
+  charts.cards = createLineChart(
+    document.getElementById('cardsChart'), '新卡片',
+    { labels: d.labels, values: d.cards }, COLORS.cyan
+  );
+  charts.copies = createLineChart(
+    document.getElementById('copiesChart'), '复制次数',
+    { labels: d.labels, values: d.copies }, COLORS.green
+  );
+  charts.gen = createLineChart(
+    document.getElementById('genChart'), 'AI 生图',
+    { labels: d.labels, values: d.generation }, COLORS.orange
+  );
+  charts.comments = createLineChart(
+    document.getElementById('commentsChart'), '评论',
+    { labels: d.labels, values: d.comments }, COLORS.gray
+  );
+  charts.notif = createLineChart(
+    document.getElementById('notifChart'), '通知',
+    { labels: d.labels, values: d.notifications }, COLORS.red
+  );
+  charts.points = createLineChart(
+    document.getElementById('pointsChart'), '积分交易',
+    { labels: d.labels, values: d.points }, COLORS.purple
+  );
+}
+
+// 图表库加载流程结束时触发一次补画
+(function () {
+  const timer = setInterval(() => {
+    if (window.__chartLibReady || typeof Chart !== 'undefined') {
+      chartLibDone = true; clearInterval(timer); drawChartsIfReady();
+    }
+  }, 100);
+  setTimeout(() => {                    // 兜底：8 秒后无论成败都放行
+    if (!chartLibDone) { chartLibDone = true; clearInterval(timer); drawChartsIfReady(); }
+  }, 8000);
+})();
 
 function switchPeriod(days) {
   loadData(days);
