@@ -38,13 +38,13 @@
       <span>已选择 <strong id="batch-count" class="text-warning">0</strong> 项</span>
     </div>
     <div class="d-flex align-items-center gap-2">
-      <button type="button" class="btn btn-sm btn-success rounded-pill px-3" onclick="executeBatch('approve')">
+      <button type="button" class="btn btn-sm btn-success rounded-pill px-3" id="batch-approve-btn">
         <i class="bi bi-check-lg me-1"></i>批量通过
       </button>
       <button type="button" class="btn btn-sm btn-danger rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#batchRejectModal">
         <i class="bi bi-x-lg me-1"></i>批量驳回
       </button>
-      <button type="button" class="btn btn-sm btn-outline-light rounded-pill px-2" onclick="deselectAll()">
+      <button type="button" class="btn btn-sm btn-outline-light rounded-pill px-2" id="deselect-all-btn">
         取消选择
       </button>
     </div>
@@ -68,7 +68,7 @@
       </div>
       <div class="modal-footer border-0 pt-0">
         <button type="button" class="btn btn-sm btn-secondary rounded-pill px-3" data-bs-dismiss="modal">取消</button>
-        <button type="button" class="btn btn-sm btn-danger rounded-pill px-3" onclick="executeBatch('reject')">确认批量拒绝</button>
+        <button type="button" class="btn btn-sm btn-danger rounded-pill px-3" id="batch-reject-confirm-btn">确认批量拒绝</button>
       </div>
     </div>
   </div>
@@ -147,7 +147,7 @@
               {% endif %}
             </div>
             {% if (card.persona and card.persona|length > 60) or (card.intro and card.intro|length > 60) or card.opening %}
-            <a href="javascript:void(0)" onclick="toggleContent('{{ card.id }}')" id="toggle-btn-{{ card.id }}" class="small text-decoration-none mt-1 d-inline-block" style="font-size: 0.72rem;">
+            <a href="javascript:void(0)" data-toggle-content="{{ card.id }}" id="toggle-btn-{{ card.id }}" class="small text-decoration-none mt-1 d-inline-block" style="font-size: 0.72rem;">
               <i class="bi bi-chevron-down me-1"></i>展开全文
             </a>
             {% endif %}
@@ -183,7 +183,7 @@
                 详情
               </a>
               {% if card.status != 'approved' %}
-              <button type="button" class="btn btn-success btn-approve" onclick="ajaxApprove('{{ card.id }}')" title="一键通过 (快捷键 A)">
+              <button type="button" class="btn btn-success btn-approve" data-card-id="{{ card.id }}" title="一键通过 (快捷键 A)">
                 <i class="bi bi-check-lg"></i>
               </button>
               {% endif %}
@@ -198,7 +198,7 @@
             <div class="modal fade reject-modal" id="rejectModal-{{ card.id }}" tabindex="-1" aria-hidden="true">
               <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content rounded-4 text-start">
-                  <form onsubmit="event.preventDefault(); ajaxReject('{{ card.id }}');">
+                  <form class="reject-form" data-card-id="{{ card.id }}">
                     <div class="modal-header border-0 pb-0">
                       <h5 class="modal-title fw-bold">拒绝通过角色卡</h5>
                       <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -504,6 +504,93 @@ document.addEventListener('keydown', function(e) {
         }, 300);
       }
     }
+  }
+});
+
+// ---------------- 事件委托：通过/驳回按钮（不依赖内联 onclick） ----------------
+document.addEventListener('click', function(e) {
+  var approveBtn = e.target.closest('.btn-approve[data-card-id]');
+  if (approveBtn) {
+    e.preventDefault();
+    var cardId = approveBtn.getAttribute('data-card-id');
+    fetch('/admin/review/' + cardId + '/approve', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        'Accept': 'application/json'
+      }
+    }).then(function(r) { return r.json(); }).then(function(data) {
+      if (data.ok) {
+        showToast('已通过角色卡', 'success');
+        removeRow(cardId, true);
+        updateBadges(1);
+      } else {
+        showToast(data.error || '操作失败', 'danger');
+      }
+    }).catch(function() {
+      showToast('网络请求异常', 'danger');
+    });
+    return;
+  }
+});
+
+// 驳回表单提交（模态框内）
+document.addEventListener('submit', function(e) {
+  var rejectForm = e.target.closest('.reject-form');
+  if (rejectForm) {
+    e.preventDefault();
+    var cardId = rejectForm.getAttribute('data-card-id');
+    var reasonInput = document.getElementById('reason-' + cardId);
+    var reason = reasonInput ? reasonInput.value : '';
+    var modalEl = document.getElementById('rejectModal-' + cardId);
+    if (modalEl) {
+      var modal = bootstrap.Modal.getInstance(modalEl);
+      if (modal) modal.hide();
+    }
+    fetch('/admin/review/' + cardId + '/reject', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({ reason: reason })
+    }).then(function(r) { return r.json(); }).then(function(data) {
+      if (data.ok) {
+        showToast('已拒绝角色卡', 'warning');
+        removeRow(cardId, false);
+        updateBadges(1);
+      } else {
+        showToast(data.error || '操作失败', 'danger');
+      }
+    }).catch(function() {
+      showToast('网络请求异常', 'danger');
+    });
+  }
+});
+
+// ---------------- 批量操作 / 取消选择 / 展开收起（事件委托） ----------------
+document.addEventListener('click', function(e) {
+  var batchApprove = e.target.closest('#batch-approve-btn');
+  if (batchApprove) {
+    executeBatch('approve');
+    return;
+  }
+  var batchRejectConfirm = e.target.closest('#batch-reject-confirm-btn');
+  if (batchRejectConfirm) {
+    executeBatch('reject');
+    return;
+  }
+  var deselectBtn = e.target.closest('#deselect-all-btn');
+  if (deselectBtn) {
+    deselectAll();
+    return;
+  }
+  var toggleLink = e.target.closest('[data-toggle-content]');
+  if (toggleLink) {
+    e.preventDefault();
+    toggleContent(toggleLink.getAttribute('data-toggle-content'));
   }
 });
 </script>
