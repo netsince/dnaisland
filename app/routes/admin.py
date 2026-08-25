@@ -26,11 +26,14 @@ from ..models import (
     Card,
     CardCopyStat,
     CardDialogueStyle,
+    CardFavorite,
     CardImage,
+    CardLike,
     CardTag,
     Comment,
     GenerationLog,
     GenerationModel,
+    GenerationTask,
     KeyUsageLog,
     Notification,
     PointTransaction,
@@ -50,6 +53,8 @@ from ..models import (
     TeaPostLike,
     TeaPostTopic,
     User,
+    UserFollow,
+    VerificationCode,
 )
 from ..models.punishment import (
     APPEAL_ACCEPTED,
@@ -2743,4 +2748,109 @@ def sponsors_search():
             }
             for u in rows
         ]
+    )
+
+
+# ---------------- 数据大屏（趋势图与折线图）----------------
+from datetime import timedelta as _td
+
+
+@admin_bp.route("/data-dashboard")
+@super_admin_required
+def data_dashboard():
+    """数据大屏页面：加载 Chart.js 和 JSON 数据接口。"""
+    return render_template("admin/data_dashboard.html")
+
+
+@admin_bp.route("/api/stats/trends")
+@super_admin_required
+def stats_trends():
+    """返回最近 30 天的逐日趋势 JSON，供 Chart.js 折线图渲染。"""
+    days = request.args.get("days", 30, type=int)
+    days = max(7, min(90, days))
+    since = datetime.now() - _td(days=days)
+    since_str = since.strftime("%Y-%m-%d %H:%M:%S")
+
+    def _daily(klass, col):
+        """按日期分组计数，返回 {date_str: count} 字典。"""
+        rows = (
+            db.session.query(func.date(col).label("dt"), func.count("*"))
+            .filter(col >= since_str)
+            .group_by(func.date(col))
+            .order_by(func.date(col))
+            .all()
+        )
+        return {str(r.dt): r[1] for r in rows}
+
+    # 各维度的逐日数据
+    raw_users = _daily(User, User.created_at)
+    raw_cards = _daily(Card, Card.created_at)
+    raw_copies = _daily(CardCopyStat, CardCopyStat.copied_at)
+    raw_gen = _daily(GenerationLog, GenerationLog.created_at)
+    raw_comments = _daily(Comment, Comment.created_at)
+    raw_notifications = _daily(Notification, Notification.created_at)
+    raw_points = _daily(PointTransaction, PointTransaction.created_at)
+    raw_tea = _daily(TeaPost, TeaPost.created_at)
+
+    # 生成日期列表（since ~ 今天）及对应的数值序列
+    labels = []
+    users_series = []
+    cards_series = []
+    copies_series = []
+    gen_series = []
+    comments_series = []
+    notif_series = []
+    points_series = []
+    tea_series = []
+
+    for i in range(days + 1):
+        d = (since + _td(days=i)).strftime("%Y-%m-%d")
+        labels.append(d)
+        users_series.append(raw_users.get(d, 0))
+        cards_series.append(raw_cards.get(d, 0))
+        copies_series.append(raw_copies.get(d, 0))
+        gen_series.append(raw_gen.get(d, 0))
+        comments_series.append(raw_comments.get(d, 0))
+        notif_series.append(raw_notifications.get(d, 0))
+        points_series.append(raw_points.get(d, 0))
+        tea_series.append(raw_tea.get(d, 0))
+
+    # 累计曲线（用户数增长）
+    cumul = 0
+    cumul_users = []
+    for v in users_series:
+        cumul += v
+        cumul_users.append(cumul)
+
+    # 时点总量（当前精确值）
+    totals = {
+        "users": User.query.count(),
+        "cards": Card.query.filter_by(status="approved").count(),
+        "card_copy_stats": CardCopyStat.query.count(),
+        "generation_logs": GenerationLog.query.count(),
+        "comments": Comment.query.count(),
+        "notifications": Notification.query.count(),
+        "point_transactions": PointTransaction.query.count(),
+        "teahouse_posts": TeaPost.query.count(),
+        "generation_tasks": GenerationTask.query.count(),
+        "card_images": CardImage.query.count(),
+        "card_likes": CardLike.query.count(),
+        "card_favorites": CardFavorite.query.count(),
+        "user_follows": UserFollow.query.count(),
+        "verification_codes": VerificationCode.query.count(),
+        "proxy_logs": ProxyLog.query.count(),
+    }
+
+    return jsonify(
+        labels=labels,
+        users=users_series,
+        cards=cards_series,
+        copies=copies_series,
+        generation=gen_series,
+        comments=comments_series,
+        notifications=notif_series,
+        points=points_series,
+        teahouse=tea_series,
+        cumul_users=cumul_users,
+        totals=totals,
     )

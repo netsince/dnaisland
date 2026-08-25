@@ -1,0 +1,297 @@
+{% extends "admin/base.html" %}
+
+{% block title %}数据大屏 · 管理控制台{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+  <div>
+    <h1 class="h3 fw-bold mb-1">数据大屏</h1>
+    <p class="text-muted small mb-0">趋势分析与关键指标可视化</p>
+  </div>
+  <div class="d-flex gap-2">
+    <button class="btn btn-outline-primary btn-sm rounded-pill px-3 active" data-period="7" onclick="switchPeriod(7)">
+      <i class="bi bi-calendar-week me-1"></i>近 7 天
+    </button>
+    <button class="btn btn-outline-primary btn-sm rounded-pill px-3" data-period="30" onclick="switchPeriod(30)">
+      <i class="bi bi-calendar-month me-1"></i>近 30 天
+    </button>
+    <button class="btn btn-outline-primary btn-sm rounded-pill px-3" data-period="90" onclick="switchPeriod(90)">
+      <i class="bi bi-calendar3 me-1"></i>近 90 天
+    </button>
+  </div>
+</div>
+
+<!-- 总量概览卡片 -->
+<div class="row g-3 mb-4" id="totalCards">
+  <div class="col-6 col-md-4 col-lg-3 col-xl"><div class="card border-0 shadow-sm rounded-4 p-3 text-center"><div class="text-muted small fw-semibold">用户总数</div><div class="fs-3 fw-bold text-primary">—</div></div></div>
+  <div class="col-6 col-md-4 col-lg-3 col-xl"><div class="card border-0 shadow-sm rounded-4 p-3 text-center"><div class="text-muted small fw-semibold">角色卡总数</div><div class="fs-3 fw-bold text-info">—</div></div></div>
+  <div class="col-6 col-md-4 col-lg-3 col-xl"><div class="card border-0 shadow-sm rounded-4 p-3 text-center"><div class="text-muted small fw-semibold">复制次数</div><div class="fs-3 fw-bold text-success">—</div></div></div>
+  <div class="col-6 col-md-4 col-lg-3 col-xl"><div class="card border-0 shadow-sm rounded-4 p-3 text-center"><div class="text-muted small fw-semibold">AI 生图</div><div class="fs-3 fw-bold text-warning">—</div></div></div>
+  <div class="col-6 col-md-4 col-lg-3 col-xl"><div class="card border-0 shadow-sm rounded-4 p-3 text-center"><div class="text-muted small fw-semibold">评论数</div><div class="fs-3 fw-bold text-secondary">—</div></div></div>
+  <div class="col-6 col-md-4 col-lg-3 col-xl"><div class="card border-0 shadow-sm rounded-4 p-3 text-center"><div class="text-muted small fw-semibold">通知数</div><div class="fs-3 fw-bold text-danger">—</div></div></div>
+</div>
+
+<!-- 图表区域 -->
+<div class="row g-4">
+  <!-- 用户趋势折线图 -->
+  <div class="col-12 col-lg-8">
+    <div class="card border-0 shadow-sm rounded-4 h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5 class="card-title fw-bold mb-0"><i class="bi bi-people me-2 text-primary"></i>用户增长趋势</h5>
+          <span class="badge bg-primary-subtle text-primary rounded-pill period-label">近 30 天</span>
+        </div>
+        <canvas id="usersChart" height="220"></canvas>
+      </div>
+    </div>
+  </div>
+  <!-- 用户累计曲线 -->
+  <div class="col-12 col-lg-4">
+    <div class="card border-0 shadow-sm rounded-4 h-100">
+      <div class="card-body d-flex flex-column">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5 class="card-title fw-bold mb-0"><i class="bi bi-graph-up-arrow me-2 text-success"></i>累计用户</h5>
+        </div>
+        <canvas id="cumulUsersChart" height="220"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- 卡片趋势 -->
+  <div class="col-12 col-md-6 col-lg-4">
+    <div class="card border-0 shadow-sm rounded-4 h-100">
+      <div class="card-body">
+        <h5 class="card-title fw-bold mb-3"><i class="bi bi-collection me-2 text-info"></i>每日新卡片</h5>
+        <canvas id="cardsChart" height="180"></canvas>
+      </div>
+    </div>
+  </div>
+  <!-- 复制趋势 -->
+  <div class="col-12 col-md-6 col-lg-4">
+    <div class="card border-0 shadow-sm rounded-4 h-100">
+      <div class="card-body">
+        <h5 class="card-title fw-bold mb-3"><i class="bi bi-files me-2 text-success"></i>每日复制次数</h5>
+        <canvas id="copiesChart" height="180"></canvas>
+      </div>
+    </div>
+  </div>
+  <!-- 生图趋势 -->
+  <div class="col-12 col-md-6 col-lg-4">
+    <div class="card border-0 shadow-sm rounded-4 h-100">
+      <div class="card-body">
+        <h5 class="card-title fw-bold mb-3"><i class="bi bi-cpu me-2 text-warning"></i>每日 AI 生图</h5>
+        <canvas id="genChart" height="180"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- 评论趋势 -->
+  <div class="col-12 col-md-6 col-lg-4">
+    <div class="card border-0 shadow-sm rounded-4 h-100">
+      <div class="card-body">
+        <h5 class="card-title fw-bold mb-3"><i class="bi bi-chat-dots me-2 text-secondary"></i>每日评论</h5>
+        <canvas id="commentsChart" height="180"></canvas>
+      </div>
+    </div>
+  </div>
+  <!-- 通知趋势 -->
+  <div class="col-12 col-md-6 col-lg-4">
+    <div class="card border-0 shadow-sm rounded-4 h-100">
+      <div class="card-body">
+        <h5 class="card-title fw-bold mb-3"><i class="bi bi-bell me-2 text-danger"></i>每日通知</h5>
+        <canvas id="notifChart" height="180"></canvas>
+      </div>
+    </div>
+  </div>
+  <!-- 积分/茶馆趋势 -->
+  <div class="col-12 col-md-6 col-lg-4">
+    <div class="card border-0 shadow-sm rounded-4 h-100">
+      <div class="card-body">
+        <h5 class="card-title fw-bold mb-3"><i class="bi bi-coin me-2 text-purple"></i>每日积分交易</h5>
+        <canvas id="pointsChart" height="180"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- 存量数据一览 -->
+  <div class="col-12">
+    <div class="card border-0 shadow-sm rounded-4">
+      <div class="card-body">
+        <h5 class="card-title fw-bold mb-3"><i class="bi bi-database me-2 text-muted"></i>全量数据快照</h5>
+        <div class="row g-2" id="snapshotGrid"></div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script>
+// ---------- 全局配置 ----------
+Chart.defaults.font.family = "'Segoe UI', system-ui, -apple-system, sans-serif";
+Chart.defaults.font.size = 11;
+Chart.defaults.color = '#6c757d';
+
+const COLORS = {
+  blue:   { bg: 'rgba(13,110,253,0.10)', border: 'rgba(13,110,253,0.8)', point: 'rgba(13,110,253,1)' },
+  green:  { bg: 'rgba(25,135,84,0.10)',  border: 'rgba(25,135,84,0.8)',  point: 'rgba(25,135,84,1)' },
+  cyan:   { bg: 'rgba(13,202,240,0.10)', border: 'rgba(13,202,240,0.8)', point: 'rgba(13,202,240,1)' },
+  orange: { bg: 'rgba(255,193,7,0.10)',  border: 'rgba(255,193,7,0.8)',  point: 'rgba(255,193,7,1)' },
+  gray:   { bg: 'rgba(108,117,125,0.10)',border: 'rgba(108,117,125,0.8)',point: 'rgba(108,117,125,1)' },
+  red:    { bg: 'rgba(220,53,69,0.10)',  border: 'rgba(220,53,69,0.8)',  point: 'rgba(220,53,69,1)' },
+  purple: { bg: 'rgba(111,66,193,0.10)', border: 'rgba(111,66,193,0.8)',point: 'rgba(111,66,193,1)' },
+};
+let charts = {};
+let currentPeriod = 7;
+
+// ---------- 通用折线图工厂 ----------
+function createLineChart(ctx, label, data, color, opts = {}) {
+  const fill = opts.fill !== false;
+  return new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: data.labels,
+      datasets: [{
+        label,
+        data: data.values,
+        borderColor: color.border,
+        backgroundColor: color.bg,
+        pointBackgroundColor: color.point,
+        pointRadius: data.values.length > 30 ? 1 : 3,
+        pointHoverRadius: 5,
+        borderWidth: 2,
+        fill,
+        tension: 0.3,
+        spanGaps: true,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: items => items[0]?.label || '',
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: {
+            maxTicksLimit: 12,
+            maxRotation: 0,
+          }
+        },
+        y: {
+          beginAtZero: true,
+          grid: { color: 'rgba(0,0,0,0.04)' },
+          ticks: { precision: 0 }
+        }
+      },
+      ...opts,
+    }
+  });
+}
+
+// ---------- 填充统计卡片 ----------
+function renderTotals(totals) {
+  const map = [
+    ['用户总数', 'users', 'primary'],
+    ['角色卡总数', 'cards', 'info'],
+    ['复制次数', 'card_copy_stats', 'success'],
+    ['AI 生图', 'generation_logs', 'warning'],
+    ['评论数', 'comments', 'secondary'],
+    ['通知数', 'notifications', 'danger'],
+  ];
+  document.querySelectorAll('#totalCards > div').forEach((el, i) => {
+    if (i < map.length) {
+      const label = map[i][0], key = map[i][1];
+      el.innerHTML = `<div class="card border-0 shadow-sm rounded-4 p-3 text-center h-100">
+        <div class="text-muted small fw-semibold">${label}</div>
+        <div class="fs-3 fw-bold text-${map[i][2]}">${(totals[key] ?? 0).toLocaleString()}</div>
+      </div>`;
+    }
+  });
+}
+
+// ---------- 填充全量数据快照 ----------
+function renderSnapshot(totals) {
+  const exclude = new Set(['cards']);
+  const grid = document.getElementById('snapshotGrid');
+  grid.innerHTML = '';
+  Object.entries(totals).forEach(([key, val]) => {
+    if (exclude.has(key)) return;
+    grid.innerHTML += `<div class="col-6 col-md-4 col-lg-3 col-xl-2">
+      <div class="border rounded-3 p-2 text-center">
+        <div class="small text-muted">${key.replace(/_/g, ' ')}</div>
+        <div class="fw-semibold">${val.toLocaleString()}</div>
+      </div>
+    </div>`;
+  });
+}
+
+// ---------- 加载数据并渲染 ----------
+function loadData(days) {
+  currentPeriod = days;
+  document.querySelectorAll('[data-period]').forEach(btn => {
+    btn.classList.toggle('active', parseInt(btn.dataset.period) === days);
+  });
+  document.querySelector('.period-label').textContent = `近 ${days} 天`;
+
+  fetch(`/admin/api/stats/trends?days=${days}`)
+    .then(r => r.json())
+    .then(d => {
+      // 填充总量卡片
+      renderTotals(d.totals);
+      renderSnapshot(d.totals);
+
+      // 销毁旧图表
+      Object.values(charts).forEach(c => c.destroy());
+      charts = {};
+
+      // 构建各图表
+      charts.users = createLineChart(
+        document.getElementById('usersChart'), '新注册用户',
+        { labels: d.labels, values: d.users }, COLORS.blue
+      );
+      charts.cumul = createLineChart(
+        document.getElementById('cumulUsersChart'), '累计用户',
+        { labels: d.labels, values: d.cumul_users }, COLORS.green
+      );
+      charts.cards = createLineChart(
+        document.getElementById('cardsChart'), '新卡片',
+        { labels: d.labels, values: d.cards }, COLORS.cyan
+      );
+      charts.copies = createLineChart(
+        document.getElementById('copiesChart'), '复制次数',
+        { labels: d.labels, values: d.copies }, COLORS.green
+      );
+      charts.gen = createLineChart(
+        document.getElementById('genChart'), 'AI 生图',
+        { labels: d.labels, values: d.generation }, COLORS.orange
+      );
+      charts.comments = createLineChart(
+        document.getElementById('commentsChart'), '评论',
+        { labels: d.labels, values: d.comments }, COLORS.gray
+      );
+      charts.notif = createLineChart(
+        document.getElementById('notifChart'), '通知',
+        { labels: d.labels, values: d.notifications }, COLORS.red
+      );
+      charts.points = createLineChart(
+        document.getElementById('pointsChart'), '积分交易',
+        { labels: d.labels, values: d.points }, COLORS.purple
+      );
+    });
+}
+
+function switchPeriod(days) {
+  loadData(days);
+}
+
+document.addEventListener('DOMContentLoaded', () => loadData(7));
+</script>
+{% endblock %}

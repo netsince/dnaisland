@@ -50,6 +50,12 @@
             <span><i class="bi bi-speedometer2 me-2"></i>仪表盘总览</span>
           </a>
 
+          <!-- 1b. 数据大屏 -->
+          <a class="nav-link py-2 px-3 rounded-3 d-flex align-items-center justify-content-between mb-1 {% if request.endpoint == 'admin.data_dashboard' %}active fw-semibold{% endif %}"
+             href="{{ url_for('admin.data_dashboard') }}">
+            <span><i class="bi bi-bar-chart-line me-2 text-purple"></i>数据大屏</span>
+          </a>
+
           <!-- 2. 审核与风控（折叠分组） -->
           <div class="sidebar-group">
             <button class="btn w-100 text-start d-flex align-items-center justify-content-between py-2 px-2 rounded-3 border-0 bg-transparent admin-group-btn {% if not is_review_active %}collapsed{% endif %}"
