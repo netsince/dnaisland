@@ -23,7 +23,7 @@
         {% endif %}
         <span class="text-secondary">›</span>
       {% endfor %}
-      <span class="fw-semibold text-dark">{{ post.author.display_name }}</span>
+      <span class="fw-semibold text-dark">{{ post.author.display_name }}</span>{% if is_sponsor(post.author.id) %}<i class="bi bi-star-fill text-danger ms-1" title="赞助者" style="font-size: 0.8rem;"></i>{% endif %}
       <span class="text-secondary">(你在这)</span>
     </nav>
     {% endif %}

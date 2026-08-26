@@ -81,6 +81,21 @@ def create_app(config_object=None):
 
     app.jinja_env.globals["teapost_visible"] = _teapost_visible
 
+    # 判断用户是否为赞助者（赞助列表中的用户，昵称旁显示红星装饰）。
+    # 每请求只查一次赞助者 user_id 集合，缓存到 flask.g。
+    def _is_sponsor(user_id):
+        if not user_id:
+            return False
+        if not hasattr(g, "_sponsor_user_ids"):
+            from .models import Sponsor
+
+            g._sponsor_user_ids = {
+                sid for (sid,) in db.session.query(Sponsor.user_id).all()
+            }
+        return user_id in g._sponsor_user_ids
+
+    app.jinja_env.globals["is_sponsor"] = _is_sponsor
+
     from flask_cors import CORS
 
     CORS(app, resources={r"/api/*": {"origins": "*"}})
