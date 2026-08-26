@@ -625,6 +625,19 @@ data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded=
   (function () {
     if (!window.history || !window.history.pushState) return;
 
+    // 后台管理页面（/admin/*）一律排除在 AJAX 无感切页之外：
+    // 管理页脚本大量依赖内联 onclick + 全局函数，软导航时脚本被 IIFE 包裹
+    // 导致全局函数丢失、DOMContentLoaded 不再触发，按钮/操作 JS 失效必须刷新——整页加载可根治。
+    function isAdminPath(href) {
+      if (!href) return false;
+      try {
+        var p = new URL(href, location.origin).pathname;
+        return p === '/admin' || p.indexOf('/admin/') === 0;
+      } catch (e) {
+        return false;
+      }
+    }
+
     function isIgnoredLink(a) {
       if (!a || a.tagName !== 'A') return true;
       var href = a.getAttribute('href');
@@ -634,6 +647,7 @@ data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded=
       // 图片预览器（GLightbox）的触发链接：交给 GLightbox 自身弹窗，勿当切页拦截
       if (a.classList && a.classList.contains('glightbox')) return true;
       if (a.origin !== location.origin) return true;
+      if (isAdminPath(href)) return true;
       return false;
     }
 
@@ -728,6 +742,11 @@ data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded=
     }
 
     function loadPage(url, pushHistory) {
+      // 后台管理页面（/admin/*）：即使经 popstate 回退或其它调用进入，也强制整页加载
+      if (isAdminPath(url)) {
+        location.href = url;
+        return;
+      }
       if (window.closeMobilePlusMenu) window.closeMobilePlusMenu();
       var main = document.querySelector('main');
       var loader = document.getElementById('pjaxLoader');
