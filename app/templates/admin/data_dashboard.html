@@ -198,11 +198,18 @@ function createLineChart(ctx, label, data, color, opts = {}) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      // 鼠标滑过曲线任意位置即显示最近数据点数值（默认 intersect:true 必须精确点中
+      // 3px 的小圆点才出提示，体验上感觉"没有 tooltip"）
+      interaction: {
+        mode: 'index',
+        intersect: false
+      },
       plugins: {
         legend: { display: false },
         tooltip: {
           callbacks: {
             title: items => items[0]?.label || '',
+            label: item => ` ${item.dataset.label}: ${item.formattedValue}`,
           }
         }
       },
