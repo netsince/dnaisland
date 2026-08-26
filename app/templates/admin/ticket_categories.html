@@ -56,6 +56,11 @@
             {% endif %}
           </td>
           <td class="text-end pe-3">
+            <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-2"
+                    data-id="{{ c.id }}" data-name="{{ c.name }}" data-sort="{{ c.sort_order }}"
+                    onclick="openCategoryEdit(this)">
+              <i class="bi bi-pencil"></i> 编辑
+            </button>
             <form method="post" action="{{ url_for('admin.ticket_categories_toggle', cat_id=c.id) }}" class="d-inline">
               <button type="submit" class="btn btn-sm btn-outline-secondary rounded-pill px-2">
                 {{ '禁用' if c.enabled else '启用' }}
@@ -77,4 +82,42 @@
   </div>
 </div>
 <p class="text-muted small mt-2 mb-0">提示：已关联工单的类别删除时会自动改为「禁用」以保留历史关联。</p>
+
+<!-- 编辑类别弹窗 -->
+<div class="modal fade" id="categoryEditModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <form method="post" id="categoryEditForm" class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">编辑类别</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">类别名称</label>
+          <input type="text" class="form-control" name="name" required maxlength="30">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">排序（小在前）</label>
+          <input type="number" class="form-control" name="sort_order" value="0">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+        <button type="submit" class="btn btn-primary">保存</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  var categoriesBase = "{{ url_for('admin.ticket_categories') }}";  // /admin/ticket-categories
+
+  function openCategoryEdit(btn) {
+    var f = document.getElementById('categoryEditForm');
+    f.action = categoriesBase + '/' + btn.dataset.id + '/edit';
+    f.elements['name'].value = btn.dataset.name;
+    f.elements['sort_order'].value = btn.dataset.sort || 0;
+    new bootstrap.Modal(document.getElementById('categoryEditModal')).show();
+  }
+</script>
 {% endblock %}
