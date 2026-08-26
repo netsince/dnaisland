@@ -37,7 +37,7 @@
           }
         </style>
 
-        {% set is_review_active = request.endpoint and (request.endpoint.startswith('admin.review') or request.endpoint.startswith('admin.reports') or request.endpoint.startswith('admin.comment_moderation') or request.endpoint.startswith('admin.tea_moderation') or request.endpoint.startswith('admin.punish_appeals')) %}
+        {% set is_review_active = request.endpoint and (request.endpoint.startswith('admin.review') or request.endpoint.startswith('admin.reports') or request.endpoint.startswith('admin.comment_moderation') or request.endpoint.startswith('admin.tea_moderation') or request.endpoint.startswith('admin.punish_appeals') or request.endpoint.startswith('admin.tickets') or request.endpoint.startswith('admin.ticket_categories')) %}
         {% set is_community_active = request.endpoint and (request.endpoint.startswith('admin.users') or request.endpoint.startswith('admin.user_') or request.endpoint.startswith('admin.comments') or request.endpoint.startswith('admin.tea_posts') or request.endpoint.startswith('admin.notify_send') or request.endpoint.startswith('admin.articles') or request.endpoint.startswith('admin.article_')) %}
         {% set is_content_active = request.endpoint and (request.endpoint.startswith('admin.cards') or request.endpoint.startswith('admin.card_') or request.endpoint.startswith('admin.recommend') or request.endpoint.startswith('admin.image_models') or request.endpoint == 'admin.image_logs' or request.endpoint == 'admin.stickers' or request.endpoint.startswith('admin.sponsors') or request.endpoint.startswith('admin.proxy_logs')) %}
         {% set is_system_active = request.endpoint and (request.endpoint.startswith('admin.keys') or request.endpoint == 'admin.copy_stats' or request.endpoint == 'admin.system_config') %}
@@ -113,6 +113,12 @@
                     {% if admin_badges.appeals > 0 %}
                     <span class="badge bg-danger rounded-pill" style="font-size: 0.68rem;">{{ admin_badges.appeals }}</span>
                     {% endif %}
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link rounded-3 d-flex align-items-center justify-content-between {% if request.endpoint.startswith('admin.tickets') or request.endpoint.startswith('admin.ticket_categories') %}active fw-semibold{% endif %}"
+                     href="{{ url_for('admin.tickets') }}">
+                    <span><i class="bi bi-ticket-perforated me-2"></i>工单管理</span>
                   </a>
                 </li>
               </ul>
@@ -226,12 +232,6 @@
             </button>
             <div class="collapse {% if is_system_active %}show{% endif %}" id="collapse-system">
               <ul class="nav nav-pills flex-column gap-1 my-1 ms-2 ps-2 border-start border-2 border-secondary-subtle">
-                <li class="nav-item">
-                  <a class="nav-link rounded-3 d-flex align-items-center {% if request.endpoint.startswith('admin.tickets') or request.endpoint.startswith('admin.ticket_categories') %}active fw-semibold{% endif %}"
-                     href="{{ url_for('admin.tickets') }}">
-                    <i class="bi bi-ticket-perforated me-2"></i>工单管理
-                  </a>
-                </li>
                 <li class="nav-item">
                   <a class="nav-link rounded-3 d-flex align-items-center {% if request.endpoint.startswith('admin.keys') %}active fw-semibold{% endif %}"
                      href="{{ url_for('admin.keys_list') }}">
