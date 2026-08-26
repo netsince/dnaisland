@@ -33,8 +33,18 @@ from ..models import (
     Punishment,
     Sponsor,
     TeaPost,
+    Ticket,
+    TicketCategory,
+    TicketMessage,
     User,
     UserFollow,
+)
+from ..models.ticket import (
+    MSG_ROLE_ADMIN,
+    MSG_ROLE_USER,
+    TICKET_CLOSED,
+    TICKET_OPEN,
+    TICKET_REPLIED,
 )
 from ..models.punishment import (
     APPEAL_ACCEPTED,
@@ -54,6 +64,7 @@ from ..services.comment_service import (
 )
 from ..services.image_service import raw_bytes_to_webp_data_url
 from ..services.notification_service import notifications_page
+from ..services.notification_service import notify, notify_super_admins
 from ..services.profile_service import update_profile
 from ..services.punishment_service import my_punishments_list, submit_punishment_appeal
 from ..services.report_service import (
@@ -1005,3 +1016,160 @@ def report():
         raw_id=raw_id,
         reasons=REPORT_REASONS,
     )
+
+
+# ---------------- 我的工单 ----------------
+@user_bp.route("/my/tickets")
+@login_required
+def my_tickets():
+    """当前用户的工单列表（按最新消息时间倒序）。"""
+    page = request.args.get("page", 1, type=int)
+    q = request.args.get("q", "").strip()
+    st = request.args.get("status", "all")
+
+    base = Ticket.query.filter_by(user_id=current_user.id)
+    if st in TICKET_STATUSES:
+        base = base.filter(Ticket.status == st)
+    if q:
+        base = base.filter(Ticket.title.ilike(f"%{q}%"))
+    # 按 updated_at 倒序（未更新则按 created_at）
+    tickets = base.order_by(
+        db.func.coalesce(Ticket.updated_at, Ticket.created_at).desc()
+    ).paginate(page=page, per_page=20, error_out=False)
+
+    return render_template(
+        "user/tickets.html",
+        tickets=tickets,
+        q=q,
+        st=st,
+    )
+
+
+@user_bp.route("/my/tickets/new", methods=["GET", "POST"])
+@login_required
+def my_tickets_new():
+    """新建工单。"""
+    categories = (
+        TicketCategory.query.filter_by(enabled=True)
+        .order_by(TicketCategory.sort_order, TicketCategory.name)
+        .all()
+    )
+
+    if request.method == "POST":
+        cat_id = request.form.get("category_id", type=int)
+        title = (request.form.get("title") or "").strip()
+        content = (request.form.get("content") or "").strip()
+
+        if not title:
+            flash("请填写工单主题", "warning")
+            return redirect(url_for("user.my_tickets_new"))
+        if not content:
+            flash("请填写工单内容", "warning")
+            return redirect(url_for("user.my_tickets_new"))
+
+        t = Ticket(
+            user_id=current_user.id,
+            category_id=cat_id or None,
+            title=title,
+            content=content,
+        )
+        db.session.add(t)
+        db.session.flush()
+        # 第一条消息即工单内容
+        tm = TicketMessage(
+            ticket_id=t.id,
+            sender_id=current_user.id,
+            sender_role=MSG_ROLE_USER,
+            content=content,
+        )
+        db.session.add(tm)
+        db.session.commit()
+        notify_super_admins(
+            f"新工单「{title}」来自 {current_user.nickname or current_user.username}",
+            type_="ticket",
+        )
+        flash("工单已提交，请等待管理员回复", "success")
+        return redirect(url_for("user.my_tickets_detail", ticket_id=t.id))
+
+    return render_template("user/ticket_new.html", categories=categories)
+
+
+@user_bp.route("/my/tickets/<int:ticket_id>")
+@login_required
+def my_tickets_detail(ticket_id):
+    """工单详情（对话视图）。"""
+    t = db.get_or_404(Ticket, ticket_id)
+    if t.user_id != current_user.id and not current_user.is_super_admin:
+        abort(404)
+    return render_template("user/ticket_detail.html", ticket=t)
+
+
+@user_bp.route("/my/tickets/<int:ticket_id>/reply", methods=["POST"])
+@login_required
+def my_tickets_reply(ticket_id):
+    """用户回复工单。"""
+    t = db.get_or_404(Ticket, ticket_id)
+    if t.user_id != current_user.id:
+        abort(404)
+    if t.status == TICKET_CLOSED:
+        flash("工单已关闭，无法回复", "warning")
+        return redirect(url_for("user.my_tickets_detail", ticket_id=t.id))
+
+    content = (request.form.get("content") or "").strip()
+    if not content:
+        flash("请填写回复内容", "warning")
+        return redirect(url_for("user.my_tickets_detail", ticket_id=t.id))
+
+    tm = TicketMessage(
+        ticket_id=t.id,
+        sender_id=current_user.id,
+        sender_role=MSG_ROLE_USER,
+        content=content,
+    )
+    db.session.add(tm)
+    t.status = TICKET_OPEN
+    db.session.commit()
+    notify_super_admins(
+        f"工单「{t.title}」有新回复（{current_user.nickname or current_user.username}）",
+        type_="ticket",
+    )
+    flash("回复已发送", "success")
+    return redirect(url_for("user.my_tickets_detail", ticket_id=t.id))
+
+
+@user_bp.route("/my/tickets/<int:ticket_id>/close", methods=["POST"])
+@login_required
+def my_tickets_close(ticket_id):
+    """用户关闭工单。"""
+    t = db.get_or_404(Ticket, ticket_id)
+    if t.user_id != current_user.id:
+        abort(404)
+    if t.status == TICKET_CLOSED:
+        flash("工单已关闭", "info")
+        return redirect(url_for("user.my_tickets_detail", ticket_id=t.id))
+    t.status = TICKET_CLOSED
+    t.closed_at = db.func.now()
+    db.session.commit()
+    flash("工单已关闭", "success")
+    return redirect(url_for("user.my_tickets_detail", ticket_id=t.id))
+
+
+@user_bp.route("/my/tickets/<int:ticket_id>/reopen", methods=["POST"])
+@login_required
+def my_tickets_reopen(ticket_id):
+    """用户重新打开已关闭的工单。"""
+    t = db.get_or_404(Ticket, ticket_id)
+    if t.user_id != current_user.id:
+        abort(404)
+    if t.status != TICKET_CLOSED:
+        flash("工单未关闭，无需重新打开", "info")
+        return redirect(url_for("user.my_tickets_detail", ticket_id=t.id))
+    t.status = TICKET_OPEN
+    t.closed_at = None
+    db.session.commit()
+    notify_super_admins(
+        f"工单「{t.title}」已由用户重新打开",
+        type_="ticket",
+    )
+    flash("工单已重新打开", "success")
+    return redirect(url_for("user.my_tickets_detail", ticket_id=t.id))

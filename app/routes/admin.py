@@ -52,9 +52,20 @@ from ..models import (
     TeaPostImage,
     TeaPostLike,
     TeaPostTopic,
+    Ticket,
+    TicketCategory,
+    TicketMessage,
     User,
     UserFollow,
     VerificationCode,
+)
+from ..models.ticket import (
+    MSG_ROLE_ADMIN,
+    MSG_ROLE_USER,
+    TICKET_CLOSED,
+    TICKET_OPEN,
+    TICKET_REPLIED,
+    TICKET_STATUSES,
 )
 from ..models.punishment import (
     APPEAL_ACCEPTED,
@@ -2583,6 +2594,196 @@ def article_toggle_author(article_id):
     db.session.commit()
     flash("已切换发布者显示状态", "success")
     return redirect(url_for("admin.articles"))
+
+
+# ---------------- 工单管理 ----------------
+@admin_bp.route("/tickets")
+@super_admin_required
+def tickets():
+    """工单列表：筛选/搜索/分页。"""
+    page = request.args.get("page", 1, type=int)
+    status = request.args.get("status", "all")
+    cat_id = request.args.get("category_id", type=int)
+    q = request.args.get("q", "").strip()
+
+    base = Ticket.query
+    if status in TICKET_STATUSES:
+        base = base.filter(Ticket.status == status)
+    if cat_id:
+        base = base.filter(Ticket.category_id == cat_id)
+    if q:
+        base = base.filter(Ticket.title.ilike(f"%{q}%"))
+    tickets = base.order_by(
+        db.func.coalesce(Ticket.updated_at, Ticket.created_at).desc()
+    ).paginate(page=page, per_page=20, error_out=False)
+
+    categories = TicketCategory.query.order_by(
+        TicketCategory.sort_order, TicketCategory.name
+    ).all()
+    return render_template(
+        "admin/tickets.html",
+        tickets=tickets,
+        categories=categories,
+        q=q,
+        st=status,
+        cat_id=cat_id,
+    )
+
+
+@admin_bp.route("/tickets/<int:ticket_id>")
+@super_admin_required
+def tickets_detail(ticket_id):
+    """工单详情（对话视图）。"""
+    t = db.get_or_404(Ticket, ticket_id)
+    return render_template("admin/ticket_detail.html", ticket=t)
+
+
+@admin_bp.route("/tickets/<int:ticket_id>/reply", methods=["POST"])
+@super_admin_required
+def tickets_reply(ticket_id):
+    """管理员回复工单。"""
+    t = db.get_or_404(Ticket, ticket_id)
+    if t.status == TICKET_CLOSED:
+        flash("工单已关闭，无法回复", "warning")
+        return redirect(url_for("admin.tickets_detail", ticket_id=t.id))
+
+    content = (request.form.get("content") or "").strip()
+    if not content:
+        flash("请填写回复内容", "warning")
+        return redirect(url_for("admin.tickets_detail", ticket_id=t.id))
+
+    tm = TicketMessage(
+        ticket_id=t.id,
+        sender_id=current_user.id,
+        sender_role=MSG_ROLE_ADMIN,
+        content=content,
+    )
+    db.session.add(tm)
+    t.status = TICKET_REPLIED
+    db.session.commit()
+    notify(
+        t.user_id,
+        f"你的工单「{t.title}」收到管理员回复，点击查看",
+        type_="ticket",
+    )
+    flash("回复已发送", "success")
+    return redirect(url_for("admin.tickets_detail", ticket_id=t.id))
+
+
+@admin_bp.route("/tickets/<int:ticket_id>/status", methods=["POST"])
+@super_admin_required
+def tickets_status(ticket_id):
+    """管理员关闭/重新打开工单。"""
+    t = db.get_or_404(Ticket, ticket_id)
+    action = request.form.get("action")
+    if action == "close":
+        if t.status == TICKET_CLOSED:
+            flash("工单已关闭", "info")
+        else:
+            t.status = TICKET_CLOSED
+            t.closed_at = db.func.now()
+            db.session.commit()
+            notify(
+                t.user_id,
+                f"工单「{t.title}」已被管理员关闭",
+                type_="ticket",
+            )
+            flash("工单已关闭", "success")
+    elif action == "reopen":
+        if t.status != TICKET_CLOSED:
+            flash("工单未关闭，无需重新打开", "info")
+        else:
+            t.status = TICKET_REPLIED
+            t.closed_at = None
+            db.session.commit()
+            notify(
+                t.user_id,
+                f"工单「{t.title}」已被管理员重新打开",
+                type_="ticket",
+            )
+            flash("工单已重新打开", "success")
+    return redirect(url_for("admin.tickets_detail", ticket_id=t.id))
+
+
+# ---------------- 工单类别管理 ----------------
+@admin_bp.route("/ticket-categories")
+@super_admin_required
+def ticket_categories():
+    """工单类别管理页。"""
+    cats = TicketCategory.query.order_by(
+        TicketCategory.sort_order, TicketCategory.name
+    ).all()
+    return render_template("admin/ticket_categories.html", categories=cats)
+
+
+@admin_bp.route("/ticket-categories/add", methods=["POST"])
+@super_admin_required
+def ticket_categories_add():
+    name = (request.form.get("name") or "").strip()
+    if not name:
+        flash("类别名称不能为空", "danger")
+        return redirect(url_for("admin.ticket_categories"))
+    order = request.form.get("sort_order", type=int) or 0
+    if TicketCategory.query.filter_by(name=name).first():
+        flash("类别名称已存在", "warning")
+        return redirect(url_for("admin.ticket_categories"))
+    c = TicketCategory(name=name, sort_order=order)
+    db.session.add(c)
+    db.session.commit()
+    flash("类别已添加", "success")
+    return redirect(url_for("admin.ticket_categories"))
+
+
+@admin_bp.route("/ticket-categories/<int:cat_id>/edit", methods=["POST"])
+@super_admin_required
+def ticket_categories_edit(cat_id):
+    c = db.get_or_404(TicketCategory, cat_id)
+    name = (request.form.get("name") or "").strip()
+    if not name:
+        flash("类别名称不能为空", "danger")
+        return redirect(url_for("admin.ticket_categories"))
+    dup = TicketCategory.query.filter_by(name=name).first()
+    if dup and dup.id != cat_id:
+        flash("类别名称已存在", "warning")
+        return redirect(url_for("admin.ticket_categories"))
+    c.name = name
+    c.sort_order = request.form.get("sort_order", type=int) or 0
+    db.session.commit()
+    flash("类别已更新", "success")
+    return redirect(url_for("admin.ticket_categories"))
+
+
+@admin_bp.route("/ticket-categories/<int:cat_id>/toggle", methods=["POST"])
+@super_admin_required
+def ticket_categories_toggle(cat_id):
+    c = db.get_or_404(TicketCategory, cat_id)
+    c.enabled = not c.enabled
+    db.session.commit()
+    flash(
+        f"类别「{c.name}」已{'启用' if c.enabled else '禁用'}",
+        "success",
+    )
+    return redirect(url_for("admin.ticket_categories"))
+
+
+@admin_bp.route("/ticket-categories/<int:cat_id>/delete", methods=["POST"])
+@super_admin_required
+def ticket_categories_delete(cat_id):
+    c = db.get_or_404(TicketCategory, cat_id)
+    # 已关联工单的类别只禁用不删除
+    exists = Ticket.query.filter_by(category_id=cat_id).first()
+    if exists:
+        c.enabled = False
+        db.session.commit()
+        flash(
+            f"类别「{c.name}」已关联工单，已改为禁用（保留关联）",
+            "info",
+        )
+    else:
+        db.session.delete(c)
+        db.session.commit()
+        flash(f"类别「{c.name}」已删除", "success")
+    return redirect(url_for("admin.ticket_categories"))
 
 
 # ---------------- 赞助页面 ----------------

@@ -227,6 +227,12 @@
             <div class="collapse {% if is_system_active %}show{% endif %}" id="collapse-system">
               <ul class="nav nav-pills flex-column gap-1 my-1 ms-2 ps-2 border-start border-2 border-secondary-subtle">
                 <li class="nav-item">
+                  <a class="nav-link rounded-3 d-flex align-items-center {% if request.endpoint.startswith('admin.tickets') or request.endpoint.startswith('admin.ticket_categories') %}active fw-semibold{% endif %}"
+                     href="{{ url_for('admin.tickets') }}">
+                    <i class="bi bi-ticket-perforated me-2"></i>工单管理
+                  </a>
+                </li>
+                <li class="nav-item">
                   <a class="nav-link rounded-3 d-flex align-items-center {% if request.endpoint.startswith('admin.keys') %}active fw-semibold{% endif %}"
                      href="{{ url_for('admin.keys_list') }}">
                     <i class="bi bi-key me-2"></i>兑换码管理

@@ -1,0 +1,95 @@
+{% extends "admin/base.html" %}
+
+{% block title %}{{ ticket.title }} · 工单详情 · 管理控制台{% endblock %}
+
+{% block admin_content %}
+<nav aria-label="breadcrumb" class="mb-3">
+  <ol class="breadcrumb small">
+    <li class="breadcrumb-item"><a href="{{ url_for('admin.tickets') }}">工单管理</a></li>
+    <li class="breadcrumb-item active text-truncate" style="max-width:400px;">{{ ticket.title }}</li>
+  </ol>
+</nav>
+
+<div class="card border-0 shadow-sm rounded-4 mb-4">
+  <div class="card-body">
+    <div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-2">
+      <h1 class="h5 fw-bold mb-0">{{ ticket.title }}</h1>
+      {% if ticket.status == 'open' %}
+      <span class="badge bg-warning text-dark rounded-pill flex-shrink-0">待处理</span>
+      {% elif ticket.status == 'replied' %}
+      <span class="badge bg-primary rounded-pill flex-shrink-0">已回复</span>
+      {% else %}
+      <span class="badge bg-secondary rounded-pill flex-shrink-0">已关闭</span>
+      {% endif %}
+    </div>
+    <div class="small text-muted mb-2">
+      {% if ticket.category %}<span class="badge bg-light text-muted border me-2">{{ ticket.category.name }}</span>{% endif %}
+      用户：<a href="{{ url_for('admin.users') }}?q={{ ticket.user.username }}" class="text-decoration-none">{{ ticket.user.nickname or ticket.user.username }}</a>
+      (UID {{ ticket.user_id }})
+    </div>
+    <div class="small text-muted">
+      提交于 {{ ticket.created_at.strftime('%Y-%m-%d %H:%M') }}
+      {% if ticket.closed_at %} · 关闭于 {{ ticket.closed_at.strftime('%Y-%m-%d %H:%M') }}{% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- 对话时间线 -->
+<div class="mb-4">
+  {% for msg in ticket.messages %}
+  <div class="d-flex gap-3 mb-3">
+    <div class="flex-shrink-0">
+      <div class="rounded-circle {% if msg.sender_role == 'admin' %}bg-primary{% else %}bg-secondary{% endif %} d-flex align-items-center justify-content-center text-white"
+           style="width:36px;height:36px;font-size:0.85rem;font-weight:600;">
+        {% if msg.sender.nickname %}{{ msg.sender.nickname[:1] }}{% elif msg.sender_role == 'admin' %}管{% else %}我{% endif %}
+      </div>
+    </div>
+    <div class="flex-grow-1 min-w-0">
+      <div class="rounded-3 p-3 {% if msg.sender_role == 'admin' %}bg-primary-subtle border border-primary-subtle{% else %}bg-body-tertiary border{% endif %}">
+        <div class="small fw-semibold {% if msg.sender_role == 'admin' %}text-primary{% else %}text-muted{% endif %} mb-1">
+          {{ msg.sender.nickname or msg.sender.username }}
+          {% if msg.sender_role == 'admin' %}<span class="badge bg-primary ms-1">管理员</span>{% else %}<span class="badge bg-secondary ms-1">用户</span>{% endif %}
+          <span class="text-muted ms-2 fw-normal">{{ msg.created_at.strftime('%m-%d %H:%M') }}</span>
+        </div>
+        <div class="small" style="white-space:pre-wrap;">{{ msg.content }}</div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- 回复 / 操作 -->
+{% if ticket.status != 'closed' %}
+<div class="card border-0 shadow-sm rounded-4 mb-3">
+  <div class="card-body">
+    <form method="post" action="{{ url_for('admin.tickets_reply', ticket_id=ticket.id) }}">
+      <div class="mb-3">
+        <label for="replyContent" class="form-label fw-semibold">管理员回复</label>
+        <textarea class="form-control" id="replyContent" name="content" rows="4" required
+                  placeholder="输入回复内容，将发送站内通知给用户…"></textarea>
+      </div>
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary btn-sm rounded-pill px-3">
+          <i class="bi bi-send me-1"></i>发送回复
+        </button>
+        <button type="submit" form="closeForm" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
+          <i class="bi bi-x-circle me-1"></i>关闭工单
+        </button>
+      </div>
+    </form>
+    <form id="closeForm" method="post" action="{{ url_for('admin.tickets_status', ticket_id=ticket.id) }}">
+      <input type="hidden" name="action" value="close">
+    </form>
+  </div>
+</div>
+{% else %}
+<div class="d-flex gap-2">
+  <form method="post" action="{{ url_for('admin.tickets_status', ticket_id=ticket.id) }}">
+    <input type="hidden" name="action" value="reopen">
+    <button type="submit" class="btn btn-outline-primary btn-sm rounded-pill px-3">
+      <i class="bi bi-arrow-counterclockwise me-1"></i>重新打开
+    </button>
+  </form>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,80 @@
+{% extends "admin/base.html" %}
+
+{% block title %}工单类别 · 管理控制台{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+  <div>
+    <h1 class="h4 fw-bold mb-1">工单类别管理</h1>
+    <p class="text-muted small mb-0">用户新建工单时从中选择类别</p>
+  </div>
+  <a href="{{ url_for('admin.tickets') }}" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
+    <i class="bi bi-ticket-perforated me-1"></i>返回工单
+  </a>
+</div>
+
+<!-- 新增 -->
+<div class="card border-0 shadow-sm rounded-4 mb-4">
+  <div class="card-body">
+    <form method="post" action="{{ url_for('admin.ticket_categories_add') }}" class="row g-2 align-items-center">
+      <div class="col-md-5">
+        <input type="text" name="name" class="form-control form-control-sm" placeholder="类别名称（如：账号问题）" required maxlength="30">
+      </div>
+      <div class="col-md-3">
+        <input type="number" name="sort_order" class="form-control form-control-sm" placeholder="排序（小在前）" value="0">
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-primary btn-sm rounded-pill px-3"><i class="bi bi-plus-lg me-1"></i>添加类别</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm rounded-4">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th class="ps-3">类别</th>
+          <th>排序</th>
+          <th>状态</th>
+          <th class="text-end pe-3">操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in categories %}
+        <tr>
+          <td class="ps-3">
+            <span class="fw-medium">{{ c.name }}</span>
+          </td>
+          <td>{{ c.sort_order }}</td>
+          <td>
+            {% if c.enabled %}
+            <span class="badge bg-success rounded-pill">启用</span>
+            {% else %}
+            <span class="badge bg-secondary rounded-pill">禁用</span>
+            {% endif %}
+          </td>
+          <td class="text-end pe-3">
+            <form method="post" action="{{ url_for('admin.ticket_categories_toggle', cat_id=c.id) }}" class="d-inline">
+              <button type="submit" class="btn btn-sm btn-outline-secondary rounded-pill px-2">
+                {{ '禁用' if c.enabled else '启用' }}
+              </button>
+            </form>
+            <form method="post" action="{{ url_for('admin.ticket_categories_delete', cat_id=c.id) }}" class="d-inline"
+                  onsubmit="return confirm('确定删除类别「{{ c.name }}」吗？');">
+              <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-2">
+                <i class="bi bi-trash"></i>
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" class="text-center text-muted py-5">暂无类别</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+<p class="text-muted small mt-2 mb-0">提示：已关联工单的类别删除时会自动改为「禁用」以保留历史关联。</p>
+{% endblock %}

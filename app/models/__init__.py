@@ -30,6 +30,17 @@ from .teahouse import (
     TeaPostTopic,
     TeaTopic,
 )
+from .ticket import (
+    TICKET_CLOSED,
+    TICKET_OPEN,
+    TICKET_REPLIED,
+    TICKET_STATUSES,
+    MSG_ROLE_ADMIN,
+    MSG_ROLE_USER,
+    Ticket,
+    TicketCategory,
+    TicketMessage,
+)
 from .user import User, UserFollow
 from .verification_code import VerificationCode
 
@@ -72,4 +83,13 @@ __all__ = [
     "ProxyLog",
     "Sticker",
     "StickerSeries",
+    "TicketCategory",
+    "Ticket",
+    "TicketMessage",
+    "TICKET_STATUSES",
+    "TICKET_OPEN",
+    "TICKET_REPLIED",
+    "TICKET_CLOSED",
+    "MSG_ROLE_USER",
+    "MSG_ROLE_ADMIN",
 ]
