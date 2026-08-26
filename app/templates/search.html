@@ -3,6 +3,7 @@
 {% from "macros/verified.html" import badge %}
 {% from "macros/highlight.html" import hl %}
 {% from "macros/cards.html" import card_grid, empty_state %}
+{% from "macros/user_badge.html" import user_badge with context %}
 
 {% block title %}搜索：{{ q }} · DNAISLAND{% endblock %}
 
@@ -61,9 +62,7 @@
  </a>
  <div class="flex-grow-1 overflow-hidden">
  <div class="d-flex align-items-center gap-2 flex-wrap">
- <a href="{{ url_for('user.profile', username=spotlight_user.username) }}" class="fw-bold fs-5 text-light text-decoration-none hover-underline">
- {{ hl(spotlight_user.nickname, q) }}{{ badge(spotlight_user) }}
- </a>
+ {{ user_badge(spotlight_user, name=hl(spotlight_user.nickname, q), class='fw-bold fs-5 text-light hover-underline') }}
  <span class="text-muted small">@{{ hl(spotlight_user.username, q) }}</span>
  </div>
  <div class="text-muted small mt-1">
@@ -124,9 +123,7 @@
  <div class="flex-grow-1 overflow-hidden">
  <div class="d-flex align-items-center justify-content-between mb-1">
  <div class="d-flex align-items-center gap-2">
- <a href="{{ url_for('user.profile', username=p.author.username) }}" class="fw-semibold text-light text-decoration-none">
- {{ p.author.display_name }}{{ badge(p.author) }}
- </a>
+ {{ user_badge(p.author, class='fw-semibold text-light') }}
  <span class="text-muted small">@{{ p.author.username }}</span>
  </div>
  <small class="text-muted">{{ p.created_at|cst }}</small>
@@ -188,9 +185,7 @@
  <div class="flex-grow-1 overflow-hidden">
  <div class="d-flex align-items-center justify-content-between mb-1">
  <div class="d-flex align-items-center gap-2">
- <a href="{{ url_for('user.profile', username=p.author.username) }}" class="fw-semibold text-light text-decoration-none">
- {{ p.author.display_name }}{{ badge(p.author) }}
- </a>
+ {{ user_badge(p.author, class='fw-semibold text-light') }}
  <span class="text-muted small">@{{ p.author.username }}</span>
  </div>
  <small class="text-muted">{{ p.created_at|cst }}</small>
@@ -231,7 +226,7 @@ style="width:52px;height:52px;">
 <div class="dna-avatar-ph flex-shrink-0" style="width:52px;height:52px;font-size:1.3rem;">{{ u.nickname[:1] }}</div>
 {% endif %}
 <div class="overflow-hidden">
-<div class="fw-semibold text-truncate text-light">{{ hl(u.nickname, q) }}{{ badge(u) }}</div>
+<div class="fw-semibold text-truncate text-light">{{ user_badge(u, name=hl(u.nickname, q)) }}</div>
 <div class="text-muted small text-truncate">@{{ hl(u.username, q) }}</div>
 </div>
 </a>

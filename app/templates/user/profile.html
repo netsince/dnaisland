@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "macros/pagination.html" import render_pagination %}
-{% from "macros/verified.html" import badge %}
 {% from "macros/cards.html" import card_grid, empty_state %}
+{% from "macros/user_badge.html" import user_badge with context %}
 
 {% block title %}{{ u.display_name }} · DNAISLAND{% endblock %}
 {% block body_class %}dna-hide-header-on-mobile{% endblock %}
@@ -59,8 +59,7 @@
  {% endif %}
  <div class="flex-grow-1 min-w-0">
  <h1 class="h5 mb-1 d-flex align-items-center flex-wrap gap-1">
- <span class="text-truncate mw-100">{{ u.display_name }}</span>
- {{ badge(u) }}
+ {{ user_badge(u, class='text-truncate mw-100') }}
  {% if u.role == 'super_admin' %}<span class="badge bg-danger-subtle text-danger border border-danger-subtle ms-1" style="font-size:0.68rem;font-weight:500;vertical-align:middle;">管理员</span>{% endif %}
  </h1>
  <div class="text-muted small text-truncate">@{{ u.username }}{% if is_self %} · <span class="dna-chip">这是你</span>{% endif %}</div>

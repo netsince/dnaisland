@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "macros/user_badge.html" import user_badge with context %}
 
 {% block title %}{{ article.title }} · DNAISLAND{% endblock %}
 
@@ -12,7 +13,7 @@
   </nav>
   <h1 class="mb-2">{{ article.title }}</h1>
   <div class="text-muted small mb-4">
-    {{ article.author.nickname if (article.show_author and article.author) else '匿名管理员' }}
+    {% if article.show_author and article.author %}{{ user_badge(article.author, link=false) }}{% else %}匿名管理员{% endif %}
     {% if article.created_at %} · {{ article.created_at|cst }}{% endif %}
   </div>
   {% if article.cover %}

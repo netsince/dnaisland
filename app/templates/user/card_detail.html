@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% from "macros/verified.html" import badge %}
 {% from "macros/cards.html" import status_badge %}
+{% from "macros/user_badge.html" import user_badge with context %}
 
 {% block title %}{{ card.name }} · DNAISLAND{% endblock %}
 {% block body_class %}dna-hide-header-on-mobile dna-page-card-detail{% endblock %}
@@ -44,7 +45,7 @@
               <div class="dna-card-meta d-flex flex-wrap gap-2 align-items-center">
                 {% if card.gender %}<span class="dna-chip">{{ card.gender }}</span>{% endif %}
                 {% if author %}
-                <a href="{{ url_for('user.profile', username=author.username) }}" class="dna-chip text-decoration-none">{{ author.display_name }}{{ badge(author) }}</a>
+                {{ user_badge(author, class='dna-chip') }}
                 {% endif %}
                 <span class="dna-chip">{{ card.view_count }} 次浏览</span>
                 <span class="dna-chip">{{ card.copy_count or 0 }} 次复制</span>
@@ -303,6 +304,14 @@
   var loggedIn  = trigger.dataset.loggedIn === 'true';
   var loginUrl  = trigger.dataset.loginUrl;
   var cardId    = {{ card.id|tojson }};
+  // 赞助者 user_id 集合：评论昵称旁加红色星标
+  var SPONSOR_IDS = {{ sponsor_ids|tojson }};
+  function sponsorStar(author) {
+    if (author && SPONSOR_IDS.indexOf(author.id) !== -1) {
+      return '<i class="bi bi-star-fill text-danger ms-1" title="赞助者" style="font-size:0.8rem;"></i>';
+    }
+    return '';
+  }
   var currentSort = 'latest';
   var onlyAuthor = false;
   var page = 1;
@@ -511,7 +520,7 @@
       + avatarEl(r.author)
       + '<div class="dna-comment-reply-item__body">'
       + '<div class="dna-comment-item__meta d-flex align-items-center flex-wrap">'
-      + '<a href="/user/' + r.author.username + '" class="text-decoration-none text-reset fw-medium">' + escHtml(r.author.display_name) + '</a>'
+      + '<a href="/user/' + r.author.username + '" class="text-decoration-none text-reset fw-medium">' + escHtml(r.author.display_name) + '</a>' + sponsorStar(r.author)
       + commentBadgesHtml(r)
       + commentReplyToHtml(r)
       + commentTimeHtml(r)
@@ -552,7 +561,7 @@
       + avatarEl(cm.author)
       + '<div class="dna-comment-item__body">'
       + '<div class="dna-comment-item__meta d-flex align-items-center flex-wrap">'
-      + '<a href="/user/' + cm.author.username + '" class="text-decoration-none text-reset fw-medium">' + escHtml(cm.author.display_name) + '</a>'
+      + '<a href="/user/' + cm.author.username + '" class="text-decoration-none text-reset fw-medium">' + escHtml(cm.author.display_name) + '</a>' + sponsorStar(cm.author)
       + commentBadgesHtml(cm)
       + commentReplyToHtml(cm)
       + commentFloorHtml(cm)

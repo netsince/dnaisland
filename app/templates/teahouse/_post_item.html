@@ -1,3 +1,4 @@
+{% from "macros/user_badge.html" import user_badge with context %}
 {% macro render_card_chip(post) %}
 {%- if post.card -%}
 {%- set cover_img = post.card.images[0] if post.card.images else None -%}
@@ -66,7 +67,7 @@
  <div class="rounded-circle bg-secondary text-center text-light"
  style="width:40px;height:40px;line-height:40px;">{{ post.author.display_name[:1] }}</div>
  {% endif %}
- <a class="text-decoration-none text-reset fw-semibold" href="{{ url_for('user.profile', username=post.author.username) }}">{{ post.author.display_name }}</a>{% if is_sponsor(post.author.id) %}<i class="bi bi-star-fill text-danger ms-1" title="赞助者" style="font-size: 0.8rem;"></i>{% endif %}
+ {{ user_badge(post.author) }}
  <span class="text-muted small">@{{ post.author.username }}</span>
  {% if top %}<span class="badge bg-primary-subtle text-primary small">原帖</span>{% endif %}
  <span class="text-muted small ms-auto">{{ post.created_at|cst }}</span>
@@ -165,7 +166,7 @@
  <div class="rounded-circle bg-secondary text-center text-light"
  style="width:40px;height:40px;line-height:40px;">{{ post.author.display_name[:1] }}</div>
  {% endif %}
- <a class="text-decoration-none text-reset fw-semibold" href="{{ url_for('user.profile', username=post.author.username) }}">{{ post.author.display_name }}</a>{% if is_sponsor(post.author.id) %}<i class="bi bi-star-fill text-danger ms-1" title="赞助者" style="font-size: 0.8rem;"></i>{% endif %}
+ {{ user_badge(post.author) }}
  <span class="text-muted small">@{{ post.author.username }}</span>
  <span class="text-muted small ms-auto">{{ post.created_at|cst }}</span>
   {% if post.edited_at %}<span class="text-muted small">· 已编辑</span>{% endif %}

@@ -1,0 +1,19 @@
+{# 统一的用户名展示组件：昵称链接 + 赞助红星 + 认证徽章。
+   使用前必须以 with context 导入（宏内用到 is_sponsor 全局函数）：
+     {% from "macros/user_badge.html" import user_badge with context %}
+   参数：
+     user    - User 模型对象（或 None，自动忽略）
+     class   - 附加到昵称上的 CSS 类
+     title   - 昵称的悬停提示
+     name    - 可选，覆盖显示的昵称文本（用于搜索高亮等场景，传入 Markup）
+     link    - 是否包一层用户主页链接，默认 True；在已有 <a> 内部调用时传 False
+#}
+{% from "macros/verified.html" import badge %}
+{% macro user_badge(user, class='', title='', name=None, link=true) %}
+ {% if user %}
+ {% set _name = name if name is not none else (user.display_name or user.username) %}
+ {% set _attrs = 'class="text-decoration-none text-reset ' ~ (class if class else '') ~ '"' ~ (' title="' ~ title ~ '"' if title else '') %}
+ {% if link %}<a href="{{ url_for('user.profile', username=user.username) }}" {{ _attrs }}>{{ _name }}</a>{% else %}<span {{ _attrs }}>{{ _name }}</span>{% endif %}{% if is_sponsor(user.id) %}<i class="bi bi-star-fill text-danger ms-1" title="赞助者" style="font-size: 0.8rem;"></i>{% endif %}
+ {{ badge(user) }}
+ {% endif %}
+{% endmacro %}

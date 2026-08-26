@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% from "teahouse/_post_item.html" import render_post, render_reply with context %}
 {% from "macros/pagination.html" import render_pagination %}
+{% from "macros/user_badge.html" import user_badge with context %}
 
 {% block title %}茶馆帖子 · DNAISLAND{% endblock %}
 {% block body_class %}dna-hide-header-on-mobile{% endblock %}
@@ -17,13 +18,13 @@
     <nav class="mb-2 small text-muted d-flex flex-wrap align-items-center gap-1" aria-label="帖子链">
       {% for a in chain %}
         {% if teapost_visible(a) %}
-          <a class="text-decoration-none" href="{{ url_for('teahouse.post_detail', post_id=a.id) }}">{{ a.author.display_name }}</a>
+          <a class="text-decoration-none" href="{{ url_for('teahouse.post_detail', post_id=a.id) }}">{{ a.author.display_name }}</a>{% if is_sponsor(a.author.id) %}<i class="bi bi-star-fill text-danger ms-1" title="赞助者" style="font-size: 0.7rem;"></i>{% endif %}
         {% else %}
           <span class="text-secondary">已隐藏</span>
         {% endif %}
         <span class="text-secondary">›</span>
       {% endfor %}
-      <span class="fw-semibold text-dark">{{ post.author.display_name }}</span>{% if is_sponsor(post.author.id) %}<i class="bi bi-star-fill text-danger ms-1" title="赞助者" style="font-size: 0.8rem;"></i>{% endif %}
+      <span class="fw-semibold text-dark">{{ user_badge(post.author) }}</span>
       <span class="text-secondary">(你在这)</span>
     </nav>
     {% endif %}

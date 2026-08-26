@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "macros/pagination.html" import render_pagination %}
+{% from "macros/user_badge.html" import user_badge with context %}
 
 {% block title %}文章 · DNAISLAND{% endblock %}
 
@@ -42,7 +43,7 @@
  </h5>
  {% if a.summary %}<p class="card-text text-muted small">{{ a.summary }}</p>{% endif %}
  <div class="mt-auto small text-muted">
- {{ a.author.nickname if (a.show_author and a.author) else '匿名管理员' }}
+ {% if a.show_author and a.author %}{{ user_badge(a.author, link=false) }}{% else %}匿名管理员{% endif %}
  · {{ a.created_at|cst('%Y-%m-%d') }}
  </div>
  </div>

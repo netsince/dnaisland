@@ -31,6 +31,7 @@ from ..models import (
     Comment,
     CommentLike,
     Punishment,
+    Sponsor,
     TeaPost,
     User,
     UserFollow,
@@ -392,6 +393,8 @@ def card_detail(card_id):
         favorited=data["favorited"],
         following=following,
         focus_comment=focus_comment,
+        # 赞助者 user_id 集合（JS 评论渲染时给昵称加红色星标）
+        sponsor_ids=[sid for (sid,) in db.session.query(Sponsor.user_id).all()],
     )
 
 

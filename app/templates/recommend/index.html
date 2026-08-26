@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "macros/verified.html" import badge %}
+{% from "macros/user_badge.html" import user_badge with context %}
 
 {% block title %}站长推荐 · DNAISLAND{% endblock %}
 
@@ -32,7 +33,7 @@
               <div class="rec-card__body">
                 <h3 class="rec-card__name">{{ c.name }}</h3>
                 <div class="rec-card__author">
-                  <i class="bi bi-person me-1"></i>{{ (c.author.nickname or c.author.username) if c.author else '未知作者' }}
+                  <i class="bi bi-person me-1"></i>{% if c.author %}{{ user_badge(c.author, link=false) }}{% else %}未知作者{% endif %}
                 </div>
                 {% if c.intro %}
                   <p class="rec-card__desc">{{ c.intro }}</p>
@@ -50,7 +51,7 @@
               </div>
               <div class="rec-user__info">
                 <div class="rec-user__name">
-                  <span class="rec-user__name-text">{{ it.user.nickname or it.user.username }}</span>
+                  <span class="rec-user__name-text">{{ user_badge(it.user, link=false) }}</span>
                   {{ badge(it.user) }}
                 </div>
                 <div class="rec-user__meta">@{{ it.user.username }} · {{ it.card_count or 0 }} 张角色卡</div>

@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% from "macros/pagination.html" import render_pagination %}
 {% from "macros/verified.html" import badge %}
+{% from "macros/user_badge.html" import user_badge with context %}
 
 {% set title_text = '粉丝' if kind == 'followers' else '关注' %}
 
@@ -37,7 +38,7 @@
  <a href="{{ url_for('user.profile', username=ou.username) }}" class="dna-avatar-ph" style="width:48px;height:48px;font-size:1.2rem;">{{ ou.display_name[:1] }}</a>
  {% endif %}
  <div class="flex-grow-1 min-w-0">
- <a class="fw-bold text-light text-decoration-none" href="{{ url_for('user.profile', username=ou.username) }}">{{ ou.display_name }}{{ badge(ou) }}</a>
+ {{ user_badge(ou, class='fw-bold text-light') }}
  <div class="text-muted small">@{{ ou.username }}</div>
  {% if ou.bio %}<div class="small text-muted mt-1 text-truncate">{{ ou.bio }}</div>{% endif %}
  </div>

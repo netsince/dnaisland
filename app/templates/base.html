@@ -132,7 +132,7 @@ function showToast(message, type) {
 <li class="nav-item">
 <a class="nav-link" href="#" id="userMenu" role="button"
 data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded="false">
-{{ current_user.nickname }}
+{{ current_user.nickname }}{% if is_sponsor(current_user.id) %}<i class="bi bi-star-fill text-danger ms-1" title="赞助者" style="font-size:0.8rem;"></i>{% endif %}
 {% if current_user.is_authenticated and unread_notifications %}<span class="badge rounded-pill bg-danger ms-1 js-unread-badge">{{ unread_notifications }}</span>{% endif %}
 </a>
 </li>
@@ -994,7 +994,7 @@ data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded=
         {% else %}
         <div class="rounded-circle bg-secondary text-light d-flex align-items-center justify-content-center" style="width:36px;height:36px;font-weight:600;">{{ current_user.display_name[:1] }}</div>
         {% endif %}
-        <span class="fw-semibold small">{{ current_user.display_name }}</span>
+        <span class="fw-semibold small">{{ current_user.display_name }}{% if is_sponsor(current_user.id) %}<i class="bi bi-star-fill text-danger ms-1" title="赞助者" style="font-size:0.8rem;"></i>{% endif %}</span>
       </div>
       {% endif %}
       <textarea class="tea-compose__input w-100 mb-3" name="content" id="teaComposeContent" rows="5" maxlength="280" placeholder="分享此刻的想法，发布到茶馆…" required></textarea>
