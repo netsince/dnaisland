@@ -1,3 +1,5 @@
+from sqlalchemy.dialects.mysql import LONGTEXT
+
 from ..extensions import db
 
 # 工单状态
@@ -83,6 +85,9 @@ class TicketMessage(db.Model):
         db.String(10), server_default=MSG_ROLE_USER, nullable=False
     )
     content = db.Column(db.Text, nullable=False)
+    image_data = db.deferred(
+        db.Column(LONGTEXT, nullable=True)
+    )  # 工单消息图片（WebP base64 data URL），可空
     created_at = db.Column(
         db.DateTime, server_default=db.func.now(), nullable=False
     )

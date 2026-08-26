@@ -40,11 +40,10 @@ from ..models import (
     UserFollow,
 )
 from ..models.ticket import (
-    MSG_ROLE_ADMIN,
     MSG_ROLE_USER,
     TICKET_CLOSED,
     TICKET_OPEN,
-    TICKET_REPLIED,
+    TICKET_STATUSES,
 )
 from ..models.punishment import (
     APPEAL_ACCEPTED,
@@ -1019,6 +1018,24 @@ def report():
 
 
 # ---------------- 我的工单 ----------------
+def _ticket_image_data():
+    """从上传的 image 文件读取并压缩为 WebP data URL；无文件返回 None，出错返回错误消息。"""
+    f = request.files.get("image")
+    if not f or not f.filename:
+        return None
+    raw = f.read()
+    if not raw:
+        return "图片内容为空"
+    if len(raw) > 16 * 1024 * 1024:
+        return "图片过大，请控制在 16MB 以内"
+    try:
+        from ..services.image_service import raw_bytes_to_webp_data_url
+
+        return raw_bytes_to_webp_data_url(raw, max_edge=1280, quality=82)
+    except Exception:
+        return "图片格式无法识别或处理失败"
+
+
 @user_bp.route("/my/tickets")
 @login_required
 def my_tickets():
@@ -1059,19 +1076,23 @@ def my_tickets_new():
         cat_id = request.form.get("category_id", type=int)
         title = (request.form.get("title") or "").strip()
         content = (request.form.get("content") or "").strip()
+        image_data = _ticket_image_data()
+        if isinstance(image_data, str):
+            flash(image_data, "warning")
+            return redirect(url_for("user.my_tickets_new"))
 
         if not title:
             flash("请填写工单主题", "warning")
             return redirect(url_for("user.my_tickets_new"))
-        if not content:
-            flash("请填写工单内容", "warning")
+        if not content and not image_data:
+            flash("请填写工单内容或上传图片", "warning")
             return redirect(url_for("user.my_tickets_new"))
 
         t = Ticket(
             user_id=current_user.id,
             category_id=cat_id or None,
             title=title,
-            content=content,
+            content=content or "",
         )
         db.session.add(t)
         db.session.flush()
@@ -1080,7 +1101,8 @@ def my_tickets_new():
             ticket_id=t.id,
             sender_id=current_user.id,
             sender_role=MSG_ROLE_USER,
-            content=content,
+            content=content or "",
+            image_data=image_data,
         )
         db.session.add(tm)
         db.session.commit()
@@ -1116,8 +1138,12 @@ def my_tickets_reply(ticket_id):
         return redirect(url_for("user.my_tickets_detail", ticket_id=t.id))
 
     content = (request.form.get("content") or "").strip()
-    if not content:
-        flash("请填写回复内容", "warning")
+    image_data = _ticket_image_data()
+    if isinstance(image_data, str):
+        flash(image_data, "warning")
+        return redirect(url_for("user.my_tickets_detail", ticket_id=t.id))
+    if not content and not image_data:
+        flash("请填写回复内容或上传图片", "warning")
         return redirect(url_for("user.my_tickets_detail", ticket_id=t.id))
 
     tm = TicketMessage(
@@ -1125,6 +1151,7 @@ def my_tickets_reply(ticket_id):
         sender_id=current_user.id,
         sender_role=MSG_ROLE_USER,
         content=content,
+        image_data=image_data,
     )
     db.session.add(tm)
     t.status = TICKET_OPEN

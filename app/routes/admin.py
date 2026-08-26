@@ -61,9 +61,7 @@ from ..models import (
 )
 from ..models.ticket import (
     MSG_ROLE_ADMIN,
-    MSG_ROLE_USER,
     TICKET_CLOSED,
-    TICKET_OPEN,
     TICKET_REPLIED,
     TICKET_STATUSES,
 )
@@ -2648,8 +2646,23 @@ def tickets_reply(ticket_id):
         return redirect(url_for("admin.tickets_detail", ticket_id=t.id))
 
     content = (request.form.get("content") or "").strip()
-    if not content:
-        flash("请填写回复内容", "warning")
+    # 管理员回复附带图片
+    image_data = None
+    f = request.files.get("image")
+    if f and f.filename:
+        raw = f.read()
+        if len(raw) > 16 * 1024 * 1024:
+            flash("图片过大，请控制在 16MB 以内", "warning")
+            return redirect(url_for("admin.tickets_detail", ticket_id=t.id))
+        try:
+            from ..services.image_service import raw_bytes_to_webp_data_url
+
+            image_data = raw_bytes_to_webp_data_url(raw, max_edge=1280, quality=82)
+        except Exception:
+            flash("图片格式无法识别或处理失败", "warning")
+            return redirect(url_for("admin.tickets_detail", ticket_id=t.id))
+    if not content and not image_data:
+        flash("请填写回复内容或上传图片", "warning")
         return redirect(url_for("admin.tickets_detail", ticket_id=t.id))
 
     tm = TicketMessage(
@@ -2657,6 +2670,7 @@ def tickets_reply(ticket_id):
         sender_id=current_user.id,
         sender_role=MSG_ROLE_ADMIN,
         content=content,
+        image_data=image_data,
     )
     db.session.add(tm)
     t.status = TICKET_REPLIED
