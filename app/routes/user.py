@@ -63,7 +63,7 @@ from ..services.comment_service import (
 )
 from ..services.image_service import raw_bytes_to_webp_data_url
 from ..services.notification_service import notifications_page
-from ..services.notification_service import notify, notify_super_admins
+from ..services.notification_service import notify_super_admins
 from ..services.profile_service import update_profile
 from ..services.punishment_service import my_punishments_list, submit_punishment_appeal
 from ..services.report_service import (
