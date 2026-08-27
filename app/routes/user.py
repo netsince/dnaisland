@@ -3,9 +3,6 @@ import json
 import os
 from datetime import timedelta
 
-from sqlalchemy import func
-from sqlalchemy.orm import joinedload
-
 from flask import (
     Blueprint,
     Response,
@@ -29,7 +26,6 @@ from ..models import (
     CardImage,
     CardTag,
     Comment,
-    CommentLike,
     Punishment,
     Sponsor,
     TeaPost,
@@ -39,17 +35,17 @@ from ..models import (
     User,
     UserFollow,
 )
-from ..models.ticket import (
-    MSG_ROLE_USER,
-    TICKET_CLOSED,
-    TICKET_OPEN,
-    TICKET_STATUSES,
-)
 from ..models.punishment import (
     APPEAL_ACCEPTED,
     APPEAL_PENDING,
     APPEAL_REJECTED,
     PUNISHMENT_TYPES,
+)
+from ..models.ticket import (
+    MSG_ROLE_USER,
+    TICKET_CLOSED,
+    TICKET_OPEN,
+    TICKET_STATUSES,
 )
 from ..services.card_edit_service import (
     resubmit_card,
@@ -62,8 +58,7 @@ from ..services.comment_service import (
     toggle_comment_like,
 )
 from ..services.image_service import raw_bytes_to_webp_data_url
-from ..services.notification_service import notifications_page
-from ..services.notification_service import notify_super_admins
+from ..services.notification_service import notifications_page, notify_super_admins
 from ..services.profile_service import update_profile
 from ..services.punishment_service import my_punishments_list, submit_punishment_appeal
 from ..services.report_service import (

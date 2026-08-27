@@ -59,17 +59,17 @@ from ..models import (
     UserFollow,
     VerificationCode,
 )
-from ..models.ticket import (
-    MSG_ROLE_ADMIN,
-    TICKET_CLOSED,
-    TICKET_REPLIED,
-    TICKET_STATUSES,
-)
 from ..models.punishment import (
     APPEAL_ACCEPTED,
     APPEAL_PENDING,
     APPEAL_REJECTED,
     PUNISHMENT_TYPES,
+)
+from ..models.ticket import (
+    MSG_ROLE_ADMIN,
+    TICKET_CLOSED,
+    TICKET_REPLIED,
+    TICKET_STATUSES,
 )
 from ..services.card_service import cascade_delete_card
 from ..services.image_service import (
@@ -1753,21 +1753,20 @@ def review_batch():
                     related_card_id=card.id,
                 )
                 count += 1
-        elif action == "reject":
-            if card.status != "rejected":
-                card.status = "rejected"
-                msg = f'你的角色卡"{card.name}"未通过审核'
-                if reason:
-                    msg += f'，原因：{reason}。可修改后重新提交。'
-                else:
-                    msg += '，可修改后重新提交。'
-                notify(
-                    card.author_id,
-                    msg,
-                    type_="review",
-                    related_card_id=card.id,
-                )
-                count += 1
+        elif action == "reject" and card.status != "rejected":
+            card.status = "rejected"
+            msg = f'你的角色卡"{card.name}"未通过审核'
+            if reason:
+                msg += f'，原因：{reason}。可修改后重新提交。'
+            else:
+                msg += '，可修改后重新提交。'
+            notify(
+                card.author_id,
+                msg,
+                type_="review",
+                related_card_id=card.id,
+            )
+            count += 1
 
     db.session.commit()
     if _is_ajax():

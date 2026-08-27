@@ -15,7 +15,6 @@ from flask import Blueprint, current_app, g, jsonify, request
 from flask_login import current_user
 from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import joinedload
 
 from ..extensions import db
 from ..models import (
@@ -352,13 +351,11 @@ def _point_tx(tx: PointTransaction) -> dict:
 
 def _article_item(a: Article, *, include_content: bool = False) -> dict:
     """文章摘要/详情序列化（列表不含正文，详情含正文）。"""
-    cover = ""
-    if a.cover:
-        if a.cover.startswith("data:"):
-            # 上传为 base64/WebP 的走 /article-cover/<id> 端点转码输出
-            cover = f"/api/v1/articles/{a.id}/cover"
-        else:
-            cover = a.cover
+    cover = (
+        f"/api/v1/articles/{a.id}/cover"
+        if a.cover and a.cover.startswith("data:")
+        else (a.cover or "")
+    )
     item = {
         "id": a.id,
         "title": a.title,

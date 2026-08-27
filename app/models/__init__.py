@@ -31,12 +31,12 @@ from .teahouse import (
     TeaTopic,
 )
 from .ticket import (
+    MSG_ROLE_ADMIN,
+    MSG_ROLE_USER,
     TICKET_CLOSED,
     TICKET_OPEN,
     TICKET_REPLIED,
     TICKET_STATUSES,
-    MSG_ROLE_ADMIN,
-    MSG_ROLE_USER,
     Ticket,
     TicketCategory,
     TicketMessage,
