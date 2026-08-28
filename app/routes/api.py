@@ -29,8 +29,17 @@ from ..models import (
     TeaPost,
     TeaPostImage,
     TeaTopic,
+    Ticket,
+    TicketCategory,
+    TicketMessage,
     User,
     UserFollow,
+)
+from ..models.ticket import (
+    MSG_ROLE_USER,
+    TICKET_CLOSED,
+    TICKET_OPEN,
+    TICKET_STATUSES,
 )
 from ..routes.card_lists import (
     card_comments_list,
@@ -76,7 +85,12 @@ from ..services.comment_service import (
     pin_comment,
     toggle_comment_like,
 )
-from ..services.notification_service import mark_all_read, notifications_page, unread_count
+from ..services.notification_service import (
+    mark_all_read,
+    notifications_page,
+    notify_super_admins,
+    unread_count,
+)
 from ..services.profile_service import update_profile
 from ..services.punishment_service import my_punishments_list, submit_punishment_appeal
 from ..services.report_service import (
@@ -1496,6 +1510,25 @@ def cards_toggle_hidden(card_id):
     return ok({"id": card.id, "is_hidden": bool(card.is_hidden)})
 
 
+@api_bp.route("/me/profile", methods=["GET"])
+@api_login_required
+def me_profile_get():
+    """获取自己的完整资料（含生日、点赞通知开关），供编辑页预填。"""
+    viewer = _ensure_self()
+    return ok({
+        "username": viewer.username,
+        "nickname": viewer.nickname,
+        "avatar": viewer.avatar or "",
+        "bio": viewer.bio or "",
+        "location": viewer.location or "",
+        "website": viewer.website or "",
+        "birthday": viewer.birthday.isoformat() if viewer.birthday else None,
+        "notify_like": bool(viewer.notify_like),
+        "verified": bool(viewer.verified),
+        "verified_label": viewer.verified_label or "",
+    })
+
+
 @api_bp.route("/me/profile", methods=["POST"])
 @api_login_required
 def me_profile_update():
@@ -1538,6 +1571,228 @@ def me_profile_update():
         "notify_like": bool(viewer.notify_like),
         "avatar": viewer.avatar,
     })
+
+
+# ---------------------------------------------------------------------------
+# 我的工单
+# ---------------------------------------------------------------------------
+
+def _ticket_item(t: "Ticket") -> dict:
+    """工单列表项序列化。"""
+    return {
+        "id": t.id,
+        "title": t.title,
+        "content": t.content,
+        "status": t.status,
+        "category_id": t.category_id,
+        "category_name": t.category_name,
+        "created_at": t.created_at.isoformat() if t.created_at else "",
+        "updated_at": (
+            (t.updated_at or t.created_at).isoformat()
+            if (t.updated_at or t.created_at)
+            else ""
+        ),
+        "last_message": _ticket_message_item(t.last_message) if t.last_message else None,
+    }
+
+
+def _ticket_message_item(m: "TicketMessage") -> dict:
+    """工单消息序列化。"""
+    return {
+        "id": m.id,
+        "sender_role": m.sender_role,
+        "sender_name": (
+            m.sender.nickname or m.sender.username if m.sender else ""
+        ),
+        "content": m.content,
+        "image": m.image_data or None,
+        "created_at": m.created_at.isoformat() if m.created_at else "",
+    }
+
+
+def _normalize_ticket_image(data_url):
+    """把客户端提交的 base64 data URL 压缩为 WebP data URL；无值返回 None。"""
+    if not data_url or not isinstance(data_url, str):
+        return None
+    raw = data_url.strip()
+    if not raw:
+        return None
+    try:
+        from ..services.image_service import compress_image
+
+        return compress_image(raw)
+    except Exception:
+        return "图片格式无法识别或处理失败"
+
+
+@api_bp.route("/tickets/categories", methods=["GET"])
+@api_login_required
+def tickets_categories():
+    """可用的工单类别列表。"""
+    cats = (
+        TicketCategory.query.filter_by(enabled=True)
+        .order_by(TicketCategory.sort_order, TicketCategory.name)
+        .all()
+    )
+    return ok({
+        "items": [
+            {"id": c.id, "name": c.name} for c in cats
+        ]
+    })
+
+
+@api_bp.route("/tickets", methods=["GET"])
+@api_login_required
+def my_tickets_list():
+    """当前用户的工单列表（按最新消息时间倒序）。"""
+    viewer = _ensure_self()
+    page = request.args.get("page", 1, type=int)
+    status = request.args.get("status", "all")
+    q = (request.args.get("q") or "").strip()
+
+    base = Ticket.query.filter_by(user_id=viewer.id)
+    if status in TICKET_STATUSES:
+        base = base.filter(Ticket.status == status)
+    if q:
+        base = base.filter(Ticket.title.ilike(f"%{q}%"))
+    pag = base.order_by(
+        db.func.coalesce(Ticket.updated_at, Ticket.created_at).desc()
+    ).paginate(page=page, per_page=20, error_out=False)
+
+    return ok({
+        "items": [_ticket_item(t) for t in pag.items],
+        "page": pag.page,
+        "pages": pag.pages,
+        "total": pag.total,
+        "has_next": pag.has_next,
+    })
+
+
+@api_bp.route("/tickets", methods=["POST"])
+@api_login_required
+def my_tickets_create():
+    """新建工单。
+
+    body = {title?, content?, category_id?, image_data?(base64 data URL)}。
+    """
+    viewer = _ensure_self()
+    data = request.get_json(silent=True) or {}
+    cat_id = data.get("category_id")
+    title = (data.get("title") or "").strip()
+    content = (data.get("content") or "").strip()
+    image = _normalize_ticket_image(data.get("image_data"))
+    if isinstance(image, str) and image.startswith("图片"):
+        return err(image, 400)
+    if not title:
+        return err("请填写工单主题")
+    if not content and not image:
+        return err("请填写工单内容或上传图片")
+
+    t = Ticket(
+        user_id=viewer.id,
+        category_id=cat_id or None,
+        title=title,
+        content=content or "",
+    )
+    db.session.add(t)
+    db.session.flush()
+    tm = TicketMessage(
+        ticket_id=t.id,
+        sender_id=viewer.id,
+        sender_role=MSG_ROLE_USER,
+        content=content or "",
+        image_data=image,
+    )
+    db.session.add(tm)
+    db.session.commit()
+    notify_super_admins(
+        f"新工单「{title}」来自 {viewer.nickname or viewer.username}",
+        type_="ticket",
+    )
+    return ok({"id": t.id, "status": t.status}), 201
+
+
+@api_bp.route("/tickets/<int:ticket_id>", methods=["GET"])
+@api_login_required
+def my_tickets_detail(ticket_id):
+    """工单详情（含对话消息）。"""
+    viewer = _ensure_self()
+    t = db.session.get(Ticket, ticket_id)
+    if not t or t.user_id != viewer.id:
+        return err("工单不存在", 404)
+    return ok({
+        **_ticket_item(t),
+        "messages": [_ticket_message_item(m) for m in t.messages],
+    })
+
+
+@api_bp.route("/tickets/<int:ticket_id>/reply", methods=["POST"])
+@api_login_required
+def my_tickets_reply(ticket_id):
+    """回复工单。body = {content?, image_data?}。"""
+    viewer = _ensure_self()
+    t = db.session.get(Ticket, ticket_id)
+    if not t or t.user_id != viewer.id:
+        return err("工单不存在", 404)
+    if t.status == TICKET_CLOSED:
+        return err("工单已关闭，无法回复")
+    data = request.get_json(silent=True) or {}
+    content = (data.get("content") or "").strip()
+    image = _normalize_ticket_image(data.get("image_data"))
+    if isinstance(image, str) and image.startswith("图片"):
+        return err(image, 400)
+    if not content and not image:
+        return err("请填写回复内容或上传图片")
+
+    tm = TicketMessage(
+        ticket_id=t.id,
+        sender_id=viewer.id,
+        sender_role=MSG_ROLE_USER,
+        content=content,
+        image_data=image,
+    )
+    db.session.add(tm)
+    t.status = TICKET_OPEN
+    db.session.commit()
+    notify_super_admins(
+        f"工单「{t.title}」有新回复（{viewer.nickname or viewer.username}）",
+        type_="ticket",
+    )
+    return ok({"id": tm.id, "status": t.status})
+
+
+@api_bp.route("/tickets/<int:ticket_id>/close", methods=["POST"])
+@api_login_required
+def my_tickets_close(ticket_id):
+    """关闭工单。"""
+    viewer = _ensure_self()
+    t = db.session.get(Ticket, ticket_id)
+    if not t or t.user_id != viewer.id:
+        return err("工单不存在", 404)
+    if t.status != TICKET_CLOSED:
+        t.status = TICKET_CLOSED
+        t.closed_at = db.func.now()
+        db.session.commit()
+    return ok({"id": t.id, "status": t.status})
+
+
+@api_bp.route("/tickets/<int:ticket_id>/reopen", methods=["POST"])
+@api_login_required
+def my_tickets_reopen(ticket_id):
+    """重新打开已关闭的工单。"""
+    viewer = _ensure_self()
+    t = db.session.get(Ticket, ticket_id)
+    if not t or t.user_id != viewer.id:
+        return err("工单不存在", 404)
+    if t.status == TICKET_CLOSED:
+        t.status = TICKET_OPEN
+        t.closed_at = None
+        db.session.commit()
+        notify_super_admins(
+            f"工单「{t.title}」已由用户重新打开",
+            type_="ticket",
+        )
+    return ok({"id": t.id, "status": t.status})
 
 
 # ---------------------------------------------------------------------------
