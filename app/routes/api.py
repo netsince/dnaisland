@@ -58,7 +58,12 @@ from ..routes.card_lists import my_cards as _shared_my_cards
 from ..routes.card_lists import my_favorites as _shared_my_favorites
 from ..routes.card_lists import my_likes as _shared_my_likes
 from ..routes.follow_lists import toggle_user_follow
-from ..routes.main import _post_search_query, _user_search_query, featured_cards
+from ..routes.main import (
+    _card_search_query,
+    _post_search_query,
+    _user_search_query,
+    featured_cards,
+)
 from ..routes.points import point_balance, point_transactions
 from ..routes.teahouse import (
     _build_stats,
@@ -1923,6 +1928,33 @@ def teahouse_search():
         "total": pag.total,
         "has_next": pag.has_next,
     })
+
+
+@api_bp.route("/search/suggest", methods=["GET"])
+def search_suggest():
+    """顶栏实时下拉建议：返回匹配度最高的若干角色卡与作者（JSON）。
+
+    与网页 /search/suggest 共用查询；客户端可在输入时轮询以展示下拉建议。
+    """
+    q = (request.args.get("q") or "").strip()
+    if len(q) < 1:
+        return ok({"cards": [], "users": []})
+
+    cards = _card_search_query(q, "relevance").limit(6).all()
+    card_hits = [
+        {"id": c.id, "name": c.name, "gender": c.gender} for c in cards
+    ]
+
+    users = _user_search_query(q, "relevance").limit(5).all()
+    user_hits = [
+        {
+            "username": u.username,
+            "nickname": u.nickname,
+            "verified": bool(u.verified),
+        }
+        for u in users
+    ]
+    return ok({"cards": card_hits, "users": user_hits})
 
 
 @api_bp.route("/teahouse/card-search", methods=["GET"])
