@@ -231,6 +231,9 @@ def _card_light(card: Card) -> dict:
         "covers": getattr(card, "covers", {}) or {},
         "created_at": card.created_at.isoformat() if card.created_at else "",
         "author": _user_public(card.author) if card.author else None,  # type: ignore[arg-type]
+        # 审核状态与隐藏状态（供「我的角色卡」管理页展示徽章）。
+        "status": card.status,
+        "is_hidden": bool(card.is_hidden),
     }
 
 
