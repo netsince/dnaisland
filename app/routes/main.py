@@ -141,7 +141,8 @@ def featured_cards(limit=12, exclude_ids=None):
     """
     exclude = set()
     if exclude_ids:
-        exclude = {int(x) for x in exclude_ids if str(x).strip().isdigit()}
+        # Card.id 为 UUID 字符串，按字符串去重（此前按 int 处理导致 exclude 不生效）。
+        exclude = {str(x).strip() for x in exclude_ids if str(x).strip()}
 
     score_map = _featured_score_map()
     if not score_map:
