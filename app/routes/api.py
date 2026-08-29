@@ -8,7 +8,10 @@
 
 import base64
 import functools
+import json
+import threading
 import time
+from datetime import timedelta
 
 import jwt
 from flask import Blueprint, current_app, g, jsonify, request
@@ -22,6 +25,9 @@ from ..models import (
     Card,
     Comment,
     CommentLike,
+    GenerationLog,
+    GenerationModel,
+    GenerationTask,
     Notification,
     PointTransaction,
     Punishment,
@@ -91,6 +97,9 @@ from ..services.comment_service import (
     pin_comment,
     toggle_comment_like,
 )
+from ..services.generation_worker import process_generation_task
+from ..services.image_gen_service import effective_credentials
+from ..services.image_service import send_webp
 from ..services.notification_service import (
     mark_all_read,
     notifications_page,
@@ -117,6 +126,7 @@ from ..services.report_service import (
     describe_report_target,
     submit_report,
 )
+from ..services.site_service import get_site_config
 from ..utils import get_user_by_username
 
 api_bp = Blueprint("api", __name__, url_prefix="/api/v1")
@@ -1877,7 +1887,6 @@ def me_avatar():
 @api_bp.route("/teahouse/images/<int:image_id>", methods=["GET"])
 def teahouse_image(image_id):
     """按 id 返回茶馆配图（WebP）。供客户端显示上传后的图片。"""
-    from ..services.image_service import send_webp
 
     img = db.session.get(TeaPostImage, image_id)
     if not img:
@@ -2043,6 +2052,261 @@ def proxy_config_save():
         "enabled": bool(cfg.enabled),
         "token": cfg.token,
         "public_base_url": request.host_url.rstrip("/") + _PROXY_PUBLIC_BASE_PATH,
+    })
+
+
+# ---------------------------------------------------------------------------
+# 生图（App 端暴露，与 Web /image-gen/* 共用服务）
+# ---------------------------------------------------------------------------
+# 宽高比 -> OpenAI size；auto 不传 size
+_IG_ASPECT_TO_SIZE = {
+    "1:1": "1024x1024",
+    "3:2": "1536x1024",
+    "2:3": "1024x1536",
+    "4:3": "1408x1024",
+    "3:4": "1024x1408",
+    "16:9": "1792x1024",
+    "9:16": "1024x1792",
+}
+_IG_VALID_ASPECTS = tuple(["auto"] + list(_IG_ASPECT_TO_SIZE.keys()))
+_IG_MAX_REFERENCES = 5
+_IG_MAX_COUNT = 2
+
+
+def _ig_image_url(log_id, idx):
+    """产出图 URL（App 用 Authorization Bearer 头访问）。"""
+    return f"/image-gen/output/{log_id}/{idx}"
+
+
+def _ig_reference_url(log_id, idx):
+    """参考图 URL。"""
+    return f"/image-gen/reference/{log_id}/{idx}"
+
+
+@api_bp.route("/image-gen/meta", methods=["GET"])
+@api_login_required
+def image_gen_meta():
+    """生图工作台元数据：可用模型 + 当前点数 + 宽高比选项。"""
+    models = (
+        GenerationModel.query.filter_by(enabled=True)
+        .order_by(GenerationModel.display_name)
+        .all()
+    )
+    return ok({
+        "models": [
+            {
+                "id": m.id,
+                "name": m.name,
+                "display_name": m.display_name,
+                "points_per_image": m.points_per_image or 0,
+            }
+            for m in models
+        ],
+        "balance": _ensure_self().points or 0,
+        "aspects": list(_IG_VALID_ASPECTS),
+        "max_references": _IG_MAX_REFERENCES,
+        "max_count": _IG_MAX_COUNT,
+    })
+
+
+@api_bp.route("/image-gen/generate", methods=["POST"])
+@api_login_required
+def image_gen_generate():
+    """创建生图任务并立即返回 task_id（实际生图由后台线程完成）。"""
+    user = _ensure_self()
+    cfg = get_site_config()
+    data = request.get_json(silent=True) or {}
+
+    model_id = data.get("model_id", type=int)
+    model = db.session.get(GenerationModel, model_id) if model_id else None
+    if not model or not model.enabled:
+        return err("请选择有效的生图模型")
+
+    base_url, api_key = effective_credentials(model, cfg)
+    if not base_url or not api_key:
+        return err("生图服务尚未配置，请联系管理员")
+
+    prompt = (data.get("prompt") or "").strip()
+    if not prompt:
+        return err("请输入提示词")
+
+    aspect = (data.get("size") or "auto").strip()
+    if aspect not in _IG_ASPECT_TO_SIZE:
+        aspect = "auto"
+    size = _IG_ASPECT_TO_SIZE.get(aspect) if aspect in _IG_ASPECT_TO_SIZE else None
+
+    try:
+        count = int(data.get("count", 1))
+    except (TypeError, ValueError):
+        count = 1
+    count = max(1, min(count, _IG_MAX_COUNT))
+
+    # 参考图：JSON 数组 [{filename, mimetype, data_b64}]，最多 MAX 张
+    ref_payload = []
+    raw_refs = data.get("references")
+    if isinstance(raw_refs, list):
+        for item in raw_refs[: _IG_MAX_REFERENCES]:
+            if not isinstance(item, dict):
+                continue
+            b64 = (item.get("data_b64") or "").strip()
+            if not b64:
+                continue
+            ref_payload.append({
+                "filename": (item.get("filename") or "ref.png").strip(),
+                "mimetype": (item.get("mimetype") or "image/png").strip(),
+                "data_b64": b64,
+            })
+    ref_count = len(ref_payload)
+    if ref_count:
+        labels = "、".join(f"图片{i + 1}" for i in range(ref_count))
+        prompt = (
+            f"参考图片编号：{labels}。"
+            f"请按这些编号理解提示词中的图片引用。\n\n{prompt}"
+        )
+
+    estimated = count * (model.points_per_image or 0)
+    balance = user.points or 0
+    if balance < estimated:
+        return err(
+            f"点数不足：本次预计消耗 {estimated} 点，当前余额 {balance} 点",
+        )
+
+    existing = GenerationTask.query.filter(
+        GenerationTask.user_id == user.id,
+        GenerationTask.status.in_(["pending", "processing"]),
+    ).first()
+    if existing:
+        return err("已有进行中的生图任务，请稍候")
+
+    task = GenerationTask(
+        user_id=user.id,
+        model_id=model.id,
+        model_name=model.display_name,
+        prompt=prompt,
+        size=size,
+        count=count,
+        references_count=ref_count,
+        reference_data=(
+            json.dumps(ref_payload, ensure_ascii=False) if ref_payload else None
+        ),
+        status="pending",
+    )
+    db.session.add(task)
+    db.session.commit()
+
+    threading.Thread(
+        target=process_generation_task,
+        args=(current_app._get_current_object(), task.id),  # type: ignore[attr-defined]
+        daemon=True,
+    ).start()
+    return ok({"task_id": task.id})
+
+
+@api_bp.route("/image-gen/tasks", methods=["GET"])
+@api_login_required
+def image_gen_tasks():
+    """当前用户进行中的生图任务（pending/processing），用于轮询。"""
+    # 复用恢复逻辑（本地导入避免循环依赖）
+    from ..routes.image_gen import recover_stale_tasks as _recover
+
+    _recover(current_app._get_current_object())  # type: ignore[attr-defined]
+    tasks = (
+        GenerationTask.query.filter(GenerationTask.user_id == _ensure_self().id)
+        .filter(GenerationTask.status.in_(["pending", "processing"]))
+        .order_by(GenerationTask.created_at.desc())
+        .all()
+    )
+    return ok({
+        "tasks": [
+            {
+                "id": t.id,
+                "status": t.status,
+                "model_name": t.model_name,
+                "size": t.size or "auto",
+                "count": t.count,
+                "created_at": (
+                    (t.created_at + timedelta(hours=8)).strftime("%Y-%m-%d %H:%M:%S")
+                    if t.created_at
+                    else ""
+                ),
+            }
+            for t in tasks
+        ]
+    })
+
+
+@api_bp.route("/image-gen/tasks/<int:task_id>", methods=["GET"])
+@api_login_required
+def image_gen_task_detail(task_id):
+    """任务详情：轮询发现任务消失后拉最终状态/错误/结果日志。"""
+    user = _ensure_self()
+    t = db.session.get(GenerationTask, task_id)
+    if not t or t.user_id != user.id:
+        return err("任务不存在", code=404)
+    points_spent = 0
+    if t.result_log_id:
+        log = db.session.get(GenerationLog, t.result_log_id)
+        if log:
+            points_spent = log.points_spent or 0
+    return ok({
+        "id": t.id,
+        "status": t.status,
+        "error": t.error,
+        "log_id": t.result_log_id,
+        "points_spent": points_spent,
+        "balance": user.points,
+    })
+
+
+@api_bp.route("/image-gen/logs", methods=["GET"])
+@api_login_required
+def image_gen_logs():
+    """当前用户生图历史（分页，含产出图/参考图 URL）。"""
+    from sqlalchemy.orm import defer
+
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", 12, type=int)
+    pagination = (
+        GenerationLog.query.options(
+            defer(GenerationLog.images),
+            defer(GenerationLog.reference_images),
+        )
+        .filter_by(user_id=_ensure_self().id)
+        .order_by(GenerationLog.created_at.desc())
+        .paginate(page=page, per_page=per_page, error_out=False)
+    )
+    items = []
+    for item in pagination.items:
+        img_count = (item.count or 1) if item.status != "failed" else 0
+        ref_count = item.references_count or 0
+        if img_count > 0:
+            items.append({
+                "id": item.id,
+                "first_image": _ig_image_url(item.id, 0),
+                "images": [
+                    _ig_image_url(item.id, i) for i in range(img_count)
+                ],
+                "references": [
+                    _ig_reference_url(item.id, i) for i in range(ref_count)
+                ],
+                "prompt": item.prompt,
+                "model_name": item.model_name,
+                "size": item.size or "auto",
+                "count": item.count,
+                "points_spent": item.points_spent,
+                "status": item.status,
+                "created_at": (
+                    (item.created_at + timedelta(hours=8)).strftime("%Y-%m-%d %H:%M")
+                    if item.created_at
+                    else ""
+                ),
+            })
+    return ok({
+        "items": items,
+        "page": pagination.page,
+        "pages": pagination.pages,
+        "total": pagination.total,
+        "has_next": pagination.has_next,
     })
 
 

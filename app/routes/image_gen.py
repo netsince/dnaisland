@@ -83,14 +83,48 @@ def _serve_webp_from_data_url(data_url):
     return send_webp(data_url)
 
 
+def _auth_user_id():
+    """解析请求者：优先 App JWT（Authorization: Bearer），回退 flask_login 会话。
+
+    返回用户 id（int）或 None（未认证）。用于产出图/参考图接口，使 App
+    也能用 Bearer 令牌访问自己的生图图片。
+    """
+    auth = request.headers.get("Authorization", "")
+    if auth.startswith("Bearer "):
+        from ..routes.api import _decode_token
+
+        payload = _decode_token(auth[7:])
+        if payload and payload.get("user_id"):
+            return int(payload["user_id"])
+        return None
+    if current_user.is_authenticated:
+        return current_user.id
+    return None
+
+
+def _ensure_owner_or_admin(owner_id):
+    """生图资源归属校验：作者或超管放行（web 会话或 App JWT 均可）。"""
+    uid = _auth_user_id()
+    if uid is None:
+        abort(403, description="无权访问该资源")
+    if uid != int(owner_id):
+        from ..models import User
+
+        u = db.session.get(User, uid)
+        if not u or not u.is_super_admin:
+            abort(403, description="无权访问该资源")
+
+
 @image_gen_bp.route("/output/<int:log_id>/<int:idx>")
-@login_required
 def output_image(log_id, idx):
-    """产出图（原图）接口：按 log_id + 序号返回 WEBP 二进制。"""
+    """产出图（原图）接口：按 log_id + 序号返回 WEBP 二进制。
+
+    鉴权在 _ensure_owner_or_admin 内完成（兼容 web 会话与 App JWT）。
+    """
     log = db.session.get(GenerationLog, log_id)
     if not log:
         abort(404)
-    ensure_owner_or_admin(log.user_id)
+    _ensure_owner_or_admin(log.user_id)
     imgs = log.image_list()
     if idx < 0 or idx >= len(imgs):
         abort(404)
@@ -98,13 +132,15 @@ def output_image(log_id, idx):
 
 
 @image_gen_bp.route("/reference/<int:log_id>/<int:idx>")
-@login_required
 def reference_image(log_id, idx):
-    """参考图（垫图）接口：按 log_id + 序号返回 WEBP 二进制。"""
+    """参考图（垫图）接口：按 log_id + 序号返回 WEBP 二进制。
+
+    鉴权在 _ensure_owner_or_admin 内完成（兼容 web 会话与 App JWT）。
+    """
     log = db.session.get(GenerationLog, log_id)
     if not log:
         abort(404)
-    ensure_owner_or_admin(log.user_id)
+    _ensure_owner_or_admin(log.user_id)
     refs = log.reference_image_list()
     if idx < 0 or idx >= len(refs):
         abort(404)
