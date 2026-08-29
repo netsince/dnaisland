@@ -62,7 +62,7 @@
  {{ user_badge(u, class='text-truncate mw-100') }}
  {% if u.role == 'super_admin' %}<span class="badge bg-danger-subtle text-danger border border-danger-subtle ms-1" style="font-size:0.68rem;font-weight:500;vertical-align:middle;">管理员</span>{% endif %}
  </h1>
- <div class="text-muted small text-truncate">@{{ u.username }}{% if is_self %} · <span class="dna-chip">这是你</span>{% endif %}</div>
+ <div class="text-muted small text-truncate">@{{ u.username }} · <span class="dna-chip">UID {{ u.id }}</span>{% if is_self %} · <span class="dna-chip">这是你</span>{% endif %}</div>
  </div>
  </div>
 
