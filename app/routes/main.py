@@ -189,6 +189,75 @@ def featured_cards(limit=12, exclude_ids=None):
     return cards
 
 
+def swipe_cards(limit=12, exclude_ids=None):
+    """「刷一刷」专用入口：只返回**有封面**（任意槽位图）的角色卡。
+
+    与 [featured_cards] 同用热度加权随机（带图优先），但候选池额外收窄为
+    「有图」的卡，保证刷一刷每一页都有封面可展示，客户端无需二次过滤。
+
+    区别点：
+    - 候选池先按「有无图片」收窄（一次 IN 查询拿到有图卡集合）再抽样；
+    - exclude 按字符串（UUID）去重，兼容 `cards.id` 为 UUID 的情况。
+    """
+    exclude = set()
+    if exclude_ids:
+        exclude = {str(x).strip() for x in exclude_ids if str(x).strip()}
+
+    score_map = _featured_score_map()
+    if not score_map:
+        return []
+
+    # 有图卡集合：存在任一 CardImage（square/landscape/portrait）即算有图。
+    image_ids = set()
+    q = db.session.query(CardImage.card_id).filter(
+        CardImage.card_id.in_(list(score_map.keys()))
+    )
+    for (cid,) in q.all():
+        image_ids.add(str(cid))
+
+    pool = [cid for cid in image_ids if cid not in exclude]
+    if not pool:
+        return []
+
+    # 纯随机保底名额 1~2；其余按得分加权无放回抽样。
+    pure = min(random.randint(1, 2), max(0, limit - 1))
+    weighted_n = max(0, limit - pure)
+
+    chosen = []
+    avail = list(pool)
+    while len(chosen) < weighted_n and avail:
+        weights = [max(score_map.get(c, 0.0), 0.0) for c in avail]
+        if sum(weights) <= 0:
+            break
+        pick = random.choices(avail, weights=weights, k=1)[0]
+        chosen.append(pick)
+        avail.remove(pick)
+
+    pure_picks = random.sample(avail, min(pure, len(avail))) if pure and avail else []
+    result_ids = chosen + pure_picks
+    random.shuffle(result_ids)
+
+    # 预载作者 + 批量封面，避免 N+1。
+    card_map = {
+        c.id: c
+        for c in Card.query.filter(Card.id.in_(result_ids))
+        .options(joinedload(Card.author))
+        .all()
+    }
+    cards = [card_map[cid] for cid in result_ids if cid in card_map]
+
+    covers_by_card: dict[str, dict[str, str]] = {}
+    for img in CardImage.query.filter(CardImage.card_id.in_(result_ids)).all():
+        covers_by_card.setdefault(img.card_id, {})[img.slot] = (
+            f"/card-image/{img.card_id}/{img.slot}"
+        )
+    for c in cards:
+        covers = covers_by_card.get(c.id, {})
+        c.covers = covers
+        c.cover = "square" in covers
+    return cards
+
+
 @main_bp.route("/")
 def index():
     # 首页「为你推荐」：与探索同款加权随机 12 张（保留 1~2 纯随机名额）；

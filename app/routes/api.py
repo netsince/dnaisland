@@ -70,6 +70,7 @@ from ..routes.main import (
     _post_search_query,
     _user_search_query,
     featured_cards,
+    swipe_cards,
 )
 from ..routes.points import point_balance, point_transactions
 from ..routes.teahouse import (
@@ -494,6 +495,21 @@ def cards_featured():
     exclude_raw = request.args.get("exclude", "")
     exclude_ids = exclude_raw.split(",") if exclude_raw else None
     cards = featured_cards(12, exclude_ids)
+    return ok([_card_light(c) for c in cards])
+
+
+@api_bp.route("/cards/swipe", methods=["GET"])
+def cards_swipe():
+    """「刷一刷」专用接口：只返回**有封面**的角色卡（含 exclude 去重）。
+
+    - 复用 [swipe_cards]（热度加权随机，候选池收窄为有图卡）；
+    - `exclude` 逗号分隔的已展示卡 id，按 UUID 字符串去重；
+    - 默认每批 12 张，客户端滑到底传 exclude 拉下一批。
+    """
+    limit = max(1, min(request.args.get("limit", 12, type=int), 24))
+    exclude_raw = request.args.get("exclude", "")
+    exclude_ids = exclude_raw.split(",") if exclude_raw else None
+    cards = swipe_cards(limit, exclude_ids)
     return ok([_card_light(c) for c in cards])
 
 
