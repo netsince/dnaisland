@@ -35,6 +35,7 @@ from ..models import (
     User,
     UserFollow,
 )
+from ..models.proxy import PUBLIC_BASE_PATH as _PROXY_PUBLIC_BASE_PATH
 from ..models.ticket import (
     MSG_ROLE_USER,
     TICKET_CLOSED,
@@ -97,6 +98,18 @@ from ..services.notification_service import (
     unread_count,
 )
 from ..services.profile_service import update_profile
+from ..services.proxy_service import (
+    delete_config as _proxy_delete_config,
+)
+from ..services.proxy_service import (
+    get_user_config as _proxy_get_config,
+)
+from ..services.proxy_service import (
+    reset_token as _proxy_reset_token,
+)
+from ..services.proxy_service import (
+    upsert_config as _proxy_upsert_config,
+)
 from ..services.punishment_service import my_punishments_list, submit_punishment_appeal
 from ..services.report_service import (
     REPORT_REASONS,
@@ -1967,6 +1980,70 @@ def teahouse_card_search():
     cards = search_cards_for_linking(_ensure_self(), q)
     enrich_cards(cards)
     return ok({"items": [_card_light(c) for c in cards]})
+
+
+# ---------------------------------------------------------------------------
+# BYOK 代理（App 端暴露，与 Web /proxy/set 共用 proxy_service）
+# ---------------------------------------------------------------------------
+@api_bp.route("/proxy/config", methods=["GET"])
+@api_login_required
+def proxy_config_get():
+    """返回当前用户的转发配置（不含上游密钥明文）。"""
+    cfg = _proxy_get_config(_ensure_self().id)
+    if cfg is None:
+        return ok({
+            "configured": False,
+            "public_base_url": request.host_url.rstrip("/") + _PROXY_PUBLIC_BASE_PATH,
+        })
+    return ok({
+        "configured": True,
+        "upstream_base_url": cfg.upstream_base_url,
+        "remark": cfg.remark,
+        "enabled": bool(cfg.enabled),
+        "token": cfg.token,
+        "public_base_url": request.host_url.rstrip("/") + _PROXY_PUBLIC_BASE_PATH,
+    })
+
+
+@api_bp.route("/proxy/config", methods=["POST"])
+@api_login_required
+def proxy_config_save():
+    """保存/更新转发配置。action: save / reset / delete。"""
+    user = _ensure_self()
+    data = request.get_json(silent=True) or {}
+    action = (data.get("action") or "save").strip()
+    if action == "delete":
+        ok_del = _proxy_delete_config(user.id)
+        if not ok_del:
+            return err("尚未创建转发配置")
+        return ok({"deleted": True})
+
+    if action == "reset":
+        new_token = _proxy_reset_token(user.id)
+        if not new_token:
+            return err("尚未创建转发配置")
+        return ok({"token": new_token})
+
+    if action != "save":
+        return err("未知操作")
+
+    cfg, error = _proxy_upsert_config(
+        user.id,
+        upstream_base_url=(data.get("upstream_base_url") or "").strip(),
+        upstream_api_key_plain=(data.get("upstream_api_key") or "").strip(),
+        remark=(data.get("remark") or "").strip(),
+        enabled=data.get("enabled", True),
+    )
+    if error:
+        return err(error)
+    return ok({
+        "configured": True,
+        "upstream_base_url": cfg.upstream_base_url,
+        "remark": cfg.remark,
+        "enabled": bool(cfg.enabled),
+        "token": cfg.token,
+        "public_base_url": request.host_url.rstrip("/") + _PROXY_PUBLIC_BASE_PATH,
+    })
 
 
 # ---------------------------------------------------------------------------
