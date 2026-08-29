@@ -107,7 +107,8 @@
   - 封面用卡片**对应比例**（portrait=9:16 / landscape=16:9 / square=1:1）`BoxFit.cover` 裁剪铺满，不拉伸变形；
   - 底部黑色→透明渐变内展示 名称/性别徽标/作者/简介/观看·复制数；
   - 点按整页进入详情页（复用外壳 `onOpenCard`）；
-  - 只展示**有封面**的卡；滑到底自动用 `excludeIds` 去重加载下一批；顶部「换一批」按钮刷新。
+  - 只展示**有封面**的卡；滑到底自动用 `exclude` 去重加载下一批；顶部「换一批」按钮刷新。
+- 后端新增专用接口 **`GET /api/v1/cards/swipe`**（`swipe_cards`）：热度加权随机但候选池收窄为「有图」卡，`exclude` 按 UUID 字符串去重，客户端无需二次过滤。
 
 ### 7. 我的工单（客服）—— 客户端现已实现
 - ✅ **已补齐（客户端）**：我的页新增「我的工单」快捷入口（`tickets_page.dart`）：
@@ -174,6 +175,7 @@
 | 举报元数据 | `GET /api/v1/reports/meta`（已接入卡详情） | ✅ 已接入 |
 | 表情包 | `/stickers/api` + `/stickers/file/<code>`（公开 JSON） | ✅ 已接入（选择器 + 内联渲染） |
 | 生图 | `/api/v1/image-gen/*`（meta/generate/tasks/logs） | ✅ 已接入（生图工作台） |
+| 刷一刷 | `GET /api/v1/cards/swipe`（只返回有封面卡 + exclude 去重） | ✅ 已接入（横向翻页浏览） |
 
 ---
 
