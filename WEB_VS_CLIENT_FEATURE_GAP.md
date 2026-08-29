@@ -179,6 +179,17 @@
 
 ---
 
+## 四b、客户端设计系统统一（Design System）
+
+> 对客户端整体 UI 做了统一规范，减少各页面各写各的重复样式：
+
+- **尺寸 token**：`lib/theme/app_dimensions.dart` —— 圆角（sm/md/lg）、页面内边距、卡片间距、卡片封面比例、触底加载阈值等常量，页面统一引用。
+- **状态视图组件**：`lib/widgets/state_views.dart` —— 全局统一的 `EmptyState` / `ErrorState` / `LoadingState`（图标+标题+副文案+操作按钮），替换了各页手写的空态/错误态。
+- **分页列表组件**：`lib/widgets/load_more_list.dart` —— 统一「下拉刷新 + 触底加载 + 加载中 footer」，已用于 点数明细、通知列表。
+- **主题集中化**：`main.dart` 统一配置 AppBar（居中标题）、Card（圆角）、InputDecoration（描边+圆角）、SnackBar（浮动）等组件主题，减少局部 override。
+
+---
+
 ## 五、建议的补齐优先级（仅供参考）
 
 > 茶馆、搜索、上传/发布、我的角色卡管理、个人资料编辑、我的工单、搜索实时建议、表情包、BYOK 代理配置、外链中转、生图已在客户端实现并提交。
