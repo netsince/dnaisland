@@ -330,6 +330,7 @@ def _comment_item(
         "id": cm.id,
         "content": cm.content,
         "has_image": bool(cm.image_data),
+        "image_data": cm.image_data if cm.image_data else None,
         "created_at": cm.created_at.isoformat() if cm.created_at else "",
         "author": _user_public(cm.author) if cm.author else None,
         "reply_to": {
