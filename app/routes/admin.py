@@ -545,10 +545,10 @@ def user_quick_action(user_id):
 
         tx = PointTransaction(
             user_id=u.id,
-            amount=amount,
+            delta=amount,
             balance_after=u.points,
-            type="admin_adjust",
-            description=reason,
+            reason=reason,
+            source="admin",
         )
         db.session.add(tx)
         db.session.commit()
