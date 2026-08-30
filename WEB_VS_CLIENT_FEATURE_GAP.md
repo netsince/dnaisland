@@ -188,6 +188,14 @@
 - **分页列表组件**：`lib/widgets/load_more_list.dart` —— 统一「下拉刷新 + 触底加载 + 加载中 footer」，已用于 点数明细、通知列表。
 - **主题集中化**：`main.dart` 统一配置 AppBar（居中标题）、Card（圆角）、InputDecoration（描边+圆角）、SnackBar（浮动）等组件主题，减少局部 override。
 
+### 积分小数支持（Points Decimal）
+> 积分已改为支持两位小数（如 0.5）。
+
+- **数据库**：`users.points`、`point_transactions.delta/balance_after`、`redemption_keys.points`、`key_usage_logs.points_gained`、`generation_models.points_per_image`、`generation_logs.points_spent` 由 `Integer` 改为 `Numeric(10,2)`（迁移 `a5b6c7d8e9f0`，保留已有整数数据）。
+- **后端**：admin 调整积分 / 兑换码点数 / 每图积分均改用 `Decimal`；`AppJSONProvider` 支持 `Decimal` 序列化为 `float`。
+- **网页前台/后台**：新增 `|points` 模板过滤器 + JS `fmtPoints`，整数值显示为 `5`、小数显示为 `0.5`。
+- **App 前台**：`PointsData.balance` 改 `double`，明细 `delta/balance_after` 用 `toDouble`；新增 `utils/points_format.dart` 统一格式化。
+
 ---
 
 ## 五、建议的补齐优先级（仅供参考）
