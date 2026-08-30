@@ -216,7 +216,7 @@
    - ✅ 点赞/收藏 toggle 抽共享组件 → 新增 `PostLikeFavMixin`，茶馆 Feed 主列表已用
    - ✅ 未登录守卫抽 helper → `AuthGuard`(评论/卡片详情/搜索 已接入)
    - ✅ 头像裁剪复用到资料编辑 → 资料编辑头像走 `card_crop_page` 强制 1:1 方形裁剪
-   - ⬜ 分页收敛到 LoadMoreListView（结构重构，功能已正常，可选）
-   - ⬜ 卡片网格抽 ResponsiveCardGrid（结构重构，功能已正常，可选）
+   - ✅ 分页收敛到 LoadMoreListView → 文章/我的卡片改用共享 `LoadMoreListView`（下拉刷新+触底加载+态）
+   - ✅ 卡片网格抽 ResponsiveCardGrid → 新增共享组件，explore/home/me/我的收藏 四处网格统一改用
 4. **P3 锦上添花**（未做）
    - ⬜ 生图同款生成 / 茶馆回复排序 / 工单搜索
