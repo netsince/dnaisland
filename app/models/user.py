@@ -19,8 +19,8 @@ class User(db.Model, UserMixin):
 
     avatar = db.deferred(db.Column(db.Text, nullable=True))  # 头像（base64 data URL），可空
 
-    # 点数（积分）余额
-    points = db.Column(db.Integer, nullable=False, server_default="0", default=0)
+    # 点数（积分）余额（支持两位小数）
+    points = db.Column(db.Numeric(scale=2), nullable=False, server_default="0", default=0)
     bio = db.Column(db.Text, nullable=True)  # 个人简介
     location = db.Column(db.String(80), server_default="", nullable=True)  # 所在地区
     website = db.Column(db.String(200), server_default="", nullable=True)  # 个人网站

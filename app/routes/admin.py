@@ -3,6 +3,7 @@ import json
 import re
 import secrets
 from datetime import datetime
+from decimal import Decimal, InvalidOperation, getcontext
 
 from flask import (
     Blueprint,
@@ -299,9 +300,9 @@ def user_edit(user_id):
         points_raw = request.form.get("points")
         if points_raw not in (None, ""):
             try:
-                new_points = int(points_raw)
-            except ValueError:
-                flash("点数必须是整数", "warning")
+                new_points = Decimal(points_raw.strip())
+            except Exception:
+                flash("点数必须是数字", "warning")
             else:
                 if new_points != (u.points or 0):
                     delta = new_points - (u.points or 0)
@@ -532,8 +533,8 @@ def user_quick_action(user_id):
 
     elif action == "adjust_points":
         try:
-            amount = int(data.get("amount", 0))
-        except (ValueError, TypeError):
+            amount = Decimal(str(data.get("amount", 0)).strip())
+        except (InvalidOperation, ValueError, TypeError):
             return jsonify(ok=False, error="请输入有效的积分数值"), 400
         if amount == 0:
             return jsonify(ok=False, error="调整积分不能为 0"), 400
@@ -641,9 +642,9 @@ def keys_generate():
         count = 1
     count = max(1, min(count, 500))
     try:
-        points = int(request.form.get("points", 0))
-    except ValueError:
-        points = 0
+        points = Decimal(request.form.get("points", "0").strip())
+    except InvalidOperation:
+        points = Decimal("0")
     try:
         max_uses = int(request.form.get("max_uses", 1))
     except ValueError:
@@ -705,9 +706,9 @@ def image_models():
         name = (request.form.get("name") or "").strip()
         display_name = (request.form.get("display_name") or "").strip()
         try:
-            points_per_image = int(request.form.get("points_per_image", 0))
-        except ValueError:
-            points_per_image = 0
+            points_per_image = Decimal(request.form.get("points_per_image", "0").strip())
+        except InvalidOperation:
+            points_per_image = Decimal("0")
         if not name or not display_name:
             flash("调用名与展示名均必填", "warning")
         else:
@@ -750,9 +751,9 @@ def image_model_edit(model_id):
         name = (request.form.get("name") or "").strip()
         display_name = (request.form.get("display_name") or "").strip()
         try:
-            points_per_image = int(request.form.get("points_per_image", 0))
-        except ValueError:
-            points_per_image = 0
+            points_per_image = Decimal(request.form.get("points_per_image", "0").strip())
+        except InvalidOperation:
+            points_per_image = Decimal("0")
         if not name or not display_name:
             flash("调用名与展示名均必填", "warning")
         else:

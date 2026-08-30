@@ -21,7 +21,7 @@ class GenerationModel(db.Model):
     name = db.Column(db.String(120), nullable=False, index=True)
     display_name = db.Column(db.String(120), nullable=False)  # 前端展示名
     points_per_image = db.Column(
-        db.Integer, nullable=False, server_default="0", default=0
+        db.Numeric(scale=2), nullable=False, server_default="0", default=0
     )  # 每张图消耗的积分数
     enabled = db.Column(
         db.Boolean, nullable=False, server_default="1", default=True
@@ -61,7 +61,7 @@ class GenerationLog(db.Model):
     images = db.deferred(db.Column(LONGTEXT, nullable=True))  # JSON 数组：base64 data URL 列表
     reference_images = db.deferred(db.Column(LONGTEXT, nullable=True))  # JSON 数组：参考图的 WebP Data URL 列表
     points_spent = db.Column(
-        db.Integer, nullable=False, server_default="0", default=0
+        db.Numeric(scale=2), nullable=False, server_default="0", default=0
     )
     error = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, server_default=db.func.now())

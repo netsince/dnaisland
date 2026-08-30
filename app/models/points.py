@@ -17,8 +17,8 @@ class PointTransaction(db.Model):
     user_id = db.Column(
         db.Integer, db.ForeignKey("users.id"), nullable=False, index=True
     )
-    delta = db.Column(db.Integer, nullable=False)  # 变化量：正为增加，负为扣减
-    balance_after = db.Column(db.Integer, nullable=False)  # 变化后余额
+    delta = db.Column(db.Numeric(scale=2), nullable=False)  # 变化量：正为增加，负为扣减
+    balance_after = db.Column(db.Numeric(scale=2), nullable=False)  # 变化后余额
     reason = db.Column(db.String(120), nullable=False, default="")  # 说明
     source = db.Column(
         db.String(20), nullable=False, default="system"
@@ -27,7 +27,7 @@ class PointTransaction(db.Model):
     created_at = db.Column(db.DateTime, server_default=db.func.now())
 
     def __repr__(self):
-        return f"<PointTransaction user={self.user_id} {self.delta:+d}>"
+        return f"<PointTransaction user={self.user_id} {self.delta:+.2f}>"
 
 
 class RedemptionKey(db.Model):
@@ -35,7 +35,7 @@ class RedemptionKey(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     code = db.Column(db.String(64), nullable=False, unique=True, index=True)
-    points = db.Column(db.Integer, nullable=False, default=0)  # 兑换可得点数
+    points = db.Column(db.Numeric(scale=2), nullable=False, default=0)  # 兑换可得点数
     max_uses = db.Column(db.Integer, nullable=False, default=1)  # 最多使用次数
     per_user_limit = db.Column(
         db.Integer, nullable=False, default=1
@@ -70,7 +70,7 @@ class KeyUsageLog(db.Model):
     user_id = db.Column(
         db.Integer, db.ForeignKey("users.id"), nullable=True, index=True
     )
-    points_gained = db.Column(db.Integer, nullable=False, default=0)
+    points_gained = db.Column(db.Numeric(scale=2), nullable=False, default=0)
     status = db.Column(db.String(10), nullable=False, default="success")  # success/fail
     note = db.Column(db.String(200), nullable=True)  # 失败原因
     created_at = db.Column(db.DateTime, server_default=db.func.now())

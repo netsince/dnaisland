@@ -1,4 +1,6 @@
 import os
+from datetime import datetime
+from decimal import Decimal
 
 from dotenv import load_dotenv
 from flask import (
@@ -12,6 +14,7 @@ from flask import (
     request,
     url_for,
 )
+from flask.json.provider import DefaultJSONProvider
 from flask_login import current_user, logout_user
 from markupsafe import Markup
 
@@ -21,9 +24,23 @@ from .extensions import bcrypt, db, login_manager, mail, migrate
 load_dotenv()
 
 
+class AppJSONProvider(DefaultJSONProvider):
+    """让 jsonify 能序列化 Decimal（积分改为支持小数后，Numeric 列返回 Decimal）。"""
+
+    def default(self, o):
+        if isinstance(o, Decimal):
+            return float(o)
+        if isinstance(o, datetime):
+            return o.isoformat()
+        return super().default(o)
+
+
 def create_app(config_object=None):
     app = Flask(__name__)
     app.config.from_object(config_object or config)
+
+    # 自定义 JSON 提供器：支持 Decimal 序列化（积分小数）
+    app.json = AppJSONProvider(app)
 
     # 环境变量可覆盖关键配置
     app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", app.config["SECRET_KEY"])
@@ -146,6 +163,19 @@ def create_app(config_object=None):
             cst_dt = dt + timedelta(hours=8)
             return cst_dt.strftime(fmt)
         return str(dt)
+
+    @app.template_filter("points")
+    def points_filter(value):
+        """积分展示：去掉末尾无意义的小数（5.00 -> 5，0.50 -> 0.5，0.5 -> 0.5）。"""
+        if value in (None, ""):
+            return "0"
+        try:
+            d = Decimal(str(value))
+        except Exception:
+            return str(value)
+        if d == d.to_integral_value():
+            return str(d.quantize(Decimal("1")))
+        return ("%f" % d).rstrip("0").rstrip(".")
 
     from .services.sticker_service import render_stickers_html
 

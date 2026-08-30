@@ -20,7 +20,7 @@
       </div>
       <div class="col-md-2">
         <label class="form-label">每图积分</label>
-        <input type="number" class="form-control" name="points_per_image" value="0" min="0">
+        <input type="number" class="form-control" name="points_per_image" value="0" min="0" step="0.01">
       </div>
       <div class="col-md-2 d-flex align-items-end">
         <div class="form-check form-switch">
@@ -61,7 +61,7 @@
         <tr>
           <td><code>{{ m.name }}</code></td>
           <td>{{ m.display_name }}</td>
-          <td>{{ m.points_per_image }}</td>
+          <td>{{ m.points_per_image|points }}</td>
           <td>
             {% if m.api_base_url %}
               <code>{{ m.api_base_url }}</code>

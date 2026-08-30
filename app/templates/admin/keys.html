@@ -19,7 +19,7 @@
       </div>
       <div class="col-md-2">
         <label class="form-label">点数</label>
-        <input type="number" class="form-control" name="points" value="100" min="0">
+        <input type="number" class="form-control" name="points" value="100" min="0" step="0.01">
       </div>
       <div class="col-md-2">
         <label class="form-label">最多使用次数</label>
@@ -87,7 +87,7 @@
       {% for k in keys %}
       <tr>
         <td><code>{{ k.code }}</code></td>
-        <td>{{ k.points }}</td>
+        <td>{{ k.points|points }}</td>
         <td>{{ k.used_count }} / {{ k.max_uses }}</td>
         <td>{{ k.per_user_limit }}</td>
         <td>
@@ -138,7 +138,7 @@
         <td><code>{{ l.code }}</code></td>
         <td><a href="{{ url_for('user.profile', username=l.username) }}">{{ l.username }}</a></td>
         <td class="{{ 'text-success' if l.status == 'success' else 'text-danger' }}">
-          {{ l.points_gained if l.status == 'success' else '—' }}
+          {{ (l.points_gained|points) if l.status == 'success' else '—' }}
         </td>
         <td>
           {% if l.status == 'success' %}

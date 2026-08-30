@@ -12,7 +12,7 @@
  <aside class="ig-side">
  <div class="ig-brand">
  <h1>◆ 生图工作台</h1>
- <span class="ig-pts" id="igPoints">点数 <b>{{ current_user.points or 0 }}</b></span>
+ <span class="ig-pts" id="igPoints">点数 <b>{{ (current_user.points or 0)|points }}</b></span>
  </div>
 
  <form method="post" action="{{ url_for('image_gen.generate') }}" enctype="multipart/form-data" class="d-flex flex-column gap-3" style="flex:1;">
@@ -26,7 +26,7 @@
  <select name="model" class="form-select" required>
  <option value="">请选择模型</option>
  {% for m in models %}
- <option value="{{ m.id }}" {{ 'selected' if default_model and m.id == default_model.id else '' }}>{{ m.display_name }}（{{ m.points_per_image }} 点/张）</option>
+ <option value="{{ m.id }}" {{ 'selected' if default_model and m.id == default_model.id else '' }}>{{ m.display_name }}（{{ m.points_per_image|points }} 点/张）</option>
  {% else %}
  <option value="" disabled>暂无可用模型（联系管理员配置）</option>
  {% endfor %}
@@ -372,6 +372,13 @@
   var activeTaskIds = new Set();
   var pollTimer = null;
 
+  function fmtPoints(v) {
+    if (v === null || v === undefined || v === '') return '0';
+    var n = parseFloat(v);
+    if (isNaN(n)) return String(v);
+    return (Math.round(n * 100) / 100).toString();
+  }
+
   function toast(msg, kind) {
     if (typeof showToast === 'function') {
       showToast(msg, kind || 'info');
@@ -400,9 +407,9 @@
         setSkeletonState(false);
         if (d.ok && d.status === 'succeeded') {
           var spent = d.points_spent || 0;
-          statusEl.textContent = '完成，消耗 ' + spent + ' 点';
+          statusEl.textContent = '完成，消耗 ' + fmtPoints(spent) + ' 点';
           statusEl.className = 'ig-status ok';
-          if (pointsEl && typeof d.balance !== 'undefined') pointsEl.innerHTML = '点数 <b>' + d.balance + '</b>';
+          if (pointsEl && typeof d.balance !== 'undefined') pointsEl.innerHTML = '点数 <b>' + fmtPoints(d.balance) + '</b>';
           toast('生图完成', 'success');
           loadWorkbenchLogs();
         } else if (d.ok) {

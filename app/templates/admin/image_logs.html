@@ -59,7 +59,7 @@
         <td class="text-truncate" style="max-width: 220px;">{{ l.prompt[:40] }}{% if l.prompt|length > 40 %}…{% endif %}</td>
         <td>{{ l.size or 'auto' }}</td>
         <td>{{ l.count }}</td>
-        <td>{{ l.points_spent }}</td>
+        <td>{{ l.points_spent|points }}</td>
         <td>
           <span class="badge bg-{{ 'success' if l.status == 'success' else ('warning' if l.status == 'partial' else 'danger') }}">
             {{ '成功' if l.status == 'success' else ('部分' if l.status == 'partial' else '失败') }}

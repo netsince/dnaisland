@@ -48,6 +48,13 @@
 
   var currentPage = 1;
 
+  function fmtPoints(v) {
+    if (v === null || v === undefined || v === '') return '0';
+    var n = parseFloat(v);
+    if (isNaN(n)) return String(v);
+    return (Math.round(n * 100) / 100).toString();
+  }
+
   function renderHorizontalMasonry() {
     var cols = row.querySelectorAll('.mg-col');
     if (!cols.length) return;
@@ -159,7 +166,7 @@
             '<img src="' + firstImage + '" alt="生成图" class="dna-img-fade__img" loading="lazy" decoding="async"></a>' +
             '<div class="mg-meta">' +
               '<div class="row1"><span class="title">' + l.model_name + ' <span class="mg-status ' + stClass + '">' + stText + '</span></span></div>' +
-              '<div class="info">' + (l.size || 'auto') + ' · ' + l.count + ' 张请求 · 消耗 ' + l.points_spent + ' 点</div>' +
+              '<div class="info">' + (l.size || 'auto') + ' · ' + l.count + ' 张请求 · 消耗 ' + fmtPoints(l.points_spent) + ' 点</div>' +
               '<div class="info">' + l.created_at + ' <a class="mg-detail" href="/image-gen/logs/' + l.id + '">详情 →</a></div>' +
             '</div>';
           rawContainer.appendChild(item);
