@@ -965,6 +965,43 @@ def users_profile_comments(username):
     })
 
 
+@api_bp.route("/users/<username>/teahouse", methods=["GET"])
+def users_profile_teahouse(username):
+    """用户主页：茶馆帖子列表（分页）。
+
+    只返回该用户「发布的帖子」（顶级帖子，parent_id 为空），复用茶馆
+    feed 的统计聚合与序列化，保证与网页版个人页「茶馆」tab 一致。
+    """
+    from ..models import TeaPost
+    from ..routes.teahouse import _build_stats
+
+    _soft_auth()
+    u = get_user_by_username(username)
+    if not u:
+        return err("用户不存在", 404)
+    cu = _ensure_self()
+    is_self = cu.is_authenticated and cu.id == u.id
+    is_admin = cu.is_authenticated and cu.is_super_admin
+
+    page = request.args.get("page", 1, type=int)
+    per_page = 20
+    query = TeaPost.query.filter_by(user_id=u.id, parent_id=None)
+    if not (is_self or is_admin):
+        query = query.filter(TeaPost.is_hidden.is_(False))
+    pagination = query.order_by(TeaPost.created_at.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    stats = _build_stats(pagination.items)
+    items = [_teapost_item(p, stats.get(p.id, {})) for p in pagination.items]
+    return ok({
+        "items": items,
+        "page": pagination.page,
+        "pages": pagination.pages,
+        "total": pagination.total,
+        "has_next": pagination.has_next,
+    })
+
+
 @api_bp.route("/users/<username>/followers", methods=["GET"])
 @api_bp.route("/users/<username>/following", methods=["GET"])
 def users_follow_list(username):
