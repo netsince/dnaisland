@@ -37,7 +37,7 @@ from ..models import (
     UserFollow,
 )
 from ..paging import IdListPagination
-from ..services.image_service import raw_bytes_to_webp_data_url
+from ..services.image_service import compress_image, raw_bytes_to_webp_data_url
 from ..services.notification_service import notify
 from ..services.sticker_service import sanitize_stickers
 from ..utils import get_user_by_username, rate_hit, respond, toggle_relation
@@ -847,13 +847,14 @@ def topic_posts_page(topic_id, viewer, page, per_page=20):
     return topic, q.paginate(page=page, per_page=per_page, error_out=False)
 
 
-def edit_teapost(viewer, post, content, card_action=None, topic_raw=None, remove_images=False):
+def edit_teapost(viewer, post, content, card_action=None, topic_raw=None, remove_images=False, new_images=None):
     """编辑茶馆帖子核心逻辑（Web 与 App 共用）。
 
     - content: 已清洗后的正文（调用方需先 prepare_teapost_content）。
     - card_action: None 保持原样；("set", card_id) 关联；("remove",) 清除。
     - topic_raw: 提供则调整话题（含空串清除），None 保持原样。
     - remove_images: True 则清空所有配图。
+    - new_images: 非空 data-URL 图片字符串列表时，用新图整体替换原有配图（单图）。
     返回 (post, error)：error 非空表示校验/权限失败（已 flash 文案可供复用）。
     """
     if not post.can_edit(viewer):
@@ -872,12 +873,38 @@ def edit_teapost(viewer, post, content, card_action=None, topic_raw=None, remove
             post.card_id = card.id if card else None
     if topic_raw is not None:
         _set_single_topic(post, topic_raw)
-    if remove_images:
+    if new_images:
+        # 提供新图则整体替换配图（单图：取第一张有效图）
+        _replace_post_images(post, new_images)
+    elif remove_images:
         for old in list(post.images):
             db.session.delete(old)
         post.images.clear()
     db.session.commit()
     return post, None
+
+
+def _replace_post_images(post, image_data_urls):
+    """用 data-URL 图片字符串整体替换帖子的配图（仅单图）。
+
+    复用发帖时的图片清洗逻辑：压缩为 WebP data URL 后再存储。会先清空原图。
+    若所有图片都无效，则回退为清空配图。
+    """
+    for old in list(post.images):
+        db.session.delete(old)
+    post.images.clear()
+    for data_url in image_data_urls:
+        if not data_url or not isinstance(data_url, str) or not data_url.strip():
+            continue
+        try:
+            stored = compress_image(
+                data_url, max_edge=TEA_IMAGE_MAX_EDGE, quality=TEA_IMAGE_QUALITY
+            )
+        except Exception:
+            continue
+        post.images.append(TeaPostImage(image_data=stored))
+        break  # 单图：仅取第一张
+
 
 
 def soft_delete_teapost(viewer, post):

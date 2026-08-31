@@ -353,6 +353,11 @@ def _comment_item(
 def _teapost_item(post: TeaPost, stats: dict) -> dict:
     """茶馆帖子摘要。"""
     img = post.images[0] if post.images else None  # type: ignore[index]
+    card = post.card if post.card else None
+    covers = {}
+    if card is not None:
+        for ci in card.images or []:  # type: ignore[union-attr]
+            covers.setdefault(ci.slot, f"/card-image/{card.id}/{ci.slot}")
     return {
         "id": post.id,
         "content": post.content,
@@ -366,6 +371,7 @@ def _teapost_item(post: TeaPost, stats: dict) -> dict:
         "card": {
             "id": post.card.id,
             "name": post.card.name,
+            "covers": covers,
         } if post.card else None,
         "parent_id": post.parent_id,
         "is_deleted": post.is_deleted,
@@ -1358,7 +1364,8 @@ def teahouse_topic_detail(topic_id):
 @api_bp.route("/teahouse/posts/<int:post_id>/edit", methods=["POST"])
 @api_login_required
 def teahouse_edit_post(post_id):
-    """编辑茶馆帖子：body = {content, card_id?, card_removed?, topic?, image_removed?}。"""
+    """编辑茶馆帖子：body = {content, card_id?, card_removed?, topic?, image_removed?, images?}。
+    images 为 data-URL 图片字符串列表，非空时用新图整体替换配图。"""
     viewer = _ensure_self()
     p = db.session.get(TeaPost, post_id)
     if not p or (p.is_deleted and not viewer.is_super_admin):
@@ -1372,7 +1379,13 @@ def teahouse_edit_post(post_id):
         card_action = ("remove",) if data.get("card_removed") else ("set", data.get("card_id"))
     topic_raw = data.get("topic") if "topic" in data else None
     remove_images = bool(data.get("image_removed"))
-    p, error = edit_teapost(viewer, p, content, card_action, topic_raw, remove_images)
+    new_images = data.get("images") or []
+    if not isinstance(new_images, list):
+        new_images = [new_images]
+    new_images = [im for im in new_images if isinstance(im, str) and im.strip()]
+    p, error = edit_teapost(
+        viewer, p, content, card_action, topic_raw, remove_images, new_images
+    )
     if error:
         return err(error)
     _notify_mentions(content, p, viewer)
