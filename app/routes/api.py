@@ -2171,7 +2171,13 @@ def image_gen_generate():
     cfg = get_site_config()
     data = request.get_json(silent=True) or {}
 
-    model_id = data.get("model_id", type=int)
+    # data 是 request.get_json 返回的普通 dict，dict.get 不接受 type= 关键字，
+    # 且也不会做类型转换。这里需手动安全转 int（缺失/非法 -> None）。
+    raw_model_id = data.get("model_id")
+    try:
+        model_id = int(raw_model_id) if raw_model_id is not None else None
+    except (TypeError, ValueError):
+        model_id = None
     model = db.session.get(GenerationModel, model_id) if model_id else None
     if not model or not model.enabled:
         return err("请选择有效的生图模型")
