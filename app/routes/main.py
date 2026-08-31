@@ -16,6 +16,7 @@ from flask import (
 )
 from flask_login import current_user
 from sqlalchemy import case, desc, func, literal_column, or_, text
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import joinedload
 
 from ..caching import TimedCache
@@ -561,6 +562,22 @@ def _ft_match(cols, q):
     return text(f"MATCH ({cols}) AGAINST (:q IN BOOLEAN MODE)").bindparams(q=q)
 
 
+def _fulltext_fallback(ft_query, like_query):
+    """优先执行 MySQL 全文检索；若 FULLTEXT 索引缺失/未迁移导致 MATCH...AGAINST
+    报错（OperationalError），回退到 LIKE 查询。
+
+    否则一旦生产 MySQL 未跑全文索引迁移，所有搜索（含联想）都会因 500 空结果。
+    LIMIT 0 仅用于触发一次执行以探测索引是否可用，不扫描实际数据。
+    """
+    if not _fulltext_enabled():
+        return like_query
+    try:
+        ft_query.limit(0).all()
+        return ft_query
+    except OperationalError:
+        return like_query
+
+
 def _card_search_query(q, sort, tag=None, viewer=None):
     """构造角色卡检索查询（已包含信息层可见性过滤与相关度排序）。
 
@@ -569,7 +586,7 @@ def _card_search_query(q, sort, tag=None, viewer=None):
 
     MySQL 且开启 FULLTEXT 时，name/intro/persona 的检索走全文索引（MATCH
     AGAINST），tag 仍用 LIKE（标签表未建全文索引）；否则回退到原有的
-    全表 LIKE，语义不变。
+    全表 LIKE，语义不变。索引缺失时自动回退 LIKE，避免搜索 500。
     """
     like = f"%{q}%"
     base = Card.visible_to(viewer if viewer is not None else current_user).outerjoin(
@@ -592,27 +609,52 @@ def _card_search_query(q, sort, tag=None, viewer=None):
         filters.append(CardTag.tag == tag)
     base = base.filter(*filters).distinct()
 
-    if sort == "hot":
-        base = _order_by_hot(base)
-    elif sort == "new":
-        base = base.order_by(Card.created_at.desc())
-    else:  # relevance
-        if use_ft:
-            # 全文检索直接用 MATCH 相关度排序
-            base = base.order_by(
+    def _apply_order(query, use_fulltext=None):
+        use_fulltext = use_ft if use_fulltext is None else use_fulltext
+        if sort == "hot":
+            return _order_by_hot(query)
+        if sort == "new":
+            return query.order_by(Card.created_at.desc())
+        # relevance：全文检索直接用 MATCH 相关度排序，否则用命中列加权 CASE。
+        if use_fulltext:
+            return query.order_by(
                 desc(ft),
                 Card.view_count.desc(),
                 Card.created_at.desc(),
             )
-        else:
-            score = case(
+        score = case(
                 (Card.name.like(like), 3),
                 (CardTag.tag.like(like), 2),
                 (or_(Card.intro.like(like), Card.persona.like(like)), 1),
                 else_=0,
             )
-            base = base.order_by(score.desc(), Card.view_count.desc(), Card.created_at.desc())
-    return base
+        return query.order_by(score.desc(), Card.view_count.desc(), Card.created_at.desc())
+
+    # 同时构造 LIKE 版本作为兜底：FULLTEXT 索引缺失时由 _fulltext_fallback 切换。
+    if use_ft:
+        ft_base = base.filter(
+            or_(ft, CardTag.tag.like(like))
+        )
+        if tag:
+            ft_base = ft_base.filter(CardTag.tag == tag)
+        ft_base = ft_base.distinct()
+        ft_query = _apply_order(ft_base, use_fulltext=True)
+        like_filters = [
+            or_(
+                Card.name.like(like),
+                Card.intro.like(like),
+                Card.persona.like(like),
+                CardTag.tag.like(like),
+            )
+        ]
+        if tag:
+            like_filters.append(CardTag.tag == tag)
+        like_base = Card.visible_to(
+            viewer if viewer is not None else current_user
+        ).outerjoin(CardTag, CardTag.card_id == Card.id)
+        like_query = _apply_order(like_base.filter(*like_filters).distinct(), use_fulltext=False)
+        return _fulltext_fallback(ft_query, like_query)
+    return _apply_order(base)
 
 
 def _user_search_query(q, sort):
@@ -647,10 +689,15 @@ def _post_search_query(q):
         TeaPost.is_deleted.is_(False),
     )
     if _fulltext_enabled() and bool(q.strip()):
-        base = base.filter(_ft_match("teahouse_posts.content", q))
-    else:
-        base = base.filter(TeaPost.content.ilike(f"%{q}%"))
-    return base.order_by(TeaPost.created_at.desc())
+        # 先走全文索引；索引缺失时由 _fulltext_fallback 回退到 LIKE。
+        ft_query = base.filter(_ft_match("teahouse_posts.content", q)).order_by(
+            TeaPost.created_at.desc()
+        )
+        like_query = base.filter(TeaPost.content.ilike(f"%{q}%")).order_by(
+            TeaPost.created_at.desc()
+        )
+        return _fulltext_fallback(ft_query, like_query)
+    return base.filter(TeaPost.content.ilike(f"%{q}%")).order_by(TeaPost.created_at.desc())
 
 
 @main_bp.route("/search")
