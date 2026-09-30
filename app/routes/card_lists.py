@@ -26,6 +26,15 @@ from ..models import (
 from ..services.card_service import build_export_package, enrich_cards
 from ..utils import toggle_relation
 
+# 置顶优先排序：已置顶的排最前（按置顶时间倒序），其余按创建时间倒序。
+# Card.pinned_at IS NULL 对「未置顶」为 True(1)、「已置顶」为 False(0)，升序即把已置顶排前。
+# 置顶卡因此天然落在第一页，既不需要单独区块，也不会在后续分页里重复出现。
+_PINNED_FIRST = (
+    Card.pinned_at.is_(None),
+    Card.pinned_at.desc(),
+    Card.created_at.desc(),
+)
+
 
 def _paginated_cards(query, page, per_page):
     """分页 + 批量装配，返回 (pagination, cards)。"""
@@ -97,14 +106,14 @@ def profile_cards(viewer, username, page=1, per_page=12):
         q = Card.query.filter_by(author_id=u.id)
     else:
         q = Card.visible_to(viewer).filter(Card.author_id == u.id)
-    q = q.order_by(Card.created_at.desc())
+    q = q.order_by(*_PINNED_FIRST)
     pag = q.paginate(page=page, per_page=per_page, error_out=False)
     return u, pag, enrich_cards(pag.items)
 
 
 def my_cards(viewer, page=1, per_page=12):
     """我的角色卡。"""
-    q = Card.query.filter_by(author_id=viewer.id).order_by(Card.created_at.desc())
+    q = Card.query.filter_by(author_id=viewer.id).order_by(*_PINNED_FIRST)
     return _paginated_cards(q, page, per_page)
 
 

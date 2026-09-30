@@ -25,6 +25,18 @@ class Card(db.Model):
     # 幂等去重：发现该作者已存在同指纹的「待审核」卡则复用，不再新建。
     content_hash = db.Column(db.String(64), nullable=True, index=True)
     is_hidden = db.Column(db.Boolean, server_default="0", nullable=False, index=True)
+    # 隐匿标签（仅超级管理员可见/可设置）：JSON 数组，存 app.services.card_hidden_tags
+    # 注册表里的稳定 key。普通用户与作者的任何接口都不会返回它。
+    hidden_tags = db.Column(db.JSON, nullable=False, default=list, server_default="[]")
+    # 由隐匿标签**派生**的热度分乘数（1.0 = 不降权）。JSON 无法在 SQL 里高效判断，
+    # 故冗余一个 SQL 可见列；唯一写入方是 card_hidden_tags.set_hidden_tags。
+    boost_factor = db.Column(
+        db.Float, nullable=False, default=1.0, server_default="1.0"
+    )
+    # 置顶时间：非空表示作者把该卡置顶到个人主页最前。
+    # 每位作者最多 MAX_PINNED_CARDS 张、且仅限「已通过」（见 card_edit_service.set_card_pinned）。
+    # 存时间戳而非布尔值，便于按置顶先后稳定排序（见 card_lists 的置顶优先排序）。
+    pinned_at = db.Column(db.DateTime, nullable=True, index=True)
     view_count = db.Column(db.Integer, server_default="0")
     # 复制量：与浏览量统计口径类似，但仅在用户点击“复制角色卡”时记录一次。
     # 去重规则：同一用户（user_id）对同一张卡每天（自然日）最多 +1，重复复制不累加。

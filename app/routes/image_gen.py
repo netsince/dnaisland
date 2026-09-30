@@ -22,6 +22,7 @@ from flask import (
 )
 from flask_login import current_user, login_required
 
+from ..constants import points_mul, points_to_str
 from ..extensions import db
 from ..models import GenerationLog, GenerationModel, GenerationTask
 from ..services.generation_worker import process_generation_task, recover_stale_tasks
@@ -215,10 +216,13 @@ def generate():
         )
 
     # 预估算积分，点数不足禁止生成
-    estimated = count * (model.points_per_image or 0)
+    estimated = points_mul(count, model.points_per_image)
     balance = current_user.points or 0
     if balance < estimated:
-        msg = f"点数不足：本次预计消耗 {estimated} 点，当前余额 {balance} 点"
+        msg = (
+            f"点数不足：本次预计消耗 {points_to_str(estimated)} 点，"
+            f"当前余额 {points_to_str(balance)} 点"
+        )
         if want_json:
             return jsonify(ok=False, code="insufficient_points", error=msg), 400
         flash(msg, "warning")
@@ -308,8 +312,8 @@ def api_task_detail(task_id):
         status=t.status,
         error=t.error,
         log_id=t.result_log_id,
-        points_spent=points_spent,
-        balance=current_user.points,
+        points_spent=points_to_str(points_spent),
+        balance=points_to_str(current_user.points),
     )
 
 
@@ -352,7 +356,7 @@ def api_logs():
                 "model_name": item.model_name,
                 "size": item.size or "auto",
                 "count": item.count,
-                "points_spent": item.points_spent,
+                "points_spent": points_to_str(item.points_spent),
                 "status": item.status,
                 "created_at": (item.created_at + timedelta(hours=8)).strftime("%Y-%m-%d %H:%M") if item.created_at else "",
                 "detail_url": url_for("image_gen.log_detail", log_id=item.id),

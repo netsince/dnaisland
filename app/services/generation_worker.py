@@ -10,6 +10,7 @@ import base64
 import json
 from datetime import datetime, timedelta
 
+from ..constants import points_mul, points_sub
 from ..extensions import db
 from ..models import GenerationLog, GenerationModel, GenerationTask, PointTransaction, User
 from ..services.image_gen_service import effective_credentials, generate_images
@@ -70,7 +71,7 @@ def process_generation_task(app, task_id):
             return
 
         actual = len(images)
-        spent = actual * (model.points_per_image or 0)
+        spent = points_mul(actual, model.points_per_image)
         status = (
             "success"
             if actual == task.count
@@ -92,7 +93,7 @@ def process_generation_task(app, task_id):
         db.session.add(log)
         db.session.flush()
         if spent and user:
-            user.points = (user.points or 0) - spent
+            user.points = points_sub(user.points, spent)
             db.session.add(
                 PointTransaction(
                     user_id=user.id,

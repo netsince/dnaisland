@@ -27,6 +27,15 @@ def _encode(raw: bytes, mime: str = "image/webp") -> str:
     return f"data:{mime};base64,{b64}"
 
 
+def image_size(raw_bytes: bytes) -> tuple[int, int]:
+    """读取图片的原始像素尺寸，返回 (宽, 高)。无法识别时抛 ValueError（消息面向用户）。"""
+    try:
+        with Image.open(BytesIO(raw_bytes)) as img:
+            return img.size
+    except Exception:
+        raise ValueError("图片无法识别，请重新选择") from None
+
+
 def compress_image(data_url: str, max_edge: int = 1024, quality: int = 80) -> str:
     """压缩任意比例为 WebP。
 

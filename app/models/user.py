@@ -1,5 +1,6 @@
 from flask_login import UserMixin
 
+from ..constants import POINT_PRECISION, POINT_SCALE
 from ..extensions import bcrypt, db
 from .punishment import Punishment
 
@@ -19,8 +20,8 @@ class User(db.Model, UserMixin):
 
     avatar = db.deferred(db.Column(db.Text, nullable=True))  # 头像（base64 data URL），可空
 
-    # 点数（积分）余额（支持两位小数）
-    points = db.Column(db.Numeric(scale=2), nullable=False, server_default="0", default=0)
+    # 点数（积分）余额（精度单点定义见 app/constants.py：DECIMAL(30,10)，10 位小数）
+    points = db.Column(db.Numeric(precision=POINT_PRECISION, scale=POINT_SCALE), nullable=False, server_default="0", default=0)
     bio = db.Column(db.Text, nullable=True)  # 个人简介
     location = db.Column(db.String(80), server_default="", nullable=True)  # 所在地区
     website = db.Column(db.String(200), server_default="", nullable=True)  # 个人网站

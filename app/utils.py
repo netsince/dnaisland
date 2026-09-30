@@ -143,20 +143,28 @@ def _prune_rate_limits() -> None:
         _RATE_LIMITS.pop(k, None)
 
 
-def rate_hit(scope, limit=5, per=60, key=None):
+def rate_hit(scope, limit=5, per=60, key=None, *, record=True):
     """进程内限流：记录一次命中并返回是否已超过限制（True=被限流）。
 
     scope 为限流维度（如 "teahouse_post"）；key 缺省取当前用户 id，未登录取客户端 IP。
+    record=False 时只检查、不记录，用于「先判断是否已被限流，失败时再记录」的两段式场景
+    （例如登录：成功不应占用失败额度）。
     单进程部署足够；多进程/多机请迁移到 Redis。
     """
     if key is None:
         key = current_user.id if current_user.is_authenticated else (request.remote_addr or "anon")
     rk = f"{scope}:{key}"
     now = time.time()
-    hits = _RATE_LIMITS.setdefault(rk, [])
+    hits = _RATE_LIMITS.get(rk)
+    if hits is None:
+        if not record:
+            return False
+        hits = _RATE_LIMITS[rk] = []
     hits[:] = [t for t in hits if now - t < per]
     if len(hits) >= limit:
         return True
+    if not record:
+        return False
     hits.append(now)
     if len(_RATE_LIMITS) > _RATE_LIMITS_MAX:
         _prune_rate_limits()

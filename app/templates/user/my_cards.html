@@ -42,6 +42,7 @@
  <div>
  <a class="fw-semibold text-decoration-none" href="{{ url_for('user.card_detail', card_id=card.id) }}">{{ card.name }}</a>
  <span class="badge bg-secondary ms-1 js-hidden-badge {% if not card.is_hidden %}d-none{% endif %}">已隐藏</span>
+ <span class="badge bg-info ms-1 js-pinned-badge {% if not card.pinned_at %}d-none{% endif %}">置顶</span>
  <div class="text-muted small mt-1">{{ card.gender or '未知' }} · {{ card.created_at|cst('%Y-%m-%d') }}</div>
  </div>
  <div class="text-nowrap js-status-badge">{{ status_badge(card.status, privileged=True) }}</div>
@@ -61,6 +62,17 @@ data-label-on="取消隐藏" data-label-off="隐藏">
 <span class="js-toggle-label">{{ '取消隐藏' if card.is_hidden else '隐藏' }}</span>
 </button>
 </form>
+{# 只有「已通过」的卡能置顶（服务端同样校验），未通过时不显示按钮以免误导 #}
+{% if card.status == 'approved' %}
+<form method="post" action="{{ url_for('user.card_toggle_pin', card_id=card.id) }}" class="d-inline js-toggle"
+data-confirm="{{ '确认取消置顶？' if card.pinned_at else '确认将该角色卡置顶到主页最前？' }}"
+data-on-class="btn-outline-secondary" data-off-class="btn-outline-info"
+data-label-on="取消置顶" data-label-off="置顶">
+<button class="btn btn-sm btn-outline-{{ 'secondary' if card.pinned_at else 'info' }}">
+<span class="js-toggle-label">{{ '取消置顶' if card.pinned_at else '置顶' }}</span>
+</button>
+</form>
+{% endif %}
  </div>
  </div>
  {% else %}

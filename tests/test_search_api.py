@@ -7,8 +7,8 @@ import pytest
 from app import create_app, db
 from app.config import Config
 from app.models.card import Card
-from app.models.user import User
 from app.models.teahouse import TeaPost
+from app.models.user import User
 from sqlalchemy.dialects.mysql import LONGTEXT
 from sqlalchemy.ext.compiler import compiles
 

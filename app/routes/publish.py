@@ -107,8 +107,9 @@ def edit():
     }
     card, error = create_card_from_payload(current_user, payload)
     if error:
-        current_app.logger.exception("发布角色卡失败: %s", error)
-        flash("提交失败，请稍后重试", "danger")
+        # 图片比例不合规等校验错误的消息是面向用户的，直接展示（不要再吞成通用文案）。
+        current_app.logger.warning("发布角色卡失败: %s", error)
+        flash(error, "danger")
         return render_template(
             "publish/edit.html",
             prefill=request.form,

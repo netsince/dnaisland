@@ -19,6 +19,7 @@ from flask_login import current_user
 from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 
+from ..constants import points_mul, points_to_str
 from ..extensions import db
 from ..models import (
     Article,
@@ -87,6 +88,7 @@ from ..routes.teahouse import (
 )
 from ..services.card_edit_service import (
     resubmit_card,
+    set_card_pinned,
     toggle_card_hidden,
     update_card_from_payload,
 )
@@ -101,6 +103,14 @@ from ..services.comment_service import (
 from ..services.generation_worker import process_generation_task
 from ..services.image_gen_service import effective_credentials
 from ..services.image_service import send_webp
+from ..services.login_service import (
+    MSG_BAD_PASSWORD,
+    MSG_THROTTLED,
+    MSG_USER_NOT_FOUND,
+    find_user_by_identifier,
+    login_throttled,
+    record_login_failure,
+)
 from ..services.notification_service import (
     mark_all_read,
     notifications_page,
@@ -277,6 +287,8 @@ def _card_light(card: Card) -> dict:
         # 审核状态与隐藏状态（供「我的角色卡」管理页展示徽章）。
         "status": card.status,
         "is_hidden": bool(card.is_hidden),
+        # 是否已置顶（供主页/管理页展示「置顶」角标）。
+        "pinned": card.pinned_at is not None,
     }
 
 
@@ -354,7 +366,7 @@ def _teapost_item(post: TeaPost, stats: dict) -> dict:
     """茶馆帖子摘要。"""
     img = post.images[0] if post.images else None  # type: ignore[index]
     card = post.card if post.card else None
-    covers = {}
+    covers: dict[str, str] = {}
     if card is not None:
         for ci in card.images or []:  # type: ignore[union-attr]
             covers.setdefault(ci.slot, f"/card-image/{card.id}/{ci.slot}")
@@ -392,10 +404,11 @@ def _notification_item(n: Notification) -> dict:
 
 
 def _point_tx(tx: PointTransaction) -> dict:
+    # 积分为 DECIMAL(30,10)：字符串无损传输（float64 只有约 15~16 位有效数字）。
     return {
         "id": tx.id,
-        "delta": tx.delta,
-        "balance_after": tx.balance_after,
+        "delta": points_to_str(tx.delta),
+        "balance_after": points_to_str(tx.balance_after),
         "reason": tx.reason,
         "source": tx.source,
         "created_at": tx.created_at.isoformat() if tx.created_at else "",
@@ -455,11 +468,18 @@ def auth_token():
     if not identifier or not password:
         return err("请提供用户名/邮箱和密码")
 
-    user = User.query.filter(
-        or_(User.username == identifier, User.email == identifier)
-    ).first()
-    if not user or not user.check_password(password):
-        return err("用户名/邮箱或密码错误", 401)
+    if login_throttled():
+        return err(MSG_THROTTLED, 429)
+
+    # 区分「账号不存在」与「密码错误」（产品要求），与网页端同一口径；
+    # 账号枚举风险由 login_throttled() 的失败限流缓解。
+    user = find_user_by_identifier(identifier)
+    if user is None:
+        record_login_failure()
+        return err(MSG_USER_NOT_FOUND, 401)
+    if not user.check_password(password):
+        record_login_failure()
+        return err(MSG_BAD_PASSWORD, 401)
     if user.is_locked:
         return err("该账号已被封禁或注销，无法登录", 403)
 
@@ -1422,7 +1442,7 @@ def points():
         "total": pagination.total,
         "pages": pagination.pages,
     }
-    data["balance"] = point_balance(_ensure_self())
+    data["balance"] = points_to_str(point_balance(_ensure_self()))
     return jsonify(ok=True, data=data)
 
 
@@ -1603,6 +1623,23 @@ def cards_toggle_hidden(card_id):
     if error:
         return err(error, 404)
     return ok({"id": card.id, "is_hidden": bool(card.is_hidden)})
+
+
+@api_bp.route("/cards/<card_id>/toggle-pin", methods=["POST"])
+@api_login_required
+def cards_toggle_pin(card_id):
+    """置顶 / 取消置顶我的角色卡：与网页 user.card_toggle_pin 共用逻辑。
+
+    仅「已通过」的卡可置顶，每位作者最多 card_edit_service.MAX_PINNED_CARDS 张。
+    """
+    viewer = _ensure_self()
+    card = db.session.get(Card, card_id)
+    if not card or card.author_id != viewer.id:
+        return err("角色卡不存在", 404)
+    card, error = set_card_pinned(viewer, card_id, card.pinned_at is None)
+    if error:
+        return err(error, 400)
+    return ok({"id": card.id, "pinned": card.pinned_at is not None})
 
 
 @api_bp.route("/me/profile", methods=["GET"])
@@ -2165,11 +2202,11 @@ def image_gen_meta():
                 "id": m.id,
                 "name": m.name,
                 "display_name": m.display_name,
-                "points_per_image": m.points_per_image or 0,
+                "points_per_image": points_to_str(m.points_per_image),
             }
             for m in models
         ],
-        "balance": _ensure_self().points or 0,
+        "balance": points_to_str(_ensure_self().points),
         "aspects": list(_IG_VALID_ASPECTS),
         "max_references": _IG_MAX_REFERENCES,
         "max_count": _IG_MAX_COUNT,
@@ -2237,11 +2274,12 @@ def image_gen_generate():
             f"请按这些编号理解提示词中的图片引用。\n\n{prompt}"
         )
 
-    estimated = count * (model.points_per_image or 0)
+    estimated = points_mul(count, model.points_per_image)
     balance = user.points or 0
     if balance < estimated:
         return err(
-            f"点数不足：本次预计消耗 {estimated} 点，当前余额 {balance} 点",
+            f"点数不足：本次预计消耗 {points_to_str(estimated)} 点，"
+            f"当前余额 {points_to_str(balance)} 点",
         )
 
     existing = GenerationTask.query.filter(
@@ -2326,8 +2364,8 @@ def image_gen_task_detail(task_id):
         "status": t.status,
         "error": t.error,
         "log_id": t.result_log_id,
-        "points_spent": points_spent,
-        "balance": user.points,
+        "points_spent": points_to_str(points_spent),
+        "balance": points_to_str(user.points),
     })
 
 
@@ -2366,7 +2404,7 @@ def image_gen_logs():
                 "model_name": item.model_name,
                 "size": item.size or "auto",
                 "count": item.count,
-                "points_spent": item.points_spent,
+                "points_spent": points_to_str(item.points_spent),
                 "status": item.status,
                 "created_at": (
                     (item.created_at + timedelta(hours=8)).strftime("%Y-%m-%d %H:%M")

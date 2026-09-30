@@ -48,11 +48,15 @@
 
   var currentPage = 1;
 
+  // 积分格式化：后端按无损字符串返回（最多 10 位小数）。
+  // 绝不用 parseFloat/Math.round —— float64 会丢精度，且会把 >2 位小数截断。
   function fmtPoints(v) {
     if (v === null || v === undefined || v === '') return '0';
-    var n = parseFloat(v);
-    if (isNaN(n)) return String(v);
-    return (Math.round(n * 100) / 100).toString();
+    var s = String(v).trim();
+    if (!/^-?\d+(\.\d+)?$/.test(s)) return s;
+    if (s.indexOf('.') !== -1) s = s.replace(/0+$/, '').replace(/\.$/, '');
+    if (s === '' || s === '-' || s === '-0') return '0';
+    return s;
   }
 
   function renderHorizontalMasonry() {

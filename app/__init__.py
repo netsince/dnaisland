@@ -19,17 +19,22 @@ from flask_login import current_user, logout_user
 from markupsafe import Markup
 
 from .config import config
+from .constants import points_to_signed_str, points_to_str
 from .extensions import bcrypt, db, login_manager, mail, migrate
 
 load_dotenv()
 
 
 class AppJSONProvider(DefaultJSONProvider):
-    """让 jsonify 能序列化 Decimal（积分改为支持小数后，Numeric 列返回 Decimal）。"""
+    """让 jsonify 能序列化 Decimal。
+
+    积分为 DECIMAL(30,10)（最多 10 位小数），float64 只有约 15~16 位有效数字，
+    转 float 会不可逆丢精度。因此统一序列化为**字符串**（无损），格式见 app.constants.points_to_str。
+    """
 
     def default(self, o):
         if isinstance(o, Decimal):
-            return float(o)
+            return points_to_str(o)
         if isinstance(o, datetime):
             return o.isoformat()
         return super().default(o)
@@ -166,16 +171,16 @@ def create_app(config_object=None):
 
     @app.template_filter("points")
     def points_filter(value):
-        """积分展示：去掉末尾无意义的小数（5.00 -> 5，0.50 -> 0.5，0.5 -> 0.5）。"""
-        if value in (None, ""):
-            return "0"
-        try:
-            d = Decimal(str(value))
-        except Exception:
-            return str(value)
-        if d == d.to_integral_value():
-            return str(d.quantize(Decimal("1")))
-        return ("%f" % d).rstrip("0").rstrip(".")
+        """积分展示：规范化字符串（去尾零、整数不带小数点），支持最多 10 位小数。
+
+        旧实现用 "%f"（固定 6 位小数）会把 10 位小数截断，已废弃。
+        """
+        return points_to_str(value)
+
+    @app.template_filter("points_signed")
+    def points_signed_filter(value):
+        """带符号积分展示（正数显式带 '+'），用于明细页的变化量。"""
+        return points_to_signed_str(value)
 
     from .services.sticker_service import render_stickers_html
 

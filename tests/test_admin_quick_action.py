@@ -71,7 +71,7 @@ def test_adjust_points_adds_and_subtracts(app, client):
     assert r.status_code == 200
     body = r.get_json()
     assert body["ok"] is True
-    assert body["points"] == 150
+    assert body["points"] == "150"  # 积分为无损字符串传输
 
     with app.app_context():
         u = db.session.get(User, target_id)
@@ -92,7 +92,7 @@ def test_adjust_points_adds_and_subtracts(app, client):
         json={"action": "adjust_points", "amount": "-60", "reason": "回收"},
     )
     assert r.status_code == 200
-    assert r.get_json()["points"] == 90
+    assert r.get_json()["points"] == "90"
 
     with app.app_context():
         u = db.session.get(User, target_id)
@@ -129,7 +129,7 @@ def test_adjust_points_never_goes_negative(app, client):
         json={"action": "adjust_points", "amount": "-100", "reason": "清零"},
     )
     assert r.status_code == 200
-    assert r.get_json()["points"] == 0
+    assert r.get_json()["points"] == "0"
 
     with app.app_context():
         u = db.session.get(User, target_id)

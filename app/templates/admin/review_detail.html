@@ -1,4 +1,5 @@
 {% extends "admin/base.html" %}
+{% from "admin/macros/hidden_tags.html" import hidden_tag_checkboxes %}
 
 {% block title %}审核 · {{ card.name }} · DNAISLAND{% endblock %}
 
@@ -211,7 +212,24 @@
         </div>
       </div>
 
-      {# 2. 作者信誉与风控概览 #}
+      {# 2. 隐匿标签（仅管理员）：擦边但未违规时降权，不封禁、不隐藏 #}
+      <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-header bg-transparent fw-bold border-0 pt-3 pb-1">
+          <i class="bi bi-eye-slash me-1"></i>隐匿标签
+        </div>
+        <div class="card-body pt-2">
+          <form method="post" action="{{ url_for('admin.card_hidden_tags', card_id=card.id) }}">
+            <input type="hidden" name="next" value="{{ url_for('admin.review_detail', card_id=card.id) }}">
+            {{ hidden_tag_checkboxes(card, hidden_tag_registry) }}
+            <button class="btn btn-sm btn-outline-dark w-100 mt-2">保存隐匿标签</button>
+          </form>
+          <div class="form-text mt-1">
+            普通用户与作者本人都看不到。适合「擦边但未违规」的卡：降权而不封禁。
+          </div>
+        </div>
+      </div>
+
+      {# 3. 作者信誉与风控概览 #}
       <div class="card border-0 shadow-sm rounded-4">
         <div class="card-header bg-transparent fw-bold border-0 pt-3 pb-1 d-flex justify-content-between align-items-center">
           <span><i class="bi bi-person-badge me-1"></i>作者信誉画像</span>

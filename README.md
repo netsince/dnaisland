@@ -39,6 +39,44 @@ export FLASK_APP=run:app          # Windows: $env:FLASK_APP="run:app"
 flask db upgrade                 # 应用迁移到数据库
 ```
 
+> 注意：仓库当前存在多个 alembic head，`flask db upgrade`（不带参数）会因多 head 报错。
+> 生产升级请显式指定目标修订，见下方「积分精度迁移」。
+
+### 积分精度迁移（DECIMAL(10,2) → DECIMAL(30,10)）
+
+`migrations/versions/d8e9f0a1b2c3_point_columns_scale10.py` 把 7 个积分列扩宽到 `DECIMAL(30,10)`
+（20 位整数 + 10 位小数）。精度常量单点定义在 `app/constants.py`（`POINT_PRECISION` / `POINT_SCALE`），
+模型与迁移必须与之一致。
+
+生产库当前位于 `a5b6c7d8e9f0`，升级命令：
+
+```bash
+flask db upgrade d8e9f0a1b2c3
+```
+
+验证（结果应全部为 `decimal(30,10)`）：
+
+```sql
+SELECT TABLE_NAME, COLUMN_NAME, COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = DATABASE()
+  AND COLUMN_NAME IN ('points','delta','balance_after','points_gained','points_per_image','points_spent');
+```
+
+**回滚有数据损失风险**：`downgrade` 会窄化回 `DECIMAL(10,2)`。若存在小数位 > 2 位的数据会被
+四舍五入，整数位 > 8 位的数据会因超范围而报错。回滚前必须先核对：
+
+```sql
+SELECT COUNT(*) FROM users WHERE points >= 100000000 OR points <= -100000000;
+-- 以及 point_transactions.delta / balance_after、redemption_keys.points、
+-- key_usage_logs.points_gained、generation_models.points_per_image、generation_logs.points_spent
+```
+
+确认无超范围数据后再执行：
+
+```bash
+flask db downgrade a5b6c7d8e9f0
+```
+
 ## 开发模式启动
 
 ```bash

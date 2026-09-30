@@ -142,10 +142,6 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
       </div>
       <div class="modal-body">
-        <div class="form-check form-check-inline mb-2">
-          <input class="form-check-input" type="checkbox" id="cropFree">
-          <label class="form-check-label" for="cropFree">自由比例</label>
-        </div>
         <div style="max-height:60vh;">
           <img id="cropImage" class="w-100">
         </div>
@@ -208,19 +204,15 @@
     });
   });
 
+  // 比例锁定为槽位要求：1:1 / 16:9 / 9:16 是展示端硬约束，不再提供「自由比例」。
+  // 服务端按同一套比例强制校验（app/services/card_publish_service.py）。
   cropModalEl.addEventListener('shown.bs.modal', () => {
     if (cropper) cropper.destroy();
-    const free = document.getElementById('cropFree').checked;
     cropper = new Cropper(cropImg, {
-      aspectRatio: free ? NaN : (ASPECT[currentSlot] || NaN),
+      aspectRatio: ASPECT[currentSlot] || NaN,
       viewMode: 1,
       autoCropArea: 1,
     });
-  });
-
-  document.getElementById('cropFree').addEventListener('change', () => {
-    if (!cropper) return;
-    cropper.setAspectRatio(document.getElementById('cropFree').checked ? NaN : (ASPECT[currentSlot] || NaN));
   });
 
   document.getElementById('cropConfirm').addEventListener('click', () => {

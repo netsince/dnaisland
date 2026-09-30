@@ -3,7 +3,6 @@ import json
 import re
 import secrets
 from datetime import datetime
-from decimal import Decimal, InvalidOperation, getcontext
 
 from flask import (
     Blueprint,
@@ -20,6 +19,13 @@ from flask_login import current_user
 from sqlalchemy import case, func, or_, update
 from sqlalchemy.orm import joinedload
 
+from ..constants import (
+    parse_points_input,
+    points_add,
+    points_sub,
+    points_to_signed_str,
+    points_to_str,
+)
 from ..decorators import super_admin_required
 from ..extensions import db
 from ..models import (
@@ -71,6 +77,12 @@ from ..models.ticket import (
     TICKET_CLOSED,
     TICKET_REPLIED,
     TICKET_STATUSES,
+)
+from ..services.card_hidden_tags import (
+    HIDDEN_TAGS,
+    card_has_hidden_tag,
+    hidden_tag_views,
+    set_hidden_tags,
 )
 from ..services.card_service import cascade_delete_card
 from ..services.image_service import (
@@ -300,12 +312,12 @@ def user_edit(user_id):
         points_raw = request.form.get("points")
         if points_raw not in (None, ""):
             try:
-                new_points = Decimal(points_raw.strip())
-            except Exception:
-                flash("点数必须是数字", "warning")
+                new_points = parse_points_input(points_raw, field="点数")
+            except ValueError as exc:
+                flash(str(exc), "warning")
             else:
                 if new_points != (u.points or 0):
-                    delta = new_points - (u.points or 0)
+                    delta = points_sub(new_points, u.points)
                     u.points = new_points
                     db.session.add(
                         PointTransaction(
@@ -434,7 +446,7 @@ def user_profile_drawer(user_id):
         "email_verified": u.email_verified,
         "role": u.role,
         "status": u.status,
-        "points": u.points or 0,
+        "points": points_to_str(u.points),
         "created_at": u.created_at.strftime("%Y-%m-%d %H:%M") if u.created_at else "",
         "bio": u.bio or "",
         "location": u.location or "",
@@ -533,14 +545,14 @@ def user_quick_action(user_id):
 
     elif action == "adjust_points":
         try:
-            amount = Decimal(str(data.get("amount", 0)).strip())
-        except (InvalidOperation, ValueError, TypeError):
-            return jsonify(ok=False, error="请输入有效的积分数值"), 400
+            amount = parse_points_input(data.get("amount"), field="积分调整量")
+        except ValueError:
+            return jsonify(ok=False, error="请输入有效的积分数值（最多 10 位小数）"), 400
         if amount == 0:
             return jsonify(ok=False, error="调整积分不能为 0"), 400
         reason = (data.get("reason") or "管理员在控制台快捷调整").strip()
 
-        u.points = (u.points or 0) + amount
+        u.points = points_add(u.points, amount)
         if u.points < 0:
             u.points = 0
 
@@ -555,11 +567,16 @@ def user_quick_action(user_id):
         db.session.commit()
         notify(
             u.id,
-            f"管理员调整了你的积分：{'+' if amount > 0 else ''}{amount}。原因：{reason}。当前余额：{u.points}。",
+            f"管理员调整了你的积分：{points_to_signed_str(amount)}。"
+            f"原因：{reason}。当前余额：{points_to_str(u.points)}。",
             type_="points",
         )
         db.session.commit()
-        return jsonify(ok=True, message=f"积分已调整，当前余额为 {u.points}", points=u.points)
+        return jsonify(
+            ok=True,
+            message=f"积分已调整，当前余额为 {points_to_str(u.points)}",
+            points=points_to_str(u.points),
+        )
 
     elif action == "change_status":
         new_status = data.get("status")
@@ -642,9 +659,10 @@ def keys_generate():
         count = 1
     count = max(1, min(count, 500))
     try:
-        points = Decimal(request.form.get("points", "0").strip())
-    except InvalidOperation:
-        points = Decimal("0")
+        points = parse_points_input(request.form.get("points", "0"), field="兑换点数")
+    except ValueError as exc:
+        flash(str(exc), "warning")
+        return redirect(url_for("admin.keys_list"))
     try:
         max_uses = int(request.form.get("max_uses", 1))
     except ValueError:
@@ -706,9 +724,12 @@ def image_models():
         name = (request.form.get("name") or "").strip()
         display_name = (request.form.get("display_name") or "").strip()
         try:
-            points_per_image = Decimal(request.form.get("points_per_image", "0").strip())
-        except InvalidOperation:
-            points_per_image = Decimal("0")
+            points_per_image = parse_points_input(
+                request.form.get("points_per_image", "0"), field="每图积分"
+            )
+        except ValueError as exc:
+            flash(str(exc), "warning")
+            return redirect(url_for("admin.image_models"))
         if not name or not display_name:
             flash("调用名与展示名均必填", "warning")
         else:
@@ -751,9 +772,12 @@ def image_model_edit(model_id):
         name = (request.form.get("name") or "").strip()
         display_name = (request.form.get("display_name") or "").strip()
         try:
-            points_per_image = Decimal(request.form.get("points_per_image", "0").strip())
-        except InvalidOperation:
-            points_per_image = Decimal("0")
+            points_per_image = parse_points_input(
+                request.form.get("points_per_image", "0"), field="每图积分"
+            )
+        except ValueError as exc:
+            flash(str(exc), "warning")
+            return redirect(url_for("admin.image_models"))
         if not name or not display_name:
             flash("调用名与展示名均必填", "warning")
         else:
@@ -1493,6 +1517,7 @@ def cards():
     status = request.args.get("status", "").strip()
     gender = request.args.get("gender", "").strip()
     author = request.args.get("author", "").strip()
+    hidden_tag = request.args.get("hidden_tag", "").strip()
     query = Card.query
     if q:
         query = query.filter(Card.name.like(f"%{q}%"))
@@ -1503,6 +1528,8 @@ def cards():
     if author:
         like = f"%{author}%"
         query = query.join(User).filter(User.username.like(like))
+    if hidden_tag in HIDDEN_TAGS:
+        query = query.filter(card_has_hidden_tag(hidden_tag))
     page = request.args.get("page", 1, type=int)
     pagination = query.order_by(Card.created_at.desc()).paginate(
         page=page, per_page=20, error_out=False
@@ -1511,11 +1538,19 @@ def cards():
         "admin/cards.html",
         cards=pagination.items,
         pagination=pagination,
-        args={"q": q, "status": status, "gender": gender, "author": author},
+        args={
+            "q": q,
+            "status": status,
+            "gender": gender,
+            "author": author,
+            "hidden_tag": hidden_tag,
+        },
         q=q,
         status=status,
         gender=gender,
         author=author,
+        hidden_tag=hidden_tag,
+        hidden_tag_registry=HIDDEN_TAGS,
     )
 
 
@@ -1530,6 +1565,8 @@ def card_edit(card_id):
         card.intro = request.form.get("intro") or ""
         card.opening = request.form.get("opening") or ""
         card.status = request.form.get("status") or card.status
+        # 隐匿标签（仅超管可设置）：多选勾选框 → JSON 存储 + 同步派生降权系数
+        set_hidden_tags(card, request.form.getlist("hidden_tags"))
         # 标签：中文逗号统一转为英文逗号后按逗号拆分、覆盖式更新
         raw_tags = (request.form.get("tags") or "").replace("，", ",")
         CardTag.query.filter_by(card_id=card.id).delete()
@@ -1565,8 +1602,31 @@ def card_edit(card_id):
     tags = [t.tag for t in CardTag.query.filter_by(card_id=card.id).all()]
     images = {i.slot: i.data for i in CardImage.query.filter_by(card_id=card.id).all()}
     return render_template(
-        "admin/card_form.html", card=card, tags=", ".join(tags), images=images
+        "admin/card_form.html",
+        card=card,
+        tags=", ".join(tags),
+        images=images,
+        hidden_tag_registry=HIDDEN_TAGS,
+        hidden_tag_views=hidden_tag_views(card),
     )
+
+
+@admin_bp.route("/cards/<card_id>/hidden-tags", methods=["POST"])
+@super_admin_required
+def card_hidden_tags(card_id):
+    """设置角色卡的隐匿标签（仅超管）。
+
+    审核页与前台详情页的管理员面板都提交到这里，避免三处各写一份逻辑。
+    """
+    card = db.get_or_404(Card, card_id)
+    set_hidden_tags(card, request.form.getlist("hidden_tags"))
+    db.session.commit()
+    flash("隐匿标签已更新", "success")
+    # 只允许跳回本站路径，避免开放重定向
+    nxt = request.form.get("next") or ""
+    if not nxt.startswith("/") or nxt.startswith("//"):
+        nxt = url_for("admin.cards")
+    return redirect(nxt)
 
 
 @admin_bp.route("/cards/<card_id>/delete", methods=["POST"])
@@ -1674,6 +1734,8 @@ def review_detail(card_id):
         slots=existing_slots,
         author_risk=author_risk,
         stats_len=stats_len,
+        hidden_tag_registry=HIDDEN_TAGS,
+        hidden_tag_views=hidden_tag_views(card),
     )
 
 

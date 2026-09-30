@@ -4,14 +4,58 @@
 仅被拒绝的卡可重提；隐藏仅作者本人可切换。
 """
 import json
+from datetime import UTC, datetime
 
 from ..extensions import db
-from ..models import CardDialogueStyle, CardImage, CardTag
+from ..models import Card, CardDialogueStyle, CardImage, CardTag
 from ..services.card_publish_service import (
     _normalize_author_note,
     _normalize_author_note_interval,
     _normalize_images,
+    validate_image_slots,
 )
+
+# 每位作者最多可置顶的角色卡数量。
+MAX_PINNED_CARDS = 2
+
+
+def _utcnow_naive() -> datetime:
+    """当前 UTC 时间（naive），与库中 server_default=now() 的口径一致。
+
+    不用已废弃的 datetime.utcnow()。
+    """
+    return datetime.now(UTC).replace(tzinfo=None)
+
+
+def set_card_pinned(viewer, card_id, pinned):
+    """置顶 / 取消置顶角色卡。返回 (card, error)。
+
+    error 取值：None | "无权操作此卡片" | "仅已通过的角色卡可以置顶" | "最多置顶 N 个角色卡"。
+    置顶要求「已通过」：否则作者会占掉一个名额，而访客根本看不到那张卡。
+    """
+    card = db.session.get(Card, card_id)
+    if not card or card.author_id != viewer.id:
+        return None, "无权操作此卡片"
+
+    if not pinned:
+        card.pinned_at = None
+        db.session.commit()
+        return card, None
+
+    if card.status != "approved":
+        return None, "仅已通过的角色卡可以置顶"
+    if card.pinned_at is not None:
+        return card, None  # 已经置顶，幂等返回
+
+    pinned_count = Card.query.filter(
+        Card.author_id == viewer.id, Card.pinned_at.isnot(None)
+    ).count()
+    if pinned_count >= MAX_PINNED_CARDS:
+        return None, f"最多置顶 {MAX_PINNED_CARDS} 个角色卡"
+
+    card.pinned_at = _utcnow_naive()
+    db.session.commit()
+    return card, None
 
 
 def resubmit_card(viewer, card):
@@ -80,9 +124,22 @@ def update_card_from_payload(card, payload):
                     )
                 )
 
-    # 图片覆盖式更新（不做 export 专用压缩，与网页 edit 一致）
+    # 图片覆盖式更新（不做 export 专用压缩，与网页 edit 一致）。
+    # 只校验「新增/被替换」的图：取值与既有图完全相同的槽位视为未改动，跳过比例校验，
+    # 否则存量比例不合规的老卡片会因为一次编辑被卡死。
+    incoming_images = payload.get("images") or {}
+    unchanged = {
+        img.slot: img.data
+        for img in CardImage.query.filter_by(card_id=card.id).all()
+    }
+    try:
+        validate_image_slots(incoming_images, unchanged=unchanged)
+        normalized_images = _normalize_images(incoming_images)
+    except ValueError as exc:
+        return str(exc)
+
     CardImage.query.filter_by(card_id=card.id).delete()
-    for slot, data_uri in _normalize_images(payload.get("images") or {}).items():
+    for slot, data_uri in normalized_images.items():
         db.session.add(CardImage(card_id=card.id, slot=slot, data=data_uri))
 
     db.session.commit()

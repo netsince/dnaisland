@@ -1,0 +1,17 @@
+{# 隐匿标签勾选框（仅管理员可见/可用）。
+   用法：{% from "admin/macros/hidden_tags.html" import hidden_tag_checkboxes %}
+   card 需带 hidden_tags 字段；registry 传 HIDDEN_TAGS。 #}
+{% macro hidden_tag_checkboxes(card, registry) %}
+<div class="d-flex flex-column gap-1">
+  {% for key, meta in registry.items() %}
+  <div class="form-check">
+    <input class="form-check-input" type="checkbox" name="hidden_tags" value="{{ key }}"
+           id="ht-{{ key }}-{{ card.id }}" {% if key in (card.hidden_tags or []) %}checked{% endif %}>
+    <label class="form-check-label" for="ht-{{ key }}-{{ card.id }}">
+      {{ meta.label }}
+      <span class="text-muted small d-block">{{ meta.desc }}</span>
+    </label>
+  </div>
+  {% endfor %}
+</div>
+{% endmacro %}

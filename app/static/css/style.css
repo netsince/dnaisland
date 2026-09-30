@@ -618,6 +618,13 @@ a { color: var(--dna-link); }
   background: var(--dna-surface);
 }
 .dna-tile__status { position: absolute; top: .6rem; left: .6rem; display: flex; gap: .35rem; }
+/* 置顶角标：放右上角，避免与左上角的审核状态角标重叠 */
+.dna-tile__pin {
+  position: absolute; top: .6rem; right: .6rem;
+  font-size: .68rem; font-weight: 700; letter-spacing: .5px;
+  color: var(--dna-inverse-text); background: var(--dna-inverse-bg);
+  padding: .12rem .45rem; border-radius: 999px;
+}
 .dna-tile__body { padding: .9rem 1rem 1.1rem; display: flex; flex-direction: column; gap: .35rem; flex: 1; }
 .dna-tile__title { font-size: 1.02rem; font-weight: 700; margin: 0; color: var(--dna-emphasis); }
 .dna-tile__meta { font-size: .78rem; color: var(--dna-muted); }

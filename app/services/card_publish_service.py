@@ -11,11 +11,31 @@ from ..extensions import db
 from ..models import Card, CardDialogueStyle, CardImage, CardTag
 from ..services.image_service import (
     compress_image,
+    data_url_to_bytes_and_mime,
+    image_size,
     optimize_image_for_export,
     raw_bytes_to_webp_data_url,
 )
 
 IMAGE_SLOTS = ("square", "landscape", "portrait")
+
+# 各槽位要求的宽高比 (宽, 高)。这是「图片比例限制」在服务端的唯一权威定义。
+# 前端必须与之一致：
+#   App：card_publish_page.dart 的 _imageSlots（CropAspect）
+#   Web：publish/edit.html 的 ASPECT
+# 客户端的裁剪锁定只是 UI 约束，可被绕过；这里才是真正的强制点。
+SLOT_ASPECT_RATIOS = {
+    "square": (1, 1),
+    "landscape": (16, 9),
+    "portrait": (9, 16),
+}
+SLOT_LABELS = {
+    "square": "1:1 形象",
+    "landscape": "16:9 形象（头图）",
+    "portrait": "9:16 形象",
+}
+# 裁剪器取整与编码会带来微小偏差，允许 ±2%。
+ASPECT_TOLERANCE = 0.02
 
 
 def _content_fingerprint(
@@ -90,6 +110,52 @@ def _normalize_author_note_interval(raw_interval, has_note):
     return 0
 
 
+def _image_bytes_from_payload(val) -> bytes:
+    """把槽位取值（原始字节或 data URL 字符串）转成图片字节；空值返回 b""。"""
+    if isinstance(val, (bytes, bytearray)):
+        return bytes(val)
+    if isinstance(val, str) and val.strip():
+        raw, _ = data_url_to_bytes_and_mime(val)
+        return raw
+    return b""
+
+
+def _validate_slot_aspect(slot: str, raw: bytes) -> None:
+    """校验图片宽高比是否符合槽位要求；不符合抛 ValueError（消息面向用户）。"""
+    spec = SLOT_ASPECT_RATIOS.get(slot)
+    if spec is None:
+        return
+    width, height = image_size(raw)
+    if width <= 0 or height <= 0:
+        raise ValueError(f"{SLOT_LABELS.get(slot, slot)} 图片尺寸无效，请重新选择")
+    expected = spec[0] / spec[1]
+    actual = width / height
+    if abs(actual - expected) / expected > ASPECT_TOLERANCE:
+        raise ValueError(
+            f"{SLOT_LABELS.get(slot, slot)} 需要 {spec[0]}:{spec[1]} 比例，"
+            f"当前图片为 {width}×{height}，请重新裁剪后上传"
+        )
+
+
+def validate_image_slots(images, *, unchanged=None) -> None:
+    """校验图片槽位的宽高比，不符合抛 ValueError。
+
+    [unchanged] 为 {slot: 既有 data URL}：取值与该槽位既有图**完全相同**的视为「未改动」，
+    跳过校验。这样编辑老卡片时，不会因为存量图片比例不合规而被卡住（只约束新上传/替换的图）。
+    新建时所有图都是新的，传 unchanged=None 即全量校验。
+    """
+    unchanged = unchanged or {}
+    for slot in IMAGE_SLOTS:
+        val = (images or {}).get(slot)
+        raw = _image_bytes_from_payload(val)
+        if not raw:
+            continue
+        prev = unchanged.get(slot)
+        if isinstance(val, str) and prev is not None and val == prev:
+            continue
+        _validate_slot_aspect(slot, raw)
+
+
 def _normalize_images(images, optimize=False):
     """images: {slot: bytes | data_url_str} → {slot: data_url_str}。
 
@@ -136,7 +202,12 @@ def create_card_from_payload(author, payload):
                     }
                 )
 
-    images = _normalize_images(payload.get("images") or {}, optimize=True)
+    # 新建时所有图片都是新上传的，全量校验比例；不合规则返回用户可读错误。
+    try:
+        validate_image_slots(payload.get("images") or {})
+        images = _normalize_images(payload.get("images") or {}, optimize=True)
+    except ValueError as exc:
+        return None, str(exc)
 
     author_note = _normalize_author_note(payload.get("author_note"))
     author_note_interval = _normalize_author_note_interval(

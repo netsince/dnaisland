@@ -492,6 +492,14 @@ data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded=
     if (badge) badge.classList.toggle('d-none', !data.state);
   }
 
+  // 置顶/取消置顶：切换按钮 + 同步「置顶」徽章
+  function applyPinned(btn, data) {
+    applyToggle(btn, data);
+    var box = btn.closest('.list-group-item') || btn.closest('.card');
+    var badge = box && box.querySelector('.js-pinned-badge');
+    if (badge) badge.classList.toggle('d-none', !data.state);
+  }
+
   // 全部已读：移除按钮与未读红点后整页刷新，使通知列表的未读状态同步
   function applyReadAll(btn) {
     var form = btn.closest('form');
@@ -538,6 +546,7 @@ data-bs-toggle="offcanvas" data-bs-target="#globalToolsOffcanvas" aria-expanded=
           return;
         }
         if (data.action === 'hidden') applyHidden(btn, data);
+        else if (data.action === 'pinned') applyPinned(btn, data);
         else if (data.action === 'read_all') applyReadAll(btn, data);
         else if (data.action === 'resubmit') applyResubmit(btn, data);
         else applyToggle(btn, data);

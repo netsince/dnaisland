@@ -4,12 +4,13 @@
 - 后端 API：管理员调整积分支持小数，余额/明细用 Decimal 正确读写。
 """
 
+from decimal import Decimal
+
 import pytest
 from app import create_app, db
 from app.config import Config
 from app.models.points import PointTransaction
 from app.models.user import User
-from decimal import Decimal
 from sqlalchemy.dialects.mysql import LONGTEXT
 from sqlalchemy.ext.compiler import compiles
 
@@ -88,7 +89,7 @@ def test_admin_adjust_points_decimals(app, client):
         json={"action": "adjust_points", "amount": "0.5", "reason": "小数加"},
     )
     assert r.status_code == 200
-    assert r.get_json()["points"] == 10.5
+    assert r.get_json()["points"] == "10.5"
 
     with app.app_context():
         u = db.session.get(User, target_id)
@@ -103,7 +104,7 @@ def test_admin_adjust_points_decimals(app, client):
         json={"action": "adjust_points", "amount": "-0.25", "reason": "小数扣"},
     )
     assert r.status_code == 200
-    assert r.get_json()["points"] == 10.25
+    assert r.get_json()["points"] == "10.25"
 
     with app.app_context():
         u = db.session.get(User, target_id)
@@ -135,7 +136,7 @@ def test_admin_adjust_points_rejects_bad_decimal(app, client):
 
 
 def test_api_points_serializes_decimal(app, client):
-    """App API /api/v1/points 能把 Decimal 余额/明细序列化为 JSON（float）。"""
+    """App API /api/v1/points 把 Decimal 余额/明细序列化为 JSON 字符串（无损，避免 float 丢精度）。"""
     with app.app_context():
         u = User(username="api_dec", nickname="API", email="api@x.com")
         u.set_password("pw")
@@ -158,9 +159,9 @@ def test_api_points_serializes_decimal(app, client):
     body = r.get_json()
     assert body["ok"] is True
     data = body["data"]
-    assert data["balance"] == 0.5
-    assert isinstance(data["balance"], float)
+    assert data["balance"] == "0.5"
+    assert isinstance(data["balance"], str)
     tx = data["items"][0]
-    assert tx["delta"] == 0.5
-    assert tx["balance_after"] == 0.5
+    assert tx["delta"] == "0.5"
+    assert tx["balance_after"] == "0.5"
 

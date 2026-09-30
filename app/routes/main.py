@@ -43,10 +43,6 @@ from ..services.image_service import send_webp
 
 main_bp = Blueprint("main", __name__)
 
-# 「有图片的角色卡」在热门推荐排序中的热度加权（等效于额外互动量）。
-# 用于让带封面的卡片优先被推荐，同时保留互动量极高但无图的卡片浮出空间。
-IMAGE_PRIORITY_BOOST = 10
-
 # 探索页「热门」排序权重（数字即业务优先级：1 = 最重要，6 = 最次要）。
 #   评论(1) > 0~5日新发布(2) > 收藏(3) > 点赞(4) > 带图(5) > 浏览(6)
 HOT_W_COMMENT      = 6.0   # 优先级 1：评论代表讨论度，权重最高
@@ -72,6 +68,17 @@ HOT_RISE_BOOST      = 0.4   # 上升段额外权重：最新卡 ×(1+0.4)=1.4，
 HOT_STABLE_END_DAYS = 8     # 平稳段终点（含）；6~8 日权重固定 ×1.0
 HOT_DECAY_START_DAYS = 8    # 下降段起点（>8 日即衰减）
 HOT_DECAY_HALF_DAYS = 7     # 下降段半衰期（天）：每过 7 天权重减半，值越小衰减越快
+
+# 作者影响力项：以「全体作者粉丝数的 P90」为归一化基准，而不是写死绝对粉丝数。
+# 平台整体涨粉时基准同步抬高（见 _follower_reference），永远只有头部约 10% 打满，
+# 因此不会出现「平台火了、人人都有 100 粉」导致该阈值失效的问题。
+HOT_W_FOLLOWER       = 4.0   # 作者影响力权重（归一化后 0~1，达到基准即打满）
+HOT_FOLLOWER_REF_PCT = 0.90  # 归一化基准取全体作者粉丝数的第 90 百分位
+FOLLOWER_REF_TTL     = 3600  # 基准重算间隔（秒）
+
+# 同作者窗口衰减：同一个推荐窗口内，该作者已入选 k 张时，本张抽样权重再乘 decay^k。
+# 只作用于「一次返回一批」的首页推荐与刷一刷（探索页是分页确定性排序，见 card_lists）。
+AUTHOR_WINDOW_DECAY  = 0.5
 
 
 def _has_image_subquery():
@@ -113,19 +120,23 @@ _FEATURED_SCORE_CACHE = TimedCache(ttl=60, maxsize=100)  # viewer -> {card_id: s
 
 
 def _featured_score_map() -> dict:
-    """返回首页推荐候选池（card_id -> 热度分），带 60s TTL + LRU 上限缓存。"""
+    """返回首页推荐候选池（card_id -> (热度分, 作者id)），带 60s TTL + LRU 上限缓存。
+
+    一并带上作者 id，供抽样阶段做「同作者窗口衰减」（见 _sample_weights）。
+    """
     vid = current_user.id if current_user.is_authenticated else "anon"
     hit = _FEATURED_SCORE_CACHE.get(vid)
     if hit is not None:
         return hit
     q, score_expr = _apply_hot_score(Card.visible_to(current_user))
-    rows = q.with_entities(Card.id, score_expr).all()
+    rows = q.with_entities(Card.id, score_expr, Card.author_id).all()
     score_map: dict = {}
-    for cid, s in rows:
+    for cid, s, author_id in rows:
         try:
-            score_map[cid] = float(s) if s is not None else 0.0
+            score = float(s) if s is not None else 0.0
         except (TypeError, ValueError):
-            score_map[cid] = 0.0
+            score = 0.0
+        score_map[cid] = (score, author_id)
     _FEATURED_SCORE_CACHE.set(vid, score_map)
     return score_map
 
@@ -151,19 +162,13 @@ def featured_cards(limit=12, exclude_ids=None):
 
     pool = [cid for cid in score_map if cid not in exclude] or list(score_map.keys())
 
-    # 纯随机保底名额：1~2 个；其余按得分加权无放回抽样
+    # 纯随机保底名额：1~2 个；其余按得分加权无放回抽样（含同作者窗口衰减）
     pure = min(random.randint(1, 2), max(0, limit - 1))
     weighted_n = max(0, limit - pure)
 
-    chosen = []
-    avail = list(pool)
-    while len(chosen) < weighted_n and avail:
-        weights = [max(score_map[c], 0.0) for c in avail]
-        if sum(weights) <= 0:
-            break
-        pick = random.choices(avail, weights=weights, k=1)[0]
-        chosen.append(pick)
-        avail.remove(pick)
+    chosen = _weighted_sample_with_author_decay(pool, score_map, weighted_n)
+    chosen_set = set(chosen)
+    avail = [cid for cid in pool if cid not in chosen_set]
 
     pure_picks = random.sample(avail, min(pure, len(avail))) if pure and avail else []
     result_ids = chosen + pure_picks
@@ -221,19 +226,13 @@ def swipe_cards(limit=12, exclude_ids=None):
     if not pool:
         return []
 
-    # 纯随机保底名额 1~2；其余按得分加权无放回抽样。
+    # 纯随机保底名额 1~2；其余按得分加权无放回抽样（含同作者窗口衰减）。
     pure = min(random.randint(1, 2), max(0, limit - 1))
     weighted_n = max(0, limit - pure)
 
-    chosen = []
-    avail = list(pool)
-    while len(chosen) < weighted_n and avail:
-        weights = [max(score_map.get(c, 0.0), 0.0) for c in avail]
-        if sum(weights) <= 0:
-            break
-        pick = random.choices(avail, weights=weights, k=1)[0]
-        chosen.append(pick)
-        avail.remove(pick)
+    chosen = _weighted_sample_with_author_decay(pool, score_map, weighted_n)
+    chosen_set = set(chosen)
+    avail = [cid for cid in pool if cid not in chosen_set]
 
     pure_picks = random.sample(avail, min(pure, len(avail))) if pure and avail else []
     result_ids = chosen + pure_picks
@@ -350,6 +349,18 @@ def _copies_agg_subquery(days=COPY_WINDOW_DAYS):
     )
 
 
+def _author_followers_subquery():
+    """每个作者的粉丝数（author_id -> count），用于把作者影响力并入热度分。"""
+    return (
+        db.session.query(
+            UserFollow.following_id.label("author_id"),
+            func.count(UserFollow.follower_id).label("fcnt"),
+        )
+        .group_by(UserFollow.following_id)
+        .subquery("author_followers_agg")
+    )
+
+
 def _likes_agg_subquery():
     """一次聚合出每张卡的赞数（card_id -> count），避免排序时逐行关联子查询。"""
     return (
@@ -387,32 +398,101 @@ def _comments_agg_subquery():
     )
 
 
-def _card_hot_score(interactions_expr, created_at_col):
-    """Hacker News 重力时间衰减热度得分：(Interactions + 1) / (AgeInHours + 2)^1.5。"""
-    if db.engine.name == "sqlite":
-        age_hours = (func.julianday("now") - func.julianday(created_at_col)) * 24.0
-    else:
-        age_hours = func.timestampdiff(literal_column("HOUR"), created_at_col, func.now())
-    return (interactions_expr + 1.0) / func.pow(age_hours + 2.0, 1.5)
+def _log_base(expr, base):
+    """以 base 为底的 SQL 对数，跨 SQLite / MySQL 可移植。
+
+    不能直接用 func.log：SQLite 的 log() 是常用对数（底 10），而 MySQL 的 LOG() 是
+    自然对数——同一个表达式在两端会得到差 2.3026 倍的口径（历史遗留不一致）。
+    这里统一用两端口径相同的 LOG10 换底，保证开发/测试与生产行为一致。
+    """
+    return func.log10(expr) / math.log10(base)
+
+
+# 作者影响力归一化基准（全体作者粉丝数的 P90）缓存：变化很慢，1 小时重算一次足够。
+_FOLLOWER_REF_CACHE = TimedCache(ttl=FOLLOWER_REF_TTL, maxsize=2)
+
+
+def _follower_reference() -> float:
+    """全体作者粉丝数的 P90，作为作者影响力的归一化基准（带 TTL 缓存）。
+
+    用「分位」而不是固定阈值：平台整体涨粉时基准同步抬高，永远只有头部约 10% 打满。
+    作者数很少时可能返回 0/1，调用方会跳过该项，避免放大小样本噪声。
+    """
+    hit = _FOLLOWER_REF_CACHE.get("p90")
+    if hit is not None:
+        return hit
+    counts = sorted(
+        int(c or 0)
+        for (c,) in db.session.query(func.count(UserFollow.follower_id))
+        .group_by(UserFollow.following_id)
+        .all()
+    )
+    ref = 0.0
+    if counts:
+        # 最近秩法：ceil(p * n) - 1，落在 [0, n-1]
+        idx = min(
+            len(counts) - 1,
+            max(0, math.ceil(HOT_FOLLOWER_REF_PCT * len(counts)) - 1),
+        )
+        ref = float(counts[idx])
+    _FOLLOWER_REF_CACHE.set("p90", ref)
+    return ref
+
+
+def _sample_weights(pool, score_map, author_seen):
+    """计算加权抽样的权重：热度分 × 同作者窗口衰减。
+
+    [score_map] 为 {card_id: (热度分, 作者id)}；[author_seen] 为本次窗口内
+    {作者id: 已入选张数}。同一作者第 k+1 张的权重乘 AUTHOR_WINDOW_DECAY^k。
+    """
+    weights = []
+    for cid in pool:
+        score, author_id = score_map[cid]
+        decay = AUTHOR_WINDOW_DECAY ** author_seen.get(author_id, 0)
+        weights.append(max(score, 0.0) * decay)
+    return weights
+
+
+def _weighted_sample_with_author_decay(pool, score_map, n):
+    """按热度分做无放回加权抽样，并对同一作者施加窗口衰减。
+
+    返回抽中的 card_id 列表（长度 ≤ n）。权重全为 0 时提前返回（调用方兜底）。
+    """
+    chosen: list = []
+    avail = list(pool)
+    author_seen: dict = {}
+    while len(chosen) < n and avail:
+        weights = _sample_weights(avail, score_map, author_seen)
+        if sum(weights) <= 0:
+            break
+        pick = random.choices(avail, weights=weights, k=1)[0]
+        chosen.append(pick)
+        avail.remove(pick)
+        author_id = score_map[pick][1]
+        author_seen[author_id] = author_seen.get(author_id, 0) + 1
+    return chosen
 
 
 def _apply_hot_score(q):
     """对查询 q 做探索热度所需的 outerjoin，并返回 (q, score_expr)。
 
     score_expr 与探索页排序同款：互动加权（评论6/收藏3/复制4/点赞2/带图1.3/浏览1）× 三段年龄权重
-    （0~5日上升、6~8日平稳、9日+下降）。供 `_order_by_hot` 排序与首页加权随机复用，确保
-    两处推荐口径一致。复制数取近 30 天并经对数压缩（HOT_W_COPY / COPY_WINDOW_DAYS）。
+    （0~5日上升、6~8日平稳、9日+下降），再叠加**作者影响力项**（粉丝数相对 P90 归一化，权重
+    HOT_W_FOLLOWER，封顶 1.0）。供 `_order_by_hot` 排序与首页加权随机复用，确保两处推荐口径一致。
+    复制数取近 30 天并经对数压缩（HOT_W_COPY / COPY_WINDOW_DAYS）。
     """
     la = _likes_agg_subquery()
     fa = _favorites_agg_subquery()
     ca = _comments_agg_subquery()
     cpa = _copies_agg_subquery()
     ia = _has_image_subquery()
+    ufa = _author_followers_subquery()
     q = q.outerjoin(la, la.c.card_id == Card.id)
     q = q.outerjoin(fa, fa.c.card_id == Card.id)
     q = q.outerjoin(ca, ca.c.card_id == Card.id)
     q = q.outerjoin(cpa, cpa.c.card_id == Card.id)
     q = q.outerjoin(ia, ia.c.card_id == Card.id)
+    q = q.outerjoin(ufa, ufa.c.author_id == Card.author_id)
 
     if db.engine.name == "sqlite":
         age_hours = (func.julianday("now") - func.julianday(Card.created_at)) * 24.0
@@ -436,13 +516,20 @@ def _apply_hot_score(q):
 
     # 浏览量对数压缩：log(1+views)/log(base)，几百次浏览也只贡献个位数量级，
     # 不再以线性方式碾压互动信号。
-    view_term = func.log(
-        func.coalesce(Card.view_count, 0) + 1.0
-    ) / math.log(HOT_VIEW_LOG_BASE)
+    view_term = _log_base(func.coalesce(Card.view_count, 0) + 1.0, HOT_VIEW_LOG_BASE)
     # 复制数对数压缩：与浏览量同款，log(1 + 近30天复制数)，避免单卡复制被线性放大碾压其他信号。
-    copy_term = func.log(
-        func.coalesce(cpa.c.cp, 0) + 1.0
-    ) / math.log(HOT_VIEW_LOG_BASE)
+    copy_term = _log_base(func.coalesce(cpa.c.cp, 0) + 1.0, HOT_VIEW_LOG_BASE)
+
+    # 作者影响力项：以 P90 为基准做对数归一化并封顶 1.0（达到基准即打满，头部不再额外受益）。
+    # 基准由 _follower_reference() 动态给出，随平台整体涨粉自动抬高，不依赖绝对粉丝数。
+    follower_ref = _follower_reference()
+    if follower_ref > 1.0:
+        follower_log = _log_base(func.coalesce(ufa.c.fcnt, 0) + 1.0, HOT_VIEW_LOG_BASE)
+        ref_log = math.log(follower_ref + 1.0, HOT_VIEW_LOG_BASE)
+        follower_term = case((follower_log >= ref_log, 1.0), else_=follower_log / ref_log)
+    else:
+        # 全站作者粉丝数还很少（基准 ≤ 1）：本项不参与，避免放大小样本噪声。
+        follower_term = literal_column("0.0")
 
     engagement = (
         func.coalesce(ca.c.cc, 0) * HOT_W_COMMENT
@@ -450,49 +537,20 @@ def _apply_hot_score(q):
         + func.coalesce(la.c.lc, 0) * HOT_W_LIKE
         + copy_term * HOT_W_COPY
         + view_term * HOT_W_VIEW
+        + follower_term * HOT_W_FOLLOWER
     )
     # 带图倍数放大：带图卡整体互动得分 ×HOT_IMG_MULT，无图 ×1.0，
     # 让带图的优势按整卡规模生效，而非被浏览量淹没的固定加分。
     img_mult = case((ia.c.card_id.isnot(None), HOT_IMG_MULT), else_=1.0)
-    score = engagement * img_mult * age_factor
+    # 隐匿标签降权（如「减少推流」×0.2）：boost_factor 由 card_hidden_tags 派生，
+    # 是 SQL 可见列，因此首页推荐/刷一刷/探索热门/搜索相关度口径统一。
+    score = engagement * img_mult * age_factor * func.coalesce(Card.boost_factor, 1.0)
     return q, score
 
 
 def _order_by_hot(q):
     """探索页「热门」排序：按与首页同款的加权得分降序。"""
     q, score = _apply_hot_score(q)
-    return q.order_by(score.desc(), Card.created_at.desc())
-
-
-def _order_by_home_hot(q, image_boost=IMAGE_PRIORITY_BOOST):
-    """首页「热门推荐」排序：多重互动信号 + Hacker News 时间衰减。
-
-    互动量 = 浏览×1 + 点赞×5 + 收藏×8 + 评论×3
-      —— 收藏/点赞是比单纯浏览更强的正反馈信号，权重更高；评论代表讨论度。
-    热度分 = (互动量 + 1) / (存在小时数 + 2)^1.5
-      —— 重力模型兼顾「当下热度」与「新鲜度」：新卡凭互动快速上浮，老卡随时间自然下沉，
-         避免老牌高浏览卡长期霸榜、新优质卡无法出头。
-    image_boost>0 时，对「至少有一张图片」的卡片额外加权，使其优先被推荐。
-    """
-    la = _likes_agg_subquery()
-    fa = _favorites_agg_subquery()
-    ca = _comments_agg_subquery()
-    q = q.outerjoin(la, la.c.card_id == Card.id)
-    q = q.outerjoin(fa, fa.c.card_id == Card.id)
-    q = q.outerjoin(ca, ca.c.card_id == Card.id)
-    interactions = (
-        func.coalesce(Card.view_count, 0) * 1.0
-        + func.coalesce(la.c.lc, 0) * 5.0
-        + func.coalesce(fa.c.fc, 0) * 8.0
-        + func.coalesce(ca.c.cc, 0) * 3.0
-    )
-    if image_boost:
-        ia = _has_image_subquery()
-        q = q.outerjoin(ia, ia.c.card_id == Card.id)
-        interactions = interactions + case(
-            (ia.c.card_id.isnot(None), image_boost), else_=0
-        )
-    score = _card_hot_score(interactions, Card.created_at)
     return q.order_by(score.desc(), Card.created_at.desc())
 
 

@@ -19,6 +19,7 @@ from flask import (
 )
 from flask_login import current_user, login_required
 
+from ..constants import points_add
 from ..extensions import db
 from ..models import KeyUsageLog, PointTransaction, RedemptionKey
 from ..utils import rate_hit
@@ -137,7 +138,7 @@ def redeem_codes(viewer, codes):
             )
             continue
 
-        viewer.points = (viewer.points or 0) + key.points
+        viewer.points = points_add(viewer.points, key.points)
         key.used_count += 1
         db.session.add(
             PointTransaction(

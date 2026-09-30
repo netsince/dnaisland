@@ -2,6 +2,7 @@
 {% from "macros/verified.html" import badge %}
 {% from "macros/cards.html" import status_badge %}
 {% from "macros/user_badge.html" import user_badge with context %}
+{% from "admin/macros/hidden_tags.html" import hidden_tag_checkboxes %}
 
 {% block title %}{{ card.name }} · DNAISLAND{% endblock %}
 {% block body_class %}dna-hide-header-on-mobile dna-page-card-detail{% endblock %}
@@ -140,8 +141,27 @@
             {% endif %}
             {% if is_admin %}
             <a class="btn btn-sm btn-outline-dark" href="{{ url_for('admin.cards') }}">前往后台审核</a>
+            <button class="btn btn-sm btn-outline-dark" type="button" data-bs-toggle="collapse"
+                    data-bs-target="#adminHiddenTags" aria-expanded="false" aria-controls="adminHiddenTags">
+              <i class="bi bi-eye-slash me-1"></i>隐匿标签
+            </button>
             {% endif %}
           </div>
+          {% if is_admin %}
+          {# 仅管理员可见：直接在前台详情页设置隐匿标签（与后台、审核页同一套逻辑） #}
+          <div class="collapse mt-2" id="adminHiddenTags">
+            <div class="border rounded p-3">
+              <div class="fw-semibold mb-2 small">
+                <i class="bi bi-eye-slash me-1"></i>隐匿标签（普通用户与作者都看不到）
+              </div>
+              <form method="post" action="{{ url_for('admin.card_hidden_tags', card_id=card.id) }}">
+                <input type="hidden" name="next" value="{{ url_for('user.card_detail', card_id=card.id) }}">
+                {{ hidden_tag_checkboxes(card, hidden_tag_registry) }}
+                <button class="btn btn-sm btn-outline-dark mt-2">保存</button>
+              </form>
+            </div>
+          </div>
+          {% endif %}
           {% endif %}
         </div>
       </div>

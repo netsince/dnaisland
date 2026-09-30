@@ -38,9 +38,9 @@
   </div>
   <div class="mb-3">
     <label class="form-label">点数</label>
-    <input type="number" class="form-control" name="points" step="0.01"
+    <input type="number" class="form-control" name="points" step="0.0000000001"
            value="{{ (user.points if user and user.points is not none else 0)|points }}">
-    <div class="form-text">留空则不修改。支持小数（如 0.5）。修改将记入积分明细。</div>
+    <div class="form-text">留空则不修改。支持最多 10 位小数（如 0.5、0.0000000001）。修改将记入积分明细。</div>
   </div>
   <div class="mb-3 form-check">
     <input type="checkbox" class="form-check-input" name="verified" id="verified"

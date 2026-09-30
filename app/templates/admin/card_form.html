@@ -1,4 +1,5 @@
 {% extends "admin/base.html" %}
+{% from "admin/macros/hidden_tags.html" import hidden_tag_checkboxes %}
 
 {% block title %}编辑角色卡 · DNAISLAND{% endblock %}
 
@@ -61,6 +62,16 @@
       {% endfor %}
     </div>
     <div class="form-text">留空则保留原有图片；选择新图片后保存将替换该槽位。</div>
+  </div>
+  <div class="mb-3">
+    <label class="form-label">隐匿标签（仅管理员可见）</label>
+    <div class="border rounded p-2">
+      {{ hidden_tag_checkboxes(card, hidden_tag_registry) }}
+    </div>
+    <div class="form-text">
+      普通用户与作者本人都看不到这些标签。「减少推流」会把该卡的热度分乘以 0.2，
+      首页推荐、刷一刷、探索页热门与搜索相关度同步降权，但不会隐藏或封禁。
+    </div>
   </div>
   <div class="mb-3">
     <label class="form-label">状态</label>

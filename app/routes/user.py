@@ -49,9 +49,11 @@ from ..models.ticket import (
 )
 from ..services.card_edit_service import (
     resubmit_card,
+    set_card_pinned,
     toggle_card_hidden,
     update_card_from_payload,
 )
+from ..services.card_hidden_tags import HIDDEN_TAGS
 from ..services.comment_service import (
     delete_comment,
     pin_comment,
@@ -400,6 +402,8 @@ def card_detail(card_id):
         focus_comment=focus_comment,
         # 赞助者 user_id 集合（JS 评论渲染时给昵称加红色星标）
         sponsor_ids=[sid for (sid,) in db.session.query(Sponsor.user_id).all()],
+        # 隐匿标签注册表：模板里仅在 is_admin 时渲染设置面板，普通用户看不到任何相关内容
+        hidden_tag_registry=HIDDEN_TAGS,
     )
 
 
@@ -796,6 +800,33 @@ def card_toggle_hidden(card_id):
         flash_cat="success",
         action="hidden",
         state=card.is_hidden,
+    )
+
+
+@user_bp.route("/my/card/<card_id>/toggle-pin", methods=["POST"])
+@login_required
+def card_toggle_pin(card_id):
+    card = db.get_or_404(Card, card_id)
+    if card.author_id != current_user.id:
+        abort(404)
+    card, error = set_card_pinned(current_user, card_id, card.pinned_at is None)
+    if error:
+        # 置顶失败（名额已满 / 未通过）是业务提示：XHR 返回 JSON 让前端弹 toast，
+        # 普通表单请求则 flash 后跳回。
+        return respond(
+            url_for("user.my_cards"),
+            ok=False,
+            status=400,
+            error=error,
+            flash_msg=error,
+            flash_cat="warning",
+        )
+    return respond(
+        url_for("user.my_cards"),
+        flash_msg="已置顶" if card.pinned_at else "已取消置顶",
+        flash_cat="success",
+        action="pinned",
+        state=card.pinned_at is not None,
     )
 
 

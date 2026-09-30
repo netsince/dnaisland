@@ -11,11 +11,18 @@ from flask import (
     url_for,
 )
 from flask_login import current_user, login_required, login_user, logout_user
-from sqlalchemy import or_
 
 from ..extensions import db, login_manager
 from ..models import User
 from ..services.email import send_verification_email
+from ..services.login_service import (
+    MSG_BAD_PASSWORD,
+    MSG_THROTTLED,
+    MSG_USER_NOT_FOUND,
+    find_user_by_identifier,
+    login_throttled,
+    record_login_failure,
+)
 from ..services.site_service import check_email_allowed
 from ..services.verification_code_service import (
     can_resend,
@@ -136,9 +143,11 @@ def login():
         password = request.form.get("password") or ""
         next_url = request.form.get("next") or url_for("main.index")
 
-        user = User.query.filter(
-            or_(User.username == identifier, User.email == identifier)
-        ).first()
+        if login_throttled():
+            flash(MSG_THROTTLED, "danger")
+            return render_template("auth/login.html")
+
+        user = find_user_by_identifier(identifier)
 
         if user is not None and user.is_locked:
             if user.is_deleted:
@@ -149,8 +158,16 @@ def login():
                 flash("该账号已被封禁，无法登录。", "danger")
             return render_template("auth/login.html")
 
-        if user is None or not user.check_password(password):
-            flash("用户名/邮箱或密码错误", "danger")
+        # 区分「账号不存在」与「密码错误」（产品要求）：这会让账号可被枚举，
+        # 因此上方 login_throttled() 的失败限流是必需的配套措施，不可单独移除。
+        if user is None:
+            record_login_failure()
+            flash(MSG_USER_NOT_FOUND, "danger")
+            return render_template("auth/login.html")
+
+        if not user.check_password(password):
+            record_login_failure()
+            flash(MSG_BAD_PASSWORD, "danger")
             return render_template("auth/login.html")
 
         remember = bool(request.form.get("remember"))
