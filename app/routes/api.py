@@ -138,6 +138,7 @@ from ..services.report_service import (
     submit_report,
 )
 from ..services.site_service import get_site_config
+from ..services.sponsor_service import is_sponsor_safe
 from ..utils import get_user_by_username
 
 api_bp = Blueprint("api", __name__, url_prefix="/api/v1")
@@ -264,6 +265,10 @@ def _user_public(user: User) -> dict:
         "website": user.website or "",
         "verified": bool(user.verified),
         "verified_label": user.verified_label or "",
+        # 赞助者标记：客户端在昵称旁画红星（与网页版 is_sponsor 同一口径）。
+        # 用 *_safe 版本：本函数也可能在无请求上下文时被调用（脚本/后台任务），
+        # 那种情况下降级为非赞助者，不让装饰性标记影响业务流程。
+        "is_sponsor": is_sponsor_safe(user.id),
         "created_at": user.created_at.isoformat() if user.created_at else "",
     }
 
@@ -1702,6 +1707,9 @@ def me_profile_update():
         "birthday": viewer.birthday.isoformat() if viewer.birthday else None,
         "notify_like": bool(viewer.notify_like),
         "avatar": viewer.avatar,
+        # 与 _user_public 保持一致：客户端拿这份响应更新本地用户缓存时，
+        # 不会把赞助者标记弄丢。
+        "is_sponsor": is_sponsor_safe(viewer.id),
     })
 
 
@@ -2077,6 +2085,8 @@ def search_suggest():
             "username": u.username,
             "nickname": u.nickname,
             "verified": bool(u.verified),
+            # 搜索建议里也带赞助者标记（网页版搜索结果同样显示红星）。
+            "is_sponsor": is_sponsor_safe(u.id),
         }
         for u in users
     ]

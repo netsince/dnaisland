@@ -28,6 +28,7 @@
 | 官方文章（公告） | ✅ | ✅ | 共用同一查询 |
 | 站长推荐 | ✅ | ✅ | 共用 `recommend_items` |
 | 赞助页 | ✅ | ✅ | 共用 `sponsors` |
+| 赞助者红星标记 | ✅ | ✅（本次补齐） | 判定收敛到 `services/sponsor_service.py`；API `_user_public()` 输出 `is_sponsor`，客户端在昵称旁渲染红星（与网页 `macros/user_badge.html` 同口径） |
 | 通知（含未读、全部已读） | ✅ | ✅ | 共用 `notifications_page` |
 | 点数中心（明细 + 兑换） | ✅ | ✅ | 共用 `redeem_codes` / `point_transactions` |
 | 我的处罚 + 申诉 | ✅ | ✅ | 共用 `punishment_service` |
