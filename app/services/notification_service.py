@@ -39,9 +39,7 @@ def unread_count(user_id: int) -> int:
 
 
 def mark_all_read(user_id: int):
-    Notification.query.filter_by(user_id=user_id, is_read=False).update(
-        {"is_read": True}
-    )
+    Notification.query.filter_by(user_id=user_id, is_read=False).update({"is_read": True})
     db.session.commit()
     _unread_cache.invalidate(user_id)
 

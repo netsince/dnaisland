@@ -68,6 +68,7 @@ def _card(author, name, status="approved", created=None):
 # 服务层
 # ---------------------------------------------------------------------------
 
+
 def test_pin_approved_card(app):
     with app.app_context():
         u = _user("p1")
@@ -133,6 +134,7 @@ def test_pin_requires_ownership(app):
 # 排序：置顶优先
 # ---------------------------------------------------------------------------
 
+
 def test_profile_cards_pinned_first(app):
     with app.app_context():
         u = _user("p8")
@@ -180,6 +182,7 @@ def test_my_cards_pinned_first(app):
 # ---------------------------------------------------------------------------
 # 接口层
 # ---------------------------------------------------------------------------
+
 
 def test_api_toggle_pin(app, client):
     with app.app_context():

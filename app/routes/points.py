@@ -29,7 +29,9 @@ points_bp = Blueprint("points", __name__, url_prefix="/points")
 # ---------------------------------------------------------------------------
 # 限流状态（进程内）
 # ---------------------------------------------------------------------------
-_REDEEM_STATE: dict[int, dict[str, float]] = {}  # user_id -> {"fail_streak":int, "locked_until":float}
+_REDEEM_STATE: dict[
+    int, dict[str, float]
+] = {}  # user_id -> {"fail_streak":int, "locked_until":float}
 
 MAX_KEYS_PER_REQUEST = 50
 MAX_REQUESTS_PER_MINUTE = 2
@@ -38,9 +40,7 @@ LOCK_SECONDS = 3600
 
 
 def _get_state(uid):
-    return _REDEEM_STATE.setdefault(
-        uid, {"fail_streak": 0, "locked_until": 0.0}
-    )
+    return _REDEEM_STATE.setdefault(uid, {"fail_streak": 0, "locked_until": 0.0})
 
 
 def redeem_allowed(uid):
@@ -109,22 +109,29 @@ def redeem_codes(viewer, codes):
         if not key.active:
             results.append({"code": code, "ok": False, "message": "兑换码已被禁用"})
             db.session.add(
-                KeyUsageLog(key_id=key.id, code=code, user_id=viewer.id,
-                            status="fail", note="兑换码已被禁用")
+                KeyUsageLog(
+                    key_id=key.id,
+                    code=code,
+                    user_id=viewer.id,
+                    status="fail",
+                    note="兑换码已被禁用",
+                )
             )
             continue
         if not key.is_valid_now():
             results.append({"code": code, "ok": False, "message": "兑换码不在有效期内"})
             db.session.add(
-                KeyUsageLog(key_id=key.id, code=code, user_id=viewer.id,
-                            status="fail", note="不在有效期内")
+                KeyUsageLog(
+                    key_id=key.id, code=code, user_id=viewer.id, status="fail", note="不在有效期内"
+                )
             )
             continue
         if key.used_count >= key.max_uses:
             results.append({"code": code, "ok": False, "message": "已达使用上限"})
             db.session.add(
-                KeyUsageLog(key_id=key.id, code=code, user_id=viewer.id,
-                            status="fail", note="已达使用上限")
+                KeyUsageLog(
+                    key_id=key.id, code=code, user_id=viewer.id, status="fail", note="已达使用上限"
+                )
             )
             continue
         used_by_user = KeyUsageLog.query.filter_by(
@@ -133,8 +140,13 @@ def redeem_codes(viewer, codes):
         if used_by_user >= key.per_user_limit:
             results.append({"code": code, "ok": False, "message": "你已使用过该兑换码"})
             db.session.add(
-                KeyUsageLog(key_id=key.id, code=code, user_id=viewer.id,
-                            status="fail", note="单人使用次数已达上限")
+                KeyUsageLog(
+                    key_id=key.id,
+                    code=code,
+                    user_id=viewer.id,
+                    status="fail",
+                    note="单人使用次数已达上限",
+                )
             )
             continue
 
@@ -142,13 +154,22 @@ def redeem_codes(viewer, codes):
         key.used_count += 1
         db.session.add(
             PointTransaction(
-                user_id=viewer.id, delta=key.points, balance_after=viewer.points,
-                reason=f"兑换码 {code}", source="redeem", related_key=code,
+                user_id=viewer.id,
+                delta=key.points,
+                balance_after=viewer.points,
+                reason=f"兑换码 {code}",
+                source="redeem",
+                related_key=code,
             )
         )
         db.session.add(
-            KeyUsageLog(key_id=key.id, code=code, user_id=viewer.id,
-                        points_gained=key.points, status="success")
+            KeyUsageLog(
+                key_id=key.id,
+                code=code,
+                user_id=viewer.id,
+                points_gained=key.points,
+                status="success",
+            )
         )
         results.append({"code": code, "ok": True, "message": f"+{key.points} 点数"})
         success_count += 1
@@ -165,9 +186,11 @@ def redeem_codes(viewer, codes):
 
 def point_transactions(viewer, page=1, per_page=20):
     """返回指定用户的变化明细分页对象（按时间倒序）。"""
-    return PointTransaction.query.filter_by(user_id=viewer.id).order_by(
-        PointTransaction.created_at.desc()
-    ).paginate(page=page, per_page=per_page, error_out=False)
+    return (
+        PointTransaction.query.filter_by(user_id=viewer.id)
+        .order_by(PointTransaction.created_at.desc())
+        .paginate(page=page, per_page=per_page, error_out=False)
+    )
 
 
 def point_balance(viewer):

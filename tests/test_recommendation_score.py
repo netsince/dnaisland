@@ -84,6 +84,7 @@ def _score_map():
 # 作者粉丝数：相对口径（P90 归一化 + 封顶）
 # ---------------------------------------------------------------------------
 
+
 def test_follower_reference_is_p90(app):
     """基准取全体作者粉丝数的 P90，而不是写死的绝对值。"""
     with app.app_context():
@@ -113,8 +114,8 @@ def test_follower_term_raises_score_and_saturates(app):
         scores = _score_map()
         low = scores[cards[1].id]
         mid = scores[cards[5].id]
-        at_ref = scores[cards[9].id]      # 恰好 P90
-        above = scores[cards[10].id]      # 高于 P90
+        at_ref = scores[cards[9].id]  # 恰好 P90
+        above = scores[cards[10].id]  # 高于 P90
 
         assert low < mid < at_ref, "粉丝越多得分应越高"
         assert above == pytest.approx(at_ref), "超过基准后应封顶，不再额外加分"
@@ -123,9 +124,9 @@ def test_follower_term_raises_score_and_saturates(app):
         # 会稀释直接比值。改用差分——同组内 img/age/boost 相同（记为 K），
         #   score(f) - score(f') = HOT_W_FOLLOWER * (t_f - t_f') * K
         # 两个差分之比可消掉未知的 K，直接检验对数归一化的线性。
-        t1 = math.log10(2) / math.log10(10)    # 1 粉
-        t5 = math.log10(6) / math.log10(10)    # 5 粉
-        t9 = 1.0                               # 达到 P90 基准 → 打满
+        t1 = math.log10(2) / math.log10(10)  # 1 粉
+        t5 = math.log10(6) / math.log10(10)  # 5 粉
+        t9 = 1.0  # 达到 P90 基准 → 打满
         per_unit_mid = (mid - low) / (t5 - t1)
         per_unit_ref = (at_ref - low) / (t9 - t1)
         assert per_unit_mid == pytest.approx(per_unit_ref, rel=0.02), (
@@ -164,6 +165,7 @@ def test_follower_reference_scales_with_platform(app):
 # 同作者窗口衰减
 # ---------------------------------------------------------------------------
 
+
 def test_sample_weights_halve_per_extra_card_from_same_author():
     score_map = {
         "a1": (10.0, 1),
@@ -191,9 +193,9 @@ def test_weighted_sample_spreads_across_authors(monkeypatch):
 
     score_map = {}
     for i in range(6):
-        score_map[f"a{i}"] = (10.0, 1)   # 作者 1：6 张同分卡
+        score_map[f"a{i}"] = (10.0, 1)  # 作者 1：6 张同分卡
     for i in range(6):
-        score_map[f"b{i}"] = (1.0, 2)    # 作者 2：6 张低分卡
+        score_map[f"b{i}"] = (1.0, 2)  # 作者 2：6 张低分卡
     pool = list(score_map)
 
     def _avg_author1(trials=80):
@@ -226,6 +228,7 @@ def test_weighted_sample_handles_zero_scores():
 # 零互动新卡 engagement 恒为 0，于是 0 × 1.4 = 0：在探索页垫底、
 # 在首页加权抽样中权重为 0（数学上永远抽不到）。
 # ---------------------------------------------------------------------------
+
 
 def test_zero_engagement_new_card_scores_above_zero(app):
     """回归：零互动新卡得分必须为正，且不低于冷启动基线。"""

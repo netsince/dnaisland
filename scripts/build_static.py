@@ -15,6 +15,7 @@
     uv run python scripts/build_static.py
     python scripts/build_static.py      # 在已激活的 venv 中直接运行
 """
+
 import os
 import re
 import sys
@@ -47,8 +48,7 @@ def main() -> int:
     with open(CSS_DST, "w", encoding="utf-8") as f:
         f.write(out)
     print(
-        f"style.min.css 已生成：{len(source)} -> {len(out)} 字符 "
-        f"（{len(source) - len(out)} 减少）"
+        f"style.min.css 已生成：{len(source)} -> {len(out)} 字符 （{len(source) - len(out)} 减少）"
     )
     return 0
 

@@ -29,9 +29,7 @@ def status_counts(model_cls, base_query=None):
 
     q = base_query if base_query is not None else model_cls.query
     return dict(
-        q.with_entities(model_cls.status, func.count(model_cls.id))
-        .group_by(model_cls.status)
-        .all()
+        q.with_entities(model_cls.status, func.count(model_cls.id)).group_by(model_cls.status).all()
     )
 
 
@@ -138,7 +136,7 @@ def _prune_rate_limits() -> None:
     while len(_RATE_LIMITS) > _RATE_LIMITS_MAX:
         k = min(
             _RATE_LIMITS,
-            key=lambda x: (min(_RATE_LIMITS[x]) if _RATE_LIMITS[x] else float("inf")),
+            key=lambda x: min(_RATE_LIMITS[x]) if _RATE_LIMITS[x] else float("inf"),
         )
         _RATE_LIMITS.pop(k, None)
 

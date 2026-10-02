@@ -141,6 +141,7 @@ def card_image(card_id, slot):
         abort(404)
     return send_webp(img.data, max_edge=1024, quality=82)
 
+
 @user_bp.route("/user/<username>")
 def profile(username):
     u = get_user_by_username(username)
@@ -155,9 +156,7 @@ def profile(username):
     tab = request.args.get("tab", "cards")
 
     # 角色卡列表：与 App 共用 profile_cards 一个函数（含可见性/隐私过滤 + 批量装配）。
-    _u2, pagination, cards = profile_cards(
-        current_user, username, page=page, per_page=12
-    )
+    _u2, pagination, cards = profile_cards(current_user, username, page=page, per_page=12)
 
     # 茶馆：我发布的帖子（顶级）/ 回帖（有父级）
     from ..models import TeaPost
@@ -191,9 +190,7 @@ def profile(username):
     following_count = UserFollow.query.filter_by(follower_id=u.id).count()
     is_following = (
         current_user.is_authenticated
-        and UserFollow.query.filter_by(
-            follower_id=current_user.id, following_id=u.id
-        ).first()
+        and UserFollow.query.filter_by(follower_id=current_user.id, following_id=u.id).first()
         is not None
     )
     return render_template(
@@ -347,11 +344,7 @@ def card_detail(card_id):
     focus_comment = request.args.get("comment", type=int)
 
     # 评论区与关联茶馆帖（页面级内容，web 独有）
-    comments = (
-        Comment.query.filter_by(card_id=card.id)
-        .order_by(Comment.created_at.asc())
-        .all()
-    )
+    comments = Comment.query.filter_by(card_id=card.id).order_by(Comment.created_at.asc()).all()
     visible_comments = [
         c
         for c in comments
@@ -367,9 +360,7 @@ def card_detail(card_id):
     following = (
         current_user.is_authenticated
         and author is not None
-        and UserFollow.query.filter_by(
-            follower_id=current_user.id, following_id=author.id
-        ).first()
+        and UserFollow.query.filter_by(follower_id=current_user.id, following_id=author.id).first()
         is not None
     )
     linked_posts = (
@@ -426,9 +417,7 @@ def card_export(card_id):
     body = json.dumps(package, ensure_ascii=False, separators=(",", ":"))
     resp = make_response(body)
     resp.headers["Content-Type"] = "application/json; charset=utf-8"
-    resp.headers["Content-Disposition"] = (
-        f'attachment; filename="dna-card-{card.id}.json"'
-    )
+    resp.headers["Content-Disposition"] = f'attachment; filename="dna-card-{card.id}.json"'
     return resp
 
 
@@ -531,26 +520,32 @@ def user_follow(username):
         # 局部提交：返回新状态供前端切换按钮，不整页刷新
         if error == "self":
             return jsonify({"ok": False, "error": "不能关注自己"})
-        return jsonify({
-            "ok": True,
-            "action": "follow",
-            "state": now_following,
-        })
+        return jsonify(
+            {
+                "ok": True,
+                "action": "follow",
+                "state": now_following,
+            }
+        )
     return redirect(url_for("user.profile", username=username))
 
 
 def _serialize_comment_author(cm):
-    return {
-        "id": cm.author.id,
-        "username": cm.author.username,
-        "display_name": cm.author.display_name,
-        "avatar": cm.author.avatar or "",
-    } if cm.author else {
-        "id": cm.user_id,
-        "username": "deleted",
-        "display_name": "已注销用户",
-        "avatar": "",
-    }
+    return (
+        {
+            "id": cm.author.id,
+            "username": cm.author.username,
+            "display_name": cm.author.display_name,
+            "avatar": cm.author.avatar or "",
+        }
+        if cm.author
+        else {
+            "id": cm.user_id,
+            "username": "deleted",
+            "display_name": "已注销用户",
+            "avatar": "",
+        }
+    )
 
 
 @user_bp.route("/api/card/<card_id>/comments", methods=["GET"])
@@ -562,7 +557,11 @@ def card_comments_api(card_id):
     only_author = request.args.get("only_author") == "1"
 
     card, data, err_code = card_comments_list(
-        card_id, current_user, page=page, per_page=per_page, sort=sort,
+        card_id,
+        current_user,
+        page=page,
+        per_page=per_page,
+        sort=sort,
         only_author=only_author,
     )
     if err_code == "not_found":
@@ -582,7 +581,9 @@ def card_comments_api(card_id):
             "id": cm.id,
             "content": cm.content,
             "image_data": cm.image_data,
-            "created_at": (cm.created_at + timedelta(hours=8)).strftime("%Y-%m-%d %H:%M") if cm.created_at else "",
+            "created_at": (cm.created_at + timedelta(hours=8)).strftime("%Y-%m-%d %H:%M")
+            if cm.created_at
+            else "",
             "author": _serialize_comment_author(cm),
             "can_report": (
                 current_user.is_authenticated
@@ -596,7 +597,9 @@ def card_comments_api(card_id):
                 and (cm.user_id == current_user.id or current_user.is_super_admin)
             ),
             "delete_url": url_for("user.card_comment_delete", card_id=card_id, comment_id=cm.id),
-            "floor": (pagination.total - ((page - 1) * per_page + idx)) if (show_floor and idx is not None) else None,
+            "floor": (pagination.total - ((page - 1) * per_page + idx))
+            if (show_floor and idx is not None)
+            else None,
             "like_count": like_count,
             "liked": liked,
             "is_pinned": bool(cm.is_pinned),
@@ -607,7 +610,9 @@ def card_comments_api(card_id):
             "reply_to": (
                 {
                     "id": cm.reply_to.id,
-                    "display_name": cm.reply_to.author.display_name if (cm.reply_to and cm.reply_to.author) else "未知用户",
+                    "display_name": cm.reply_to.author.display_name
+                    if (cm.reply_to and cm.reply_to.author)
+                    else "未知用户",
                 }
                 if cm.reply_to
                 else None
@@ -654,14 +659,16 @@ def card_comments_api(card_id):
             )
             focus_page = (newer + same_newer) // per_page + 1
 
-    return jsonify({
-        "items": items,
-        "page": pagination.page,
-        "pages": pagination.pages,
-        "total": pagination.total,
-        "has_next": pagination.has_next,
-        "focus_page": focus_page,
-    })
+    return jsonify(
+        {
+            "items": items,
+            "page": pagination.page,
+            "pages": pagination.pages,
+            "total": pagination.total,
+            "has_next": pagination.has_next,
+            "focus_page": focus_page,
+        }
+    )
 
 
 @user_bp.route("/card/<card_id>/comment", methods=["POST"])
@@ -677,11 +684,7 @@ def card_comment(card_id):
     image_data = None
     image_file = request.files.get("image")
     if image_file and image_file.filename:
-        ext = (
-            image_file.filename.rsplit(".", 1)[-1].lower()
-            if "." in image_file.filename
-            else ""
-        )
+        ext = image_file.filename.rsplit(".", 1)[-1].lower() if "." in image_file.filename else ""
         if ext not in {"png", "jpg", "jpeg", "gif", "webp"}:
             err_msg = "仅支持上传 png/jpg/jpeg/gif/webp 格式的图片"
             if not is_xhr():
@@ -709,27 +712,51 @@ def card_comment(card_id):
             return redirect(url_for("user.card_detail", card_id=card_id))
 
     _cm, err_code = create_comment(
-        card_id, current_user, content,
-        reply_to_id=reply_to_id, image_data=image_data,
+        card_id,
+        current_user,
+        content,
+        reply_to_id=reply_to_id,
+        image_data=image_data,
     )
     if err_code == "empty":
-        return respond(url_for("user.card_detail", card_id=card_id), ok=False, status=400,
-                       flash_msg="评论内容不能为空", flash_cat="warning",
-                       error="评论内容不能为空")
+        return respond(
+            url_for("user.card_detail", card_id=card_id),
+            ok=False,
+            status=400,
+            flash_msg="评论内容不能为空",
+            flash_cat="warning",
+            error="评论内容不能为空",
+        )
     if err_code == "too_long":
-        return respond(url_for("user.card_detail", card_id=card_id), ok=False, status=400,
-                       flash_msg="评论内容不能超过 500 字", flash_cat="warning",
-                       error="评论内容不能超过 500 字")
+        return respond(
+            url_for("user.card_detail", card_id=card_id),
+            ok=False,
+            status=400,
+            flash_msg="评论内容不能超过 500 字",
+            flash_cat="warning",
+            error="评论内容不能超过 500 字",
+        )
     if err_code == "muted":
-        return respond(url_for("user.card_detail", card_id=card_id), ok=False, status=403,
-                       flash_msg="你已被禁言，暂时无法评论", flash_cat="warning",
-                       error="你已被禁言，暂时无法评论")
+        return respond(
+            url_for("user.card_detail", card_id=card_id),
+            ok=False,
+            status=403,
+            flash_msg="你已被禁言，暂时无法评论",
+            flash_cat="warning",
+            error="你已被禁言，暂时无法评论",
+        )
     if err_code == "unauth":
-        return respond(url_for("user.card_detail", card_id=card_id), ok=False, status=401,
-                       flash_msg="请先登录后再评论", flash_cat="warning",
-                       error="请先登录后再评论")
-    return respond(url_for("user.card_detail", card_id=card_id),
-                   flash_msg="评论成功", flash_cat="success")
+        return respond(
+            url_for("user.card_detail", card_id=card_id),
+            ok=False,
+            status=401,
+            flash_msg="请先登录后再评论",
+            flash_cat="warning",
+            error="请先登录后再评论",
+        )
+    return respond(
+        url_for("user.card_detail", card_id=card_id), flash_msg="评论成功", flash_cat="success"
+    )
 
 
 @user_bp.route("/card/<card_id>/comment/<int:comment_id>/like", methods=["POST"])
@@ -896,8 +923,9 @@ def card_edit(card_id):
     tags = [t.tag for t in CardTag.query.filter_by(card_id=card.id).all()]
     dialogue = [
         {"user": d.user_text, "assistant": d.assistant_text}
-        for d in CardDialogueStyle.query.filter_by(card_id=card.id)
-        .order_by(CardDialogueStyle.turn_index)
+        for d in CardDialogueStyle.query.filter_by(card_id=card.id).order_by(
+            CardDialogueStyle.turn_index
+        )
     ]
     images = load_card_images(card.id)
     prefill = {
@@ -945,7 +973,8 @@ def notifications_read_all():
     mark_all_read(current_user.id)
     return respond(
         url_for("user.notifications"),
-        flash_msg="已全部标记为已读", flash_cat="success",
+        flash_msg="已全部标记为已读",
+        flash_cat="success",
         action="read_all",
     )
 
@@ -982,9 +1011,7 @@ def _follow_items(users, include_banned):
             UserFollow.following_id.in_(ids),
         ).all()
         following_ids = {r.following_id for r in rows}
-    return [
-        {"user": user, "is_following": user.id in following_ids} for user in users
-    ]
+    return [{"user": user, "is_following": user.id in following_ids} for user in users]
 
 
 def resolve_report_target(target_type, raw_id):
@@ -1076,9 +1103,9 @@ def my_tickets():
     if q:
         base = base.filter(Ticket.title.ilike(f"%{q}%"))
     # 按 updated_at 倒序（未更新则按 created_at）
-    tickets = base.order_by(
-        db.func.coalesce(Ticket.updated_at, Ticket.created_at).desc()
-    ).paginate(page=page, per_page=20, error_out=False)
+    tickets = base.order_by(db.func.coalesce(Ticket.updated_at, Ticket.created_at).desc()).paginate(
+        page=page, per_page=20, error_out=False
+    )
 
     return render_template(
         "user/tickets.html",

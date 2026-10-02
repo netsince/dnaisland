@@ -24,8 +24,9 @@ class TestConfig(Config):
 def app(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
     app = create_app(TestConfig)
-    assert app.config["SQLALCHEMY_DATABASE_URI"].startswith("sqlite"), \
+    assert app.config["SQLALCHEMY_DATABASE_URI"].startswith("sqlite"), (
         f"🧨 测试连到了非 SQLite 数据库！{app.config['SQLALCHEMY_DATABASE_URI']}"
+    )
     with app.app_context():
         db.create_all()
         yield app
@@ -119,7 +120,7 @@ def test_comment_reply_to_relationship(app):
             card_id=card.id,
             user_id=user2.id,
             content="Child reply comment",
-            reply_to_id=parent_comment.id
+            reply_to_id=parent_comment.id,
         )
         db.session.add(child_comment)
         db.session.commit()
@@ -194,9 +195,16 @@ def test_card_comment_pin_api(client, app):
     with app.app_context():
         author = User(username="author_pin", nickname="AuthorPin", email="author_pin@example.com")
         author.set_password("password123")
-        normal_user = User(username="normal_user", nickname="NormalUser", email="normal@example.com")
+        normal_user = User(
+            username="normal_user", nickname="NormalUser", email="normal@example.com"
+        )
         normal_user.set_password("password123")
-        admin = User(username="admin_user", nickname="AdminUser", email="admin@example.com", role="super_admin")
+        admin = User(
+            username="admin_user",
+            nickname="AdminUser",
+            email="admin@example.com",
+            role="super_admin",
+        )
         admin.set_password("password123")
         db.session.add_all([author, normal_user, admin])
         db.session.commit()
@@ -246,7 +254,9 @@ def test_card_comments_api_latest_hottest_and_pin_priority(client, app):
     """测试 card_comments_api 的 latest / hottest 排序以及 is_pinned 优先置顶规则"""
     card_id = "card-sort-1"
     with app.app_context():
-        author = User(username="sort_author", nickname="SortAuthor", email="sort_author@example.com")
+        author = User(
+            username="sort_author", nickname="SortAuthor", email="sort_author@example.com"
+        )
         author.set_password("password123")
         user1 = User(username="sort_user1", nickname="SortUser1", email="sort1@example.com")
         user1.set_password("password123")
@@ -261,20 +271,38 @@ def test_card_comments_api_latest_hottest_and_pin_priority(client, app):
 
         now = datetime.now(UTC)
         # cm1: 最早发布，0 赞，未置顶
-        cm1 = Comment(card_id=card_id, user_id=author.id, content="cm1 earliest", created_at=now - timedelta(minutes=10))
+        cm1 = Comment(
+            card_id=card_id,
+            user_id=author.id,
+            content="cm1 earliest",
+            created_at=now - timedelta(minutes=10),
+        )
         # cm2: 中间发布，有 2 个点赞，未置顶
-        cm2 = Comment(card_id=card_id, user_id=user1.id, content="cm2 hottest", created_at=now - timedelta(minutes=5))
+        cm2 = Comment(
+            card_id=card_id,
+            user_id=user1.id,
+            content="cm2 hottest",
+            created_at=now - timedelta(minutes=5),
+        )
         # cm3: 最新发布，0 赞，已置顶
-        cm3 = Comment(card_id=card_id, user_id=user2.id, content="cm3 pinned", created_at=now - timedelta(minutes=1), is_pinned=True)
+        cm3 = Comment(
+            card_id=card_id,
+            user_id=user2.id,
+            content="cm3 pinned",
+            created_at=now - timedelta(minutes=1),
+            is_pinned=True,
+        )
         db.session.add_all([cm1, cm2, cm3])
         db.session.commit()
         cm3_id = cm3.id
 
         # 为 cm2 添加 2 个点赞
-        db.session.add_all([
-            CommentLike(user_id=author.id, comment_id=cm2.id),
-            CommentLike(user_id=user1.id, comment_id=cm2.id),
-        ])
+        db.session.add_all(
+            [
+                CommentLike(user_id=author.id, comment_id=cm2.id),
+                CommentLike(user_id=user1.id, comment_id=cm2.id),
+            ]
+        )
         db.session.commit()
 
     # 1. 最新排序 (latest)：置顶 cm3 处于最前，然后最新的是 cm2, cm1
@@ -352,4 +380,3 @@ def test_card_comment_post_with_reply_to_id(client, app):
     assert child_item["reply_to"] is not None
     assert child_item["reply_to"]["id"] == parent_id
     assert child_item["reply_to"]["display_name"] == "U1Reply"
-

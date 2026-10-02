@@ -29,14 +29,10 @@ def effective_credentials(model, site_cfg):
     模型级配置（GenerationModel.api_base_url / api_key）优先，
     缺失时回退全局 SiteConfig 的 image_base_url / image_api_key。
     """
-    base = (
-        (getattr(model, "api_base_url", "") or "").strip()
-        or (site_cfg.image_base_url or "").strip()
-    )
-    key = (
-        (getattr(model, "api_key", "") or "").strip()
-        or (site_cfg.image_api_key or "").strip()
-    )
+    base = (getattr(model, "api_base_url", "") or "").strip() or (
+        site_cfg.image_base_url or ""
+    ).strip()
+    key = (getattr(model, "api_key", "") or "").strip() or (site_cfg.image_api_key or "").strip()
     return base, key
 
 
@@ -120,12 +116,8 @@ def _edit_single(base_url, api_key, model, prompt, size, references):
 
     def write_field(name, value):
         buf.write(f"--{boundary}\r\n".encode())
-        buf.write(
-            f'Content-Disposition: form-data; name="{name}"\r\n\r\n'.encode()
-        )
-        buf.write(
-            value.encode("utf-8") if isinstance(value, str) else value
-        )
+        buf.write(f'Content-Disposition: form-data; name="{name}"\r\n\r\n'.encode())
+        buf.write(value.encode("utf-8") if isinstance(value, str) else value)
         buf.write(b"\r\n")
 
     write_field("model", model)
@@ -138,9 +130,7 @@ def _edit_single(base_url, api_key, model, prompt, size, references):
 
     for fname, fbytes, mime in references:
         buf.write(f"--{boundary}\r\n".encode())
-        buf.write(
-            f'Content-Disposition: form-data; name="image"; filename="{fname}"\r\n'.encode()
-        )
+        buf.write(f'Content-Disposition: form-data; name="image"; filename="{fname}"\r\n'.encode())
         buf.write(f"Content-Type: {mime}\r\n\r\n".encode())
         buf.write(fbytes)
         buf.write(b"\r\n")
@@ -184,9 +174,7 @@ def generate_images(base_url, api_key, model, prompt, size, n, references):
     errors = []
     with ThreadPoolExecutor(max_workers=n) as executor:
         futures = [
-            executor.submit(
-                _single_task, base_url, api_key, model, prompt, size, references
-            )
+            executor.submit(_single_task, base_url, api_key, model, prompt, size, references)
             for _ in range(n)
         ]
         for fut in as_completed(futures):

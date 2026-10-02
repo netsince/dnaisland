@@ -52,17 +52,22 @@ def client(app):
 
 
 def _user(name, role="user"):
-    u = User(username=name, nickname=name, email=f"{name}@x.com",
-             password_hash="x", role=role)
+    u = User(username=name, nickname=name, email=f"{name}@x.com", password_hash="x", role=role)
     db.session.add(u)
     db.session.commit()
     return u
 
 
 def _card(author, name, created=None):
-    c = Card(id=f"card-{name}", author_id=author.id, name=name, gender="无性",
-             persona="", status="approved",
-             created_at=created or datetime.now())
+    c = Card(
+        id=f"card-{name}",
+        author_id=author.id,
+        name=name,
+        gender="无性",
+        persona="",
+        status="approved",
+        created_at=created or datetime.now(),
+    )
     db.session.add(c)
     db.session.commit()
     return c
@@ -71,6 +76,7 @@ def _card(author, name, created=None):
 # ---------------------------------------------------------------------------
 # 注册表与规范化
 # ---------------------------------------------------------------------------
+
 
 def test_registry_has_reduce_boost():
     assert REDUCE_BOOST in HIDDEN_TAGS
@@ -93,6 +99,7 @@ def test_boost_factor():
 # ---------------------------------------------------------------------------
 # 写入：JSON 与 SQL 可见系数必须一致
 # ---------------------------------------------------------------------------
+
 
 def test_set_hidden_tags_keeps_json_and_factor_in_sync(app):
     with app.app_context():
@@ -129,6 +136,7 @@ def test_hidden_tag_views_expose_label_for_admin(app):
 # 降权：热度分 ×0.2
 # ---------------------------------------------------------------------------
 
+
 def test_reduce_boost_scales_hot_score(app):
     with app.app_context():
         u = _user("a4")
@@ -150,6 +158,7 @@ def test_reduce_boost_scales_hot_score(app):
 # ---------------------------------------------------------------------------
 # 不可见性（硬约束）
 # ---------------------------------------------------------------------------
+
 
 def test_api_card_payload_never_exposes_hidden_tags(app, client):
     with app.app_context():
@@ -186,6 +195,7 @@ def test_web_card_detail_never_exposes_hidden_tags(app, client):
 # 管理后台
 # ---------------------------------------------------------------------------
 
+
 def test_admin_can_set_and_clear_hidden_tag(app, client):
     with app.app_context():
         admin = _user("boss", role="super_admin")
@@ -216,9 +226,11 @@ def test_admin_can_set_and_clear_hidden_tag(app, client):
         assert card.hidden_tags == []
         assert float(card.boost_factor) == pytest.approx(1.0)
 
+
 # ---------------------------------------------------------------------------
 # 三处设置入口 + 后台筛选
 # ---------------------------------------------------------------------------
+
 
 def _admin_and_card(admin_name, card_name):
     admin = _user(admin_name, role="super_admin")

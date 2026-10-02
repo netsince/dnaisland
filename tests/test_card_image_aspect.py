@@ -71,6 +71,7 @@ def _author(name):
 # 新建：全量校验
 # ---------------------------------------------------------------------------
 
+
 def test_create_rejects_wrong_ratio_bytes(app):
     """Web 上传走原始字节。"""
     with app.app_context():
@@ -100,9 +101,7 @@ def test_create_rejects_wrong_ratio_data_url(app):
 def test_create_accepts_correct_ratios(app, slot, w, h):
     with app.app_context():
         author = _author(f"ok_{slot}")
-        card, error = create_card_from_payload(
-            author, {"name": "x", "images": {slot: _png(w, h)}}
-        )
+        card, error = create_card_from_payload(author, {"name": "x", "images": {slot: _png(w, h)}})
         assert error is None
         assert card is not None
 
@@ -137,6 +136,7 @@ def test_create_rejects_invalid_image(app):
 # 编辑：只校验被替换/新增的图，存量不动
 # ---------------------------------------------------------------------------
 
+
 def test_edit_skips_unchanged_legacy_image(app):
     """存量不合规图片原样回传时不得被卡住（不动存量数据）。"""
     with app.app_context():
@@ -154,9 +154,7 @@ def test_edit_skips_unchanged_legacy_image(app):
         db.session.commit()
 
         # 编辑时原样回传 -> 视为未改动 -> 放行
-        assert update_card_from_payload(
-            card, {"name": "n2", "images": {"square": legacy}}
-        ) is None
+        assert update_card_from_payload(card, {"name": "n2", "images": {"square": legacy}}) is None
 
 
 def test_edit_rejects_replaced_wrong_ratio_image(app):
@@ -180,6 +178,7 @@ def test_edit_rejects_replaced_wrong_ratio_image(app):
 # ---------------------------------------------------------------------------
 # 接口层
 # ---------------------------------------------------------------------------
+
 
 def test_api_publish_rejects_wrong_ratio(app, client):
     with app.app_context():

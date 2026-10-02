@@ -1,4 +1,5 @@
 """表情包公开 API：供前端面板与评论渲染使用。"""
+
 import base64
 import contextlib
 import hashlib
@@ -16,10 +17,7 @@ def api_list():
 
     只返回轻量元数据 + 图片 URL，不内联 base64，避免响应体过大导致面板卡顿。
     """
-    series = (
-        StickerSeries.query.order_by(StickerSeries.sort_order, StickerSeries.id)
-        .all()
-    )
+    series = StickerSeries.query.order_by(StickerSeries.sort_order, StickerSeries.id).all()
     out = []
     for s in series:
         out.append(

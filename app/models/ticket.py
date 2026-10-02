@@ -3,9 +3,9 @@ from sqlalchemy.dialects.mysql import LONGTEXT
 from ..extensions import db
 
 # 工单状态
-TICKET_OPEN = "open"          # 待处理（新建 / 用户新回复后回到此状态）
-TICKET_REPLIED = "replied"    # 已回复（管理员回复后）
-TICKET_CLOSED = "closed"      # 已关闭
+TICKET_OPEN = "open"  # 待处理（新建 / 用户新回复后回到此状态）
+TICKET_REPLIED = "replied"  # 已回复（管理员回复后）
+TICKET_CLOSED = "closed"  # 已关闭
 
 TICKET_STATUSES = [TICKET_OPEN, TICKET_REPLIED, TICKET_CLOSED]
 
@@ -32,23 +32,13 @@ class Ticket(db.Model):
     __tablename__ = "tickets"
 
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(
-        db.Integer, db.ForeignKey("users.id"), nullable=False, index=True
-    )
-    category_id = db.Column(
-        db.Integer, db.ForeignKey("ticket_categories.id"), nullable=True
-    )
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    category_id = db.Column(db.Integer, db.ForeignKey("ticket_categories.id"), nullable=True)
     title = db.Column(db.String(120), nullable=False)
     content = db.Column(db.Text, nullable=False)
-    status = db.Column(
-        db.String(20), server_default=TICKET_OPEN, nullable=False, index=True
-    )
-    created_at = db.Column(
-        db.DateTime, server_default=db.func.now(), nullable=False, index=True
-    )
-    updated_at = db.Column(
-        db.DateTime, server_default=db.func.now(), onupdate=db.func.now()
-    )
+    status = db.Column(db.String(20), server_default=TICKET_OPEN, nullable=False, index=True)
+    created_at = db.Column(db.DateTime, server_default=db.func.now(), nullable=False, index=True)
+    updated_at = db.Column(db.DateTime, server_default=db.func.now(), onupdate=db.func.now())
     closed_at = db.Column(db.DateTime, nullable=True)
 
     user = db.relationship("User", foreign_keys=[user_id])
@@ -75,21 +65,13 @@ class TicketMessage(db.Model):
     __tablename__ = "ticket_messages"
 
     id = db.Column(db.Integer, primary_key=True)
-    ticket_id = db.Column(
-        db.Integer, db.ForeignKey("tickets.id"), nullable=False, index=True
-    )
-    sender_id = db.Column(
-        db.Integer, db.ForeignKey("users.id"), nullable=False
-    )
-    sender_role = db.Column(
-        db.String(10), server_default=MSG_ROLE_USER, nullable=False
-    )
+    ticket_id = db.Column(db.Integer, db.ForeignKey("tickets.id"), nullable=False, index=True)
+    sender_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    sender_role = db.Column(db.String(10), server_default=MSG_ROLE_USER, nullable=False)
     content = db.Column(db.Text, nullable=False)
     image_data = db.deferred(
         db.Column(LONGTEXT, nullable=True)
     )  # 工单消息图片（WebP base64 data URL），可空
-    created_at = db.Column(
-        db.DateTime, server_default=db.func.now(), nullable=False
-    )
+    created_at = db.Column(db.DateTime, server_default=db.func.now(), nullable=False)
 
     sender = db.relationship("User", foreign_keys=[sender_id])

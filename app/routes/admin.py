@@ -115,6 +115,7 @@ def apply_mute(user_id, reason, notify_msg):
     notify(u.id, notify_msg, type_="punish")
     db.session.commit()
 
+
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
 
@@ -136,15 +137,11 @@ def inject_admin_badges():
         pending_comments = Comment.query.filter_by(status="pending").count()
         pending_tea = TeaPost.query.filter_by(status="pending").count()
         pending_appeals = Punishment.query.filter_by(appeal_status="pending").count()
-        total = (
-            pending_cards
-            + pending_reports
-            + pending_comments
-            + pending_tea
-            + pending_appeals
-        )
+        total = pending_cards + pending_reports + pending_comments + pending_tea + pending_appeals
     except Exception:
-        pending_cards = pending_reports = pending_comments = pending_tea = pending_appeals = total = 0
+        pending_cards = pending_reports = pending_comments = pending_tea = pending_appeals = (
+            total
+        ) = 0
 
     return {
         "admin_badges": {
@@ -180,27 +177,13 @@ def index():
 
     # 待办与最新动态列表
     pending_cards_list = (
-        Card.query.filter_by(status="pending")
-        .order_by(Card.created_at.desc())
-        .limit(6)
-        .all()
+        Card.query.filter_by(status="pending").order_by(Card.created_at.desc()).limit(6).all()
     )
     pending_reports_list = (
-        Report.query.filter_by(status="pending")
-        .order_by(Report.created_at.desc())
-        .limit(6)
-        .all()
+        Report.query.filter_by(status="pending").order_by(Report.created_at.desc()).limit(6).all()
     )
-    recent_users_list = (
-        User.query.order_by(User.created_at.desc())
-        .limit(6)
-        .all()
-    )
-    recent_gen_logs = (
-        GenerationLog.query.order_by(GenerationLog.created_at.desc())
-        .limit(6)
-        .all()
-    )
+    recent_users_list = User.query.order_by(User.created_at.desc()).limit(6).all()
+    recent_gen_logs = GenerationLog.query.order_by(GenerationLog.created_at.desc()).limit(6).all()
 
     stats = {
         "total_users": total_users,
@@ -405,9 +388,7 @@ def user_profile_drawer(user_id):
 
     # 处罚历史
     punishments = (
-        Punishment.query.filter_by(user_id=u.id)
-        .order_by(Punishment.created_at.desc())
-        .all()
+        Punishment.query.filter_by(user_id=u.id).order_by(Punishment.created_at.desc()).all()
     )
     punishments_data = [
         {
@@ -838,9 +819,7 @@ def stickers():
                 flash("系列已添加", "success")
         return redirect(url_for("admin.stickers"))
 
-    series = StickerSeries.query.order_by(
-        StickerSeries.sort_order, StickerSeries.id
-    ).all()
+    series = StickerSeries.query.order_by(StickerSeries.sort_order, StickerSeries.id).all()
     return render_template("admin/stickers.html", series=series)
 
 
@@ -1006,13 +985,17 @@ def sticker_reorder():
     if not ids:
         return jsonify(ok=True)
     if kind == "series":
-        stmt = update(StickerSeries).where(StickerSeries.id.in_(ids)).values(
-            sort_order=case({sid: i for i, sid in enumerate(ids)}, value=StickerSeries.id)
+        stmt = (
+            update(StickerSeries)
+            .where(StickerSeries.id.in_(ids))
+            .values(sort_order=case({sid: i for i, sid in enumerate(ids)}, value=StickerSeries.id))
         )
     elif kind == "sticker":
         # 单条 CASE WHEN 批量更新，不 SELECT 巨大的 image_data 字段
-        stmt = update(Sticker).where(Sticker.id.in_(ids)).values(
-            sort_order=case({stid: i for i, stid in enumerate(ids)}, value=Sticker.id)
+        stmt = (
+            update(Sticker)
+            .where(Sticker.id.in_(ids))
+            .values(sort_order=case({stid: i for i, stid in enumerate(ids)}, value=Sticker.id))
         )
     else:
         return jsonify(ok=False, error="unknown type"), 400
@@ -1025,9 +1008,9 @@ def sticker_reorder():
 @super_admin_required
 def image_logs():
     page = request.args.get("page", 1, type=int)
-    pagination = GenerationLog.query.order_by(
-        GenerationLog.created_at.desc()
-    ).paginate(page=page, per_page=20, error_out=False)
+    pagination = GenerationLog.query.order_by(GenerationLog.created_at.desc()).paginate(
+        page=page, per_page=20, error_out=False
+    )
     logs = pagination.items
     user_ids = [log.user_id for log in logs]
     users_map = (
@@ -1037,9 +1020,7 @@ def image_logs():
     )
     for log in logs:
         log.nickname = users_map.get(log.user_id, f"UID{log.user_id}")
-    return render_template(
-        "admin/image_logs.html", pagination=pagination, logs=logs
-    )
+    return render_template("admin/image_logs.html", pagination=pagination, logs=logs)
 
 
 @admin_bp.route("/proxy-logs")
@@ -1052,12 +1033,7 @@ def proxy_logs():
     query = ProxyLog.query
 
     if q:
-        user_ids = [
-            u.id
-            for u in User.query.filter(
-                User.nickname.ilike(f"%{q}%")
-            ).all()
-        ]
+        user_ids = [u.id for u in User.query.filter(User.nickname.ilike(f"%{q}%")).all()]
         query = query.filter(
             ProxyLog.user_id.in_(user_ids)
             | ProxyLog.token.ilike(f"%{q}%")
@@ -1067,13 +1043,11 @@ def proxy_logs():
         if status == "success":
             query = query.filter(ProxyLog.status_code == 200)
         elif status == "error":
-            query = query.filter(
-                ProxyLog.status_code.is_(None) | (ProxyLog.status_code != 200)
-            )
+            query = query.filter(ProxyLog.status_code.is_(None) | (ProxyLog.status_code != 200))
 
-    pagination = query.order_by(
-        ProxyLog.created_at.desc(), ProxyLog.id.desc()
-    ).paginate(page=page, per_page=20, error_out=False)
+    pagination = query.order_by(ProxyLog.created_at.desc(), ProxyLog.id.desc()).paginate(
+        page=page, per_page=20, error_out=False
+    )
     logs = pagination.items
     user_ids = [log.user_id for log in logs if log.user_id]
     users_map = (
@@ -1082,10 +1056,10 @@ def proxy_logs():
         else {}
     )
     for log in logs:
-        log.nickname = users_map.get(log.user_id, "未认证" if log.user_id is None else f"UID{log.user_id}")
-    return render_template(
-        "admin/proxy_logs.html", pagination=pagination, logs=logs
-    )
+        log.nickname = users_map.get(
+            log.user_id, "未认证" if log.user_id is None else f"UID{log.user_id}"
+        )
+    return render_template("admin/proxy_logs.html", pagination=pagination, logs=logs)
 
 
 @admin_bp.route("/proxy-logs/<int:log_id>")
@@ -1121,12 +1095,10 @@ def copy_stats():
     # 概览统计：总复制次数、去重角色卡数、去重复制用户数
     total = db.session.query(func.count(CardCopyStat.id)).scalar() or 0
     cards_copied = (
-        db.session.query(func.count(db.func.distinct(CardCopyStat.card_id))).scalar()
-        or 0
+        db.session.query(func.count(db.func.distinct(CardCopyStat.card_id))).scalar() or 0
     )
     users_copied = (
-        db.session.query(func.count(db.func.distinct(CardCopyStat.user_id))).scalar()
-        or 0
+        db.session.query(func.count(db.func.distinct(CardCopyStat.user_id))).scalar() or 0
     )
     return render_template(
         "admin/copy_stats.html",
@@ -1153,11 +1125,19 @@ def recommend():
         if r.kind == "card":
             c = db.session.get(Card, r.ref_id)
             if c:
-                target = {"name": c.name, "gender": c.gender, "link": url_for("user.card_detail", card_id=c.id)}
+                target = {
+                    "name": c.name,
+                    "gender": c.gender,
+                    "link": url_for("user.card_detail", card_id=c.id),
+                }
         elif r.kind == "user":
             u = db.session.get(User, int(r.ref_id)) if str(r.ref_id).isdigit() else None
             if u:
-                target = {"name": u.nickname or u.username, "gender": None, "link": url_for("user.profile", username=u.username)}
+                target = {
+                    "name": u.nickname or u.username,
+                    "gender": None,
+                    "link": url_for("user.profile", username=u.username),
+                }
         items.append({"rec": r, "target": target})
     return render_template("admin/recommend.html", items=items)
 
@@ -1286,12 +1266,10 @@ def recommend_reorder():
     ids = [int(x) for x in (data.get("ids") or []) if str(x).strip().isdigit()]
     if not ids:
         return jsonify(ok=True)
-    stmt = update(SiteRecommendation).where(
-        SiteRecommendation.id.in_(ids)
-    ).values(
-        sort_order=case(
-            {rid: i for i, rid in enumerate(ids)}, value=SiteRecommendation.id
-        )
+    stmt = (
+        update(SiteRecommendation)
+        .where(SiteRecommendation.id.in_(ids))
+        .values(sort_order=case({rid: i for i, rid in enumerate(ids)}, value=SiteRecommendation.id))
     )
     db.session.execute(stmt)
     db.session.commit()
@@ -1353,9 +1331,7 @@ def recommend_search():
             User.id.notin_(punished),
         )
         if q:
-            query = query.filter(
-                or_(User.nickname.ilike(f"%{q}%"), User.username.ilike(f"%{q}%"))
-            )
+            query = query.filter(or_(User.nickname.ilike(f"%{q}%"), User.username.ilike(f"%{q}%")))
         rows = query.order_by(User.id.desc()).limit(20).all()
         # 拥有的角色卡数量（含任意状态，反映创作量）
         uid_counts = (
@@ -1499,8 +1475,7 @@ def punish_appeal_resolve(punishment_id):
         db.session.commit()
         notify(
             p.user_id,
-            "你的申诉未通过。"
-            + (f"管理员回复：{reply}" if reply else ""),
+            "你的申诉未通过。" + (f"管理员回复：{reply}" if reply else ""),
             type_="punish",
         )
         flash("已驳回该申诉", "success")
@@ -1662,7 +1637,11 @@ def review():
     # 批量查询已有图片插槽（只查 slot，不读取 Base64 LONGTEXT 大数据）
     slots_map = {}
     if card_ids:
-        all_slots = db.session.query(CardImage.card_id, CardImage.slot).filter(CardImage.card_id.in_(card_ids)).all()
+        all_slots = (
+            db.session.query(CardImage.card_id, CardImage.slot)
+            .filter(CardImage.card_id.in_(card_ids))
+            .all()
+        )
         for cid, slot in all_slots:
             slots_map.setdefault(cid, set()).add(slot)
 
@@ -1706,14 +1685,15 @@ def review_detail(card_id):
     )
     # 优化：只读取已有插槽集合，避免跨公网载入整个 Base64 LONGTEXT 造成卡顿
     existing_slots = {
-        row[0]
-        for row in db.session.query(CardImage.slot).filter_by(card_id=card.id).all()
+        row[0] for row in db.session.query(CardImage.slot).filter_by(card_id=card.id).all()
     }
 
     # 作者风控画像
     author_risk = {
         "active_punishments": author.active_punishments if author else [],
-        "report_count": Report.query.filter_by(target_type="user", target_id=str(author.id)).count() if author else 0,
+        "report_count": Report.query.filter_by(target_type="user", target_id=str(author.id)).count()
+        if author
+        else 0,
         "card_count": Card.query.filter_by(author_id=author.id).count() if author else 0,
     }
 
@@ -1770,14 +1750,16 @@ def review_reject(card_id):
         if _is_ajax():
             return jsonify(ok=True, card_id=card_id)
         return redirect(url_for("admin.review"))
-    reason = (request.form.get("reason") or (request.json.get("reason") if request.is_json else "") or "").strip()
+    reason = (
+        request.form.get("reason") or (request.json.get("reason") if request.is_json else "") or ""
+    ).strip()
     card.status = "rejected"
     db.session.commit()
     msg = f'你的角色卡"{card.name}"未通过审核'
     if reason:
-        msg += f'，原因：{reason}。可修改后重新提交。'
+        msg += f"，原因：{reason}。可修改后重新提交。"
     else:
-        msg += '，可修改后重新提交。'
+        msg += "，可修改后重新提交。"
     notify(
         card.author_id,
         msg,
@@ -1820,9 +1802,9 @@ def review_batch():
             card.status = "rejected"
             msg = f'你的角色卡"{card.name}"未通过审核'
             if reason:
-                msg += f'，原因：{reason}。可修改后重新提交。'
+                msg += f"，原因：{reason}。可修改后重新提交。"
             else:
-                msg += '，可修改后重新提交。'
+                msg += "，可修改后重新提交。"
             notify(
                 card.author_id,
                 msg,
@@ -1915,14 +1897,10 @@ def report_detail(report_id):
     }
 
     # 统计同一被举报对象被多少人举报，便于管理员判断严重程度
-    related = Report.query.filter_by(
-        target_type=r.target_type, target_id=r.target_id
-    ).all()
+    related = Report.query.filter_by(target_type=r.target_type, target_id=r.target_id).all()
     related_total = len(related)
     related_pending = sum(1 for x in related if x.status == "pending")
-    related_reporters = [
-        (x.reporter.nickname if x.reporter else x.reporter_id) for x in related
-    ]
+    related_reporters = [(x.reporter.nickname if x.reporter else x.reporter_id) for x in related]
 
     return render_template(
         "admin/report_detail.html",
@@ -2024,11 +2002,13 @@ def comment_moderation():
 
     items = []
     for c in pagination.items:
-        items.append({
-            "comment": c,
-            "card": cards_map.get(c.card_id),
-            "parent": c.reply_to,
-        })
+        items.append(
+            {
+                "comment": c,
+                "card": cards_map.get(c.card_id),
+                "parent": c.reply_to,
+            }
+        )
     return render_template(
         "admin/comment_moderation.html",
         items=items,
@@ -2063,15 +2043,12 @@ def comment_reject(comment_id):
     card_name = card.name if card else "未知角色卡"
     notify(
         c.user_id,
-        f'你发布在角色卡《{card_name}》下的评论因违反社区规范已被移除。',
+        f"你发布在角色卡《{card_name}》下的评论因违反社区规范已被移除。",
         type_="comment",
     )
 
     # 可选：拒绝的同时禁言该用户（复用 mute 处罚）
-    mute = (
-        request.form.get("mute") == "1"
-        or (request.is_json and request.json.get("mute"))
-    )
+    mute = request.form.get("mute") == "1" or (request.is_json and request.json.get("mute"))
     if mute:
         apply_mute(
             c.user_id,
@@ -2093,7 +2070,9 @@ def comment_reject(comment_id):
 def comment_moderation_batch():
     data = request.get_json(silent=True) or request.form
     action = data.get("action")
-    comment_ids = data.getlist("comment_ids") if hasattr(data, "getlist") else data.get("comment_ids", [])
+    comment_ids = (
+        data.getlist("comment_ids") if hasattr(data, "getlist") else data.get("comment_ids", [])
+    )
     if isinstance(comment_ids, str):
         comment_ids = [int(c.strip()) for c in comment_ids.split(",") if c.strip().isdigit()]
     mute = str(data.get("mute", "")).lower() in ("1", "true", "yes")
@@ -2113,7 +2092,7 @@ def comment_moderation_batch():
             card_name = card.name if card else "未知角色卡"
             notify(
                 c.user_id,
-                f'你发布在角色卡《{card_name}》下的评论因违反社区规范已被移除。',
+                f"你发布在角色卡《{card_name}》下的评论因违反社区规范已被移除。",
                 type_="comment",
             )
             if mute:
@@ -2149,10 +2128,7 @@ def comments():
     pagination = query.order_by(Comment.created_at.desc()).paginate(
         page=page, per_page=20, error_out=False
     )
-    items = [
-        {"comment": c, "card": db.session.get(Card, c.card_id)}
-        for c in pagination.items
-    ]
+    items = [{"comment": c, "card": db.session.get(Card, c.card_id)} for c in pagination.items]
     return render_template(
         "admin/comments.html",
         items=items,
@@ -2232,12 +2208,14 @@ def tea_moderation():
     )
     items = []
     for p in pagination.items:
-        items.append({
-            "post": p,
-            "parent": p.parent,
-            "card": p.card,
-            "poll": p.poll,
-        })
+        items.append(
+            {
+                "post": p,
+                "parent": p.parent,
+                "card": p.card,
+                "poll": p.poll,
+            }
+        )
     return render_template(
         "teahouse/admin_moderation.html",
         items=items,
@@ -2270,10 +2248,7 @@ def tea_post_reject(post_id):
     notify(p.user_id, "你在茶馆发布的帖子因违反社区规范已被移除。", type_="teahouse")
 
     # 可选：拒绝的同时禁言该用户（复用 mute 处罚）
-    mute = (
-        request.form.get("mute") == "1"
-        or (request.is_json and request.json.get("mute"))
-    )
+    mute = request.form.get("mute") == "1" or (request.is_json and request.json.get("mute"))
     if mute:
         apply_mute(
             p.user_id,
@@ -2349,9 +2324,7 @@ def _cascade_delete_teapost(post):
     # 指向该帖的相关通知（点赞/提及/回复等外部链接含 /teahouse/<id>）
     # 用正则精确匹配，避免误删 /teahouse/12 这类长 id 中前缀 /teahouse/1 的通知
     pattern = re.compile(rf"/teahouse/{pid}(?!\d)")
-    for n in Notification.query.filter(
-        Notification.message.like(f"%teahouse/{pid}%")
-    ).all():
+    for n in Notification.query.filter(Notification.message.like(f"%teahouse/{pid}%")).all():
         if pattern.search(n.message):
             db.session.delete(n)
     db.session.delete(post)
@@ -2477,9 +2450,7 @@ def system_config():
 
         # 公告（富文本 / HTML）
         cfg.announcement_enabled = request.form.get("announcement_enabled") == "1"
-        cfg.announcement_content = (
-            request.form.get("announcement_content") or ""
-        ).strip() or None
+        cfg.announcement_content = (request.form.get("announcement_content") or "").strip() or None
 
         # 首页 Hero
         cfg.hero_enabled = request.form.get("hero_enabled") == "1"
@@ -2496,18 +2467,14 @@ def system_config():
         cfg.hero_buttons = json.dumps(buttons, ensure_ascii=False)
 
         # 协议链接（外部 URL）
-        cfg.privacy_policy_url = (
-            request.form.get("privacy_policy_url") or ""
-        ).strip() or None
+        cfg.privacy_policy_url = (request.form.get("privacy_policy_url") or "").strip() or None
         cfg.tos_url = (request.form.get("tos_url") or "").strip() or None
 
         # 联系客服邮箱（mailto）
         cfg.contact_email = (request.form.get("contact_email") or "").strip() or None
 
         # 纪念横幅跳转 URL（mourning 状态用户主页横幅可点击跳转）
-        cfg.memorial_banner_url = (
-            request.form.get("memorial_banner_url") or ""
-        ).strip() or None
+        cfg.memorial_banner_url = (request.form.get("memorial_banner_url") or "").strip() or None
 
         # 注册邮箱白名单
         cfg.email_whitelist_enabled = request.form.get("email_whitelist_enabled") == "1"
@@ -2524,17 +2491,13 @@ def system_config():
             cfg.image_api_key = api_key
 
         # 获取兑换码跳转地址（可选）
-        cfg.redeem_code_url = (
-            request.form.get("redeem_code_url") or ""
-        ).strip() or None
+        cfg.redeem_code_url = (request.form.get("redeem_code_url") or "").strip() or None
 
         db.session.commit()
         flash("系统配置已保存", "success")
         return redirect(url_for("admin.system_config"))
 
-    return render_template(
-        "admin/system.html", cfg=cfg, hero_buttons=cfg.hero_buttons_list()
-    )
+    return render_template("admin/system.html", cfg=cfg, hero_buttons=cfg.hero_buttons_list())
 
 
 # ---------------- 文章管理（仅管理员可发布） ----------------
@@ -2673,13 +2636,11 @@ def tickets():
         base = base.filter(Ticket.category_id == cat_id)
     if q:
         base = base.filter(Ticket.title.ilike(f"%{q}%"))
-    tickets = base.order_by(
-        db.func.coalesce(Ticket.updated_at, Ticket.created_at).desc()
-    ).paginate(page=page, per_page=20, error_out=False)
+    tickets = base.order_by(db.func.coalesce(Ticket.updated_at, Ticket.created_at).desc()).paginate(
+        page=page, per_page=20, error_out=False
+    )
 
-    categories = TicketCategory.query.order_by(
-        TicketCategory.sort_order, TicketCategory.name
-    ).all()
+    categories = TicketCategory.query.order_by(TicketCategory.sort_order, TicketCategory.name).all()
     return render_template(
         "admin/tickets.html",
         tickets=tickets,
@@ -2786,9 +2747,7 @@ def tickets_status(ticket_id):
 @super_admin_required
 def ticket_categories():
     """工单类别管理页。"""
-    cats = TicketCategory.query.order_by(
-        TicketCategory.sort_order, TicketCategory.name
-    ).all()
+    cats = TicketCategory.query.order_by(TicketCategory.sort_order, TicketCategory.name).all()
     return render_template("admin/ticket_categories.html", categories=cats)
 
 
@@ -2871,12 +2830,7 @@ def sponsors():
     rows = Sponsor.query.order_by(Sponsor.sort_order, Sponsor.created_at).all()
     uid_map = {}
     if rows:
-        uid_map = {
-            u.id: u
-            for u in User.query.filter(
-                User.id.in_([s.user_id for s in rows])
-            ).all()
-        }
+        uid_map = {u.id: u for u in User.query.filter(User.id.in_([s.user_id for s in rows])).all()}
     items = []
     for s in rows:
         u = uid_map.get(s.user_id)
@@ -2904,9 +2858,7 @@ def sponsors_config():
     cfg = get_site_config()
     cfg.sponsor_enabled = request.form.get("sponsor_enabled") == "1"
     cfg.sponsor_title = (request.form.get("sponsor_title") or "").strip() or None
-    cfg.sponsor_content = (
-        request.form.get("sponsor_content") or ""
-    ).strip() or None
+    cfg.sponsor_content = (request.form.get("sponsor_content") or "").strip() or None
     cfg.sponsor_url = (request.form.get("sponsor_url") or "").strip() or None
     db.session.commit()
     flash("赞助配置已保存", "success")
@@ -2936,9 +2888,7 @@ def sponsors_add():
     display_name = (request.form.get("display_name") or "").strip()
     amount = (request.form.get("amount") or "").strip() or None
     display_name = display_name or (u.nickname or u.username)
-    max_order = db.session.query(
-        db.func.coalesce(db.func.max(Sponsor.sort_order), 0)
-    ).scalar()
+    max_order = db.session.query(db.func.coalesce(db.func.max(Sponsor.sort_order), 0)).scalar()
     db.session.add(
         Sponsor(
             user_id=u.id,
@@ -2990,8 +2940,10 @@ def sponsors_reorder():
     ids = [int(x) for x in (data.get("ids") or []) if str(x).strip().isdigit()]
     if not ids:
         return jsonify(ok=True)
-    stmt = update(Sponsor).where(Sponsor.id.in_(ids)).values(
-        sort_order=case({rid: i for i, rid in enumerate(ids)}, value=Sponsor.id)
+    stmt = (
+        update(Sponsor)
+        .where(Sponsor.id.in_(ids))
+        .values(sort_order=case({rid: i for i, rid in enumerate(ids)}, value=Sponsor.id))
     )
     db.session.execute(stmt)
     db.session.commit()
@@ -3003,17 +2955,13 @@ def sponsors_reorder():
 def sponsors_search():
     """快速选择器：仅返回状态正常、未被处罚的用户（含管理员），供添加时搜索点选。"""
     q = (request.args.get("q") or "").strip()
-    punished = db.session.query(Punishment.user_id).filter(
-        Punishment.status == "active"
-    )
+    punished = db.session.query(Punishment.user_id).filter(Punishment.status == "active")
     query = User.query.filter(
         User.status == "active",
         User.id.notin_(punished),
     )
     if q:
-        query = query.filter(
-            or_(User.nickname.ilike(f"%{q}%"), User.username.ilike(f"%{q}%"))
-        )
+        query = query.filter(or_(User.nickname.ilike(f"%{q}%"), User.username.ilike(f"%{q}%")))
     rows = query.order_by(User.id.desc()).limit(20).all()
     return jsonify(
         [

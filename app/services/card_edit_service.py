@@ -3,6 +3,7 @@
 两端口径一致：编辑覆盖字段 + 标签/对话风格/图片整体替换 + 编辑后自动 re-pending；
 仅被拒绝的卡可重提；隐藏仅作者本人可切换。
 """
+
 import json
 from datetime import UTC, datetime
 
@@ -128,10 +129,7 @@ def update_card_from_payload(card, payload):
     # 只校验「新增/被替换」的图：取值与既有图完全相同的槽位视为未改动，跳过比例校验，
     # 否则存量比例不合规的老卡片会因为一次编辑被卡死。
     incoming_images = payload.get("images") or {}
-    unchanged = {
-        img.slot: img.data
-        for img in CardImage.query.filter_by(card_id=card.id).all()
-    }
+    unchanged = {img.slot: img.data for img in CardImage.query.filter_by(card_id=card.id).all()}
     try:
         validate_image_slots(incoming_images, unchanged=unchanged)
         normalized_images = _normalize_images(incoming_images)

@@ -11,6 +11,7 @@
     python scripts/lint_templates.py        # 在已激活的 venv 中直接运行
 退出码：发现问题时为 1，全部通过为 0（可用于 CI / pre-commit）。
 """
+
 import os
 import sys
 
@@ -23,7 +24,12 @@ from jinja2 import nodes
 
 # Jinja2 内建名字（可被当作函数调用，且无需注册）
 JINJA_BUILTINS = {
-    "range", "dict", "lipsum", "cycler", "joiner", "namespace",
+    "range",
+    "dict",
+    "lipsum",
+    "cycler",
+    "joiner",
+    "namespace",
 }
 # Flask 注入的全局（已在 env.globals，保险起见一并列入白名单）
 FLASK_GLOBALS = {"url_for", "get_flashed_messages", "config", "request", "session", "g"}

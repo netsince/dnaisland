@@ -35,8 +35,9 @@ class TestConfig(Config):
 def app(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
     app = create_app(TestConfig)
-    assert app.config["SQLALCHEMY_DATABASE_URI"].startswith("sqlite"), \
+    assert app.config["SQLALCHEMY_DATABASE_URI"].startswith("sqlite"), (
         f"🧨 测试连到了非 SQLite 数据库！{app.config['SQLALCHEMY_DATABASE_URI']}"
+    )
     with app.app_context():
         db.create_all()
         yield app
@@ -99,13 +100,19 @@ def test_teahouse_models_create_and_relations(app):
         db.session.commit()
 
         assert TeaTopic.query.filter_by(name="AI讨论").first().id == topic.id
-        assert TeaPostTopic.query.filter_by(post_id=orig_post.id, topic_id=topic.id).first() is not None
+        assert (
+            TeaPostTopic.query.filter_by(post_id=orig_post.id, topic_id=topic.id).first()
+            is not None
+        )
 
         # Test TeaPostFavorite
         fav = TeaPostFavorite(user_id=user.id, post_id=orig_post.id)
         db.session.add(fav)
         db.session.commit()
-        assert TeaPostFavorite.query.filter_by(user_id=user.id, post_id=orig_post.id).first() is not None
+        assert (
+            TeaPostFavorite.query.filter_by(user_id=user.id, post_id=orig_post.id).first()
+            is not None
+        )
 
         # Test TeaPoll & TeaPollOption & TeaPollVote
         poll = TeaPoll(post_id=orig_post.id, is_multiple=False)
@@ -125,4 +132,7 @@ def test_teahouse_models_create_and_relations(app):
         db.session.add(vote)
         db.session.commit()
 
-        assert TeaPollVote.query.filter_by(poll_id=poll.id, user_id=user.id).first().option_id == opt1.id
+        assert (
+            TeaPollVote.query.filter_by(poll_id=poll.id, user_id=user.id).first().option_id
+            == opt1.id
+        )

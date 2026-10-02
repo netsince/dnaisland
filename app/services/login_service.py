@@ -40,9 +40,7 @@ def _client_key() -> str:
 
 def find_user_by_identifier(identifier: str):
     """按用户名或邮箱查找账号（网页与 App 同一口径）。"""
-    return User.query.filter(
-        or_(User.username == identifier, User.email == identifier)
-    ).first()
+    return User.query.filter(or_(User.username == identifier, User.email == identifier)).first()
 
 
 def login_throttled() -> bool:

@@ -2,6 +2,7 @@
 
 约定：follower 为当前操作人（User 实例），following 为被关注目标（User 实例）。
 """
+
 from ..models import UserFollow
 from ..services.notification_service import notify
 from ..utils import toggle_relation
@@ -19,9 +20,7 @@ def toggle_user_follow(viewer, target):
     if target.id == viewer.id:
         return None, "self"
     now_following, _ = toggle_relation(
-        UserFollow.query.filter_by(
-            follower_id=viewer.id, following_id=target.id
-        ).first(),
+        UserFollow.query.filter_by(follower_id=viewer.id, following_id=target.id).first(),
         UserFollow(follower_id=viewer.id, following_id=target.id),
         UserFollow.query.filter_by(following_id=target.id),
     )

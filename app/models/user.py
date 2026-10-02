@@ -21,7 +21,12 @@ class User(db.Model, UserMixin):
     avatar = db.deferred(db.Column(db.Text, nullable=True))  # 头像（base64 data URL），可空
 
     # 点数（积分）余额（精度单点定义见 app/constants.py：DECIMAL(30,10)，10 位小数）
-    points = db.Column(db.Numeric(precision=POINT_PRECISION, scale=POINT_SCALE), nullable=False, server_default="0", default=0)
+    points = db.Column(
+        db.Numeric(precision=POINT_PRECISION, scale=POINT_SCALE),
+        nullable=False,
+        server_default="0",
+        default=0,
+    )
     bio = db.Column(db.Text, nullable=True)  # 个人简介
     location = db.Column(db.String(80), server_default="", nullable=True)  # 所在地区
     website = db.Column(db.String(200), server_default="", nullable=True)  # 个人网站
@@ -32,7 +37,9 @@ class User(db.Model, UserMixin):
     verified_label = db.Column(db.String(50), nullable=True)  # 认证说明，如「官方」「知名创作者」
 
     # 通知偏好
-    notify_like = db.Column(db.Boolean, server_default="1", nullable=False)  # 茶馆被点赞时通知（可关，防刷屏）
+    notify_like = db.Column(
+        db.Boolean, server_default="1", nullable=False
+    )  # 茶馆被点赞时通知（可关，防刷屏）
 
     @property
     def is_super_admin(self) -> bool:

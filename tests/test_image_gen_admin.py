@@ -33,8 +33,9 @@ class TestConfig(Config):
 def app(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
     app = create_app(TestConfig)
-    assert app.config["SQLALCHEMY_DATABASE_URI"].startswith("sqlite"), \
+    assert app.config["SQLALCHEMY_DATABASE_URI"].startswith("sqlite"), (
         f"🧨 测试连到了非 SQLite 数据库！{app.config['SQLALCHEMY_DATABASE_URI']}"
+    )
     with app.app_context():
         db.create_all()
         yield app
@@ -49,7 +50,9 @@ def client(app):
 
 def _make_admin():
     u = User(
-        username="admin_img", nickname="管", email="admin_img@example.com",
+        username="admin_img",
+        nickname="管",
+        email="admin_img@example.com",
         role="super_admin",
     )
     u.set_password("pass123")
@@ -81,13 +84,13 @@ def test_add_duplicate_call_name_allowed(app, client):
 
     assert _add_model(client, display_name="恭喜", points_per_image="5").status_code == 302
     # 同名第二条：活动免费版（0 积分）
-    assert _add_model(client, display_name="恭喜（活动免费）", points_per_image="0").status_code == 302
+    assert (
+        _add_model(client, display_name="恭喜（活动免费）", points_per_image="0").status_code == 302
+    )
 
     with app.app_context():
         rows = (
-            GenerationModel.query.filter_by(name="gpt-image-1")
-            .order_by(GenerationModel.id)
-            .all()
+            GenerationModel.query.filter_by(name="gpt-image-1").order_by(GenerationModel.id).all()
         )
         assert len(rows) == 2
         assert [r.points_per_image for r in rows] == [5, 0]

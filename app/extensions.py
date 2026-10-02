@@ -14,9 +14,7 @@ _drop_all_orig = db.drop_all
 
 
 def _drop_all_disabled(*args, **kwargs):
-    raise RuntimeError(
-        "db.drop_all() 已被永久禁用。如需清空表，请手动执行 DROP TABLE 语句。"
-    )
+    raise RuntimeError("db.drop_all() 已被永久禁用。如需清空表，请手动执行 DROP TABLE 语句。")
 
 
 db.drop_all = _drop_all_disabled  # type: ignore[method-assign]

@@ -1,4 +1,5 @@
 """表情包（Sticker）模型：系列 + 表情，图片以 base64 内联存储。"""
+
 from ..extensions import db
 
 

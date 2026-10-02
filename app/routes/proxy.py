@@ -121,15 +121,11 @@ def relay(path):
 
     # 2) 组装上游请求：路径整体替换 + 认证替换
     upstream_key = decrypt_secret(cfg.upstream_api_key)
-    upstream_url = build_upstream_url(
-        cfg.upstream_base_url, inbound_path, request.query_string
-    )
+    upstream_url = build_upstream_url(cfg.upstream_base_url, inbound_path, request.query_string)
     body = request.get_data()
     headers = pick_forward_headers(request.headers, upstream_key)
     data = body if body else None
-    upstream_req = urllib.request.Request(
-        upstream_url, data=data, headers=headers, method=method
-    )
+    upstream_req = urllib.request.Request(upstream_url, data=data, headers=headers, method=method)
 
     # 3) 发起转发
     try:
@@ -148,9 +144,7 @@ def relay(path):
             duration_ms=int((time.monotonic() - started) * 1000),
             error=f"upstream http {e.code}",
         )
-        content_type = (
-            e.headers.get_content_type() if e.headers else "application/json"
-        )
+        content_type = e.headers.get_content_type() if e.headers else "application/json"
         return Response(err_body, status=e.code, content_type=content_type)
     except (URLError, TimeoutError, OSError) as e:  # 连接失败/超时
         message = f"无法连接上游服务：{e}"
@@ -200,9 +194,7 @@ def relay(path):
                 error=None,
             )
 
-    return Response(
-        stream_with_context(generate()), status=status, headers=out_headers
-    )
+    return Response(stream_with_context(generate()), status=status, headers=out_headers)
 
 
 def _extract_token(auth_header):

@@ -15,11 +15,13 @@ class PointTransaction(db.Model):
     __tablename__ = "point_transactions"
 
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(
-        db.Integer, db.ForeignKey("users.id"), nullable=False, index=True
-    )
-    delta = db.Column(db.Numeric(precision=POINT_PRECISION, scale=POINT_SCALE), nullable=False)  # 变化量：正为增加，负为扣减
-    balance_after = db.Column(db.Numeric(precision=POINT_PRECISION, scale=POINT_SCALE), nullable=False)  # 变化后余额
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    delta = db.Column(
+        db.Numeric(precision=POINT_PRECISION, scale=POINT_SCALE), nullable=False
+    )  # 变化量：正为增加，负为扣减
+    balance_after = db.Column(
+        db.Numeric(precision=POINT_PRECISION, scale=POINT_SCALE), nullable=False
+    )  # 变化后余额
     reason = db.Column(db.String(120), nullable=False, default="")  # 说明
     source = db.Column(
         db.String(20), nullable=False, default="system"
@@ -36,11 +38,11 @@ class RedemptionKey(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     code = db.Column(db.String(64), nullable=False, unique=True, index=True)
-    points = db.Column(db.Numeric(precision=POINT_PRECISION, scale=POINT_SCALE), nullable=False, default=0)  # 兑换可得点数
+    points = db.Column(
+        db.Numeric(precision=POINT_PRECISION, scale=POINT_SCALE), nullable=False, default=0
+    )  # 兑换可得点数
     max_uses = db.Column(db.Integer, nullable=False, default=1)  # 最多使用次数
-    per_user_limit = db.Column(
-        db.Integer, nullable=False, default=1
-    )  # 同一用户最多使用次数
+    per_user_limit = db.Column(db.Integer, nullable=False, default=1)  # 同一用户最多使用次数
     used_count = db.Column(db.Integer, nullable=False, server_default="0", default=0)
     valid_from = db.Column(db.Date, nullable=True)  # 有效期起（含）
     valid_to = db.Column(db.Date, nullable=True)  # 有效期止（含）
@@ -64,14 +66,12 @@ class KeyUsageLog(db.Model):
     __tablename__ = "key_usage_logs"
 
     id = db.Column(db.Integer, primary_key=True)
-    key_id = db.Column(
-        db.Integer, db.ForeignKey("redemption_keys.id"), nullable=True, index=True
-    )
+    key_id = db.Column(db.Integer, db.ForeignKey("redemption_keys.id"), nullable=True, index=True)
     code = db.Column(db.String(64), nullable=False, index=True)  # 冗余，便于审计
-    user_id = db.Column(
-        db.Integer, db.ForeignKey("users.id"), nullable=True, index=True
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
+    points_gained = db.Column(
+        db.Numeric(precision=POINT_PRECISION, scale=POINT_SCALE), nullable=False, default=0
     )
-    points_gained = db.Column(db.Numeric(precision=POINT_PRECISION, scale=POINT_SCALE), nullable=False, default=0)
     status = db.Column(db.String(10), nullable=False, default="success")  # success/fail
     note = db.Column(db.String(200), nullable=True)  # 失败原因
     created_at = db.Column(db.DateTime, server_default=db.func.now())

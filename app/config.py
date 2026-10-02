@@ -28,17 +28,21 @@ class Config:
         # MySQL / PostgreSQL 等远程数据库网络连接与连接池参数调优
         options.update(
             {
-                "pool_recycle": int(os.environ.get("DB_POOL_RECYCLE", 120)),   # 120s 回收，避免被云防火墙/NAT 网关掐断空闲连接
-                "pool_size": int(os.environ.get("DB_POOL_SIZE", 10)),          # 连接池基准连接数
-                "max_overflow": int(os.environ.get("DB_MAX_OVERFLOW", 20)),     # 允许突发连接数
-                "pool_timeout": int(os.environ.get("DB_POOL_TIMEOUT", 30)),     # 排队等待连接超时
-                "pool_use_lifo": True,                                          # 优先复用最新活跃连接（LIFO），大幅减少空闲断连
+                "pool_recycle": int(
+                    os.environ.get("DB_POOL_RECYCLE", 120)
+                ),  # 120s 回收，避免被云防火墙/NAT 网关掐断空闲连接
+                "pool_size": int(os.environ.get("DB_POOL_SIZE", 10)),  # 连接池基准连接数
+                "max_overflow": int(os.environ.get("DB_MAX_OVERFLOW", 20)),  # 允许突发连接数
+                "pool_timeout": int(os.environ.get("DB_POOL_TIMEOUT", 30)),  # 排队等待连接超时
+                "pool_use_lifo": True,  # 优先复用最新活跃连接（LIFO），大幅减少空闲断连
                 "connect_args": {
-                    "connect_timeout": int(os.environ.get("DB_CONNECT_TIMEOUT", 15)), # TCP 建连超时 (秒)
-                    "read_timeout": int(os.environ.get("DB_READ_TIMEOUT", 60)),       # 读超时 (秒)
-                    "write_timeout": int(os.environ.get("DB_WRITE_TIMEOUT", 60)),     # 写超时 (秒)
+                    "connect_timeout": int(
+                        os.environ.get("DB_CONNECT_TIMEOUT", 15)
+                    ),  # TCP 建连超时 (秒)
+                    "read_timeout": int(os.environ.get("DB_READ_TIMEOUT", 60)),  # 读超时 (秒)
+                    "write_timeout": int(os.environ.get("DB_WRITE_TIMEOUT", 60)),  # 写超时 (秒)
                     "charset": "utf8mb4",
-                    "max_allowed_packet": 64 * 1024 * 1024,                           # 64MB 允许大卡片/图片传输
+                    "max_allowed_packet": 64 * 1024 * 1024,  # 64MB 允许大卡片/图片传输
                 },
             }
         )
@@ -80,8 +84,8 @@ class Config:
     # 请求体大小上限：避免带图发帖等场景的 base64 表单字段过大触发 413。
     # Werkzeug 默认 MAX_FORM_MEMORY_SIZE 仅 500KB，超大 data URL 会直接 413，
     # 故在此显式放宽；同时客户端会对配图压缩到有界 WebP，进一步降低负载。
-    MAX_CONTENT_LENGTH = 16 * 1024 * 1024       # 整体请求体上限 16MB
-    MAX_FORM_MEMORY_SIZE = 16 * 1024 * 1024     # 单个表单字段在内存中的上限 16MB
+    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 整体请求体上限 16MB
+    MAX_FORM_MEMORY_SIZE = 16 * 1024 * 1024  # 单个表单字段在内存中的上限 16MB
 
 
 config = Config()

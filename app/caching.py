@@ -7,6 +7,7 @@ TTL 过期与 LRU 容量上限，防止内存无限增长。
 如需跨进程 / 跨机共享，只需把本类替换为 Redis 等后端实现（保持同一接口），
 各调用方无需改动。
 """
+
 import time
 from collections import OrderedDict
 from typing import Any

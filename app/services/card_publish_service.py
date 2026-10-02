@@ -3,6 +3,7 @@
 Web 端 /publish/edit 与 App 端 /api/v1/cards/publish 都调用 create_card_from_payload，
 保证字段处理、图片压缩、审核状态等完全一致；解析导入直接复用 card_import_service。
 """
+
 import hashlib
 import json
 import uuid
@@ -272,7 +273,5 @@ def create_card_from_payload(author, payload):
         )
     for slot, data_uri in images.items():
         optimized_data = optimize_image_for_export(data_uri)
-        db.session.add(
-            CardImage(card_id=card_id, slot=slot, data=optimized_data, optimized=True)
-        )
+        db.session.add(CardImage(card_id=card_id, slot=slot, data=optimized_data, optimized=True))
     return card, None

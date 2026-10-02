@@ -61,9 +61,7 @@ class SiteConfig(db.Model):
     # 「前往赞助」按钮跳转链接
     sponsor_url = db.Column(db.String(500), nullable=True)
 
-    updated_at = db.Column(
-        db.DateTime, server_default=db.func.now(), onupdate=db.func.now()
-    )
+    updated_at = db.Column(db.DateTime, server_default=db.func.now(), onupdate=db.func.now())
 
     def hero_buttons_list(self):
         if not self.hero_buttons:
@@ -113,16 +111,12 @@ class Article(db.Model):
     content = db.Column(LONGTEXT, nullable=False)  # 富文本 / HTML（长文用 LONGTEXT）
     cover = db.Column(db.Text, nullable=True)  # 封面图 URL / base64
 
-    author_id = db.Column(
-        db.Integer, db.ForeignKey("users.id"), nullable=False, index=True
-    )
+    author_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
     is_published = db.Column(db.Boolean, server_default="1", nullable=False, index=True)
     # 发布者是否公开：False 时隐藏发布者身份（匿名管理员）
     show_author = db.Column(db.Boolean, server_default="1", nullable=False)
 
     created_at = db.Column(db.DateTime, server_default=db.func.now())
-    updated_at = db.Column(
-        db.DateTime, server_default=db.func.now(), onupdate=db.func.now()
-    )
+    updated_at = db.Column(db.DateTime, server_default=db.func.now(), onupdate=db.func.now())
 
     author = db.relationship("User", backref="articles")

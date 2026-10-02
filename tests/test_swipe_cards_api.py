@@ -46,9 +46,7 @@ def _mk_card(author, id_, name, has_image=False, slot="portrait"):
 
     设一定 view_count 使热度分为正，确保加权随机能抽出（而非仅靠纯随机名额）。
     """
-    card = Card(
-        id=id_, author_id=author.id, name=name, persona="P", view_count=100
-    )
+    card = Card(id=id_, author_id=author.id, name=name, persona="P", view_count=100)
     card.status = "approved"
     db.session.add(card)
     db.session.flush()

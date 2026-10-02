@@ -26,8 +26,9 @@ class TestConfig(Config):
 def app(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
     app = create_app(TestConfig)
-    assert app.config["SQLALCHEMY_DATABASE_URI"].startswith("sqlite"), \
+    assert app.config["SQLALCHEMY_DATABASE_URI"].startswith("sqlite"), (
         f"🧨 测试连到了非 SQLite 数据库！{app.config['SQLALCHEMY_DATABASE_URI']}"
+    )
     with app.app_context():
         db.create_all()
         yield app
@@ -232,6 +233,7 @@ def test_comment_image_upload(app, client):
 
     # 3. 测试正常上传合法图片（生成一张真实可用的 PNG，避免 PIL 解码失败）
     from PIL import Image as _PILImage
+
     _buf = io.BytesIO()
     _PILImage.new("RGB", (4, 4), (200, 30, 30)).save(_buf, format="PNG")
     png_data = _buf.getvalue()
@@ -283,7 +285,9 @@ def test_comment_reply_flatten_to_top_level(app, client):
         db.session.flush()
         top_id = top.id
         reply = Comment(
-            card_id=card.id, user_id=u2.id, content="第二层回复",
+            card_id=card.id,
+            user_id=u2.id,
+            content="第二层回复",
             reply_to_id=top_id,
         )
         db.session.add(reply)
@@ -333,7 +337,10 @@ def test_api_user_profile_comments(app, client):
         db.session.flush()
         top_id = top.id
         reply = Comment(
-            card_id=card.id, user_id=u1.id, content="我的回复", reply_to_id=top_id,
+            card_id=card.id,
+            user_id=u1.id,
+            content="我的回复",
+            reply_to_id=top_id,
         )
         db.session.add(reply)
         db.session.commit()
@@ -351,5 +358,3 @@ def test_api_user_profile_comments(app, client):
 
     # 用户不存在返回 404。
     assert client.get("/api/v1/users/nobody/comments").status_code == 404
-
-

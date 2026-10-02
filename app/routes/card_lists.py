@@ -5,6 +5,7 @@ Web 路由与 App API 路由都只调用这些函数，再各自做输出（HTML
 viewer 参数表示「以谁的身份看」（Web 传 current_user，App 传 JWT 用户），
 避免两端可见性口径不一致。
 """
+
 from flask import current_app, request
 from sqlalchemy import case, func
 from sqlalchemy.orm import joinedload
@@ -72,11 +73,7 @@ def explore_cards(viewer, page=1, gender="", tag=None, sort="hot", per_page=24):
         q = q.filter(Card.gender == gender)
     if tag:
         q = q.join(CardTag, CardTag.card_id == Card.id).filter(CardTag.tag == tag)
-    q = (
-        q.order_by(Card.created_at.desc())
-        if sort == "new"
-        else _order_by_likes(q)
-    )
+    q = q.order_by(Card.created_at.desc()) if sort == "new" else _order_by_likes(q)
     if tag:
         q = q.distinct()
     return _paginated_cards(q, page, per_page)
@@ -152,23 +149,17 @@ def recommend_items():
 
     # 批量取推荐引用到的卡片 / 用户，避免在循环里逐条 db.session.get 造成 N+1
     card_ids = [r.ref_id for r in recs if r.kind == "card"]
-    user_ids = [
-        int(r.ref_id) for r in recs if r.kind == "user" and str(r.ref_id).isdigit()
-    ]
+    user_ids = [int(r.ref_id) for r in recs if r.kind == "user" and str(r.ref_id).isdigit()]
     card_map: dict = (
         {
             c.id: c
-            for c in Card.query.options(joinedload(Card.author))
-            .filter(Card.id.in_(card_ids))
-            .all()
+            for c in Card.query.options(joinedload(Card.author)).filter(Card.id.in_(card_ids)).all()
         }
         if card_ids
         else {}
     )
     user_map: dict = (
-        {u.id: u for u in User.query.filter(User.id.in_(user_ids)).all()}
-        if user_ids
-        else {}
+        {u.id: u for u in User.query.filter(User.id.in_(user_ids)).all()} if user_ids else {}
     )
     card_counts = (
         dict(
@@ -289,8 +280,9 @@ def card_detail_core(card_id, viewer):
     tags = [t.tag for t in CardTag.query.filter_by(card_id=card.id).all()]
     dialogue = [
         {"user": d.user_text, "assistant": d.assistant_text}
-        for d in CardDialogueStyle.query.filter_by(card_id=card.id)
-        .order_by(CardDialogueStyle.turn_index)
+        for d in CardDialogueStyle.query.filter_by(card_id=card.id).order_by(
+            CardDialogueStyle.turn_index
+        )
     ]
     images = {}
     for img in CardImage.query.filter_by(card_id=card.id).all():
@@ -323,16 +315,20 @@ def card_detail_core(card_id, viewer):
 
     comment_count = Comment.query.filter_by(card_id=card.id, is_hidden=False).count()
 
-    return card, {
-        "tags": tags,
-        "dialogue": dialogue,
-        "images": images,
-        "like_count": like_count,
-        "favorite_count": favorite_count,
-        "comment_count": comment_count,
-        "liked": liked,
-        "favorited": favorited,
-    }, None
+    return (
+        card,
+        {
+            "tags": tags,
+            "dialogue": dialogue,
+            "images": images,
+            "like_count": like_count,
+            "favorite_count": favorite_count,
+            "comment_count": comment_count,
+            "liked": liked,
+            "favorited": favorited,
+        },
+        None,
+    )
 
 
 def card_comments_list(card_id, viewer, page=1, per_page=20, sort="latest", only_author=False):
@@ -372,9 +368,7 @@ def card_comments_list(card_id, viewer, page=1, per_page=20, sort="latest", only
             Comment.id.desc(),
         )
     else:
-        q = q.order_by(
-            Comment.is_pinned.desc(), Comment.created_at.desc(), Comment.id.desc()
-        )
+        q = q.order_by(Comment.is_pinned.desc(), Comment.created_at.desc(), Comment.id.desc())
     pag = q.paginate(page=page, per_page=per_page, error_out=False)
 
     top_ids = [cm.id for cm in pag.items]
@@ -450,15 +444,19 @@ def card_comments_list(card_id, viewer, page=1, per_page=20, sort="latest", only
                     .all()
                 }
 
-    return card, {
-        "pagination": pag,
-        "like_counts": like_counts,
-        "user_liked_ids": user_liked_ids,
-        "sort": sort,
-        "replies_by_parent": replies_by_parent,
-        "reply_like_counts": reply_like_counts,
-        "reply_liked_ids": reply_liked_ids,
-    }, None
+    return (
+        card,
+        {
+            "pagination": pag,
+            "like_counts": like_counts,
+            "user_liked_ids": user_liked_ids,
+            "sort": sort,
+            "replies_by_parent": replies_by_parent,
+            "reply_like_counts": reply_like_counts,
+            "reply_liked_ids": reply_liked_ids,
+        },
+        None,
+    )
 
 
 def create_comment(card_id, viewer, content, reply_to_id=None, image_data=None):

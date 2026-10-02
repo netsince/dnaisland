@@ -2,6 +2,7 @@
 
 对应 card_detail.html + /api/card/<card_id>/comments 接口的新增行为。
 """
+
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -28,8 +29,9 @@ class TestConfig(Config):
 def app(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
     app = create_app(TestConfig)
-    assert app.config["SQLALCHEMY_DATABASE_URI"].startswith("sqlite"), \
+    assert app.config["SQLALCHEMY_DATABASE_URI"].startswith("sqlite"), (
         f"🧨 测试连到了非 SQLite 数据库！{app.config['SQLALCHEMY_DATABASE_URI']}"
+    )
     with app.app_context():
         db.create_all()
         yield app
@@ -47,9 +49,7 @@ def _seed(app, card_id="c1"):
     with app.app_context():
         author = User(username="author", nickname="Author", email="a@example.com")
         author.set_password("pw")
-        commenter = User(
-            username="commenter", nickname="Commenter", email="c@example.com"
-        )
+        commenter = User(username="commenter", nickname="Commenter", email="c@example.com")
         commenter.set_password("pw")
         db.session.add_all([author, commenter])
         db.session.commit()
@@ -114,20 +114,28 @@ def test_comments_nested_reply_thread(client, app):
         db.session.commit()
         now = datetime.now(UTC)
         top = Comment(
-            card_id="card-nested", user_id=author.id, content="顶层评论",
+            card_id="card-nested",
+            user_id=author.id,
+            content="顶层评论",
             created_at=now - timedelta(minutes=30),
         )
         db.session.add(top)
         db.session.flush()
         reply = Comment(
-            card_id="card-nested", user_id=u1.id, content="直接回复",
-            reply_to_id=top.id, created_at=now - timedelta(minutes=20),
+            card_id="card-nested",
+            user_id=u1.id,
+            content="直接回复",
+            reply_to_id=top.id,
+            created_at=now - timedelta(minutes=20),
         )
         db.session.add(reply)
         db.session.flush()
         deep = Comment(
-            card_id="card-nested", user_id=u2.id, content="回复的回复",
-            reply_to_id=reply.id, created_at=now - timedelta(minutes=10),
+            card_id="card-nested",
+            user_id=u2.id,
+            content="回复的回复",
+            reply_to_id=reply.id,
+            created_at=now - timedelta(minutes=10),
         )
         db.session.add(deep)
         db.session.commit()

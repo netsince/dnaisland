@@ -66,6 +66,7 @@ def client(app):
 # 常量与格式化
 # ---------------------------------------------------------------------------
 
+
 def test_precision_constants():
     assert POINT_PRECISION == 30
     assert POINT_SCALE == 10
@@ -112,6 +113,7 @@ def test_points_to_signed_str(value, expected):
 # 输入校验
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.parametrize(
     "raw,expected",
     [
@@ -129,9 +131,9 @@ def test_parse_points_input_accepts(raw, expected):
 @pytest.mark.parametrize(
     "raw",
     [
-        "0.00000000001",      # 11 位小数
-        "1.23456789012",      # 11 位小数
-        "1e20",               # 超出 DECIMAL(30,10) 容量
+        "0.00000000001",  # 11 位小数
+        "1.23456789012",  # 11 位小数
+        "1e20",  # 超出 DECIMAL(30,10) 容量
         "abc",
         "1.2.3",
         "",
@@ -165,6 +167,7 @@ def test_arithmetic_helpers_treat_none_as_zero():
 # ---------------------------------------------------------------------------
 # 模型列定义
 # ---------------------------------------------------------------------------
+
 
 def test_model_columns_use_point_precision(app):
     columns = [
@@ -202,6 +205,7 @@ def test_sqlite_roundtrip_keeps_ten_decimals(app):
 # JSON 序列化
 # ---------------------------------------------------------------------------
 
+
 def test_json_provider_serializes_decimal_as_string(app):
     assert app.json.default(Decimal("10.2500000000")) == "10.25"
     assert app.json.default(Decimal("0.0000000001")) == "0.0000000001"
@@ -224,8 +228,11 @@ def test_api_points_returns_strings(app, client):
         uid = u.id
         db.session.add(
             PointTransaction(
-                user_id=uid, delta=Decimal("0.1234567891"),
-                balance_after=Decimal("0.1234567891"), reason="充值", source="redeem",
+                user_id=uid,
+                delta=Decimal("0.1234567891"),
+                balance_after=Decimal("0.1234567891"),
+                reason="充值",
+                source="redeem",
             )
         )
         db.session.commit()
@@ -251,8 +258,11 @@ def test_web_points_page_shows_ten_decimals(app, client):
         db.session.commit()
         db.session.add(
             PointTransaction(
-                user_id=u.id, delta=Decimal("0.1234567891"),
-                balance_after=Decimal("0.1234567891"), reason="充值", source="redeem",
+                user_id=u.id,
+                delta=Decimal("0.1234567891"),
+                balance_after=Decimal("0.1234567891"),
+                reason="充值",
+                source="redeem",
             )
         )
         db.session.commit()
@@ -269,9 +279,12 @@ def test_web_points_page_shows_ten_decimals(app, client):
 # 后台输入：>10 位小数必须拒绝，不得静默四舍五入
 # ---------------------------------------------------------------------------
 
+
 def _make_admin_and_target(app, admin_name, target_name, points):
     with app.app_context():
-        admin = User(username=admin_name, nickname="老板", email=f"{admin_name}@x.com", role="super_admin")
+        admin = User(
+            username=admin_name, nickname="老板", email=f"{admin_name}@x.com", role="super_admin"
+        )
         admin.set_password("pw")
         target = User(username=target_name, nickname="目标", email=f"{target_name}@x.com")
         target.set_password("pw")

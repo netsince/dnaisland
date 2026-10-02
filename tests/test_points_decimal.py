@@ -59,8 +59,11 @@ def test_points_columns_accept_decimals(app):
         got.points += Decimal("0.25")
         db.session.add(
             PointTransaction(
-                user_id=u.id, delta=Decimal("0.25"),
-                balance_after=got.points, reason="t", source="consume",
+                user_id=u.id,
+                delta=Decimal("0.25"),
+                balance_after=got.points,
+                reason="t",
+                source="consume",
             )
         )
         db.session.commit()
@@ -146,8 +149,11 @@ def test_api_points_serializes_decimal(app, client):
         uid = u.id
         db.session.add(
             PointTransaction(
-                user_id=uid, delta=Decimal("0.5"), balance_after=Decimal("0.5"),
-                reason="充值", source="redeem",
+                user_id=uid,
+                delta=Decimal("0.5"),
+                balance_after=Decimal("0.5"),
+                reason="充值",
+                source="redeem",
             )
         )
         db.session.commit()
@@ -164,4 +170,3 @@ def test_api_points_serializes_decimal(app, client):
     tx = data["items"][0]
     assert tx["delta"] == "0.5"
     assert tx["balance_after"] == "0.5"
-

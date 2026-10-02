@@ -40,9 +40,7 @@ class Punishment(db.Model):
     appeal_handled_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
     appeal_reply = db.Column(db.Text, nullable=True)
 
-    user = db.relationship(
-        "User", foreign_keys=[user_id], backref="punishments"
-    )
+    user = db.relationship("User", foreign_keys=[user_id], backref="punishments")
     handler = db.relationship("User", foreign_keys=[handled_by])
 
     @classmethod

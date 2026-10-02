@@ -3,6 +3,7 @@
 Web 端路由与 App 端接口都调用这里的函数，保证权限口径、点赞通知、置顶归属等
 行为完全一致。
 """
+
 from ..extensions import db
 from ..models import Card, CommentLike
 from ..services.notification_service import notify
@@ -15,9 +16,7 @@ def toggle_comment_like(viewer, comment):
     返回 (is_now_liked, new_count)。若点赞成功且评论作者不是自己，则通知评论作者。
     """
     is_now_liked, new_count = toggle_relation(
-        CommentLike.query.filter_by(
-            user_id=viewer.id, comment_id=comment.id
-        ).first(),
+        CommentLike.query.filter_by(user_id=viewer.id, comment_id=comment.id).first(),
         CommentLike(user_id=viewer.id, comment_id=comment.id),
         CommentLike.query.filter_by(comment_id=comment.id),
     )

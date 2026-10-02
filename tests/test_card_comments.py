@@ -24,14 +24,14 @@ class TestConfig(Config):
 def app(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
     app = create_app(TestConfig)
-    assert app.config["SQLALCHEMY_DATABASE_URI"].startswith("sqlite"), \
+    assert app.config["SQLALCHEMY_DATABASE_URI"].startswith("sqlite"), (
         f"🧨 测试连到了非 SQLite 数据库！{app.config['SQLALCHEMY_DATABASE_URI']}"
+    )
     with app.app_context():
         db.create_all()
         yield app
         db.session.remove()
         db.metadata.drop_all(bind=db.engine, checkfirst=True)
-
 
 
 @pytest.fixture
@@ -44,16 +44,12 @@ def test_comment_api_extended_fields(client, app):
     with app.app_context():
         author = User(username="author", nickname="Author", email="author@example.com")
         author.set_password("password123")
-        commenter = User(
-            username="commenter", nickname="Commenter", email="commenter@example.com"
-        )
+        commenter = User(username="commenter", nickname="Commenter", email="commenter@example.com")
         commenter.set_password("password123")
         db.session.add_all([author, commenter])
         db.session.commit()
 
-        card = Card(
-            id=card_id, author_id=author.id, name="Test Card", persona="Persona"
-        )
+        card = Card(id=card_id, author_id=author.id, name="Test Card", persona="Persona")
         db.session.add(card)
         db.session.commit()
 
@@ -97,9 +93,7 @@ def test_comment_api_extended_fields(client, app):
     assert item1["can_delete"] is False
 
     # 以 commenter 身份登录查看 API
-    client.post(
-        "/auth/login", data={"identifier": "commenter", "password": "password123"}
-    )
+    client.post("/auth/login", data={"identifier": "commenter", "password": "password123"})
     res = client.get(f"/api/card/{card_id}/comments")
     data = res.get_json()
     assert data["items"][0]["can_delete"] is True
@@ -114,15 +108,11 @@ def test_comment_length_limit(client, app):
         db.session.add(user)
         db.session.commit()
 
-        card = Card(
-            id=card_id, author_id=user.id, name="Test Card 2", persona="Persona"
-        )
+        card = Card(id=card_id, author_id=user.id, name="Test Card 2", persona="Persona")
         db.session.add(card)
         db.session.commit()
 
-    client.post(
-        "/auth/login", data={"identifier": "user1", "password": "password123"}
-    )
+    client.post("/auth/login", data={"identifier": "user1", "password": "password123"})
 
     long_content = "a" * 501
     res = client.post(
@@ -137,13 +127,9 @@ def test_comment_length_limit(client, app):
 def test_comment_delete_permission(client, app):
     card_id = "test-card-3"
     with app.app_context():
-        author = User(
-            username="author2", nickname="Author2", email="author2@example.com"
-        )
+        author = User(username="author2", nickname="Author2", email="author2@example.com")
         author.set_password("password123")
-        user2 = User(
-            username="user2", nickname="User2", email="user2@example.com"
-        )
+        user2 = User(username="user2", nickname="User2", email="user2@example.com")
         user2.set_password("password123")
         admin = User(
             username="admin",
@@ -156,9 +142,7 @@ def test_comment_delete_permission(client, app):
         db.session.commit()
         author_id = author.id
 
-        card = Card(
-            id=card_id, author_id=author_id, name="Test Card 3", persona="Persona"
-        )
+        card = Card(id=card_id, author_id=author_id, name="Test Card 3", persona="Persona")
         db.session.add(card)
         db.session.commit()
 
@@ -168,17 +152,13 @@ def test_comment_delete_permission(client, app):
         cm_id = cm.id
 
     # 1. 非本人 (user2) 尝试删除 -> 403
-    client.post(
-        "/auth/login", data={"identifier": "user2", "password": "password123"}
-    )
+    client.post("/auth/login", data={"identifier": "user2", "password": "password123"})
     res = client.post(f"/card/{card_id}/comment/{cm_id}/delete")
     assert res.status_code == 403
 
     # 2. 本人 (author) 尝试删除 -> 200
     client.get("/auth/logout")
-    client.post(
-        "/auth/login", data={"identifier": "author2", "password": "password123"}
-    )
+    client.post("/auth/login", data={"identifier": "author2", "password": "password123"})
     res = client.post(f"/card/{card_id}/comment/{cm_id}/delete")
     assert res.status_code == 200
     assert res.get_json().get("ok") is True
@@ -193,9 +173,7 @@ def test_comment_delete_permission(client, app):
         cm_admin_target_id = cm_admin_target.id
 
     client.get("/auth/logout")
-    client.post(
-        "/auth/login", data={"identifier": "admin", "password": "password123"}
-    )
+    client.post("/auth/login", data={"identifier": "admin", "password": "password123"})
     res = client.post(f"/card/{card_id}/comment/{cm_admin_target_id}/delete")
     assert res.status_code == 200
     assert res.get_json().get("ok") is True

@@ -45,20 +45,20 @@ main_bp = Blueprint("main", __name__)
 
 # 探索页「热门」排序权重（数字即业务优先级：1 = 最重要，6 = 最次要）。
 #   评论(1) > 0~5日新发布(2) > 收藏(3) > 点赞(4) > 带图(5) > 浏览(6)
-HOT_W_COMMENT      = 6.0   # 优先级 1：评论代表讨论度，权重最高
-HOT_W_FAVORITE     = 3.0   # 优先级 3：每个收藏都加一次权
-HOT_W_LIKE         = 2.0   # 优先级 4：每个点赞都加一次权
-HOT_W_VIEW         = 1.0   # 优先级 6：浏览最弱信号
+HOT_W_COMMENT = 6.0  # 优先级 1：评论代表讨论度，权重最高
+HOT_W_FAVORITE = 3.0  # 优先级 3：每个收藏都加一次权
+HOT_W_LIKE = 2.0  # 优先级 4：每个点赞都加一次权
+HOT_W_VIEW = 1.0  # 优先级 6：浏览最弱信号
 # 复制数信号（方案 B）：近 30 天复制量经对数压缩后作为独立加权项。
 # 复制 = 强正向意图（用户实际带走使用），含金量高于浏览/点赞、介于收藏与评论之间。
-HOT_W_COPY         = 4.0   # 复制权重（介于收藏 3 与评论 6 之间）
-COPY_WINDOW_DAYS   = 30    # 只统计近 30 天复制，保证信号「当下化」并与 HN 时间衰减协同
+HOT_W_COPY = 4.0  # 复制权重（介于收藏 3 与评论 6 之间）
+COPY_WINDOW_DAYS = 30  # 只统计近 30 天复制，保证信号「当下化」并与 HN 时间衰减协同
 # 浏览量对数压缩：用 log(1+views) 替代线性 views，削弱「被动累加」的浏览主导
 # （几百次浏览不会再以线性方式碾压互动信号），同时保留「看得多 = 略热门」的弱信号。
-HOT_VIEW_LOG_BASE   = 10.0
+HOT_VIEW_LOG_BASE = 10.0
 # 带图改为「倍数放大」而非固定加分：带图为 IMG_MULT，无图为 1.0。
 # 这样带图卡的整段互动得分按比例放大，不再被浏览量级淹没（固定 +5 在几百浏览面前无意义）。
-HOT_IMG_MULT        = 1.3   # 带图卡整体得分 ×1.3
+HOT_IMG_MULT = 1.3  # 带图卡整体得分 ×1.3
 # 冷启动基线：加在 engagement 括号内的正数（单位 = 互动分）。
 # 年龄加成是**乘数**，engagement 为 0 时 0 × 1.4 仍为 0：新发布且零互动的卡会恒为
 # 0 分——在探索页排在所有「被点开过至少一次」的卡之后，在首页加权抽样中权重为 0
@@ -74,30 +74,28 @@ HOT_COLD_START_BASE = 3.0
 #             注意这是乘数：它只放大已有互动，零互动卡靠 HOT_COLD_START_BASE 保底。
 #   6~8 日  ：平稳权重 —— 固定 ×1.0，不增不减；
 #   9 日及以后：下降权重 —— 按半衰期平滑衰减，老卡随时间下沉、前排轮换。
-HOT_RISE_END_DAYS   = 5     # 上升段终点（含）
-HOT_RISE_BOOST      = 0.4   # 上升段额外权重：最新卡 ×(1+0.4)=1.4，线性回落到 5 日时 ×1.0
-HOT_STABLE_END_DAYS = 8     # 平稳段终点（含）；6~8 日权重固定 ×1.0
-HOT_DECAY_START_DAYS = 8    # 下降段起点（>8 日即衰减）
-HOT_DECAY_HALF_DAYS = 7     # 下降段半衰期（天）：每过 7 天权重减半，值越小衰减越快
+HOT_RISE_END_DAYS = 5  # 上升段终点（含）
+HOT_RISE_BOOST = 0.4  # 上升段额外权重：最新卡 ×(1+0.4)=1.4，线性回落到 5 日时 ×1.0
+HOT_STABLE_END_DAYS = 8  # 平稳段终点（含）；6~8 日权重固定 ×1.0
+HOT_DECAY_START_DAYS = 8  # 下降段起点（>8 日即衰减）
+HOT_DECAY_HALF_DAYS = 7  # 下降段半衰期（天）：每过 7 天权重减半，值越小衰减越快
 
 # 作者影响力项：以「全体作者粉丝数的 P90」为归一化基准，而不是写死绝对粉丝数。
 # 平台整体涨粉时基准同步抬高（见 _follower_reference），永远只有头部约 10% 打满，
 # 因此不会出现「平台火了、人人都有 100 粉」导致该阈值失效的问题。
-HOT_W_FOLLOWER       = 4.0   # 作者影响力权重（归一化后 0~1，达到基准即打满）
+HOT_W_FOLLOWER = 4.0  # 作者影响力权重（归一化后 0~1，达到基准即打满）
 HOT_FOLLOWER_REF_PCT = 0.90  # 归一化基准取全体作者粉丝数的第 90 百分位
-FOLLOWER_REF_TTL     = 3600  # 基准重算间隔（秒）
+FOLLOWER_REF_TTL = 3600  # 基准重算间隔（秒）
 
 # 同作者窗口衰减：同一个推荐窗口内，该作者已入选 k 张时，本张抽样权重再乘 decay^k。
 # 只作用于「一次返回一批」的首页推荐与刷一刷（探索页是分页确定性排序，见 card_lists）。
-AUTHOR_WINDOW_DECAY  = 0.5
+AUTHOR_WINDOW_DECAY = 0.5
 
 
 def _has_image_subquery():
     """返回「至少有一张图片」的卡片 id 子查询，用于推荐排序时给有图卡加权。"""
     return (
-        db.session.query(CardImage.card_id)
-        .group_by(CardImage.card_id)
-        .subquery("card_has_image")
+        db.session.query(CardImage.card_id).group_by(CardImage.card_id).subquery("card_has_image")
     )
 
 
@@ -188,9 +186,7 @@ def featured_cards(limit=12, exclude_ids=None):
     # 预载作者（1 条 LEFT JOIN），避免序列化时逐卡再查作者造成 N+1。
     card_map = {
         c.id: c
-        for c in Card.query.filter(Card.id.in_(result_ids))
-        .options(joinedload(Card.author))
-        .all()
+        for c in Card.query.filter(Card.id.in_(result_ids)).options(joinedload(Card.author)).all()
     }
     cards = [card_map[cid] for cid in result_ids if cid in card_map]
 
@@ -227,9 +223,7 @@ def swipe_cards(limit=12, exclude_ids=None):
 
     # 有图卡集合：存在任一 CardImage（square/landscape/portrait）即算有图。
     image_ids = set()
-    q = db.session.query(CardImage.card_id).filter(
-        CardImage.card_id.in_(list(score_map.keys()))
-    )
+    q = db.session.query(CardImage.card_id).filter(CardImage.card_id.in_(list(score_map.keys())))
     for (cid,) in q.all():
         image_ids.add(str(cid))
 
@@ -252,9 +246,7 @@ def swipe_cards(limit=12, exclude_ids=None):
     # 预载作者 + 批量封面，避免 N+1。
     card_map = {
         c.id: c
-        for c in Card.query.filter(Card.id.in_(result_ids))
-        .options(joinedload(Card.author))
-        .all()
+        for c in Card.query.filter(Card.id.in_(result_ids)).options(joinedload(Card.author)).all()
     }
     cards = [card_map[cid] for cid in result_ids if cid in card_map]
 
@@ -308,10 +300,7 @@ def sponsor():
     enabled = bool(cfg and cfg.sponsor_enabled)
     items = []
     if enabled and rows:
-        uid_map = {
-            u.id: u
-            for u in User.query.filter(User.id.in_([s.user_id for s in rows])).all()
-        }
+        uid_map = {u.id: u for u in User.query.filter(User.id.in_([s.user_id for s in rows])).all()}
         for s in rows:
             u = uid_map.get(s.user_id)
             if not u:
@@ -337,9 +326,11 @@ def sponsor():
 
 def _banned_author_ids():
     """处于 profile_banned 处罚的作者，其主页不可被搜索到。"""
-    return db.session.query(Punishment.user_id).filter(
-        Punishment.status == "active", Punishment.type == "profile_banned"
-    ).distinct()
+    return (
+        db.session.query(Punishment.user_id)
+        .filter(Punishment.status == "active", Punishment.type == "profile_banned")
+        .distinct()
+    )
 
 
 def _copies_agg_subquery(days=COPY_WINDOW_DAYS):
@@ -517,8 +508,10 @@ def _apply_hot_score(q):
     #   6~8 日  → 平稳：×1.0
     #   >8 日   → 下降：0.5^((age-8)/半衰期)，平滑衰减
     age_factor = case(
-        (age_days <= HOT_RISE_END_DAYS,
-         1.0 + HOT_RISE_BOOST * (HOT_RISE_END_DAYS - age_days) / HOT_RISE_END_DAYS),
+        (
+            age_days <= HOT_RISE_END_DAYS,
+            1.0 + HOT_RISE_BOOST * (HOT_RISE_END_DAYS - age_days) / HOT_RISE_END_DAYS,
+        ),
         (age_days <= HOT_STABLE_END_DAYS, 1.0),
         else_=func.pow(
             literal_column("0.5"),
@@ -615,10 +608,7 @@ def _fulltext_enabled() -> bool:
     仅 MySQL 且配置开启时返回 True；SQLite 等不支持 FULLTEXT 的引擎一律回退
     到 LIKE，保证开发 / 测试环境行为与原有一致（可回归、可移植）。
     """
-    return (
-        db.engine.name == "mysql"
-        and current_app.config.get("FULLTEXT_SEARCH", True)
-    )
+    return db.engine.name == "mysql" and current_app.config.get("FULLTEXT_SEARCH", True)
 
 
 def _ft_match(cols, q):
@@ -695,18 +685,16 @@ def _card_search_query(q, sort, tag=None, viewer=None):
                 Card.created_at.desc(),
             )
         score = case(
-                (Card.name.like(like), 3),
-                (CardTag.tag.like(like), 2),
-                (or_(Card.intro.like(like), Card.persona.like(like)), 1),
-                else_=0,
-            )
+            (Card.name.like(like), 3),
+            (CardTag.tag.like(like), 2),
+            (or_(Card.intro.like(like), Card.persona.like(like)), 1),
+            else_=0,
+        )
         return query.order_by(score.desc(), Card.view_count.desc(), Card.created_at.desc())
 
     # 同时构造 LIKE 版本作为兜底：FULLTEXT 索引缺失时由 _fulltext_fallback 切换。
     if use_ft:
-        ft_base = base.filter(
-            or_(ft, CardTag.tag.like(like))
-        )
+        ft_base = base.filter(or_(ft, CardTag.tag.like(like)))
         if tag:
             ft_base = ft_base.filter(CardTag.tag == tag)
         ft_base = ft_base.distinct()
@@ -721,9 +709,9 @@ def _card_search_query(q, sort, tag=None, viewer=None):
         ]
         if tag:
             like_filters.append(CardTag.tag == tag)
-        like_base = Card.visible_to(
-            viewer if viewer is not None else current_user
-        ).outerjoin(CardTag, CardTag.card_id == Card.id)
+        like_base = Card.visible_to(viewer if viewer is not None else current_user).outerjoin(
+            CardTag, CardTag.card_id == Card.id
+        )
         like_query = _apply_order(like_base.filter(*like_filters).distinct(), use_fulltext=False)
         return _fulltext_fallback(ft_query, like_query)
     return _apply_order(base)
@@ -913,13 +901,14 @@ def search_suggest():
     if len(q) < 1:
         return jsonify({"cards": [], "users": []})
 
-    cards = (
-        _card_search_query(q, "relevance")
-        .limit(6)
-        .all()
-    )
+    cards = _card_search_query(q, "relevance").limit(6).all()
     card_hits = [
-        {"id": c.id, "name": c.name, "gender": c.gender, "url": url_for("user.card_detail", card_id=c.id)}
+        {
+            "id": c.id,
+            "name": c.name,
+            "gender": c.gender,
+            "url": url_for("user.card_detail", card_id=c.id),
+        }
         for c in cards
     ]
 
@@ -974,9 +963,7 @@ def articles():
                     Article.content.like(like),
                 )
             )
-        pagination = query.order_by(order).paginate(
-            page=page, per_page=10, error_out=False
-        )
+        pagination = query.order_by(order).paginate(page=page, per_page=10, error_out=False)
         items = pagination.items
     except Exception:
         # 表尚未建立（如迁移未执行）时优雅降级为空列表
@@ -1008,4 +995,3 @@ def article_detail(article_id):
     if a is None or not a.is_published:
         abort(404)
     return render_template("articles/show.html", article=a)
-

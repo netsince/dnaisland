@@ -3,6 +3,7 @@
 覆盖核心场景：正常搜索返回结果，以及生产 MySQL 缺全文索引时
 （FULLTEXT MATCH...AGAINST 抛错）自动回退 LIKE，搜索不空结果 / 不 500。
 """
+
 import pytest
 from app import create_app, db
 from app.config import Config
@@ -46,8 +47,14 @@ def _seed(app):
         author.set_password("pass123")
         db.session.add(author)
         db.session.commit()
-        card = Card(id="card-s-1", author_id=author.id, name="测试角色卡",
-                    persona="某个角色设定", intro="简介内容", status="approved")
+        card = Card(
+            id="card-s-1",
+            author_id=author.id,
+            name="测试角色卡",
+            persona="某个角色设定",
+            intro="简介内容",
+            status="approved",
+        )
         db.session.add(card)
         db.session.commit()
         post = TeaPost(user_id=author.id, content="这是一条茶馆帖内容用于搜索", parent_id=None)

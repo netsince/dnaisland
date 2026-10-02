@@ -3,6 +3,7 @@
 统一将上传的图片处理为体积更小的 WebP（保留 alpha 通道、统一最长边、控制质量），
 在观感损失极小的前提下最大化压缩，减少数据库存储与传输体积。
 """
+
 import base64
 import hashlib
 import re
@@ -48,9 +49,7 @@ def compress_image(data_url: str, max_edge: int = 1024, quality: int = 80) -> st
     w, h = img.size
     if max(w, h) > max_edge:
         scale = max_edge / max(w, h)
-        img = img.resize(
-            (max(1, int(w * scale)), max(1, int(h * scale))), Image.Resampling.LANCZOS
-        )
+        img = img.resize((max(1, int(w * scale)), max(1, int(h * scale))), Image.Resampling.LANCZOS)
     out = BytesIO()
     img.save(out, format="WEBP", quality=quality)
     return _encode(out.getvalue(), mime="image/webp")
@@ -82,9 +81,7 @@ def raw_bytes_to_webp_data_url(raw_bytes: bytes, max_edge: int = 1024, quality: 
     w, h = img.size
     if max(w, h) > max_edge:
         scale = max_edge / max(w, h)
-        img = img.resize(
-            (max(1, int(w * scale)), max(1, int(h * scale))), Image.Resampling.LANCZOS
-        )
+        img = img.resize((max(1, int(w * scale)), max(1, int(h * scale))), Image.Resampling.LANCZOS)
     out = BytesIO()
     img.save(out, format="WEBP", quality=quality)
     return _encode(out.getvalue(), mime="image/webp")
@@ -163,7 +160,9 @@ EXPORT_OPTIMIZE_MAX_EDGE = 768
 EXPORT_OPTIMIZE_QUALITY = 82
 
 
-def optimize_image_for_export(data_url: str, max_edge: int = EXPORT_OPTIMIZE_MAX_EDGE, quality: int = EXPORT_OPTIMIZE_QUALITY) -> str:
+def optimize_image_for_export(
+    data_url: str, max_edge: int = EXPORT_OPTIMIZE_MAX_EDGE, quality: int = EXPORT_OPTIMIZE_QUALITY
+) -> str:
     """为“复制到剪贴板”导出准备：轻度压缩为 WebP，控制体积但保留可识别度。
 
     用于两种场景：
@@ -177,4 +176,3 @@ def optimize_image_for_export(data_url: str, max_edge: int = EXPORT_OPTIMIZE_MAX
         return compress_image(data_url, max_edge=max_edge, quality=quality)
     except Exception:
         return data_url
-

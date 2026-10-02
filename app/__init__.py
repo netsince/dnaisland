@@ -210,14 +210,10 @@ def create_app(config_object=None):
             host = urlparse(url).netloc.lower()
             # 本站链接：直接可点
             if (host and host == req_host) or url.startswith("/"):
-                return (
-                    f'<a href="{url}" target="_blank" rel="noopener noreferrer">{url}</a>'
-                )
+                return f'<a href="{url}" target="_blank" rel="noopener noreferrer">{url}</a>'
             # 外链：经中转确认页
             leave = url_for("teahouse.leave", url=url)
-            return (
-                f'<a href="{leave}" target="_blank" rel="noopener noreferrer">{url}</a>'
-            )
+            return f'<a href="{leave}" target="_blank" rel="noopener noreferrer">{url}</a>'
 
         return Markup(render_stickers_html(_URL_RE.sub(_repl, escaped)))
 
@@ -315,10 +311,9 @@ def create_app(config_object=None):
     @app.before_request
     def _negotiate_response():
         # 统一内容协商：XHR 或 /api/ 前缀视为期望 JSON 响应，供 respond() 使用
-        g.want_json = (
-            request.headers.get("X-Requested-With") == "XMLHttpRequest"
-            or request.path.startswith("/api/")
-        )
+        g.want_json = request.headers.get(
+            "X-Requested-With"
+        ) == "XMLHttpRequest" or request.path.startswith("/api/")
 
     @app.errorhandler(400)
     @app.errorhandler(403)

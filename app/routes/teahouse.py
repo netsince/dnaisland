@@ -208,8 +208,7 @@ def _require_visible_post(post_id):
     if p.is_deleted and not viewer.is_super_admin:
         abort(404)
     if p.is_hidden and not (
-        viewer.is_authenticated
-        and (viewer.id == p.user_id or viewer.is_super_admin)
+        viewer.is_authenticated and (viewer.id == p.user_id or viewer.is_super_admin)
     ):
         abort(404)
     return p
@@ -239,7 +238,9 @@ def _notify_mentions(content, post, actor):
 
 # feed 每页帖子的计数聚合（点赞数/回复数/话题）按「当页 id 集合」缓存 30s，
 # 避免每个请求都跑多轮 group by。本人赞/藏是 per-user 状态，始终实时计算（见 _build_stats）。
-_STATS_CACHE: "OrderedDict[frozenset[int], tuple[float, Any]]" = OrderedDict()  # frozenset(ids) -> (ts, {pid: {...全局计数...}})
+_STATS_CACHE: "OrderedDict[frozenset[int], tuple[float, Any]]" = (
+    OrderedDict()
+)  # frozenset(ids) -> (ts, {pid: {...全局计数...}})
 _STATS_TTL = 30
 
 
@@ -385,15 +386,15 @@ def toggle_teapost_like(viewer, post):
             author = post.author
             if author and author.notify_like:
                 dup = (
-                    Notification.query.filter_by(
-                        user_id=post.user_id, type="like", is_read=False
-                    )
+                    Notification.query.filter_by(user_id=post.user_id, type="like", is_read=False)
                     .filter(Notification.message.contains(f"/teahouse/{post.id}"))
                     .first()
                 )
                 if not dup:
                     url = url_for("teahouse.post_detail", post_id=post.id, _external=True)
-                    notify(post.user_id, f"{viewer.nickname} 赞了你在茶馆的帖子：{url}", type_="like")
+                    notify(
+                        post.user_id, f"{viewer.nickname} 赞了你在茶馆的帖子：{url}", type_="like"
+                    )
     else:
         Notification.query.filter_by(user_id=post.user_id, type="like", is_read=False).filter(
             Notification.message.contains(f"/teahouse/{post.id}")
@@ -440,9 +441,7 @@ def teahouse_feed_page(viewer, sort, page, per_page, topic_id=None):
         )
         ids = _hot_post_order(
             sig,
-            lambda: _visible_query(
-                TeaPost.query.filter(TeaPost.parent_id.is_(None)), viewer
-            ),
+            lambda: _visible_query(TeaPost.query.filter(TeaPost.parent_id.is_(None)), viewer),
         )
         if page < 1:
             page = 1
@@ -469,7 +468,9 @@ def teahouse_feed_page(viewer, sort, page, per_page, topic_id=None):
 # 茶馆「最热」排序结果缓存：每次请求都要对整表做点赞/回复数聚合 + 时间衰减排序 +
 # COUNT 分页；60s 内顺序变化极小，故缓存有序帖子 id 列表，分页直接切片，
 # 免去每请求重算。缓存基于「全局可见」集合（超管可见范围不同，故 key 区分）。
-_HOT_POST_CACHE: "OrderedDict[str, tuple[float, Any]]" = OrderedDict()  # signature -> (ts, [post_id,...])
+_HOT_POST_CACHE: "OrderedDict[str, tuple[float, Any]]" = (
+    OrderedDict()
+)  # signature -> (ts, [post_id,...])
 _HOT_POST_TTL = 60
 
 
@@ -582,12 +583,23 @@ def topic_detail(topic_id):
 def create_post():
     content, err_msg = prepare_teapost_content(request.form.get("content"))
     if err_msg:
-        return respond(url_for("teahouse.index"), ok=False, status=400,
-                       flash_msg=err_msg, flash_cat="warning", error=err_msg)
+        return respond(
+            url_for("teahouse.index"),
+            ok=False,
+            status=400,
+            flash_msg=err_msg,
+            flash_cat="warning",
+            error=err_msg,
+        )
     if _too_frequent(current_user.id):
-        return respond(url_for("teahouse.index"), ok=False, status=429,
-                       flash_msg="发帖太频繁了，请稍后再试", flash_cat="warning",
-                       error="发帖太频繁了，请稍后再试")
+        return respond(
+            url_for("teahouse.index"),
+            ok=False,
+            status=429,
+            flash_msg="发帖太频繁了，请稍后再试",
+            flash_cat="warning",
+            error="发帖太频繁了，请稍后再试",
+        )
     post = TeaPost(user_id=current_user.id, content=content)
     card = _resolve_card(request.form.get("card_id"), current_user)
     if card:
@@ -664,11 +676,7 @@ def card_search():
     items = []
     for c in cards:
         cover = c.images[0] if c.images else None
-        image_url = (
-            url_for("user.card_image", card_id=c.id, slot=cover.slot)
-            if cover
-            else None
-        )
+        image_url = url_for("user.card_image", card_id=c.id, slot=cover.slot) if cover else None
         items.append(
             {
                 "id": c.id,
@@ -687,12 +695,23 @@ def reply(post_id):
     p = _require_visible_post(post_id)
     content, err_msg = prepare_teapost_content(request.form.get("content"))
     if err_msg:
-        return respond(url_for("teahouse.post_detail", post_id=post_id), ok=False, status=400,
-                       flash_msg=err_msg, flash_cat="warning", error=err_msg)
+        return respond(
+            url_for("teahouse.post_detail", post_id=post_id),
+            ok=False,
+            status=400,
+            flash_msg=err_msg,
+            flash_cat="warning",
+            error=err_msg,
+        )
     if _too_frequent(current_user.id):
-        return respond(url_for("teahouse.post_detail", post_id=post_id), ok=False, status=429,
-                       flash_msg="回复太频繁了，请稍后再试", flash_cat="warning",
-                       error="回复太频繁了，请稍后再试")
+        return respond(
+            url_for("teahouse.post_detail", post_id=post_id),
+            ok=False,
+            status=429,
+            flash_msg="回复太频繁了，请稍后再试",
+            flash_cat="warning",
+            error="回复太频繁了，请稍后再试",
+        )
 
     reply_post = TeaPost(user_id=current_user.id, parent_id=post_id, content=content)
     card = _resolve_card(request.form.get("card_id"), current_user)
@@ -714,7 +733,8 @@ def reply(post_id):
     reply_html = reply_macro(reply_post, stats, root_id=post_id)
     return respond(
         url_for("teahouse.post_detail", post_id=post_id),
-        flash_msg="回复成功", flash_cat="success",
+        flash_msg="回复成功",
+        flash_cat="success",
         action="reply",
         reply_html=reply_html,
         reply_count=TeaPost.query.filter_by(parent_id=post_id).count(),
@@ -817,9 +837,7 @@ def delete_post(post_id):
 # ---------------------------------------------------------------------------
 def favorites_page(viewer, page, per_page=20):
     """当前 viewer 收藏的茶馆帖子（分页，按收藏时间倒序）。"""
-    sub = db.session.query(TeaPostFavorite.post_id).filter(
-        TeaPostFavorite.user_id == viewer.id
-    )
+    sub = db.session.query(TeaPostFavorite.post_id).filter(TeaPostFavorite.user_id == viewer.id)
     q = TeaPost.query.filter(TeaPost.id.in_(sub))
     q = _visible_query(q, viewer)
     q = q.join(TeaPostFavorite, TeaPostFavorite.post_id == TeaPost.id)
@@ -832,9 +850,7 @@ def topic_posts_page(topic_id, viewer, page, per_page=20):
     topic = db.session.get(TeaTopic, topic_id)
     if not topic:
         return None, None
-    topic_post_ids = (
-        db.session.query(TeaPostTopic.post_id).filter_by(topic_id=topic_id).subquery()
-    )
+    topic_post_ids = db.session.query(TeaPostTopic.post_id).filter_by(topic_id=topic_id).subquery()
     roots = (
         db.session.query(func.coalesce(TeaPost.parent_id, TeaPost.id).label("root_id"))
         .join(topic_post_ids, TeaPost.id == topic_post_ids.c.post_id)
@@ -847,7 +863,9 @@ def topic_posts_page(topic_id, viewer, page, per_page=20):
     return topic, q.paginate(page=page, per_page=per_page, error_out=False)
 
 
-def edit_teapost(viewer, post, content, card_action=None, topic_raw=None, remove_images=False, new_images=None):
+def edit_teapost(
+    viewer, post, content, card_action=None, topic_raw=None, remove_images=False, new_images=None
+):
     """编辑茶馆帖子核心逻辑（Web 与 App 共用）。
 
     - content: 已清洗后的正文（调用方需先 prepare_teapost_content）。
@@ -904,7 +922,6 @@ def _replace_post_images(post, image_data_urls):
             continue
         post.images.append(TeaPostImage(image_data=stored))
         break  # 单图：仅取第一张
-
 
 
 def soft_delete_teapost(viewer, post):

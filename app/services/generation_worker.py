@@ -72,11 +72,7 @@ def process_generation_task(app, task_id):
 
         actual = len(images)
         spent = points_mul(actual, model.points_per_image)
-        status = (
-            "success"
-            if actual == task.count
-            else ("partial" if actual > 0 else "failed")
-        )
+        status = "success" if actual == task.count else ("partial" if actual > 0 else "failed")
         log = GenerationLog(
             user_id=task.user_id,
             model_id=model.id,

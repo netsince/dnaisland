@@ -32,15 +32,13 @@ class ProxyConfig(db.Model):
     )
     upstream_base_url = db.Column(db.Text, nullable=False)  # 上游 OpenAI 兼容地址
     upstream_api_key = db.Column(db.Text, nullable=False)  # 上游密钥（加密存储）
-    token = db.Column(db.String(120), nullable=False, unique=True, index=True)  # sk-dnaisland-{uuid}
+    token = db.Column(
+        db.String(120), nullable=False, unique=True, index=True
+    )  # sk-dnaisland-{uuid}
     remark = db.Column(db.String(120), nullable=True)  # 备注/名称，可空
-    enabled = db.Column(
-        db.Boolean, nullable=False, server_default="1", default=True
-    )
+    enabled = db.Column(db.Boolean, nullable=False, server_default="1", default=True)
     created_at = db.Column(db.DateTime, server_default=db.func.now())
-    updated_at = db.Column(
-        db.DateTime, server_default=db.func.now(), onupdate=db.func.now()
-    )
+    updated_at = db.Column(db.DateTime, server_default=db.func.now(), onupdate=db.func.now())
 
     user = db.relationship("User", backref="proxy_config")
 
@@ -55,12 +53,8 @@ class ProxyLog(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     # 可空：鉴权失败的请求没有对应用户，同样需要审计
-    user_id = db.Column(
-        db.Integer, db.ForeignKey("users.id"), nullable=True, index=True
-    )
-    config_id = db.Column(
-        db.Integer, db.ForeignKey("proxy_configs.id"), nullable=True, index=True
-    )
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
+    config_id = db.Column(db.Integer, db.ForeignKey("proxy_configs.id"), nullable=True, index=True)
     token = db.Column(db.String(120), nullable=True)  # 快照：本次使用的平台令牌
     method = db.Column(db.String(16), nullable=False)
     path = db.Column(db.String(500), nullable=True)  # 请求路径（不含域名）
@@ -70,9 +64,7 @@ class ProxyLog(db.Model):
     response_body = db.deferred(db.Column(LONGTEXT, nullable=True))  # 响应体原文
     duration_ms = db.Column(db.Integer, nullable=True)
     error = db.Column(db.Text, nullable=True)
-    created_at = db.Column(
-        db.DateTime, server_default=db.func.now(), index=True
-    )
+    created_at = db.Column(db.DateTime, server_default=db.func.now(), index=True)
 
     user = db.relationship("User", backref="proxy_logs")
     config = db.relationship("ProxyConfig", backref="logs")

@@ -23,8 +23,9 @@ class TestConfig(Config):
 def app(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
     app = create_app(TestConfig)
-    assert app.config["SQLALCHEMY_DATABASE_URI"].startswith("sqlite"), \
+    assert app.config["SQLALCHEMY_DATABASE_URI"].startswith("sqlite"), (
         f"🧨 测试连到了非 SQLite 数据库！{app.config['SQLALCHEMY_DATABASE_URI']}"
+    )
     with app.app_context():
         db.create_all()
         yield app
@@ -93,9 +94,7 @@ def test_profile_teahouse_hides_hidden_posts_for_others(app, client):
     assert hidden_id not in ids
 
     # 作者本人访问：能看到自己的隐藏帖。
-    r = client.get(
-        "/api/v1/users/tea_hidden/teahouse", headers=_headers(app, author_id)
-    )
+    r = client.get("/api/v1/users/tea_hidden/teahouse", headers=_headers(app, author_id))
     ids = [i["id"] for i in r.get_json()["data"]["items"]]
     assert visible_id in ids
     assert hidden_id in ids

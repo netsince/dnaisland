@@ -147,6 +147,7 @@ api_bp = Blueprint("api", __name__, url_prefix="/api/v1")
 # JWT 工具
 # ---------------------------------------------------------------------------
 
+
 def _jwt_secret():
     return current_app.config["SECRET_KEY"]
 
@@ -190,6 +191,7 @@ def api_login_required(fn):
         else:
             return jsonify(ok=False, error="请先登录"), 401
         return fn(*args, **kwargs)
+
     return wrapper
 
 
@@ -216,6 +218,7 @@ def _soft_auth():
 # 统一响应辅助
 # ---------------------------------------------------------------------------
 
+
 def ok(data=None):
     return jsonify(ok=True, data=data)
 
@@ -230,29 +233,36 @@ def paginated(query, page=1, per_page=20, *, serialize_fn=None):
         page = 1
     pag = query.paginate(page=page, per_page=per_page, error_out=False)
     items = [serialize_fn(item) for item in pag.items] if serialize_fn else pag.items
-    return jsonify(ok=True, data={
-        "items": items,
-        "page": pag.page,
-        "pages": pag.pages,
-        "total": pag.total,
-        "has_next": pag.has_next,
-    })
+    return jsonify(
+        ok=True,
+        data={
+            "items": items,
+            "page": pag.page,
+            "pages": pag.pages,
+            "total": pag.total,
+            "has_next": pag.has_next,
+        },
+    )
 
 
 def _cards_response(pag, cards):
     """把共享函数返回的 (pagination, cards) 序列化成 App JSON。"""
-    return jsonify(ok=True, data={
-        "items": [_card_light(c) for c in cards],
-        "page": pag.page,
-        "pages": pag.pages,
-        "total": pag.total,
-        "has_next": pag.has_next,
-    })
+    return jsonify(
+        ok=True,
+        data={
+            "items": [_card_light(c) for c in cards],
+            "page": pag.page,
+            "pages": pag.pages,
+            "total": pag.total,
+            "has_next": pag.has_next,
+        },
+    )
 
 
 # ---------------------------------------------------------------------------
 # 序列化器（模型 → dict）
 # ---------------------------------------------------------------------------
+
 
 def _user_public(user: User) -> dict:
     return {
@@ -352,13 +362,21 @@ def _comment_item(
         "author": _user_public(cm.author) if cm.author else None,
         "reply_to": {
             "id": cm.reply_to.id,
-            "author_name": cm.reply_to.author.display_name if (cm.reply_to and cm.reply_to.author) else "未知用户",
-        } if cm.reply_to else None,
+            "author_name": cm.reply_to.author.display_name
+            if (cm.reply_to and cm.reply_to.author)
+            else "未知用户",
+        }
+        if cm.reply_to
+        else None,
         "like_count": like_count,
         "liked": liked_by_user,
         "is_pinned": bool(cm.is_pinned),
         "moderated": bool(cm.moderated),
-        "is_mine": bool(viewer is not None and getattr(viewer, "is_authenticated", False) and viewer.id == cm.user_id),
+        "is_mine": bool(
+            viewer is not None
+            and getattr(viewer, "is_authenticated", False)
+            and viewer.id == cm.user_id
+        ),
         "is_author": bool(card is not None and cm.user_id == card.author_id),
         "floor": floor,
     }
@@ -384,12 +402,16 @@ def _teapost_item(post: TeaPost, stats: dict) -> dict:
             "id": img.id,
             "sort_order": img.sort_order,
             "url": f"/api/v1/teahouse/images/{img.id}",
-        } if img else None,
+        }
+        if img
+        else None,
         "card": {
             "id": post.card.id,
             "name": post.card.name,
             "covers": covers,
-        } if post.card else None,
+        }
+        if post.card
+        else None,
         "parent_id": post.parent_id,
         "is_deleted": post.is_deleted,
         "is_hidden": post.is_hidden,
@@ -464,6 +486,7 @@ def _punishment_item(p: Punishment) -> dict:
 # 认证
 # ---------------------------------------------------------------------------
 
+
 @api_bp.route("/auth/token", methods=["POST"])
 def auth_token():
     """JWT 登录：用用户名/邮箱 + 密码换 token。"""
@@ -490,10 +513,12 @@ def auth_token():
 
     # JWT 签发：记登录，但不影响 flask_login session
     token = _make_token(user.id)
-    return ok({
-        "token": token,
-        "user": _user_public(user),
-    })
+    return ok(
+        {
+            "token": token,
+            "user": _user_public(user),
+        }
+    )
 
 
 @api_bp.route("/auth/refresh", methods=["POST"])
@@ -516,6 +541,7 @@ def auth_me():
 # ---------------------------------------------------------------------------
 # 角色卡
 # ---------------------------------------------------------------------------
+
 
 @api_bp.route("/cards/featured", methods=["GET"])
 def cards_featured():
@@ -552,9 +578,7 @@ def recommend():
     items = []
     for it in rec_items:
         if it["kind"] == "card":
-            items.append(
-                {"kind": "card", "note": it["note"], "data": _card_light(it["card"])}
-            )
+            items.append({"kind": "card", "note": it["note"], "data": _card_light(it["card"])})
         else:
             items.append(
                 {
@@ -599,20 +623,24 @@ def articles_list():
         pag = query.order_by(order).paginate(page=page, per_page=10, error_out=False)
     except Exception:
         # 表尚未建立（如迁移未执行）时优雅降级为空列表
-        return ok({
-            "items": [],
-            "page": 1,
-            "pages": 1,
-            "total": 0,
-            "has_next": False,
-        })
-    return ok({
-        "items": [_article_item(a) for a in pag.items],
-        "page": pag.page,
-        "pages": pag.pages,
-        "total": pag.total,
-        "has_next": pag.has_next,
-    })
+        return ok(
+            {
+                "items": [],
+                "page": 1,
+                "pages": 1,
+                "total": 0,
+                "has_next": False,
+            }
+        )
+    return ok(
+        {
+            "items": [_article_item(a) for a in pag.items],
+            "page": pag.page,
+            "pages": pag.pages,
+            "total": pag.total,
+            "has_next": pag.has_next,
+        }
+    )
 
 
 @api_bp.route("/articles/<int:article_id>", methods=["GET"])
@@ -641,9 +669,7 @@ def article_cover(article_id):
 
         if a.cover.startswith("data:image/webp"):
             raw = _b64.b64decode(a.cover.split(",", 1)[1])
-            return current_app.response_class(
-                raw, mimetype="image/webp"
-            )
+            return current_app.response_class(raw, mimetype="image/webp")
         # 其他 data 类型由网页端转码；App 侧直接透传（base64 原文作为图片数据）
         raw = _b64.b64decode(a.cover.split(",", 1)[1])
         mime = a.cover.split(";", 1)[0].split(":", 1)[1] if ";" in a.cover else "image/png"
@@ -711,9 +737,7 @@ def cards_search():
     sort = request.args.get("sort", "relevance")
     tag = (request.args.get("tag") or "").strip() or None
     page = request.args.get("page", 1, type=int)
-    pag, cards = search_cards(
-        _ensure_self(), q, sort=sort, tag=tag, page=page, per_page=12
-    )
+    pag, cards = search_cards(_ensure_self(), q, sort=sort, tag=tag, page=page, per_page=12)
     return _cards_response(pag, cards)
 
 
@@ -731,6 +755,7 @@ def cards_detail(card_id):
 # ---------------------------------------------------------------------------
 # 角色卡写操作（点赞/收藏/评论等，复用现有 XHR 逻辑）
 # ---------------------------------------------------------------------------
+
 
 @api_bp.route("/cards/<card_id>/like", methods=["POST"])
 @api_login_required
@@ -765,7 +790,11 @@ def cards_comments(card_id):
     only_author = request.args.get("only_author") == "1"
     viewer = _ensure_self()
     card, data, err_code = card_comments_list(
-        card_id, viewer, page=page, per_page=per_page, sort=sort,
+        card_id,
+        viewer,
+        page=page,
+        per_page=per_page,
+        sort=sort,
         only_author=only_author,
     )
     if err_code == "not_found":
@@ -794,22 +823,26 @@ def cards_comments(card_id):
     items = []
     for idx, cm in enumerate(pag.items):
         replies = [_reply_item(r) for r in replies_by_parent.get(cm.id, [])]
-        items.append(_comment_item(
-            cm,
-            cm.id in user_liked_ids,
-            like_counts.get(cm.id, 0),
-            viewer=viewer,
-            card=card,
-            replies=replies,
-            floor=(pag.total - ((page - 1) * per_page + idx)) if show_floor else None,
-        ))
-    return ok({
-        "items": items,
-        "page": pag.page,
-        "pages": pag.pages,
-        "total": pag.total,
-        "has_next": pag.has_next,
-    })
+        items.append(
+            _comment_item(
+                cm,
+                cm.id in user_liked_ids,
+                like_counts.get(cm.id, 0),
+                viewer=viewer,
+                card=card,
+                replies=replies,
+                floor=(pag.total - ((page - 1) * per_page + idx)) if show_floor else None,
+            )
+        )
+    return ok(
+        {
+            "items": items,
+            "page": pag.page,
+            "pages": pag.pages,
+            "total": pag.total,
+            "has_next": pag.has_next,
+        }
+    )
 
 
 @api_bp.route("/cards/<card_id>/comments", methods=["POST"])
@@ -827,8 +860,11 @@ def cards_comment_post(card_id):
     image_data = data.get("image_data") or None
 
     cm, err_code = create_comment(
-        card_id, _ensure_self(), content,
-        reply_to_id=reply_to_id, image_data=image_data,
+        card_id,
+        _ensure_self(),
+        content,
+        reply_to_id=reply_to_id,
+        image_data=image_data,
     )
     if err_code == "not_found":
         return err("角色卡不存在", 404)
@@ -884,6 +920,7 @@ def cards_comment_delete(card_id, comment_id):
 # 用户
 # ---------------------------------------------------------------------------
 
+
 @api_bp.route("/users/<username>", methods=["GET"])
 def users_profile(username):
     """用户主页。"""
@@ -910,19 +947,21 @@ def users_profile(username):
         and UserFollow.query.filter_by(follower_id=cu.id, following_id=u.id).first() is not None
     )
 
-    return ok({
-        "user": _user_public(u),
-        "restricted": False,
-        "follower_count": follower_count,
-        "following_count": following_count,
-        "is_following": is_following,
-        "cards": {
-            "items": [_card_light(c) for c in cards],
-            "page": cards_pag.page,
-            "pages": cards_pag.pages,
-            "total": cards_pag.total,
-        },
-    })
+    return ok(
+        {
+            "user": _user_public(u),
+            "restricted": False,
+            "follower_count": follower_count,
+            "following_count": following_count,
+            "is_following": is_following,
+            "cards": {
+                "items": [_card_light(c) for c in cards],
+                "page": cards_pag.page,
+                "pages": cards_pag.pages,
+                "total": cards_pag.total,
+            },
+        }
+    )
 
 
 @api_bp.route("/users/<username>/comments", methods=["GET"])
@@ -960,10 +999,14 @@ def users_profile_comments(username):
             .all()
         )
         if cu.is_authenticated:
-            liked_rows = db.session.query(CommentLike.comment_id).filter(
-                CommentLike.user_id == cu.id,
-                CommentLike.comment_id.in_(ids),
-            ).all()
+            liked_rows = (
+                db.session.query(CommentLike.comment_id)
+                .filter(
+                    CommentLike.user_id == cu.id,
+                    CommentLike.comment_id.in_(ids),
+                )
+                .all()
+            )
             liked_ids = {row[0] for row in liked_rows}
 
     # 批量附加评论所属角色卡（含方形封面标记）
@@ -987,13 +1030,15 @@ def users_profile_comments(username):
         item["card"] = {"id": card.id, "name": card.name} if card else None
         items.append(item)
 
-    return ok({
-        "items": items,
-        "page": pagination.page,
-        "pages": pagination.pages,
-        "total": pagination.total,
-        "has_next": pagination.has_next,
-    })
+    return ok(
+        {
+            "items": items,
+            "page": pagination.page,
+            "pages": pagination.pages,
+            "total": pagination.total,
+            "has_next": pagination.has_next,
+        }
+    )
 
 
 @api_bp.route("/users/<username>/teahouse", methods=["GET"])
@@ -1024,13 +1069,15 @@ def users_profile_teahouse(username):
     )
     stats = _build_stats(pagination.items)
     items = [_teapost_item(p, stats.get(p.id, {})) for p in pagination.items]
-    return ok({
-        "items": items,
-        "page": pagination.page,
-        "pages": pagination.pages,
-        "total": pagination.total,
-        "has_next": pagination.has_next,
-    })
+    return ok(
+        {
+            "items": items,
+            "page": pagination.page,
+            "pages": pagination.pages,
+            "total": pagination.total,
+            "has_next": pagination.has_next,
+        }
+    )
 
 
 @api_bp.route("/users/<username>/followers", methods=["GET"])
@@ -1079,16 +1126,15 @@ def users_follow_list(username):
         ).all()
         following_ids = {r.following_id for r in rows}
 
-    return ok({
-        "items": [
-            {**_user_public(x), "is_following": x.id in following_ids}
-            for x in items
-        ],
-        "page": pag.page,
-        "pages": pag.pages,
-        "total": pag.total,
-        "has_next": pag.has_next,
-    })
+    return ok(
+        {
+            "items": [{**_user_public(x), "is_following": x.id in following_ids} for x in items],
+            "page": pag.page,
+            "pages": pag.pages,
+            "total": pag.total,
+            "has_next": pag.has_next,
+        }
+    )
 
 
 @api_bp.route("/users/<username>/follow", methods=["POST"])
@@ -1108,6 +1154,7 @@ def users_follow(username):
 # ---------------------------------------------------------------------------
 # 我的
 # ---------------------------------------------------------------------------
+
 
 @api_bp.route("/my/cards", methods=["GET"])
 @api_login_required
@@ -1136,6 +1183,7 @@ def my_likes():
 # ---------------------------------------------------------------------------
 # 通知
 # ---------------------------------------------------------------------------
+
 
 @api_bp.route("/notifications", methods=["GET"])
 @api_login_required
@@ -1171,6 +1219,7 @@ def notifications_unread_count():
 # 茶馆
 # ---------------------------------------------------------------------------
 
+
 @api_bp.route("/teahouse/posts", methods=["GET"])
 def teahouse_posts():
     """茶馆 Feed：sort=hot|new, page=1, topic_id=可选。"""
@@ -1182,7 +1231,9 @@ def teahouse_posts():
     sort = request.args.get("sort", "new")
     topic_id = request.args.get("topic_id", type=int)
     per_page = 20
-    posts, total, pages, has_next = teahouse_feed_page(_ensure_self(), sort, page, per_page, topic_id)
+    posts, total, pages, has_next = teahouse_feed_page(
+        _ensure_self(), sort, page, per_page, topic_id
+    )
     stats = _build_stats(posts)
     items = [_teapost_item(p, stats.get(p.id, {})) for p in posts]
     return ok({"items": items, "page": page, "pages": pages, "total": total, "has_next": has_next})
@@ -1226,6 +1277,7 @@ def teahouse_create_post():
         first = images[0]
         try:
             from ..services.image_service import data_url_to_bytes_and_mime
+
             data_url_to_bytes_and_mime(first)
         except Exception:
             return err("图片格式非法")
@@ -1264,17 +1316,19 @@ def teahouse_post_detail(post_id):
 
     stats = _build_stats(list(dict.fromkeys([p] + reply_pag.items + chain)))
 
-    return ok({
-        "post": _teapost_item(p, stats.get(p.id, {})),
-        "chain": [_teapost_item(c, stats.get(c.id, {})) for c in chain],
-        "replies": {
-            "items": [_teapost_item(r, stats.get(r.id, {})) for r in reply_pag.items],
-            "page": reply_pag.page,
-            "pages": reply_pag.pages,
-            "total": reply_pag.total,
-            "has_next": reply_pag.has_next,
-        },
-    })
+    return ok(
+        {
+            "post": _teapost_item(p, stats.get(p.id, {})),
+            "chain": [_teapost_item(c, stats.get(c.id, {})) for c in chain],
+            "replies": {
+                "items": [_teapost_item(r, stats.get(r.id, {})) for r in reply_pag.items],
+                "page": reply_pag.page,
+                "pages": reply_pag.pages,
+                "total": reply_pag.total,
+                "has_next": reply_pag.has_next,
+            },
+        }
+    )
 
 
 @api_bp.route("/teahouse/posts/<int:post_id>/reply", methods=["POST"])
@@ -1357,13 +1411,15 @@ def teahouse_favorites():
     page = request.args.get("page", 1, type=int)
     pag = favorites_page(_ensure_self(), page)
     stats = _build_stats(pag.items)
-    return ok({
-        "items": [_teapost_item(p, stats.get(p.id, {})) for p in pag.items],
-        "page": pag.page,
-        "pages": pag.pages,
-        "total": pag.total,
-        "has_next": pag.has_next,
-    })
+    return ok(
+        {
+            "items": [_teapost_item(p, stats.get(p.id, {})) for p in pag.items],
+            "page": pag.page,
+            "pages": pag.pages,
+            "total": pag.total,
+            "has_next": pag.has_next,
+        }
+    )
 
 
 @api_bp.route("/teahouse/topics/<int:topic_id>", methods=["GET"])
@@ -1376,14 +1432,16 @@ def teahouse_topic_detail(topic_id):
     if topic is None:
         return err("话题不存在", 404)
     stats = _build_stats(pag.items)
-    return ok({
-        "topic": {"id": topic.id, "name": topic.name, "post_count": topic.post_count},
-        "items": [_teapost_item(p, stats.get(p.id, {})) for p in pag.items],
-        "page": pag.page,
-        "pages": pag.pages,
-        "total": pag.total,
-        "has_next": pag.has_next,
-    })
+    return ok(
+        {
+            "topic": {"id": topic.id, "name": topic.name, "post_count": topic.post_count},
+            "items": [_teapost_item(p, stats.get(p.id, {})) for p in pag.items],
+            "page": pag.page,
+            "pages": pag.pages,
+            "total": pag.total,
+            "has_next": pag.has_next,
+        }
+    )
 
 
 @api_bp.route("/teahouse/posts/<int:post_id>/edit", methods=["POST"])
@@ -1408,9 +1466,7 @@ def teahouse_edit_post(post_id):
     if not isinstance(new_images, list):
         new_images = [new_images]
     new_images = [im for im in new_images if isinstance(im, str) and im.strip()]
-    p, error = edit_teapost(
-        viewer, p, content, card_action, topic_raw, remove_images, new_images
-    )
+    p, error = edit_teapost(viewer, p, content, card_action, topic_raw, remove_images, new_images)
     if error:
         return err(error)
     _notify_mentions(content, p, viewer)
@@ -1434,6 +1490,7 @@ def teahouse_delete_post(post_id):
 # ---------------------------------------------------------------------------
 # 积分
 # ---------------------------------------------------------------------------
+
 
 @api_bp.route("/points", methods=["GET"])
 @api_login_required
@@ -1469,17 +1526,25 @@ def points_redeem():
     ok_flag, message, results, success_count = redeem_codes(_ensure_self(), codes)
     if not ok_flag:
         return err(message)
-    return ok({"results": results, "success_count": success_count, "fail_count": len(codes) - success_count})
+    return ok(
+        {
+            "results": results,
+            "success_count": success_count,
+            "fail_count": len(codes) - success_count,
+        }
+    )
 
 
 # ---------------------------------------------------------------------------
 # 系统信息
 # ---------------------------------------------------------------------------
 
+
 @api_bp.route("/site-config", methods=["GET"])
 def site_config():
     """站点公开配置（复用现有 /api/site-config）。"""
     from ..services.site_service import public_config
+
     return jsonify(ok=True, data=public_config())
 
 
@@ -1509,12 +1574,7 @@ def sponsors():
     rows = Sponsor.query.order_by(func.rand()).limit(30).all()
     users = {}
     if rows:
-        users = {
-            u.id: u
-            for u in User.query.filter(
-                User.id.in_([s.user_id for s in rows])
-            ).all()
-        }
+        users = {u.id: u for u in User.query.filter(User.id.in_([s.user_id for s in rows])).all()}
     items = []
     for s in rows:
         u = users.get(s.user_id)
@@ -1652,18 +1712,20 @@ def cards_toggle_pin(card_id):
 def me_profile_get():
     """获取自己的完整资料（含生日、点赞通知开关），供编辑页预填。"""
     viewer = _ensure_self()
-    return ok({
-        "username": viewer.username,
-        "nickname": viewer.nickname,
-        "avatar": viewer.avatar or "",
-        "bio": viewer.bio or "",
-        "location": viewer.location or "",
-        "website": viewer.website or "",
-        "birthday": viewer.birthday.isoformat() if viewer.birthday else None,
-        "notify_like": bool(viewer.notify_like),
-        "verified": bool(viewer.verified),
-        "verified_label": viewer.verified_label or "",
-    })
+    return ok(
+        {
+            "username": viewer.username,
+            "nickname": viewer.nickname,
+            "avatar": viewer.avatar or "",
+            "bio": viewer.bio or "",
+            "location": viewer.location or "",
+            "website": viewer.website or "",
+            "birthday": viewer.birthday.isoformat() if viewer.birthday else None,
+            "notify_like": bool(viewer.notify_like),
+            "verified": bool(viewer.verified),
+            "verified_label": viewer.verified_label or "",
+        }
+    )
 
 
 @api_bp.route("/me/profile", methods=["POST"])
@@ -1699,23 +1761,26 @@ def me_profile_update():
     )
     if error:
         return err(error)
-    return ok({
-        "nickname": viewer.nickname,
-        "bio": viewer.bio,
-        "location": viewer.location,
-        "website": viewer.website,
-        "birthday": viewer.birthday.isoformat() if viewer.birthday else None,
-        "notify_like": bool(viewer.notify_like),
-        "avatar": viewer.avatar,
-        # 与 _user_public 保持一致：客户端拿这份响应更新本地用户缓存时，
-        # 不会把赞助者标记弄丢。
-        "is_sponsor": is_sponsor_safe(viewer.id),
-    })
+    return ok(
+        {
+            "nickname": viewer.nickname,
+            "bio": viewer.bio,
+            "location": viewer.location,
+            "website": viewer.website,
+            "birthday": viewer.birthday.isoformat() if viewer.birthday else None,
+            "notify_like": bool(viewer.notify_like),
+            "avatar": viewer.avatar,
+            # 与 _user_public 保持一致：客户端拿这份响应更新本地用户缓存时，
+            # 不会把赞助者标记弄丢。
+            "is_sponsor": is_sponsor_safe(viewer.id),
+        }
+    )
 
 
 # ---------------------------------------------------------------------------
 # 我的工单
 # ---------------------------------------------------------------------------
+
 
 def _ticket_item(t: "Ticket") -> dict:
     """工单列表项序列化。"""
@@ -1728,9 +1793,7 @@ def _ticket_item(t: "Ticket") -> dict:
         "category_name": t.category_name,
         "created_at": t.created_at.isoformat() if t.created_at else "",
         "updated_at": (
-            (t.updated_at or t.created_at).isoformat()
-            if (t.updated_at or t.created_at)
-            else ""
+            (t.updated_at or t.created_at).isoformat() if (t.updated_at or t.created_at) else ""
         ),
         "last_message": _ticket_message_item(t.last_message) if t.last_message else None,
     }
@@ -1741,9 +1804,7 @@ def _ticket_message_item(m: "TicketMessage") -> dict:
     return {
         "id": m.id,
         "sender_role": m.sender_role,
-        "sender_name": (
-            m.sender.nickname or m.sender.username if m.sender else ""
-        ),
+        "sender_name": (m.sender.nickname or m.sender.username if m.sender else ""),
         "content": m.content,
         "image": m.image_data or None,
         "created_at": m.created_at.isoformat() if m.created_at else "",
@@ -1774,11 +1835,7 @@ def tickets_categories():
         .order_by(TicketCategory.sort_order, TicketCategory.name)
         .all()
     )
-    return ok({
-        "items": [
-            {"id": c.id, "name": c.name} for c in cats
-        ]
-    })
+    return ok({"items": [{"id": c.id, "name": c.name} for c in cats]})
 
 
 @api_bp.route("/tickets", methods=["GET"])
@@ -1795,17 +1852,19 @@ def my_tickets_list():
         base = base.filter(Ticket.status == status)
     if q:
         base = base.filter(Ticket.title.ilike(f"%{q}%"))
-    pag = base.order_by(
-        db.func.coalesce(Ticket.updated_at, Ticket.created_at).desc()
-    ).paginate(page=page, per_page=20, error_out=False)
+    pag = base.order_by(db.func.coalesce(Ticket.updated_at, Ticket.created_at).desc()).paginate(
+        page=page, per_page=20, error_out=False
+    )
 
-    return ok({
-        "items": [_ticket_item(t) for t in pag.items],
-        "page": pag.page,
-        "pages": pag.pages,
-        "total": pag.total,
-        "has_next": pag.has_next,
-    })
+    return ok(
+        {
+            "items": [_ticket_item(t) for t in pag.items],
+            "page": pag.page,
+            "pages": pag.pages,
+            "total": pag.total,
+            "has_next": pag.has_next,
+        }
+    )
 
 
 @api_bp.route("/tickets", methods=["POST"])
@@ -1860,10 +1919,12 @@ def my_tickets_detail(ticket_id):
     t = db.session.get(Ticket, ticket_id)
     if not t or t.user_id != viewer.id:
         return err("工单不存在", 404)
-    return ok({
-        **_ticket_item(t),
-        "messages": [_ticket_message_item(m) for m in t.messages],
-    })
+    return ok(
+        {
+            **_ticket_item(t),
+            "messages": [_ticket_message_item(m) for m in t.messages],
+        }
+    )
 
 
 @api_bp.route("/tickets/<int:ticket_id>/reply", methods=["POST"])
@@ -1938,6 +1999,7 @@ def my_tickets_reopen(ticket_id):
 # ---------------------------------------------------------------------------
 # 图片上传（客户端 multipart 文件 → WebP data URL）
 # ---------------------------------------------------------------------------
+
 
 @api_bp.route("/upload/image", methods=["POST"])
 @api_login_required
@@ -2031,16 +2093,15 @@ def users_search():
             UserFollow.following_id.in_([u.id for u in items]),
         ).all()
         following_ids = {r.following_id for r in rows}
-    return ok({
-        "items": [
-            {**_user_public(u), "is_following": u.id in following_ids}
-            for u in items
-        ],
-        "page": pag.page,
-        "pages": pag.pages,
-        "total": pag.total,
-        "has_next": pag.has_next,
-    })
+    return ok(
+        {
+            "items": [{**_user_public(u), "is_following": u.id in following_ids} for u in items],
+            "page": pag.page,
+            "pages": pag.pages,
+            "total": pag.total,
+            "has_next": pag.has_next,
+        }
+    )
 
 
 @api_bp.route("/teahouse/search", methods=["GET"])
@@ -2055,13 +2116,15 @@ def teahouse_search():
     pag = _post_search_query(q).paginate(page=page, per_page=15, error_out=False)
     stats = _build_stats(pag.items)
     items = [_teapost_item(p, stats.get(p.id, {})) for p in pag.items]
-    return ok({
-        "items": items,
-        "page": pag.page,
-        "pages": pag.pages,
-        "total": pag.total,
-        "has_next": pag.has_next,
-    })
+    return ok(
+        {
+            "items": items,
+            "page": pag.page,
+            "pages": pag.pages,
+            "total": pag.total,
+            "has_next": pag.has_next,
+        }
+    )
 
 
 @api_bp.route("/search/suggest", methods=["GET"])
@@ -2075,9 +2138,7 @@ def search_suggest():
         return ok({"cards": [], "users": []})
 
     cards = _card_search_query(q, "relevance").limit(6).all()
-    card_hits = [
-        {"id": c.id, "name": c.name, "gender": c.gender} for c in cards
-    ]
+    card_hits = [{"id": c.id, "name": c.name, "gender": c.gender} for c in cards]
 
     users = _user_search_query(q, "relevance").limit(5).all()
     user_hits = [
@@ -2114,18 +2175,22 @@ def proxy_config_get():
     """返回当前用户的转发配置（不含上游密钥明文）。"""
     cfg = _proxy_get_config(_ensure_self().id)
     if cfg is None:
-        return ok({
-            "configured": False,
+        return ok(
+            {
+                "configured": False,
+                "public_base_url": request.host_url.rstrip("/") + _PROXY_PUBLIC_BASE_PATH,
+            }
+        )
+    return ok(
+        {
+            "configured": True,
+            "upstream_base_url": cfg.upstream_base_url,
+            "remark": cfg.remark,
+            "enabled": bool(cfg.enabled),
+            "token": cfg.token,
             "public_base_url": request.host_url.rstrip("/") + _PROXY_PUBLIC_BASE_PATH,
-        })
-    return ok({
-        "configured": True,
-        "upstream_base_url": cfg.upstream_base_url,
-        "remark": cfg.remark,
-        "enabled": bool(cfg.enabled),
-        "token": cfg.token,
-        "public_base_url": request.host_url.rstrip("/") + _PROXY_PUBLIC_BASE_PATH,
-    })
+        }
+    )
 
 
 @api_bp.route("/proxy/config", methods=["POST"])
@@ -2159,14 +2224,16 @@ def proxy_config_save():
     )
     if error:
         return err(error)
-    return ok({
-        "configured": True,
-        "upstream_base_url": cfg.upstream_base_url,
-        "remark": cfg.remark,
-        "enabled": bool(cfg.enabled),
-        "token": cfg.token,
-        "public_base_url": request.host_url.rstrip("/") + _PROXY_PUBLIC_BASE_PATH,
-    })
+    return ok(
+        {
+            "configured": True,
+            "upstream_base_url": cfg.upstream_base_url,
+            "remark": cfg.remark,
+            "enabled": bool(cfg.enabled),
+            "token": cfg.token,
+            "public_base_url": request.host_url.rstrip("/") + _PROXY_PUBLIC_BASE_PATH,
+        }
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -2202,25 +2269,25 @@ def _ig_reference_url(log_id, idx):
 def image_gen_meta():
     """生图工作台元数据：可用模型 + 当前点数 + 宽高比选项。"""
     models = (
-        GenerationModel.query.filter_by(enabled=True)
-        .order_by(GenerationModel.display_name)
-        .all()
+        GenerationModel.query.filter_by(enabled=True).order_by(GenerationModel.display_name).all()
     )
-    return ok({
-        "models": [
-            {
-                "id": m.id,
-                "name": m.name,
-                "display_name": m.display_name,
-                "points_per_image": points_to_str(m.points_per_image),
-            }
-            for m in models
-        ],
-        "balance": points_to_str(_ensure_self().points),
-        "aspects": list(_IG_VALID_ASPECTS),
-        "max_references": _IG_MAX_REFERENCES,
-        "max_count": _IG_MAX_COUNT,
-    })
+    return ok(
+        {
+            "models": [
+                {
+                    "id": m.id,
+                    "name": m.name,
+                    "display_name": m.display_name,
+                    "points_per_image": points_to_str(m.points_per_image),
+                }
+                for m in models
+            ],
+            "balance": points_to_str(_ensure_self().points),
+            "aspects": list(_IG_VALID_ASPECTS),
+            "max_references": _IG_MAX_REFERENCES,
+            "max_count": _IG_MAX_COUNT,
+        }
+    )
 
 
 @api_bp.route("/image-gen/generate", methods=["POST"])
@@ -2265,24 +2332,23 @@ def image_gen_generate():
     ref_payload = []
     raw_refs = data.get("references")
     if isinstance(raw_refs, list):
-        for item in raw_refs[: _IG_MAX_REFERENCES]:
+        for item in raw_refs[:_IG_MAX_REFERENCES]:
             if not isinstance(item, dict):
                 continue
             b64 = (item.get("data_b64") or "").strip()
             if not b64:
                 continue
-            ref_payload.append({
-                "filename": (item.get("filename") or "ref.png").strip(),
-                "mimetype": (item.get("mimetype") or "image/png").strip(),
-                "data_b64": b64,
-            })
+            ref_payload.append(
+                {
+                    "filename": (item.get("filename") or "ref.png").strip(),
+                    "mimetype": (item.get("mimetype") or "image/png").strip(),
+                    "data_b64": b64,
+                }
+            )
     ref_count = len(ref_payload)
     if ref_count:
         labels = "、".join(f"图片{i + 1}" for i in range(ref_count))
-        prompt = (
-            f"参考图片编号：{labels}。"
-            f"请按这些编号理解提示词中的图片引用。\n\n{prompt}"
-        )
+        prompt = f"参考图片编号：{labels}。请按这些编号理解提示词中的图片引用。\n\n{prompt}"
 
     estimated = points_mul(count, model.points_per_image)
     balance = user.points or 0
@@ -2307,9 +2373,7 @@ def image_gen_generate():
         size=size,
         count=count,
         references_count=ref_count,
-        reference_data=(
-            json.dumps(ref_payload, ensure_ascii=False) if ref_payload else None
-        ),
+        reference_data=(json.dumps(ref_payload, ensure_ascii=False) if ref_payload else None),
         status="pending",
     )
     db.session.add(task)
@@ -2337,23 +2401,25 @@ def image_gen_tasks():
         .order_by(GenerationTask.created_at.desc())
         .all()
     )
-    return ok({
-        "tasks": [
-            {
-                "id": t.id,
-                "status": t.status,
-                "model_name": t.model_name,
-                "size": t.size or "auto",
-                "count": t.count,
-                "created_at": (
-                    (t.created_at + timedelta(hours=8)).strftime("%Y-%m-%d %H:%M:%S")
-                    if t.created_at
-                    else ""
-                ),
-            }
-            for t in tasks
-        ]
-    })
+    return ok(
+        {
+            "tasks": [
+                {
+                    "id": t.id,
+                    "status": t.status,
+                    "model_name": t.model_name,
+                    "size": t.size or "auto",
+                    "count": t.count,
+                    "created_at": (
+                        (t.created_at + timedelta(hours=8)).strftime("%Y-%m-%d %H:%M:%S")
+                        if t.created_at
+                        else ""
+                    ),
+                }
+                for t in tasks
+            ]
+        }
+    )
 
 
 @api_bp.route("/image-gen/tasks/<int:task_id>", methods=["GET"])
@@ -2369,14 +2435,16 @@ def image_gen_task_detail(task_id):
         log = db.session.get(GenerationLog, t.result_log_id)
         if log:
             points_spent = log.points_spent or 0
-    return ok({
-        "id": t.id,
-        "status": t.status,
-        "error": t.error,
-        "log_id": t.result_log_id,
-        "points_spent": points_to_str(points_spent),
-        "balance": points_to_str(user.points),
-    })
+    return ok(
+        {
+            "id": t.id,
+            "status": t.status,
+            "error": t.error,
+            "log_id": t.result_log_id,
+            "points_spent": points_to_str(points_spent),
+            "balance": points_to_str(user.points),
+        }
+    )
 
 
 @api_bp.route("/image-gen/logs", methods=["GET"])
@@ -2401,34 +2469,34 @@ def image_gen_logs():
         img_count = (item.count or 1) if item.status != "failed" else 0
         ref_count = item.references_count or 0
         if img_count > 0:
-            items.append({
-                "id": item.id,
-                "first_image": _ig_image_url(item.id, 0),
-                "images": [
-                    _ig_image_url(item.id, i) for i in range(img_count)
-                ],
-                "references": [
-                    _ig_reference_url(item.id, i) for i in range(ref_count)
-                ],
-                "prompt": item.prompt,
-                "model_name": item.model_name,
-                "size": item.size or "auto",
-                "count": item.count,
-                "points_spent": points_to_str(item.points_spent),
-                "status": item.status,
-                "created_at": (
-                    (item.created_at + timedelta(hours=8)).strftime("%Y-%m-%d %H:%M")
-                    if item.created_at
-                    else ""
-                ),
-            })
-    return ok({
-        "items": items,
-        "page": pagination.page,
-        "pages": pagination.pages,
-        "total": pagination.total,
-        "has_next": pagination.has_next,
-    })
+            items.append(
+                {
+                    "id": item.id,
+                    "first_image": _ig_image_url(item.id, 0),
+                    "images": [_ig_image_url(item.id, i) for i in range(img_count)],
+                    "references": [_ig_reference_url(item.id, i) for i in range(ref_count)],
+                    "prompt": item.prompt,
+                    "model_name": item.model_name,
+                    "size": item.size or "auto",
+                    "count": item.count,
+                    "points_spent": points_to_str(item.points_spent),
+                    "status": item.status,
+                    "created_at": (
+                        (item.created_at + timedelta(hours=8)).strftime("%Y-%m-%d %H:%M")
+                        if item.created_at
+                        else ""
+                    ),
+                }
+            )
+    return ok(
+        {
+            "items": items,
+            "page": pagination.page,
+            "pages": pagination.pages,
+            "total": pagination.total,
+            "has_next": pagination.has_next,
+        }
+    )
 
 
 # ---------------------------------------------------------------------------

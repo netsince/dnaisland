@@ -88,6 +88,7 @@ def _flashed_messages(html: str) -> list:
 # 文案区分
 # ---------------------------------------------------------------------------
 
+
 def test_web_unknown_identifier_message(app, client, user):
     r = _web_login(client, "nobody", "whatever")
     assert r.status_code == 200
@@ -133,6 +134,7 @@ def test_api_success_returns_token(app, client, user):
 # ---------------------------------------------------------------------------
 # 失败限流
 # ---------------------------------------------------------------------------
+
 
 def test_api_throttled_after_five_failures(app, client, user):
     for _ in range(5):

@@ -43,10 +43,13 @@ def client(app):
 
 def _auth_token(client):
     """通过 App 登录接口取 JWT（与 App 端一致）。"""
-    r = client.post("/api/v1/auth/token", json={
-        "identifier": "gen_api_user",
-        "password": "pass123",
-    })
+    r = client.post(
+        "/api/v1/auth/token",
+        json={
+            "identifier": "gen_api_user",
+            "password": "pass123",
+        },
+    )
     assert r.status_code == 200, r.get_json()
     data = r.get_json()
     return data["data"]["token"]
@@ -60,8 +63,12 @@ def test_app_generate_returns_ok_not_500(app, client):
         u.points = 100
         db.session.add(u)
         m = GenerationModel(
-            name="gpt-image-1", display_name="恭喜", points_per_image=5, enabled=True,
-            api_base_url="https://mock.example.com/v1", api_key="sk-mock",
+            name="gpt-image-1",
+            display_name="恭喜",
+            points_per_image=5,
+            enabled=True,
+            api_base_url="https://mock.example.com/v1",
+            api_key="sk-mock",
         )
         db.session.add(m)
         db.session.commit()

@@ -28,9 +28,7 @@ POINT_QUANTUM = Decimal(1).scaleb(-POINT_SCALE)
 # DECIMAL(30,10) 可表示的绝对值上限 = 10^20 - 10^-10。
 # 必须用字符串字面量构造：decimal 默认上下文精度只有 28 位，10^20 - 10^-10 需要 30 位有效数字，
 # 走算术运算会被静默舍入成 99999999999999999999.99999999（少两位）。
-POINT_MAX_ABS = Decimal(
-    "9" * (POINT_PRECISION - POINT_SCALE) + "." + "9" * POINT_SCALE
-)
+POINT_MAX_ABS = Decimal("9" * (POINT_PRECISION - POINT_SCALE) + "." + "9" * POINT_SCALE)
 
 
 # 积分运算上下文。

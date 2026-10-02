@@ -1,4 +1,5 @@
 """表情包服务：进程内缓存映射、文本渲染与提交清洗。"""
+
 import re
 from urllib.parse import quote
 
@@ -45,9 +46,7 @@ def render_stickers_html(text):
         if code not in smap:
             return ""
         url = "/stickers/file/" + quote(code, safe="")
-        return (
-            f'<img class="dna-sticker" src="{url}" alt="{code}" title="{code}">'
-        )
+        return f'<img class="dna-sticker" src="{url}" alt="{code}" title="{code}">'
 
     return _STICKER_TOKEN_RE.sub(_repl, text)
 

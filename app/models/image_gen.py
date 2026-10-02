@@ -22,11 +22,12 @@ class GenerationModel(db.Model):
     name = db.Column(db.String(120), nullable=False, index=True)
     display_name = db.Column(db.String(120), nullable=False)  # 前端展示名
     points_per_image = db.Column(
-        db.Numeric(precision=POINT_PRECISION, scale=POINT_SCALE), nullable=False, server_default="0", default=0
+        db.Numeric(precision=POINT_PRECISION, scale=POINT_SCALE),
+        nullable=False,
+        server_default="0",
+        default=0,
     )  # 每张图消耗的积分数
-    enabled = db.Column(
-        db.Boolean, nullable=False, server_default="1", default=True
-    )
+    enabled = db.Column(db.Boolean, nullable=False, server_default="1", default=True)
     # 模型级 API 配置（OpenAI 格式通道）：为空时回退全局 SiteConfig.image_base_url / image_api_key。
     # 每个模型可独立指向不同生图服务（如不同厂商），密钥不在模板中回显。
     api_base_url = db.Column(db.Text, nullable=True)
@@ -43,9 +44,7 @@ class GenerationLog(db.Model):
     __tablename__ = "generation_logs"
 
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(
-        db.Integer, db.ForeignKey("users.id"), nullable=False, index=True
-    )
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
     model_id = db.Column(
         db.Integer, db.ForeignKey("generation_models.id"), nullable=True, index=True
     )
@@ -53,16 +52,19 @@ class GenerationLog(db.Model):
     prompt = db.Column(db.Text, nullable=False)
     size = db.Column(db.String(20), nullable=True)  # 如 1024x1024 / None=auto
     count = db.Column(db.Integer, nullable=False, default=1)  # 请求张数
-    references_count = db.Column(
-        db.Integer, nullable=False, server_default="0", default=0
-    )
+    references_count = db.Column(db.Integer, nullable=False, server_default="0", default=0)
     status = db.Column(
         db.String(10), nullable=False, default="success"
     )  # success / partial / failed
     images = db.deferred(db.Column(LONGTEXT, nullable=True))  # JSON 数组：base64 data URL 列表
-    reference_images = db.deferred(db.Column(LONGTEXT, nullable=True))  # JSON 数组：参考图的 WebP Data URL 列表
+    reference_images = db.deferred(
+        db.Column(LONGTEXT, nullable=True)
+    )  # JSON 数组：参考图的 WebP Data URL 列表
     points_spent = db.Column(
-        db.Numeric(precision=POINT_PRECISION, scale=POINT_SCALE), nullable=False, server_default="0", default=0
+        db.Numeric(precision=POINT_PRECISION, scale=POINT_SCALE),
+        nullable=False,
+        server_default="0",
+        default=0,
     )
     error = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, server_default=db.func.now())
@@ -100,14 +102,10 @@ class GenerationTask(db.Model):
     __tablename__ = "generation_tasks"
 
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(
-        db.Integer, db.ForeignKey("users.id"), nullable=False, index=True
-    )
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
     status = db.Column(db.String(16), nullable=False, default="pending", index=True)
     prompt = db.Column(db.Text, nullable=False)
-    model_id = db.Column(
-        db.Integer, db.ForeignKey("generation_models.id"), nullable=True
-    )
+    model_id = db.Column(db.Integer, db.ForeignKey("generation_models.id"), nullable=True)
     model_name = db.Column(db.String(120), nullable=True)
     size = db.Column(db.String(20), nullable=True)
     count = db.Column(db.Integer, nullable=False, default=1)
@@ -117,9 +115,7 @@ class GenerationTask(db.Model):
     result_log_id = db.Column(db.Integer, nullable=True)
     error = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, server_default=db.func.now())
-    updated_at = db.Column(
-        db.DateTime, server_default=db.func.now(), onupdate=db.func.now()
-    )
+    updated_at = db.Column(db.DateTime, server_default=db.func.now(), onupdate=db.func.now())
 
     def reference_list(self):
         if not self.reference_data:
@@ -128,4 +124,3 @@ class GenerationTask(db.Model):
             return json.loads(self.reference_data)
         except (ValueError, TypeError):
             return []
-

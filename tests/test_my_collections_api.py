@@ -22,8 +22,9 @@ class TestConfig(Config):
 def app(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
     app = create_app(TestConfig)
-    assert app.config["SQLALCHEMY_DATABASE_URI"].startswith("sqlite"), \
+    assert app.config["SQLALCHEMY_DATABASE_URI"].startswith("sqlite"), (
         f"🧨 测试连到了非 SQLite 数据库！{app.config['SQLALCHEMY_DATABASE_URI']}"
+    )
     with app.app_context():
         db.create_all()
         yield app
@@ -40,7 +41,9 @@ def test_my_favorites_and_likes_api(app, client):
     """GET /api/v1/my/favorites、/my/likes 返回收藏/点赞的角色卡列表。"""
     with app.app_context():
         author = User(
-            username="mc_author", nickname="作者", email="mc_a@example.com",
+            username="mc_author",
+            nickname="作者",
+            email="mc_a@example.com",
         )
         author.set_password("pass123")
         u = User(username="mc_u", nickname="用户", email="mc_u@example.com")

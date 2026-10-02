@@ -52,9 +52,7 @@ MAX_COUNT = 2
 @login_required
 def workbench():
     models = (
-        GenerationModel.query.filter_by(enabled=True)
-        .order_by(GenerationModel.display_name)
-        .all()
+        GenerationModel.query.filter_by(enabled=True).order_by(GenerationModel.display_name).all()
     )
     # 默认选中每图积分最低的可用模型
     default_model = min(models, key=lambda m: m.points_per_image or 0) if models else None
@@ -210,10 +208,7 @@ def generate():
     ref_count = len(ref_payload)
     if ref_count:
         labels = "、".join(f"图片{i + 1}" for i in range(ref_count))
-        prompt = (
-            f"参考图片编号：{labels}。"
-            f"请按这些编号理解提示词中的图片引用。\n\n{prompt}"
-        )
+        prompt = f"参考图片编号：{labels}。请按这些编号理解提示词中的图片引用。\n\n{prompt}"
 
     # 预估算积分，点数不足禁止生成
     estimated = points_mul(count, model.points_per_image)
@@ -245,9 +240,7 @@ def generate():
         size=size,
         count=count,
         references_count=ref_count,
-        reference_data=(
-            json.dumps(ref_payload, ensure_ascii=False) if ref_payload else None
-        ),
+        reference_data=(json.dumps(ref_payload, ensure_ascii=False) if ref_payload else None),
         status="pending",
     )
     db.session.add(task)
@@ -339,37 +332,41 @@ def api_logs():
         img_count = (item.count or 1) if item.status != "failed" else 0
         ref_count = item.references_count or 0
         if img_count > 0:
-            items.append({
-                "id": item.id,
-                "first_image": url_for(
-                    "image_gen.output_image", log_id=item.id, idx=0
-                ),
-                "images": [
-                    url_for("image_gen.output_image", log_id=item.id, idx=i)
-                    for i in range(img_count)
-                ],
-                "references": [
-                    url_for("image_gen.reference_image", log_id=item.id, idx=i)
-                    for i in range(ref_count)
-                ],
-                "prompt": item.prompt,
-                "model_name": item.model_name,
-                "size": item.size or "auto",
-                "count": item.count,
-                "points_spent": points_to_str(item.points_spent),
-                "status": item.status,
-                "created_at": (item.created_at + timedelta(hours=8)).strftime("%Y-%m-%d %H:%M") if item.created_at else "",
-                "detail_url": url_for("image_gen.log_detail", log_id=item.id),
-            })
-    return jsonify({
-        "ok": True,
-        "total": pagination.total,
-        "page": pagination.page,
-        "pages": pagination.pages,
-        "has_next": pagination.has_next,
-        "has_prev": pagination.has_prev,
-        "items": items,
-    })
+            items.append(
+                {
+                    "id": item.id,
+                    "first_image": url_for("image_gen.output_image", log_id=item.id, idx=0),
+                    "images": [
+                        url_for("image_gen.output_image", log_id=item.id, idx=i)
+                        for i in range(img_count)
+                    ],
+                    "references": [
+                        url_for("image_gen.reference_image", log_id=item.id, idx=i)
+                        for i in range(ref_count)
+                    ],
+                    "prompt": item.prompt,
+                    "model_name": item.model_name,
+                    "size": item.size or "auto",
+                    "count": item.count,
+                    "points_spent": points_to_str(item.points_spent),
+                    "status": item.status,
+                    "created_at": (item.created_at + timedelta(hours=8)).strftime("%Y-%m-%d %H:%M")
+                    if item.created_at
+                    else "",
+                    "detail_url": url_for("image_gen.log_detail", log_id=item.id),
+                }
+            )
+    return jsonify(
+        {
+            "ok": True,
+            "total": pagination.total,
+            "page": pagination.page,
+            "pages": pagination.pages,
+            "has_next": pagination.has_next,
+            "has_prev": pagination.has_prev,
+            "items": items,
+        }
+    )
 
 
 @image_gen_bp.route("/logs")

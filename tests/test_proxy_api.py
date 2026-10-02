@@ -37,8 +37,9 @@ class TestConfig(Config):
 def app(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
     app = create_app(TestConfig)
-    assert app.config["SQLALCHEMY_DATABASE_URI"].startswith("sqlite"), \
+    assert app.config["SQLALCHEMY_DATABASE_URI"].startswith("sqlite"), (
         f"🧨 测试连到了非 SQLite 数据库！{app.config['SQLALCHEMY_DATABASE_URI']}"
+    )
     with app.app_context():
         db.create_all()
         yield app
@@ -101,6 +102,7 @@ class FakeResp:
 
 # ---------- 配置管理 ----------
 
+
 def test_set_config_creates_and_token_stable_on_edit(app, client):
     """首次创建签发令牌；编辑上游不改令牌、不清空密钥。"""
     with app.app_context():
@@ -160,9 +162,7 @@ def test_reset_token_invalidates_old(app, client, monkeypatch):
     monkeypatch.setattr(
         proxy_routes, "open_upstream", lambda req: FakeResp(chunks=(b'{"ok":true}',))
     )
-    r = client.get(
-        "/proxyapi/v1/models", headers={"Authorization": f"Bearer {old_token}"}
-    )
+    r = client.get("/proxyapi/v1/models", headers={"Authorization": f"Bearer {old_token}"})
     assert r.status_code == 200
 
     # 重置
@@ -174,15 +174,11 @@ def test_reset_token_invalidates_old(app, client, monkeypatch):
     assert new_token != old_token
 
     # 旧令牌失效
-    r = client.get(
-        "/proxyapi/v1/models", headers={"Authorization": f"Bearer {old_token}"}
-    )
+    r = client.get("/proxyapi/v1/models", headers={"Authorization": f"Bearer {old_token}"})
     assert r.status_code == 401
 
     # 新令牌可用
-    r = client.get(
-        "/proxyapi/v1/models", headers={"Authorization": f"Bearer {new_token}"}
-    )
+    r = client.get("/proxyapi/v1/models", headers={"Authorization": f"Bearer {new_token}"})
     assert r.status_code == 200
 
 
@@ -242,15 +238,14 @@ def test_two_users_independent_configs(app, client):
 
 # ---------- 鉴权 ----------
 
+
 def test_relay_requires_valid_token(app, client):
     r = client.get("/proxyapi/v1/models")
     assert r.status_code == 401
     body = r.get_json()
     assert body["error"]["code"] == "invalid_api_key"
 
-    r = client.get(
-        "/proxyapi/v1/models", headers={"Authorization": "Bearer sk-not-ours"}
-    )
+    r = client.get("/proxyapi/v1/models", headers={"Authorization": "Bearer sk-not-ours"})
     assert r.status_code == 401
 
     with app.app_context():
@@ -265,14 +260,13 @@ def test_relay_disabled_config(app, client):
     with app.app_context():
         token = ProxyConfig.query.one().token
 
-    r = client.get(
-        "/proxyapi/v1/models", headers={"Authorization": f"Bearer {token}"}
-    )
+    r = client.get("/proxyapi/v1/models", headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 403
     assert r.get_json()["error"]["code"] == "proxy_disabled"
 
 
 # ---------- 全量透传 ----------
+
 
 def test_relay_forward_get(app, client, monkeypatch):
     from app.routes import proxy as proxy_routes
@@ -419,9 +413,7 @@ def test_relay_upstream_connect_failure(app, client, monkeypatch):
 
     monkeypatch.setattr(proxy_routes, "open_upstream", fake_open)
 
-    r = client.get(
-        "/proxyapi/v1/models", headers={"Authorization": f"Bearer {token}"}
-    )
+    r = client.get("/proxyapi/v1/models", headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 502
     assert r.get_json()["error"]["code"] == "upstream_error"
 
@@ -432,6 +424,7 @@ def test_relay_upstream_connect_failure(app, client, monkeypatch):
 
 
 # ---------- 加密 ----------
+
 
 def test_encryption_roundtrip(app):
     from app.services.proxy_service import decrypt_secret, encrypt_secret
@@ -444,6 +437,7 @@ def test_encryption_roundtrip(app):
 
 
 # ---------- 管理端 ----------
+
 
 def test_admin_logs_require_super_admin(app, client, monkeypatch):
     from app.routes import proxy as proxy_routes
@@ -471,9 +465,7 @@ def test_admin_logs_require_super_admin(app, client, monkeypatch):
 
     # 退出 alice，登录 boss（同一 client；logout 是 GET 路由）
     client.get("/auth/logout")
-    resp = client.post(
-        "/auth/login", data={"identifier": "boss", "password": "pass123"}
-    )
+    resp = client.post("/auth/login", data={"identifier": "boss", "password": "pass123"})
     assert resp.status_code == 302, "boss login should redirect"
     r = client.get("/admin/proxy-logs")
     assert r.status_code == 200, f"boss admin page returned {r.status_code}"

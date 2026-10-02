@@ -16,8 +16,7 @@ def create_code(email: str, purpose: str = "register") -> str:
         email=email,
         code=code,
         purpose=purpose,
-        expires_at=datetime.datetime.utcnow()
-        + datetime.timedelta(minutes=CODE_TTL_MINUTES),
+        expires_at=datetime.datetime.utcnow() + datetime.timedelta(minutes=CODE_TTL_MINUTES),
     )
     db.session.add(record)
     db.session.commit()

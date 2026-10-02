@@ -1,4 +1,5 @@
 """邮件发送工具。"""
+
 import threading
 
 from flask import current_app
@@ -21,7 +22,7 @@ def send_verification_email(to: str, code: str) -> None:
     )
     msg.html = (
         f"<p>欢迎注册 <b>DNAISLAND</b>！</p>"
-        f"<p>你的邮箱验证码是：<b style=\"font-size:20px;letter-spacing:2px\">{code}</b></p>"
+        f'<p>你的邮箱验证码是：<b style="font-size:20px;letter-spacing:2px">{code}</b></p>'
         f"<p>该验证码 10 分钟内有效，请勿泄露给他人。</p>"
     )
     # 绑定请求期间的 app 对象，后台线程内重建上下文以访问 Flask-Mail 配置

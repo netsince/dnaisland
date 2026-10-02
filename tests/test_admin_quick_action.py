@@ -29,8 +29,9 @@ class TestConfig(Config):
 def app(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
     app = create_app(TestConfig)
-    assert app.config["SQLALCHEMY_DATABASE_URI"].startswith("sqlite"), \
+    assert app.config["SQLALCHEMY_DATABASE_URI"].startswith("sqlite"), (
         f"🧨 测试连到了非 SQLite 数据库！{app.config['SQLALCHEMY_DATABASE_URI']}"
+    )
     with app.app_context():
         db.create_all()
         yield app
@@ -44,9 +45,7 @@ def client(app):
 
 
 def _login(client, identifier, password="pass123"):
-    return client.post(
-        "/auth/login", data={"identifier": identifier, "password": password}
-    )
+    return client.post("/auth/login", data={"identifier": identifier, "password": password})
 
 
 def test_adjust_points_adds_and_subtracts(app, client):

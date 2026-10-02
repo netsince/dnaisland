@@ -51,18 +51,14 @@ def _seed(app):
     两人昵称都含「大佬」，便于一次搜索命中多个用户来验证批量序列化。
     """
     with app.app_context():
-        sponsor = User(
-            username="s_sponsor", nickname="赞助大佬", email="sp@example.com"
-        )
+        sponsor = User(username="s_sponsor", nickname="赞助大佬", email="sp@example.com")
         sponsor.set_password("pass123")
         plain = User(username="s_plain", nickname="普通大佬", email="pl@example.com")
         plain.set_password("pass123")
         db.session.add_all([sponsor, plain])
         db.session.commit()
 
-        db.session.add(
-            Sponsor(user_id=sponsor.id, display_name="赞助大佬", amount="¥66.6")
-        )
+        db.session.add(Sponsor(user_id=sponsor.id, display_name="赞助大佬", amount="¥66.6"))
         db.session.add_all(
             [
                 Card(

@@ -8,11 +8,7 @@ from ..services.notification_service import notify_super_admins
 
 def my_punishments_list(user_id: int):
     """返回某用户的处罚明细（按时间倒序）。Web 与 App 共用。"""
-    return (
-        Punishment.query.filter_by(user_id=user_id)
-        .order_by(Punishment.created_at.desc())
-        .all()
-    )
+    return Punishment.query.filter_by(user_id=user_id).order_by(Punishment.created_at.desc()).all()
 
 
 def submit_punishment_appeal(viewer, punishment, reason):
@@ -34,7 +30,7 @@ def submit_punishment_appeal(viewer, punishment, reason):
     punishment.appeal_at = db.func.now()
     db.session.commit()
     notify_super_admins(
-        f'用户 {viewer.nickname} 对处罚「{PUNISHMENT_TYPES.get(punishment.type, punishment.type)}」提交了申诉，请到「处罚申诉」处理。',
+        f"用户 {viewer.nickname} 对处罚「{PUNISHMENT_TYPES.get(punishment.type, punishment.type)}」提交了申诉，请到「处罚申诉」处理。",
         type_="punish",
     )
     return punishment, None

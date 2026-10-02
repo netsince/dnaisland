@@ -17,9 +17,7 @@ class Card(db.Model):
     opening = db.Column(db.Text, server_default="")
     original_link = db.Column(db.String(512), nullable=True)
     created_at = db.Column(db.DateTime, server_default=db.func.now())
-    updated_at = db.Column(
-        db.DateTime, server_default=db.func.now(), onupdate=db.func.now()
-    )
+    updated_at = db.Column(db.DateTime, server_default=db.func.now(), onupdate=db.func.now())
     status = db.Column(db.String(20), server_default="pending")
     # 内容指纹（sha256，由规范化后的文本字段生成）。用于同一作者重复提交时
     # 幂等去重：发现该作者已存在同指纹的「待审核」卡则复用，不再新建。
@@ -30,9 +28,7 @@ class Card(db.Model):
     hidden_tags = db.Column(db.JSON, nullable=False, default=list, server_default="[]")
     # 由隐匿标签**派生**的热度分乘数（1.0 = 不降权）。JSON 无法在 SQL 里高效判断，
     # 故冗余一个 SQL 可见列；唯一写入方是 card_hidden_tags.set_hidden_tags。
-    boost_factor = db.Column(
-        db.Float, nullable=False, default=1.0, server_default="1.0"
-    )
+    boost_factor = db.Column(db.Float, nullable=False, default=1.0, server_default="1.0")
     # 置顶时间：非空表示作者把该卡置顶到个人主页最前。
     # 每位作者最多 MAX_PINNED_CARDS 张、且仅限「已通过」（见 card_edit_service.set_card_pinned）。
     # 存时间戳而非布尔值，便于按置顶先后稳定排序（见 card_lists 的置顶优先排序）。
@@ -52,9 +48,7 @@ class Card(db.Model):
     author_note = db.Column(db.Text, nullable=True)
     # 作者注释注入间隔（每多少条历史消息注入一次），0 表示禁用。
     # 仅当 author_note 非空时生效；为空时导出为 0，客户端会自动回退到全局作者注释。
-    author_note_interval = db.Column(
-        db.Integer, nullable=False, server_default="0"
-    )
+    author_note_interval = db.Column(db.Integer, nullable=False, server_default="0")
 
     author = db.relationship("User", backref="cards")
     images = db.relationship("CardImage", backref="card")
@@ -133,9 +127,7 @@ class CardImage(db.Model):
     slot = db.Column(db.String(20), nullable=False)  # square | landscape | portrait
     data = db.deferred(db.Column(LONGTEXT, nullable=False))  # base64 data URI
     # 是否已做过“导出复制专用”的轻度压缩优化；优化过的图片在导出时直接复用，不再重压缩
-    optimized = db.Column(
-        db.Boolean, nullable=False, server_default=db.text("0"), index=True
-    )
+    optimized = db.Column(db.Boolean, nullable=False, server_default=db.text("0"), index=True)
 
 
 class CardLike(db.Model):
@@ -165,19 +157,13 @@ class CardCopyStat(db.Model):
     __tablename__ = "card_copy_stats"
 
     id = db.Column(db.Integer, primary_key=True)
-    card_id = db.Column(
-        db.String(36), db.ForeignKey("cards.id"), nullable=False, index=True
-    )
+    card_id = db.Column(db.String(36), db.ForeignKey("cards.id"), nullable=False, index=True)
     # 角色卡名称快照（复制时的名称，后续改名不影响历史记录）
     card_name = db.Column(db.String(120), nullable=False, server_default="")
-    user_id = db.Column(
-        db.Integer, db.ForeignKey("users.id"), nullable=False, index=True
-    )
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
     # 复制者用户名快照
     username = db.Column(db.String(120), nullable=False, server_default="")
-    copied_at = db.Column(
-        db.DateTime, server_default=db.func.now(), nullable=False, index=True
-    )
+    copied_at = db.Column(db.DateTime, server_default=db.func.now(), nullable=False, index=True)
     # 复制者来源 IP，用于版权溯源
     copier_ip = db.Column(db.String(64), nullable=True)
 
@@ -200,7 +186,9 @@ class Comment(db.Model):
     card_id = db.Column(db.String(36), db.ForeignKey("cards.id"), nullable=False, index=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     content = db.Column(db.Text, nullable=False)
-    image_data = db.deferred(db.Column(LONGTEXT, nullable=True))  # 评论图片（WebP base64 data URL），可空
+    image_data = db.deferred(
+        db.Column(LONGTEXT, nullable=True)
+    )  # 评论图片（WebP base64 data URL），可空
     created_at = db.Column(db.DateTime, server_default=db.func.now())
     # 评论审核（先发后审）：is_hidden=被拒绝隐藏；moderated=是否已进入审核流程处理过
     is_hidden = db.Column(db.Boolean, server_default="0", nullable=False, index=True)
@@ -210,4 +198,3 @@ class Comment(db.Model):
 
     author = db.relationship("User", backref="comments")
     reply_to = db.relationship("Comment", remote_side=[id], backref="replies")
-

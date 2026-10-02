@@ -4,6 +4,7 @@
 Pagination，避免对带聚合子查询的重查询再次执行 COUNT + 排序。
 接口仅暴露模板 `macros/pagination.html` 所需的属性/方法。
 """
+
 from math import ceil
 
 
