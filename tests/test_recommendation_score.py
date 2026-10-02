@@ -1,7 +1,8 @@
 """推荐算法：作者粉丝数（相对口径）+ 同作者窗口衰减。"""
 
+import math
 import random
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pytest
 from app import create_app, db
@@ -9,6 +10,7 @@ from app.config import Config
 from app.models import Card, UserFollow
 from app.models.user import User
 from app.routes.main import (
+    _FEATURED_SCORE_CACHE,
     _FOLLOWER_REF_CACHE,
     AUTHOR_WINDOW_DECAY,
     HOT_W_FOLLOWER,
@@ -17,6 +19,7 @@ from app.routes.main import (
     _sample_weights,
     _weighted_sample_with_author_decay,
 )
+from app.services.card_hidden_tags import REDUCE_BOOST, set_hidden_tags
 from sqlalchemy.dialects.mysql import LONGTEXT
 from sqlalchemy.ext.compiler import compiles
 
@@ -39,7 +42,10 @@ def app(monkeypatch):
     assert app.config["SQLALCHEMY_DATABASE_URI"].startswith("sqlite")
     with app.app_context():
         db.create_all()
-        _FOLLOWER_REF_CACHE._store.clear() if hasattr(_FOLLOWER_REF_CACHE, "_store") else None
+        # 推荐相关的缓存是模块级全局：不清空会让用例互相污染
+        # （例如上个用例缓存的「匿名 viewer 分数表」里没有本用例新建的卡）。
+        _FOLLOWER_REF_CACHE.clear()
+        _FEATURED_SCORE_CACHE.clear()
         yield app
         db.session.remove()
         db.metadata.drop_all(bind=db.engine, checkfirst=True)
@@ -112,9 +118,19 @@ def test_follower_term_raises_score_and_saturates(app):
 
         assert low < mid < at_ref, "粉丝越多得分应越高"
         assert above == pytest.approx(at_ref), "超过基准后应封顶，不再额外加分"
-        # 用比值断言（年龄权重对所有卡相同，会在比值里抵消）：
-        # 1 粉 → log10(2)/log10(10) ≈ 0.301，基准 → 1.0
-        assert at_ref / low == pytest.approx(1 / 0.30103, rel=0.02)
+
+        # 粉丝项本身必须与「冷启动基线」无关地成立：基线对每张卡等量相加，
+        # 会稀释直接比值。改用差分——同组内 img/age/boost 相同（记为 K），
+        #   score(f) - score(f') = HOT_W_FOLLOWER * (t_f - t_f') * K
+        # 两个差分之比可消掉未知的 K，直接检验对数归一化的线性。
+        t1 = math.log10(2) / math.log10(10)    # 1 粉
+        t5 = math.log10(6) / math.log10(10)    # 5 粉
+        t9 = 1.0                               # 达到 P90 基准 → 打满
+        per_unit_mid = (mid - low) / (t5 - t1)
+        per_unit_ref = (at_ref - low) / (t9 - t1)
+        assert per_unit_mid == pytest.approx(per_unit_ref, rel=0.02), (
+            "粉丝项应按 log10(1+f)/log10(1+基准) 归一化后线性加权"
+        )
 
 
 def test_follower_reference_scales_with_platform(app):
@@ -201,3 +217,86 @@ def test_weighted_sample_spreads_across_authors(monkeypatch):
 def test_weighted_sample_handles_zero_scores():
     score_map = {"a": (0.0, 1), "b": (0.0, 2)}
     assert _weighted_sample_with_author_decay(list(score_map), score_map, 2) == []
+
+
+# ---------------------------------------------------------------------------
+# 冷启动：零互动新卡不得恒为 0 分
+#
+# 旧实现 score = engagement × img × age × boost，年龄加成是**乘数**，
+# 零互动新卡 engagement 恒为 0，于是 0 × 1.4 = 0：在探索页垫底、
+# 在首页加权抽样中权重为 0（数学上永远抽不到）。
+# ---------------------------------------------------------------------------
+
+def test_zero_engagement_new_card_scores_above_zero(app):
+    """回归：零互动新卡得分必须为正，且不低于冷启动基线。"""
+    from app.routes.main import HOT_COLD_START_BASE
+
+    with app.app_context():
+        a = _user("cold_a")
+        c = _card(a, "fresh")
+        score = _score_map()[c.id]
+        assert score > 0, f"零互动新卡得分必须为正，实际 {score}"
+        # 新卡（age≤5、无图）的年龄系数 ≥1.0、带图系数 1.0，故分数不低于基线本身。
+        assert score >= HOT_COLD_START_BASE, (
+            f"零互动新卡得分 {score} 应不低于冷启动基线 {HOT_COLD_START_BASE}"
+        )
+
+
+def test_zero_engagement_new_card_outranks_zero_engagement_old_card(app):
+    """同样零互动：新卡必须压过老卡，因为基线同样吃年龄衰减。"""
+    with app.app_context():
+        a = _user("cold_b")
+        old = _card(a, "old", created=datetime.now() - timedelta(days=30))
+        new = _card(a, "new")
+        scores = _score_map()
+        assert scores[new.id] > scores[old.id], (
+            f"新卡 {scores[new.id]} 应高于 30 天前的老卡 {scores[old.id]}"
+        )
+
+
+def test_cold_start_baseline_is_still_suppressed_by_reduce_boost(app):
+    """基线在乘法括号内：降权卡的新卡基线同样 ×0.2，不能成为绕过降权的后门。"""
+    with app.app_context():
+        u = _user("cold_c")
+        now = datetime.now()
+        plain = _card(u, "plain", created=now)
+        flagged = _card(u, "flagged", created=now)
+        set_hidden_tags(flagged, [REDUCE_BOOST])
+        db.session.commit()
+
+        scores = _score_map()
+        assert scores[plain.id] > 0
+        assert scores[flagged.id] == pytest.approx(scores[plain.id] * 0.2, rel=0.01)
+
+
+def test_zero_engagement_new_card_has_nonzero_sampling_weight(app):
+    """首页加权抽样：零互动新卡权重必须 > 0（旧实现为 0，永远抽不到）。"""
+    from app.routes.main import _featured_score_map
+
+    with app.app_context():
+        a = _user("cold_d")
+        c = _card(a, "fresh")
+        with app.test_request_context("/"):
+            smap = _featured_score_map()
+            assert c.id in smap, "零互动新卡必须进入首页候选池"
+            assert _sample_weights([c.id], smap, {})[0] > 0, "零互动新卡在首页抽样中的权重必须为正"
+
+
+def test_new_card_sorts_before_old_card_with_a_single_view(app):
+    """端到端：老卡只要被点开过**一次**，就不得压过零互动的全新卡。
+
+    这是「新卡沉底」最直接的复现：旧实现里零互动新卡恒为 0 分，
+    而任何被点开过一次的老卡都有 log10(2)≈0.301 的正分，必然排在前面。
+    """
+    from app.routes.main import _order_by_hot
+
+    with app.app_context():
+        a = _user("cold_e")
+        old = _card(a, "old", created=datetime.now() - timedelta(days=45))
+        old.view_count = 1
+        new = _card(a, "new")
+        db.session.commit()
+        ids = [cid for (cid,) in _order_by_hot(Card.visible_to(None)).with_entities(Card.id).all()]
+        assert ids.index(new.id) < ids.index(old.id), (
+            "零互动新卡必须排在「只被点开过一次」的老卡之前"
+        )
