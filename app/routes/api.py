@@ -245,12 +245,12 @@ def paginated(query, page=1, per_page=20, *, serialize_fn=None):
     )
 
 
-def _cards_response(pag, cards):
+def _cards_response(pag, cards, *, with_pinned: bool = False):
     """把共享函数返回的 (pagination, cards) 序列化成 App JSON。"""
     return jsonify(
         ok=True,
         data={
-            "items": [_card_light(c) for c in cards],
+            "items": [_card_light(c, with_pinned=with_pinned) for c in cards],
             "page": pag.page,
             "pages": pag.pages,
             "total": pag.total,
@@ -283,11 +283,15 @@ def _user_public(user: User) -> dict:
     }
 
 
-def _card_light(card: Card) -> dict:
+def _card_light(card: Card, *, with_pinned: bool = False) -> dict:
     """轻量卡片摘要（卡片列表通用）。
 
     封面与作者已由 card_service.enrich_cards 批量预载（card.covers / card.author），
     这里不再逐卡发 count/查询，避免 N+1，使 App 端与网页版同样快。
+
+    with_pinned：**只有「作者自己的卡片列表」才传 True**（作者主页 / 我的角色卡）。
+    置顶是作者对自己主页排序的操作，与别的列表无关；此前这里无条件输出 pinned，
+    于是首页推荐、探索、刷一刷、搜索…到处挂着别人卡的「置顶」角标。
     """
     return {
         "id": card.id,
@@ -302,8 +306,8 @@ def _card_light(card: Card) -> dict:
         # 审核状态与隐藏状态（供「我的角色卡」管理页展示徽章）。
         "status": card.status,
         "is_hidden": bool(card.is_hidden),
-        # 是否已置顶（供主页/管理页展示「置顶」角标）。
-        "pinned": card.pinned_at is not None,
+        # 是否已置顶（只在作者主页 / 我的角色卡里为 true，见 docstring）。
+        "pinned": bool(with_pinned and card.pinned_at is not None),
     }
 
 
@@ -955,7 +959,7 @@ def users_profile(username):
             "following_count": following_count,
             "is_following": is_following,
             "cards": {
-                "items": [_card_light(c) for c in cards],
+                "items": [_card_light(c, with_pinned=True) for c in cards],
                 "page": cards_pag.page,
                 "pages": cards_pag.pages,
                 "total": cards_pag.total,
@@ -1161,7 +1165,7 @@ def users_follow(username):
 def my_cards():
     page = request.args.get("page", 1, type=int)
     pag, cards = _shared_my_cards(_ensure_self(), page=page, per_page=12)
-    return _cards_response(pag, cards)
+    return _cards_response(pag, cards, with_pinned=True)
 
 
 @api_bp.route("/my/favorites", methods=["GET"])

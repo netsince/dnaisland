@@ -146,7 +146,7 @@
  {% if pagination.total == 0 %}
  {{ empty_state('还没有发布任何角色卡。', '') }}
  {% else %}
- {{ card_grid(cards, show_status=(is_self or is_admin)) }}
+ {{ card_grid(cards, show_status=(is_self or is_admin), show_pin=True) }}
  {{ render_pagination(pagination, 'user.profile', args) }}
  {% endif %}
  {% elif tab == 'teahouse_posts' %}

@@ -244,3 +244,36 @@ def test_api_card_list_exposes_pinned(app, client):
     assert r.status_code == 200
     item = r.get_json()["data"]["cards"]["items"][0]
     assert item["pinned"] is True
+
+
+def test_api_explore_does_not_expose_pinned(app, client):
+    """置顶角标只属于「作者自己的列表」。
+
+    用户反馈：首页/探索里别人置顶的卡也挂着「置顶」角标。pinned 字段现在只在
+    作者主页与「我的角色卡」里为 true，探索（sort=new 是确定序）必须为 false。
+    """
+    with app.app_context():
+        u = _user("api5")
+        c = _card(u, "explore_me")
+        set_card_pinned(u, c.id, True)
+        cid = c.id
+    client.post("/auth/login", data={"identifier": "api5", "password": "pw"})
+
+    r = client.get("/api/v1/cards/explore?sort=new")
+    assert r.status_code == 200
+    items = r.get_json()["data"]["items"]
+    mine = [it for it in items if it["id"] == cid]
+    assert mine, "这张卡应该在探索结果里（否则用例是空跑）"
+    assert mine[0]["pinned"] is False
+
+
+def test_web_search_does_not_show_pinned_badge(app, client):
+    """网页版同理：搜索/首页这类列表不该出现「置顶」角标。"""
+    with app.app_context():
+        u = _user("web3")
+        c = _card(u, "searchable_pin")
+        set_card_pinned(u, c.id, True)
+
+    html = client.get("/search?q=searchable_pin").get_data(as_text=True)
+    assert "searchable_pin" in html, "卡片应该出现在搜索结果里（否则用例是空跑）"
+    assert "dna-tile__pin" not in html
