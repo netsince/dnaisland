@@ -1,4 +1,4 @@
-"""推荐算法：作者粉丝数（相对口径）+ 同作者窗口衰减。"""
+"""推荐算法：作者粉丝数（相对口径）+ 同作者窗口衰减 + 内容分量 + 新人保底名额。"""
 
 import math
 import random
@@ -7,15 +7,17 @@ from datetime import datetime, timedelta
 import pytest
 from app import create_app, db
 from app.config import Config
-from app.models import Card, UserFollow
+from app.models import Card, CardDialogueStyle, CardImage, UserFollow
 from app.models.user import User
 from app.routes.main import (
     _FEATURED_SCORE_CACHE,
     _FOLLOWER_REF_CACHE,
+    _NEWCOMER_ID_CACHE,
     AUTHOR_WINDOW_DECAY,
     HOT_W_FOLLOWER,
     _apply_hot_score,
     _follower_reference,
+    _newcomer_ids,
     _sample_weights,
     _weighted_sample_with_author_decay,
 )
@@ -46,6 +48,7 @@ def app(monkeypatch):
         # （例如上个用例缓存的「匿名 viewer 分数表」里没有本用例新建的卡）。
         _FOLLOWER_REF_CACHE.clear()
         _FEATURED_SCORE_CACHE.clear()
+        _NEWCOMER_ID_CACHE.clear()
         yield app
         db.session.remove()
         db.metadata.drop_all(bind=db.engine, checkfirst=True)
@@ -231,17 +234,31 @@ def test_weighted_sample_handles_zero_scores():
 
 
 def test_zero_engagement_new_card_scores_above_zero(app):
-    """回归：零互动新卡得分必须为正，且不低于冷启动基线。"""
-    from app.routes.main import HOT_COLD_START_BASE
+    """回归：零互动新卡得分必须为正，否则加权抽样永远抽不到它。
 
+    注意：内容分量乘数（0.4~1.0）会缩放冷启动基线，所以**空壳**新卡的分数不再
+    必然 ≥ 基线本身 —— 这正是本次要的效果（空壳不该和充实卡同分）。这里只保证
+    「> 0，仍可被抽到」；「有内容的新卡仍不低于基线」见下一个用例。
+    """
     with app.app_context():
         a = _user("cold_a")
         c = _card(a, "fresh")
         score = _score_map()[c.id]
         assert score > 0, f"零互动新卡得分必须为正，实际 {score}"
-        # 新卡（age≤5、无图）的年龄系数 ≥1.0、带图系数 1.0，故分数不低于基线本身。
+
+
+def test_content_rich_new_card_keeps_baseline_floor(app):
+    """有内容的新卡：内容分量打满 ⇒ 分数仍不低于冷启动基线（旧保证只对空壳收紧）。"""
+    from app.routes.main import HOT_COLD_START_BASE, HOT_CONTENT_FULL
+
+    with app.app_context():
+        a = _user("cold_rich")
+        c = _card(a, "rich")
+        c.persona = "字" * int(HOT_CONTENT_FULL)
+        db.session.commit()
+        score = _score_map()[c.id]
         assert score >= HOT_COLD_START_BASE, (
-            f"零互动新卡得分 {score} 应不低于冷启动基线 {HOT_COLD_START_BASE}"
+            f"内容量已达及格线的新卡得分 {score} 不应低于冷启动基线 {HOT_COLD_START_BASE}"
         )
 
 
@@ -303,3 +320,234 @@ def test_new_card_sorts_before_old_card_with_a_single_view(app):
         assert ids.index(new.id) < ids.index(old.id), (
             "零互动新卡必须排在「只被点开过一次」的老卡之前"
         )
+
+
+# ---------------------------------------------------------------------------
+# 内容分量：惩罚空壳，而不是奖励长度
+#
+# 用户反馈：字少的劣质卡会被推荐到前面，字多但新人的卡反而吃亏。
+# 根因是热度分里原本没有任何内容量信号 —— 空壳卡与充实卡只要互动/图/年龄相同
+# 就完全同分。下面用「同作者、同年龄、零互动、无图」的对照组来隔离这一项。
+# ---------------------------------------------------------------------------
+
+
+def _rich_card(author, name, chars=2000, dialogues=0, created=None):
+    """造一张内容充实的卡：人设 chars 个字，可选 dialogues 组对话示例。
+
+    [created] 显式传同一个时间时，同组卡的年龄权重完全相同 —— 否则「刚创建」
+    的先后差几微秒就足以让严格不等号成立，断言会为错误的原因通过。
+    """
+    c = _card(author, name, created=created)
+    c.persona = "字" * chars
+    db.session.flush()
+    for i in range(dialogues):
+        db.session.add(
+            CardDialogueStyle(
+                card_id=c.id,
+                turn_index=i,
+                user_text=f"用户第{i}句",
+                assistant_text=f"角色第{i}句",
+            )
+        )
+    db.session.commit()
+    return c
+
+
+def test_thin_card_scores_far_below_rich_card(app):
+    """同作者、同年龄、零互动、无图：空壳卡必须显著低于充实卡。
+
+    断言写死「至少低 40%」而不是引用 HOT_CONTENT_FLOOR —— 否则把下限调回 1.0
+    （等于关掉内容分量）时，断言会跟着一起放松，测试就抓不到回归了。
+    """
+    with app.app_context():
+        a = _user("content_a")
+        now = datetime.now()
+        thin = _card(a, "thin", created=now)  # persona=""（空壳）
+        rich = _rich_card(a, "rich", chars=2000, created=now)
+        scores = _score_map()
+
+        assert scores[thin.id] < scores[rich.id] * 0.6, (
+            "空壳卡应至少比充实卡低 40%（内容分量下限），实际 "
+            f"{scores[thin.id]} vs {scores[rich.id]}"
+        )
+        # 但仍为正：空壳卡依旧可被抽到，只是不再享受同等待遇。
+        assert scores[thin.id] > 0
+
+
+def test_content_multiplier_saturates(app):
+    """超过及格线不再加分：避免「谁字多谁赢」的字数军备竞赛。"""
+    with app.app_context():
+        a = _user("content_b")
+        now = datetime.now()
+        below = _rich_card(a, "below", chars=900, created=now)  # 未到及格线
+        at_full = _rich_card(a, "at_full", chars=1500, created=now)
+        way_over = _rich_card(a, "way_over", chars=9000, created=now)
+        scores = _score_map()
+        assert scores[below.id] < scores[at_full.id] * 0.95, "及格线以下应继续获益"
+        assert scores[at_full.id] == pytest.approx(scores[way_over.id], rel=0.01), (
+            "内容量超过及格线后不应继续获益"
+        )
+
+
+def test_content_multiplier_ramps_monotonically(app):
+    """及格线以下单调爬升：越空越低（用严格不等号，关掉内容分量即失败）。"""
+    with app.app_context():
+        a = _user("content_c")
+        now = datetime.now()
+        empty = _card(a, "c0", created=now)
+        small = _rich_card(a, "c300", chars=300, created=now)
+        mid = _rich_card(a, "c900", chars=900, created=now)
+        full = _rich_card(a, "c1500", chars=1500, created=now)
+        scores = _score_map()
+        ordered = [scores[c.id] for c in (empty, small, mid, full)]
+        assert ordered[0] < ordered[1] * 0.95, f"300 字应明显高于空壳，实际 {ordered}"
+        assert ordered[1] < ordered[2] * 0.95, f"900 字应明显高于 300 字，实际 {ordered}"
+        assert ordered[2] < ordered[3] * 0.95, f"及格线应明显高于 900 字，实际 {ordered}"
+        assert ordered[0] > 0
+
+
+def test_content_counts_dialogue_examples(app):
+    """对话示例也算投入：人设很短但示例齐全的卡同样能打满内容分量。"""
+    with app.app_context():
+        a = _user("content_d")
+        now = datetime.now()
+        bare = _card(a, "bare", created=now)  # 人设空、无示例
+        with_examples = _rich_card(a, "examples", chars=100, dialogues=8, created=now)
+        rich = _rich_card(a, "persona", chars=1500, created=now)
+        scores = _score_map()
+
+        assert scores[with_examples.id] > scores[bare.id] * 1.5, "带示例的卡必须明显高于空壳卡"
+        assert scores[with_examples.id] == pytest.approx(scores[rich.id], rel=0.01), (
+            "8 组示例折算的字数已达及格线，应与纯人设打满的卡同分"
+        )
+
+
+def test_content_multiplier_cannot_bypass_reduce_boost(app):
+    """内容分量在乘法括号内：降权卡的「内容收益」同样被 ×0.2 压制，不是后门。"""
+    with app.app_context():
+        u = _user("content_e")
+        plain = _rich_card(u, "plain_rich", chars=2000)
+        flagged = _rich_card(u, "flagged_rich", chars=2000)
+        set_hidden_tags(flagged, [REDUCE_BOOST])
+        db.session.commit()
+
+        scores = _score_map()
+        assert scores[flagged.id] == pytest.approx(scores[plain.id] * 0.2, rel=0.01)
+
+
+# ---------------------------------------------------------------------------
+# 新人保底名额：新人作品固定占几个推荐位
+#
+# 作者影响力项是加在 engagement 里的固定加数（最多 +4），与卡片质量无关：
+# 老作者的零互动空壳卡得分是新人的零互动充实卡的 2.3 倍。新人缺的是曝光位，
+# 只能靠固定名额来给（见 NEWCOMER_SLOTS）。
+# ---------------------------------------------------------------------------
+
+
+def test_newcomer_pool_definition(app):
+    """新人作品口径：作者作品数 ≤ 3 且本卡发布 ≤ 14 天。"""
+    from app.routes.main import NEWCOMER_CARD_MAX_AGE_DAYS, NEWCOMER_MAX_APPROVED_CARDS
+
+    with app.app_context():
+        fresh_author = _user("nc_fresh")
+        first = _card(fresh_author, "first")  # 第 1 张、刚发布 ⇒ 新人作品
+        old_card = _card(
+            fresh_author,
+            "old",
+            created=datetime.now() - timedelta(days=NEWCOMER_CARD_MAX_AGE_DAYS + 1),
+        )
+
+        prolific = _user("nc_prolific")
+        cards = [_card(prolific, f"p{i}") for i in range(NEWCOMER_MAX_APPROVED_CARDS + 1)]
+
+        hidden = _user("nc_hidden")
+        hidden_card = _card(hidden, "hidden")
+        hidden_card.is_hidden = True
+        pending = _user("nc_pending")
+        pending_card = _card(pending, "pending")
+        pending_card.status = "pending"
+        db.session.commit()
+
+        ids = _newcomer_ids()
+        assert first.id in ids, "刚发布的第一张卡应算新人作品"
+        assert old_card.id not in ids, "超过保底天数的卡不再参与"
+        assert all(c.id not in ids for c in cards), (
+            f"作者已通过 {len(cards)} 张卡（>{NEWCOMER_MAX_APPROVED_CARDS}）就不算新人了"
+        )
+        assert hidden_card.id not in ids, "隐藏卡不参与"
+        assert pending_card.id not in ids, "未通过审核的卡不参与"
+
+
+def _veteran_cards(author, n, prefix, with_image=False):
+    """造 n 张「老作者的高分卡」：内容充实 + 高浏览 + 高复制，把加权池占满。"""
+    for i in range(n):
+        c = _rich_card(author, f"{prefix}{i}", chars=2000)
+        c.view_count = 100000
+        c.copy_count = 5000
+        if with_image:
+            db.session.add(
+                CardImage(card_id=c.id, slot="portrait", data="data:image/png;base64,AAAA")
+            )
+    db.session.commit()
+
+
+def test_featured_reserves_slots_for_newcomers(app, monkeypatch):
+    """首页推荐：即使新人卡分数垫底，也必须靠保底名额被排进这一批。
+
+    为了让结论**确定**而不是靠运气：
+    - 关掉「纯随机名额」（randint→0）—— 否则它偶尔会顺手把新人卡抽进来，
+      把「保底名额失效」这个回归掩盖掉；
+    - 新人卡 boost_factor 压到 0.001（等效于「分数垫底到加权池几乎抽不到」），
+      老作者 30 张高分卡把加权池占满；
+    - 固定随机种子，结果可复现。
+    对照验证过：NEWCOMER_SLOTS 置 0 时本用例失败。
+    """
+    from app.routes import main as main_mod
+    from app.routes.main import _featured_score_map, featured_cards
+
+    with app.app_context():
+        veteran = _user("nc_veteran")
+        _veteran_cards(veteran, 30, "v")
+
+        rookie = _user("nc_rookie")
+        rookie_card = _card(rookie, "rookie")  # 空壳 + 零互动 + 极低权重
+        rookie_card.boost_factor = 0.001
+        db.session.commit()
+
+        with app.test_request_context("/"):
+            _featured_score_map()  # 预热缓存，确保分数表包含新卡
+            monkeypatch.setattr(main_mod.random, "randint", lambda a, b: 0)
+            random.seed(20261101)
+            picked = [c.id for c in featured_cards(limit=12)]
+
+        assert rookie_card.id in picked, (
+            "新人保底名额没有生效：分数垫底的新人卡被加权池挤掉了"
+        )
+        assert len(picked) == 12, "结果条数应保持 limit（名额不足时由加权池补满）"
+        assert len(set(picked)) == 12, "同一批里不应出现重复卡"
+
+
+def test_swipe_reserves_slots_for_newcomers(app, monkeypatch):
+    """刷一刷：同一套三池抽样，新人卡（有封面）也保底入选。"""
+    from app.routes import main as main_mod
+    from app.routes.main import _featured_score_map, swipe_cards
+
+    with app.app_context():
+        veteran = _user("nc_sw_veteran")
+        _veteran_cards(veteran, 30, "sv", with_image=True)
+
+        rookie = _user("nc_sw_rookie")
+        rookie_card = _card(rookie, "sw_rookie")
+        rookie_card.boost_factor = 0.001
+        db.session.add(
+            CardImage(card_id=rookie_card.id, slot="square", data="data:image/png;base64,AAAA")
+        )
+        db.session.commit()
+
+        with app.test_request_context("/"):
+            _featured_score_map()
+            monkeypatch.setattr(main_mod.random, "randint", lambda a, b: 0)
+            random.seed(20261101)
+            picked = {c.id for c in swipe_cards(limit=12)}
+
+        assert rookie_card.id in picked, "刷一刷也应给新人作品留名额"

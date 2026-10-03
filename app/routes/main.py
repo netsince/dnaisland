@@ -25,6 +25,7 @@ from ..models import (
     Article,
     Card,
     CardCopyStat,
+    CardDialogueStyle,
     CardFavorite,
     CardImage,
     CardLike,
@@ -69,6 +70,27 @@ HOT_IMG_MULT = 1.3  # 带图卡整体得分 ×1.3
 # 不会变成绕过降权的后门（见 tests/test_recommendation_score.py）。
 # 回滚：置 0.0 即精确恢复旧行为（零互动新卡重新恒为 0 分）。
 HOT_COLD_START_BASE = 3.0
+
+# 内容分量乘数（HOT_CONTENT_FLOOR ~ 1.0）：**惩罚空壳，而不是奖励长度**。
+#
+# 问题：热度分里原本没有任何「内容量」信号 —— 一张 persona 只有几十字的空壳卡，
+# 与一张人设数千字 + 多组对话示例的卡，只要互动/带图/年龄相同就**完全同分**。
+# 排序（探索最热）与加权抽样（首页/刷一刷）都分辨不出劣质卡，首页那 1~2 个
+# 纯随机名额更是无条件把任意卡送上前排。作者影响力项又让老作者的零互动空壳卡
+# 压过新人的零互动充实卡（详见 tests/test_recommendation_score.py）。
+#
+# 设计取向：
+#   * **饱和曲线**：内容量到「及格线」就打满 1.0，超过不再加分 —— 避免
+#     「谁字多谁赢」的字数军备竞赛，也堵住堆砌废话刷分；
+#   * 低于及格线线性下滑，**下限 0.4**：空壳卡抽样权重只剩 40%，但既不为 0
+#     （仍可能被抽到），也仍能靠真实互动爬回来 —— 我们只是不再给它同等待遇；
+#   * 放在**乘法括号内**（与带图/年龄/boost 同级）：降权卡（减少推流 ×0.2）的
+#     内容收益同样被压制，不会变成绕过降权的后门，与冷启动基线同一原则。
+#
+# 回滚：HOT_CONTENT_FLOOR 置 1.0 即精确恢复旧行为（内容量不再影响分数）。
+HOT_CONTENT_FULL = 1500.0  # 及格线（字符数）：内容量达到它即打满 1.0
+HOT_CONTENT_FLOOR = 0.4  # 下限乘数：完全空壳卡的得分系数
+HOT_CONTENT_DIALOGUE_CHARS = 200.0  # 每组对话示例折算的等效字数（示例同样是投入）
 # 探索页「热门」排序的年龄权重曲线（三段式，是整个 engagement 的乘数）：
 #   0~5 日  ：上升权重 —— 新卡整体得分被放大（最新 ×1.4），到 5 日回落到 ×1.0；
 #             注意这是乘数：它只放大已有互动，零互动卡靠 HOT_COLD_START_BASE 保底。
@@ -90,6 +112,21 @@ FOLLOWER_REF_TTL = 3600  # 基准重算间隔（秒）
 # 同作者窗口衰减：同一个推荐窗口内，该作者已入选 k 张时，本张抽样权重再乘 decay^k。
 # 只作用于「一次返回一批」的首页推荐与刷一刷（探索页是分页确定性排序，见 card_lists）。
 AUTHOR_WINDOW_DECAY = 0.5
+
+# 新人保底名额：首页「为你推荐」与「刷一刷」每次固定留几个名额给**新人作品**。
+#
+# 为什么不能只靠分数：作者影响力项（粉丝 P90 归一化，最多 +4）是加在 engagement
+# 里的固定加数、与卡片质量无关，于是「老作者的零互动空壳卡」比「新人的零互动
+# 充实卡」高 2.3 倍。而新人真正缺的是**曝光位** ——「没曝光 → 没互动 → 更没曝光」
+# 是个死锁，冷启动基线只能让他不为 0 分，给不了位置。
+#
+# 「新人」口径取**作品数**而非注册时间：注册一年后才发第一张卡的人同样是新人；
+# 同时要求本卡发布不久，避免旧卡被永久钉在前排。名额与「纯随机」名额并存
+# （后者负责偶遇感），三池互不重叠，池子不够时由加权池补满。
+NEWCOMER_SLOTS = 2  # 每次推荐固定留给新人作品的名额数
+NEWCOMER_MAX_APPROVED_CARDS = 3  # 作者「已通过」卡数 ≤ 此值算新人作者
+NEWCOMER_CARD_MAX_AGE_DAYS = 14  # 只有发布不超过此天数的卡参与保底
+NEWCOMER_TTL = 60  # 新人卡集合的重算间隔（秒）
 
 
 def _has_image_subquery():
@@ -154,8 +191,9 @@ def featured_cards(limit=12, exclude_ids=None):
     """首页「为你推荐」统一入口：网页版 index 与 API cards_featured 共用。
 
     与探索页同款加权得分做加权随机，但保留发现感：
-    - 每张卡用探索同款得分（互动加权 × 三段年龄权重）作为抽样权重，热门卡被抽中概率更高；
-      得分里已含「带图 ×1.3」与新鲜度加成，故天然「有图优先」。
+    - 每张卡用探索同款得分（互动加权 × 内容分量 × 三段年龄权重）作为抽样权重，热门卡被抽中概率更高；
+      得分里已含「带图 ×1.3」与新鲜度加成，故天然「有图优先」；
+    - 固定留 NEWCOMER_SLOTS 个名额给新人作品（见 NEWCOMER_SLOTS 说明）；
     - 预留 1~2 个名额做「纯随机」均匀抽样，注入偶遇感，避免前排总被热门占据。
     - exclude_ids 为已展示过的 id（换一换时传入），从候选池剔除，保证不重复。
     - 返回带 `cover` 标记的 Card 列表；真实图片由前端按 `/card-image/...` 按需加载。
@@ -170,17 +208,7 @@ def featured_cards(limit=12, exclude_ids=None):
         return []
 
     pool = [cid for cid in score_map if cid not in exclude] or list(score_map.keys())
-
-    # 纯随机保底名额：1~2 个；其余按得分加权无放回抽样（含同作者窗口衰减）
-    pure = min(random.randint(1, 2), max(0, limit - 1))
-    weighted_n = max(0, limit - pure)
-
-    chosen = _weighted_sample_with_author_decay(pool, score_map, weighted_n)
-    chosen_set = set(chosen)
-    avail = [cid for cid in pool if cid not in chosen_set]
-
-    pure_picks = random.sample(avail, min(pure, len(avail))) if pure and avail else []
-    result_ids = chosen + pure_picks
+    result_ids = _pick_recommended(pool, score_map, limit)
     random.shuffle(result_ids)
 
     # 预载作者（1 条 LEFT JOIN），避免序列化时逐卡再查作者造成 N+1。
@@ -231,16 +259,8 @@ def swipe_cards(limit=12, exclude_ids=None):
     if not pool:
         return []
 
-    # 纯随机保底名额 1~2；其余按得分加权无放回抽样（含同作者窗口衰减）。
-    pure = min(random.randint(1, 2), max(0, limit - 1))
-    weighted_n = max(0, limit - pure)
-
-    chosen = _weighted_sample_with_author_decay(pool, score_map, weighted_n)
-    chosen_set = set(chosen)
-    avail = [cid for cid in pool if cid not in chosen_set]
-
-    pure_picks = random.sample(avail, min(pure, len(avail))) if pure and avail else []
-    result_ids = chosen + pure_picks
+    # 与首页同一套三池抽样（加权热门 + 新人保底 + 纯随机）。
+    result_ids = _pick_recommended(pool, score_map, limit)
     random.shuffle(result_ids)
 
     # 预载作者 + 批量封面，避免 N+1。
@@ -410,6 +430,31 @@ def _log_base(expr, base):
     return func.log10(expr) / math.log10(base)
 
 
+def _char_len(expr):
+    """取**字符数**（而非字节数）的跨库写法。
+
+    不能直接用 LENGTH()：MySQL 的 LENGTH() 返回**字节数**，utf8mb4 下一个汉字算
+    3 个 —— 同一张卡在开发(SQLite)与生产(MySQL)会得到差 3 倍的内容量，阈值形同
+    虚设。SQLite 没有 CHAR_LENGTH()，它的 LENGTH() 本身就是字符数，故按引擎分支
+    （与 `_apply_hot_score` 里 age_hours 的写法一致）。
+    """
+    if db.engine.name == "sqlite":
+        return func.length(expr)
+    return func.char_length(expr)
+
+
+def _dialogue_count_subquery():
+    """一次聚合出每张卡的对话示例组数（card_id -> count），供内容分量使用。"""
+    return (
+        db.session.query(
+            CardDialogueStyle.card_id,
+            func.count(CardDialogueStyle.id).label("dc"),
+        )
+        .group_by(CardDialogueStyle.card_id)
+        .subquery("card_dialogue_agg")
+    )
+
+
 # 作者影响力归一化基准（全体作者粉丝数的 P90）缓存：变化很慢，1 小时重算一次足够。
 _FOLLOWER_REF_CACHE = TimedCache(ttl=FOLLOWER_REF_TTL, maxsize=2)
 
@@ -475,12 +520,98 @@ def _weighted_sample_with_author_decay(pool, score_map, n):
     return chosen
 
 
+# 「新人作品」卡 id 集合缓存：条件只与发布/审核时间有关，60s 重算一次足够。
+_NEWCOMER_ID_CACHE = TimedCache(ttl=NEWCOMER_TTL, maxsize=2)
+
+
+def _newcomer_ids() -> set:
+    """「新人作品」卡 id 集合（已通过、未隐藏、发布不久、作者作品数还很少）。
+
+    口径见 NEWCOMER_SLOTS 处的说明：按**作品数**而不是注册时间认定新人，且要求
+    本卡发布不超过 NEWCOMER_CARD_MAX_AGE_DAYS 天。
+
+    只按**全局**条件取一次并缓存：可见性过滤（屏蔽作者、被处罚隐藏）交给调用方
+    与推荐池求交集，这样与 `_featured_score_map()` 的口径天然一致。
+    """
+    hit = _NEWCOMER_ID_CACHE.get("ids")
+    if hit is not None:
+        return hit
+
+    cutoff = datetime.now() - timedelta(days=NEWCOMER_CARD_MAX_AGE_DAYS)
+    per_author = (
+        db.session.query(
+            Card.author_id.label("author_id"),
+            func.count(Card.id).label("n"),
+        )
+        .filter(Card.status == "approved", Card.is_hidden.is_(False))
+        .group_by(Card.author_id)
+        .subquery("author_approved_count")
+    )
+    rows = (
+        db.session.query(Card.id)
+        .join(per_author, per_author.c.author_id == Card.author_id)
+        .filter(
+            Card.status == "approved",
+            Card.is_hidden.is_(False),
+            Card.created_at >= cutoff,
+            per_author.c.n <= NEWCOMER_MAX_APPROVED_CARDS,
+        )
+        .all()
+    )
+    ids = {str(cid) for (cid, ) in rows}
+    _NEWCOMER_ID_CACHE.set("ids", ids)
+    return ids
+
+
+def _pick_recommended(pool, score_map, limit):
+    """从候选池里挑 limit 张卡：**加权热门 + 新人保底 + 纯随机**（三池互不重叠）。
+
+    首页「为你推荐」与「刷一刷」共用同一个函数，保证两个推荐面的口径一致。
+
+    * 加权池：按热度分（含内容分量）× 同作者窗口衰减，抽 limit 的绝大部分；
+    * 新人池：固定留 NEWCOMER_SLOTS 个名额给新人作品（理由见 NEWCOMER_SLOTS），
+      只从「新人作品 ∩ 候选池 ∩ 未入选」里抽，池子不够就自然少抽；
+    * 纯随机池：1~2 个均匀随机名额，负责偶遇感；
+    * 最后若还差几张（新人池/随机池不够），用加权池补满，保证首页条数稳定。
+    """
+    if not pool or limit <= 0:
+        return []
+
+    pure = min(random.randint(1, 2), max(0, limit - 1))
+    # 至少给加权池留 1 个名额，避免小 limit 时名额被保底池吃光。
+    newcomer_n = min(NEWCOMER_SLOTS, max(0, limit - pure - 1))
+    weighted_n = max(0, limit - pure - newcomer_n)
+
+    chosen = _weighted_sample_with_author_decay(pool, score_map, weighted_n)
+    taken = set(chosen)
+
+    if newcomer_n:
+        fresh = [cid for cid in pool if cid not in taken and cid in _newcomer_ids()]
+        chosen += _weighted_sample_with_author_decay(fresh, score_map, newcomer_n)
+        taken = set(chosen)
+
+    if pure:
+        avail = [cid for cid in pool if cid not in taken]
+        if avail:
+            chosen += random.sample(avail, min(pure, len(avail)))
+            taken = set(chosen)
+
+    if len(chosen) < limit:
+        avail = [cid for cid in pool if cid not in taken]
+        chosen += _weighted_sample_with_author_decay(
+            avail, score_map, limit - len(chosen)
+        )
+    return chosen
+
+
 def _apply_hot_score(q):
     """对查询 q 做探索热度所需的 outerjoin，并返回 (q, score_expr)。
 
-    score_expr 与探索页排序同款：(互动加权 + 冷启动基线) × 带图系数 × 三段年龄权重 × boost_factor。
+    score_expr 与探索页排序同款：
+        (互动加权 + 冷启动基线) × 带图系数 × 内容分量 × 三段年龄权重 × boost_factor。
     互动加权为 评论6/收藏3/复制4/点赞2/浏览1，并叠加**作者影响力项**（粉丝数相对 P90 归一化，
-    权重 HOT_W_FOLLOWER，封顶 1.0）；冷启动基线 HOT_COLD_START_BASE 保证零互动新卡不为 0 分。
+    权重 HOT_W_FOLLOWER，封顶 1.0）；冷启动基线 HOT_COLD_START_BASE 保证零互动新卡不为 0 分；
+    内容分量 HOT_CONTENT_FLOOR~1.0 惩罚空壳卡（见常量处说明）。
     供 `_order_by_hot` 排序与首页加权随机复用，确保两处推荐口径一致。
     复制数取近 30 天并经对数压缩（HOT_W_COPY / COPY_WINDOW_DAYS）。
     """
@@ -490,12 +621,14 @@ def _apply_hot_score(q):
     cpa = _copies_agg_subquery()
     ia = _has_image_subquery()
     ufa = _author_followers_subquery()
+    da = _dialogue_count_subquery()
     q = q.outerjoin(la, la.c.card_id == Card.id)
     q = q.outerjoin(fa, fa.c.card_id == Card.id)
     q = q.outerjoin(ca, ca.c.card_id == Card.id)
     q = q.outerjoin(cpa, cpa.c.card_id == Card.id)
     q = q.outerjoin(ia, ia.c.card_id == Card.id)
     q = q.outerjoin(ufa, ufa.c.author_id == Card.author_id)
+    q = q.outerjoin(da, da.c.card_id == Card.id)
 
     if db.engine.name == "sqlite":
         age_hours = (func.julianday("now") - func.julianday(Card.created_at)) * 24.0
@@ -549,9 +682,32 @@ def _apply_hot_score(q):
     # 带图倍数放大：带图卡整体互动得分 ×HOT_IMG_MULT，无图 ×1.0，
     # 让带图的优势按整卡规模生效，而非被浏览量淹没的固定加分。
     img_mult = case((ia.c.card_id.isnot(None), HOT_IMG_MULT), else_=1.0)
+
+    # 内容分量：人设 + 简介 + 开场白 + 对话示例折算字数，达到及格线即打满 1.0，
+    # 低于及格线线性下滑到 HOT_CONTENT_FLOOR（详见常量处说明）。
+    # 用 case 而非 min()/LEAST()：两者在 SQLite / MySQL 上语义不同（后者两参数
+    # 形式是聚合函数，会报错），case 两端一致。
+    content_chars = (
+        _char_len(func.coalesce(Card.persona, ""))
+        + _char_len(func.coalesce(Card.intro, ""))
+        + _char_len(func.coalesce(Card.opening, ""))
+        + func.coalesce(da.c.dc, 0) * HOT_CONTENT_DIALOGUE_CHARS
+    )
+    content_ratio = case(
+        (content_chars >= HOT_CONTENT_FULL, 1.0),
+        else_=content_chars / HOT_CONTENT_FULL,
+    )
+    content_mult = HOT_CONTENT_FLOOR + (1.0 - HOT_CONTENT_FLOOR) * content_ratio
+
     # 隐匿标签降权（如「减少推流」×0.2）：boost_factor 由 card_hidden_tags 派生，
     # 是 SQL 可见列，因此首页推荐/刷一刷/探索热门/搜索相关度口径统一。
-    score = engagement * img_mult * age_factor * func.coalesce(Card.boost_factor, 1.0)
+    score = (
+        engagement
+        * img_mult
+        * content_mult
+        * age_factor
+        * func.coalesce(Card.boost_factor, 1.0)
+    )
     return q, score
 
 
