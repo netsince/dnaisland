@@ -66,6 +66,30 @@ def _extract_images(payload):
     return out
 
 
+# ---------------------------------------------------------------------------
+# 上游错误的「人话翻译」
+#
+# 只翻译**含义确定**的少数几种，其余一律原样返回（绝不吞掉真实错误）。
+#
+# 目前只有一条：Go 网关的 multipart 解析在中继时读到 EOF。实测（生产库该模型带参考图
+# 17/17 全失败 + 直连复现）：img.yunfei.best 上 `grok生图` 分组里 grok-imagine-image
+# 渠道对**任何**合法 multipart 都返回它（连 werkzeug 生成的标准 body 也一样），而同一
+# 渠道的 JSON 生图接口正常 —— 即那条渠道的图片编辑中继坏了，我们这边绕不开（试过
+# JSON base64、image[]、换 boundary、换 part 顺序，全部同样报错）。
+# 对用户来说唯一能做的动作就是「去掉参考图」或「换模型」，所以直接说这句。
+_REF_UNSUPPORTED_PATTERNS = ("multipart: nextpart: eof", "nextpart: eof")
+REF_UNSUPPORTED_MESSAGE = "该模型当前不支持参考图。请去掉参考图后重试，或换用其他模型。"
+
+
+def _friendly_upstream_message(message):
+    """把上游原始错误翻译成用户看得懂、能照做的提示；翻译不了就原样返回。"""
+    lowered = str(message or "").lower()
+    for pattern in _REF_UNSUPPORTED_PATTERNS:
+        if pattern in lowered:
+            return REF_UNSUPPORTED_MESSAGE
+    return message
+
+
 def _read_http_error(e):
     try:
         body = e.read().decode("utf-8", "replace")
@@ -75,6 +99,16 @@ def _read_http_error(e):
         msg = json.loads(body).get("error", {}).get("message") or body
     except Exception:
         msg = body
+    friendly = _friendly_upstream_message(msg)
+    if friendly != msg:
+        # 原始文本只留给服务端日志：用户看人话，也不带 "400" 这种对用户没意义的噪声。
+        try:
+            from flask import current_app
+
+            current_app.logger.warning("生图上游原始错误：%s", msg)
+        except Exception:
+            pass
+        return friendly
     return f"生图接口错误 ({getattr(e, 'code', '?')}): {msg}"
 
 
