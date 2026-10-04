@@ -24,6 +24,7 @@
         <select class="form-select form-select-sm" name="role">
           <option value="" {% if not role %}selected{% endif %}>全部角色</option>
           <option value="user" {% if role == 'user' %}selected{% endif %}>普通用户</option>
+          <option value="reviewer" {% if role == 'reviewer' %}selected{% endif %}>审核员</option>
           <option value="super_admin" {% if role == 'super_admin' %}selected{% endif %}>超级管理员</option>
         </select>
       </div>
@@ -93,6 +94,8 @@
         <td>
           {% if u.role == 'super_admin' %}
             <span class="badge bg-danger">super_admin</span>
+          {% elif u.role == 'reviewer' %}
+            <span class="badge bg-warning text-dark">reviewer</span>
           {% else %}
             <span class="badge bg-secondary">user</span>
           {% endif %}

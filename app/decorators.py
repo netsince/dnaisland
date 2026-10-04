@@ -25,6 +25,28 @@ def super_admin_required(f):
     return decorated
 
 
+def review_required(f):
+    """仅允许 super_admin 或 reviewer（审核员）访问；其余登录用户 403，未登录跳登录。
+
+    只用于后台**审核台**：角色卡审核、评论审核、茶馆审核三处（通过/驳回/批量）。
+    审核员除此之外没有任何后台权限 —— 后台其它路由仍然只挂 [super_admin_required]，
+    所以审核员访问用户管理/系统设置/举报处置等页面一律 403。
+    """
+
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not current_user.is_authenticated:
+            flash("请先登录", "warning")
+            return redirect(url_for("auth.login"))
+        if not getattr(current_user, "can_review", False):
+            from flask import abort
+
+            abort(403)
+        return f(*args, **kwargs)
+
+    return decorated
+
+
 def block_if_muted(message="你已被禁言，暂时无法执行该操作", redirect_endpoint="main.index"):
     """被禁言（且非超级管理员）的用户，拦截其写操作。
 

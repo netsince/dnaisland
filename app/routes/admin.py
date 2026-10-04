@@ -26,7 +26,7 @@ from ..constants import (
     points_to_signed_str,
     points_to_str,
 )
-from ..decorators import super_admin_required
+from ..decorators import review_required, super_admin_required
 from ..extensions import db
 from ..models import (
     Article,
@@ -78,6 +78,7 @@ from ..models.ticket import (
     TICKET_REPLIED,
     TICKET_STATUSES,
 )
+from ..models.user import ROLES
 from ..services.card_hidden_tags import (
     HIDDEN_TAGS,
     card_has_hidden_tag,
@@ -158,8 +159,13 @@ def inject_admin_badges():
 # ---------------- 仪表盘 / 入口 ----------------
 @admin_bp.route("/")
 @admin_bp.route("/dashboard")
-@super_admin_required
+@review_required
 def index():
+    # 审核员没有仪表盘权限，但 /admin/ 是后台的默认入口（登录后跳转、书签都可能落到
+    # 这里），直接 403 会像"坏了"。这里把他转送到审核台；普通用户仍然 403（由装饰器挡）。
+    if current_user.is_reviewer:
+        return redirect(url_for("admin.review"))
+
     today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
     # 核心指标统计
@@ -263,7 +269,7 @@ def user_create():
         if User.query.filter_by(email=email).first():
             flash("邮箱已存在", "danger")
             return render_template("admin/user_form.html", user=None)
-        if role not in ("user", "super_admin"):
+        if role not in ROLES:
             role = "user"
         u = User(username=username, nickname=nickname, email=email, role=role, status=status)
         u.verified = request.form.get("verified") == "1"
@@ -286,7 +292,7 @@ def user_edit(user_id):
         u.nickname = (request.form.get("nickname") or "").strip() or u.nickname
         u.email = (request.form.get("email") or "").strip() or u.email
         u.role = request.form.get("role") or u.role
-        if u.role not in ("user", "super_admin"):
+        if u.role not in ROLES:
             u.role = "user"
         new_status = request.form.get("status") or u.status
         if new_status not in ("active", "admin_del", "user_del", "mourning"):
@@ -1615,7 +1621,7 @@ def card_delete(card_id):
 
 # ---------------- 审核 ----------------
 @admin_bp.route("/review")
-@super_admin_required
+@review_required
 def review():
     status = request.args.get("status", "pending").strip() or "pending"
     query = Card.query.options(joinedload(Card.author))
@@ -1673,7 +1679,7 @@ def review():
 
 
 @admin_bp.route("/review/<card_id>")
-@super_admin_required
+@review_required
 def review_detail(card_id):
     card = Card.query.options(joinedload(Card.author)).filter_by(id=card_id).first_or_404()
     author = card.author
@@ -1720,7 +1726,7 @@ def review_detail(card_id):
 
 
 @admin_bp.route("/review/<card_id>/approve", methods=["POST"])
-@super_admin_required
+@review_required
 def review_approve(card_id):
     card = db.session.get(Card, card_id)
     if not card or card.status == "approved":
@@ -1743,7 +1749,7 @@ def review_approve(card_id):
 
 
 @admin_bp.route("/review/<card_id>/reject", methods=["POST"])
-@super_admin_required
+@review_required
 def review_reject(card_id):
     card = db.session.get(Card, card_id)
     if not card or card.status == "rejected":
@@ -1774,7 +1780,7 @@ def review_reject(card_id):
 
 
 @admin_bp.route("/review/batch", methods=["POST"])
-@super_admin_required
+@review_required
 def review_batch():
     data = request.get_json(silent=True) or request.form
     action = data.get("action")
@@ -1981,7 +1987,7 @@ def report_action(report_id):
 
 # ---------------- 评论审核（先发后审） ----------------
 @admin_bp.route("/comments/moderation")
-@super_admin_required
+@review_required
 def comment_moderation():
     page = request.args.get("page", 1, type=int)
     pagination = (
@@ -2019,7 +2025,7 @@ def comment_moderation():
 
 
 @admin_bp.route("/comments/<int:comment_id>/approve", methods=["POST"])
-@super_admin_required
+@review_required
 def comment_approve(comment_id):
     c = db.get_or_404(Comment, comment_id)
     c.moderated = True  # 同意：保持可见
@@ -2031,7 +2037,7 @@ def comment_approve(comment_id):
 
 
 @admin_bp.route("/comments/<int:comment_id>/reject", methods=["POST"])
-@super_admin_required
+@review_required
 def comment_reject(comment_id):
     c = db.get_or_404(Comment, comment_id)
     # 拒绝：隐藏评论 + 标记已审核
@@ -2066,7 +2072,7 @@ def comment_reject(comment_id):
 
 
 @admin_bp.route("/comments/batch", methods=["POST"])
-@super_admin_required
+@review_required
 def comment_moderation_batch():
     data = request.get_json(silent=True) or request.form
     action = data.get("action")
@@ -2191,7 +2197,7 @@ def notify_send():
 
 # ---------------- 茶馆帖子审核（先发后审） ----------------
 @admin_bp.route("/teahouse/moderation")
-@super_admin_required
+@review_required
 def tea_moderation():
     page = request.args.get("page", 1, type=int)
     pagination = (
@@ -2226,7 +2232,7 @@ def tea_moderation():
 
 
 @admin_bp.route("/teahouse/<int:post_id>/approve", methods=["POST"])
-@super_admin_required
+@review_required
 def tea_post_approve(post_id):
     p = db.get_or_404(TeaPost, post_id)
     p.moderated = True  # 同意：保持可见
@@ -2238,7 +2244,7 @@ def tea_post_approve(post_id):
 
 
 @admin_bp.route("/teahouse/<int:post_id>/reject", methods=["POST"])
-@super_admin_required
+@review_required
 def tea_post_reject(post_id):
     p = db.get_or_404(TeaPost, post_id)
     # 拒绝：隐藏帖子 + 标记已审核 + 通知作者
@@ -2265,7 +2271,7 @@ def tea_post_reject(post_id):
 
 
 @admin_bp.route("/teahouse/batch", methods=["POST"])
-@super_admin_required
+@review_required
 def tea_moderation_batch():
     data = request.get_json(silent=True) or request.form
     action = data.get("action")

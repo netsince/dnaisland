@@ -2,6 +2,7 @@ import click
 
 from .extensions import bcrypt, db
 from .models import Card, User
+from .models.user import ROLES
 from .services.site_service import get_site_config
 
 
@@ -21,9 +22,13 @@ def init_commands(app):
     @click.argument("username")
     @click.argument("role")
     def set_role(username: str, role: str):
-        """设置用户角色（user / super_admin）。"""
-        if role not in ("user", "super_admin"):
-            raise click.ClickException("role 只能是 user 或 super_admin")
+        """设置用户角色（user / reviewer / super_admin）。
+
+        reviewer = 审核员：只有后台三个审核台（角色卡/评论/茶馆）的权限，
+        社区里与普通用户无异。
+        """
+        if role not in ROLES:
+            raise click.ClickException(f"role 只能是 {' / '.join(ROLES)}")
         user = db.session.query(User).filter_by(username=username).first()
         if not user:
             raise click.ClickException(f"用户不存在: {username}")

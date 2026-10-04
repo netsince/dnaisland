@@ -4,6 +4,12 @@ from ..constants import POINT_PRECISION, POINT_SCALE
 from ..extensions import bcrypt, db
 from .punishment import Punishment
 
+# 后台角色（users.role）的全部合法取值，单点定义，后台表单/命令/校验都引用它。
+#   user        普通用户：没有任何后台权限
+#   reviewer    审核员：只有后台三个审核台（角色卡/评论/茶馆）的权限，社区里等同普通用户
+#   super_admin 超级管理员：全部后台权限
+ROLES = ("user", "reviewer", "super_admin")
+
 
 class User(db.Model, UserMixin):
     __tablename__ = "users"
@@ -44,6 +50,20 @@ class User(db.Model, UserMixin):
     @property
     def is_super_admin(self) -> bool:
         return self.role == "super_admin"
+
+    @property
+    def is_reviewer(self) -> bool:
+        """审核员：后台只有三个审核台（角色卡/评论/茶馆）的权限。
+
+        在社区里与普通用户无异（能发帖、评论、点赞）—— 这是刻意的：
+        这个身份只用来「把审核这件事交出去」，不是把账号降级。
+        """
+        return self.role == "reviewer"
+
+    @property
+    def can_review(self) -> bool:
+        """是否有审核权限（审核员或超级管理员）。审核台路由统一用它判定。"""
+        return self.is_reviewer or self.is_super_admin
 
     @property
     def is_deleted(self) -> bool:

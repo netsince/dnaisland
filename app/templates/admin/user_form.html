@@ -24,6 +24,7 @@
     <label class="form-label">角色</label>
     <select class="form-select" name="role">
       <option value="user" {% if user and user.role == 'user' %}selected{% endif %}>user</option>
+      <option value="reviewer" {% if user and user.role == 'reviewer' %}selected{% endif %}>reviewer（审核员：仅后台审核台）</option>
       <option value="super_admin" {% if user and user.role == 'super_admin' %}selected{% endif %}>super_admin</option>
     </select>
   </div>

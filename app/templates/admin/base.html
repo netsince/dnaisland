@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 
 {% block content %}
+{# 待办角标：审核员只统计他能看到的三个审核队列，不含举报/申诉（那些他没有权限）。 #}
+{% set review_badges_total = admin_badges.cards + admin_badges.comments + admin_badges.tea + (0 if current_user.is_reviewer else admin_badges.reports + admin_badges.appeals) %}
 <div class="container-fluid px-lg-4 py-3">
   <div class="row g-4">
     <!-- 侧边栏导航 -->
@@ -8,8 +10,8 @@
       <div class="card border-0 shadow-sm rounded-4 p-3 sticky-top" style="top: 72px; z-index: 100;">
         <div class="d-flex align-items-center justify-content-between pb-3 mb-2 border-bottom">
           <span class="fw-bold fs-6 tracking-wide text-uppercase">管理控制台</span>
-          {% if admin_badges.total > 0 %}
-          <span class="badge bg-danger rounded-pill" title="未处理待办总数">{{ admin_badges.total }} 待办</span>
+          {% if review_badges_total > 0 %}
+          <span class="badge bg-danger rounded-pill" title="未处理待办总数">{{ review_badges_total }} 待办</span>
           {% endif %}
         </div>
 
@@ -41,9 +43,9 @@
         {% set is_community_active = request.endpoint and (request.endpoint.startswith('admin.users') or request.endpoint.startswith('admin.user_') or request.endpoint.startswith('admin.comments') or request.endpoint.startswith('admin.tea_posts') or request.endpoint.startswith('admin.notify_send') or request.endpoint.startswith('admin.articles') or request.endpoint.startswith('admin.article_')) %}
         {% set is_content_active = request.endpoint and (request.endpoint.startswith('admin.cards') or request.endpoint.startswith('admin.card_') or request.endpoint.startswith('admin.recommend') or request.endpoint.startswith('admin.image_models') or request.endpoint == 'admin.image_logs' or request.endpoint == 'admin.stickers' or request.endpoint.startswith('admin.sponsors') or request.endpoint.startswith('admin.proxy_logs')) %}
         {% set is_system_active = request.endpoint and (request.endpoint.startswith('admin.keys') or request.endpoint == 'admin.copy_stats' or request.endpoint == 'admin.system_config') %}
-        {% set review_badges_total = admin_badges.cards + admin_badges.reports + admin_badges.comments + admin_badges.tea + admin_badges.appeals %}
 
         <div class="admin-sidebar-nav overflow-y-auto d-flex flex-column gap-1" style="max-height: calc(100vh - 160px);">
+          {% if current_user.is_super_admin %}
           <!-- 1. 仪表盘（单项直达） -->
           <a class="nav-link py-2 px-3 rounded-3 d-flex align-items-center justify-content-between mb-1 {% if request.endpoint in ['admin.index', 'admin.dashboard'] %}active fw-semibold{% endif %}"
              href="{{ url_for('admin.index') }}">
@@ -55,6 +57,7 @@
              href="{{ url_for('admin.data_dashboard') }}">
             <span><i class="bi bi-bar-chart-line me-2 text-purple"></i>数据大屏</span>
           </a>
+          {% endif %}
 
           <!-- 2. 审核与风控（折叠分组） -->
           <div class="sidebar-group">
@@ -79,6 +82,7 @@
                     {% endif %}
                   </a>
                 </li>
+                {% if current_user.is_super_admin %}
                 <li class="nav-item">
                   <a class="nav-link rounded-3 d-flex align-items-center justify-content-between {% if request.endpoint.startswith('admin.reports') %}active fw-semibold{% endif %}"
                      href="{{ url_for('admin.reports') }}">
@@ -88,6 +92,7 @@
                     {% endif %}
                   </a>
                 </li>
+                {% endif %}
                 <li class="nav-item">
                   <a class="nav-link rounded-3 d-flex align-items-center justify-content-between {% if request.endpoint.startswith('admin.comment_moderation') %}active fw-semibold{% endif %}"
                      href="{{ url_for('admin.comment_moderation') }}">
@@ -106,6 +111,7 @@
                     {% endif %}
                   </a>
                 </li>
+                {% if current_user.is_super_admin %}
                 <li class="nav-item">
                   <a class="nav-link rounded-3 d-flex align-items-center justify-content-between {% if request.endpoint.startswith('admin.punish_appeals') %}active fw-semibold{% endif %}"
                      href="{{ url_for('admin.punish_appeals') }}">
@@ -121,10 +127,12 @@
                     <span><i class="bi bi-ticket-perforated me-2"></i>工单管理</span>
                   </a>
                 </li>
+                {% endif %}
               </ul>
             </div>
           </div>
 
+          {% if current_user.is_super_admin %}
           <!-- 3. 用户与社区（折叠分组） -->
           <div class="sidebar-group">
             <button class="btn w-100 text-start d-flex align-items-center justify-content-between py-2 px-2 rounded-3 border-0 bg-transparent admin-group-btn {% if not is_community_active %}collapsed{% endif %}"
@@ -167,7 +175,9 @@
               </ul>
             </div>
           </div>
+          {% endif %}
 
+          {% if current_user.is_super_admin %}
           <!-- 4. 内容与生图（折叠分组） -->
           <div class="sidebar-group">
             <button class="btn w-100 text-start d-flex align-items-center justify-content-between py-2 px-2 rounded-3 border-0 bg-transparent admin-group-btn {% if not is_content_active %}collapsed{% endif %}"
@@ -222,7 +232,9 @@
               </ul>
             </div>
           </div>
+          {% endif %}
 
+          {% if current_user.is_super_admin %}
           <!-- 5. 系统与运营（折叠分组） -->
           <div class="sidebar-group">
             <button class="btn w-100 text-start d-flex align-items-center justify-content-between py-2 px-2 rounded-3 border-0 bg-transparent admin-group-btn {% if not is_system_active %}collapsed{% endif %}"
@@ -253,6 +265,7 @@
               </ul>
             </div>
           </div>
+          {% endif %}
         </div>
       </div>
     </nav>
@@ -513,7 +526,7 @@ function renderUserDrawer(d) {
   // 基础属性
   document.getElementById('user-email').textContent = d.email;
   document.getElementById('user-email-verified').innerHTML = d.email_verified ? '<span class="badge bg-success-subtle text-success">已验证</span>' : '<span class="badge bg-secondary-subtle text-secondary">未验证</span>';
-  document.getElementById('user-role').innerHTML = '<span class="badge ' + (d.role === 'super_admin' ? 'bg-danger' : 'bg-primary') + '">' + d.role + '</span>';
+  document.getElementById('user-role').innerHTML = '<span class="badge ' + (d.role === 'super_admin' ? 'bg-danger' : (d.role === 'reviewer' ? 'bg-warning text-dark' : 'bg-primary')) + '">' + d.role + '</span>';
   document.getElementById('user-status').innerHTML = '<span class="badge ' + (d.status === 'active' ? 'bg-success' : 'bg-danger') + '">' + d.status + '</span>';
   document.getElementById('user-created').textContent = d.created_at || '-';
   document.getElementById('user-verified').textContent = d.verified ? (d.verified_label || '已认证') : '未认证';

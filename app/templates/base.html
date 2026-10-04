@@ -107,7 +107,7 @@ function showToast(message, type) {
  <li class="nav-item">
  <a class="nav-link" href="{{ url_for('publish.start') }}">发布</a>
  </li>
- {% if current_user.is_authenticated and current_user.is_super_admin %}
+ {% if current_user.is_authenticated and current_user.can_review %}
  <li class="nav-item">
  <a class="nav-link" href="{{ url_for('admin.review') }}">后台
  {% if site_cfg.shutdown.enabled %}<span class="badge bg-warning text-dark ms-1">关站中</span>{% endif %}
