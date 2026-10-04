@@ -152,10 +152,15 @@ def _jwt_secret():
     return current_app.config["SECRET_KEY"]
 
 
-def _make_token(user_id: int, *, expire_hours=168) -> str:
-    """签发 JWT，默认 7 天过期。"""
+def _make_token(user_id: int, *, expire_hours=168, epoch: int = 0) -> str:
+    """签发 JWT，默认 7 天过期。
+
+    `epoch` 是该用户的会话代数（users.session_epoch）：改密码会让它 +1，于是此前签发的
+    token 全部失效。老客户端不需要任何改动 —— 它只是把服务端给的 token 原样带回来。
+    """
     payload = {
         "user_id": user_id,
+        "epoch": int(epoch or 0),
         "exp": int(time.time()) + expire_hours * 3600,
         "iat": int(time.time()),
     }
@@ -169,6 +174,15 @@ def _decode_token(token: str) -> dict | None:
         return None
     except jwt.InvalidTokenError:
         return None
+
+
+def _epoch_ok(payload: dict, user) -> bool:
+    """凭证里的会话代数是否仍然有效。
+
+    **缺失按 0**：加这一列之前签发的 token 没有 epoch 字段，若按"必须相等"硬判，
+    部署瞬间会让所有 App 用户掉线。按 0 处理则只有真正改过密码的用户才失效。
+    """
+    return int(payload.get("epoch", 0) or 0) == int(getattr(user, "session_epoch", 0) or 0)
 
 
 def api_login_required(fn):
@@ -185,6 +199,9 @@ def api_login_required(fn):
             user = db.session.get(User, payload["user_id"])
             if not user or user.is_locked:
                 return jsonify(ok=False, error="账号异常，无法操作"), 403
+            if not _epoch_ok(payload, user):
+                # 密码改过（含"找回密码"）：该用户此前签发的所有 token 一并作废。
+                return jsonify(ok=False, error="登录已过期，请重新登录"), 401
             g.api_user = user
         elif current_user.is_authenticated:
             g.api_user = current_user
@@ -210,7 +227,8 @@ def _soft_auth():
     if auth.startswith("Bearer "):
         payload = _decode_token(auth[7:])
         user = db.session.get(User, payload["user_id"]) if payload else None
-        if user and not user.is_locked:
+        # 会话代数不匹配（密码改过）时按匿名处理：旧 token 不能继续以该用户身份读数据。
+        if user and not user.is_locked and _epoch_ok(payload, user):
             g.api_user = user
 
 
@@ -516,7 +534,7 @@ def auth_token():
         return err("该账号已被封禁或注销，无法登录", 403)
 
     # JWT 签发：记登录，但不影响 flask_login session
-    token = _make_token(user.id)
+    token = _make_token(user.id, epoch=user.session_epoch or 0)
     return ok(
         {
             "token": token,
@@ -530,7 +548,8 @@ def auth_token():
 def auth_refresh():
     """刷新 JWT。"""
     user = _ensure_self()
-    token = _make_token(user.id)
+    # 带上当前代数：刷新出来的 token 必须与库里一致，否则刷新会把旧会话"洗白"。
+    token = _make_token(user.id, epoch=user.session_epoch or 0)
     return ok({"token": token})
 
 

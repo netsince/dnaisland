@@ -24,6 +24,11 @@ class User(db.Model, UserMixin):
     status = db.Column(db.String(20), server_default="active")
     role = db.Column(db.String(20), server_default="user", nullable=False, index=True)
 
+    # 会话代数：每改一次密码 +1（见 set_password）。网页会话与 App JWT 都会带上它，
+    # 请求时比对，不一致即视为失效 —— 于是"改密码 = 踢掉所有旧设备"。
+    # 默认 0 且**缺失/为 0 一律当 0**，所以新增这一列不会把线上所有人踢下线。
+    session_epoch = db.Column(db.Integer, nullable=False, server_default="0", default=0)
+
     avatar = db.deferred(db.Column(db.Text, nullable=True))  # 头像（base64 data URL），可空
 
     # 点数（积分）余额（精度单点定义见 app/constants.py：DECIMAL(30,10)，10 位小数）
@@ -142,7 +147,14 @@ class User(db.Model, UserMixin):
         return self.has_punishment("hide_cards")
 
     def set_password(self, password):
+        """设置密码，并**推进会话代数**（session_epoch）让旧凭证全部失效。
+
+        放在这里而不是各个调用点：改密码的入口不止一个（找回密码、后台改密、
+        将来可能有的"修改密码"），任何一处漏了都会留下"密码已改但旧会话还能用"的
+        后门。自动推进后，调用方无需知情，也无需记得。
+        """
         self.password_hash = bcrypt.generate_password_hash(password).decode("utf-8")
+        self.session_epoch = (self.session_epoch or 0) + 1
 
     def check_password(self, password):
         return bcrypt.check_password_hash(self.password_hash, password)

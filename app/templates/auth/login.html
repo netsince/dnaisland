@@ -19,9 +19,12 @@
             <label for="password" class="form-label">密码</label>
             <input type="password" class="form-control" id="password" name="password" required>
           </div>
-          <div class="mb-3 form-check">
-            <input type="checkbox" class="form-check-input" id="remember" name="remember" value="y" checked>
-            <label class="form-check-label" for="remember">记住我</label>
+          <div class="mb-3 form-check d-flex justify-content-between align-items-center">
+            <span>
+              <input type="checkbox" class="form-check-input" id="remember" name="remember" value="y" checked>
+              <label class="form-check-label" for="remember">记住我</label>
+            </span>
+            <a class="small" href="{{ url_for('auth.forgot') }}">忘记密码？</a>
           </div>
           <button type="submit" class="btn btn-primary w-100">登录</button>
         </form>

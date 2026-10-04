@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}找回密码 · DNAISLAND{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-sm-10 col-md-7 col-lg-5">
+    <div class="card shadow-sm">
+      <div class="card-body p-4">
+        <h2 class="h4 mb-4 text-center">找回密码</h2>
+        <form method="post" action="{{ url_for('auth.reset_password') }}" novalidate>
+          <div class="mb-3">
+            <label for="email" class="form-label">注册邮箱</label>
+            <div class="input-group">
+              <input type="email" class="form-control" id="email" name="email"
+                     value="{{ email or '' }}" required autofocus>
+              <button type="button" class="btn btn-outline-secondary" id="sendCodeBtn">发送验证码</button>
+            </div>
+            <div class="form-text" id="sendCodeHint">
+              填注册时用的邮箱，我们会发送一封带验证码的邮件。
+            </div>
+          </div>
+          <div class="mb-3">
+            <label for="code" class="form-label">邮箱验证码</label>
+            <input type="text" class="form-control" id="code" name="code"
+                   value="{{ code or '' }}" inputmode="numeric" autocomplete="one-time-code" required>
+            <div class="form-text">10 分钟内有效。</div>
+          </div>
+          <div class="mb-3">
+            <label for="password" class="form-label">新密码</label>
+            <input type="password" class="form-control" id="password" name="password"
+                   autocomplete="new-password" required>
+            <div class="form-text">至少 6 位。</div>
+          </div>
+          <div class="mb-3">
+            <label for="confirm_password" class="form-label">确认新密码</label>
+            <input type="password" class="form-control" id="confirm_password"
+                   name="confirm_password" autocomplete="new-password" required>
+          </div>
+          <button type="submit" class="btn btn-primary w-100">重置密码</button>
+        </form>
+        <p class="text-center mt-3 mb-0">
+          想起来了？<a href="{{ url_for('auth.login') }}">返回登录</a>
+          · 还没有账号？<a href="{{ url_for('auth.register') }}">去注册</a>
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const btn = document.getElementById('sendCodeBtn');
+  const hint = document.getElementById('sendCodeHint');
+  const emailInput = document.getElementById('email');
+
+  btn.addEventListener('click', async () => {
+    const email = emailInput.value.trim();
+    if (!email) {
+      hint.textContent = '请先填写邮箱再发送验证码。';
+      hint.className = 'form-text text-danger';
+      return;
+    }
+    btn.disabled = true;
+    btn.textContent = '发送中…';
+    try {
+      const resp = await fetch("{{ url_for('auth.reset_code') }}", {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({email: email})
+      });
+      const data = await resp.json();
+      // 服务端对"邮箱是否注册"的响应是同一句话，这里原样展示即可。
+      hint.textContent = data.message || '验证码已发送，请查收邮箱。';
+      hint.className = data.ok ? 'form-text text-success' : 'form-text text-danger';
+      if (data.ok) {
+        let left = 60;
+        btn.textContent = left + ' 秒后重发';
+        const timer = setInterval(() => {
+          left -= 1;
+          if (left <= 0) {
+            clearInterval(timer);
+            btn.disabled = false;
+            btn.textContent = '重新发送';
+          } else {
+            btn.textContent = left + ' 秒后重发';
+          }
+        }, 1000);
+      } else {
+        btn.disabled = false;
+        btn.textContent = '发送验证码';
+      }
+    } catch (e) {
+      hint.textContent = '网络错误，请重试。';
+      hint.className = 'form-text text-danger';
+      btn.disabled = false;
+      btn.textContent = '发送验证码';
+    }
+  });
+</script>
+{% endblock %}

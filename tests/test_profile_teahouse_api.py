@@ -40,7 +40,11 @@ def client(app):
 
 def _headers(app, user_id):
     with app.app_context():
-        return {"Authorization": f"Bearer {_make_token(user_id)}"}
+        user = db.session.get(User, user_id)
+        # 带上会话代数（users.session_epoch）：不带的话，密码改过（epoch ≥ 1）的用户会被
+        # 判成"过期 token"，请求退化为匿名 —— 那正是 test_session_epoch.py 要测的行为，
+        # 不是本文件要测的东西。这里按真实客户端的样子来：token 由服务端签发并带上代数。
+        return {"Authorization": f"Bearer {_make_token(user_id, epoch=user.session_epoch or 0)}"}
 
 
 def test_profile_teahouse_returns_top_level_posts(app, client):
