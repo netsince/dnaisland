@@ -2488,29 +2488,36 @@ def image_gen_logs():
         .paginate(page=page, per_page=per_page, error_out=False)
     )
     items = []
+    # 失败记录默认**仍然不返回**：老版本 App 的历史瀑布流只认图片，多出无图条目会渲染成
+    # 空白卡片。需要"失败也出现在历史里"的客户端显式带 ?include_failed=1（新 App 就是这么调的）。
+    include_failed = (request.args.get("include_failed") or "").lower() in ("1", "true", "yes")
     for item in pagination.items:
-        img_count = (item.count or 1) if item.status != "failed" else 0
+        failed = item.status == "failed"
+        img_count = 0 if failed else (item.count or 1)
+        if img_count == 0 and not include_failed:
+            continue
         ref_count = item.references_count or 0
-        if img_count > 0:
-            items.append(
-                {
-                    "id": item.id,
-                    "first_image": _ig_image_url(item.id, 0),
-                    "images": [_ig_image_url(item.id, i) for i in range(img_count)],
-                    "references": [_ig_reference_url(item.id, i) for i in range(ref_count)],
-                    "prompt": item.prompt,
-                    "model_name": item.model_name,
-                    "size": item.size or "auto",
-                    "count": item.count,
-                    "points_spent": points_to_str(item.points_spent),
-                    "status": item.status,
-                    "created_at": (
-                        (item.created_at + timedelta(hours=8)).strftime("%Y-%m-%d %H:%M")
-                        if item.created_at
-                        else ""
-                    ),
-                }
-            )
+        items.append(
+            {
+                "id": item.id,
+                "first_image": _ig_image_url(item.id, 0) if img_count > 0 else "",
+                "images": [_ig_image_url(item.id, i) for i in range(img_count)],
+                "references": [_ig_reference_url(item.id, i) for i in range(ref_count)],
+                "prompt": item.prompt,
+                "model_name": item.model_name,
+                "size": item.size or "auto",
+                "count": item.count,
+                "points_spent": points_to_str(item.points_spent),
+                "status": item.status,
+                # 失败原因（详情页要显示）：其它状态为空串。新增字段，老客户端忽略即可。
+                "error": item.error or "",
+                "created_at": (
+                    (item.created_at + timedelta(hours=8)).strftime("%Y-%m-%d %H:%M")
+                    if item.created_at
+                    else ""
+                ),
+            }
+        )
     return ok(
         {
             "items": items,
