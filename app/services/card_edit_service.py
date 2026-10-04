@@ -128,16 +128,32 @@ def update_card_from_payload(card, payload):
     # 图片覆盖式更新（不做 export 专用压缩，与网页 edit 一致）。
     # 只校验「新增/被替换」的图：取值与既有图完全相同的槽位视为未改动，跳过比例校验，
     # 否则存量比例不合规的老卡片会因为一次编辑被卡死。
-    incoming_images = payload.get("images") or {}
-    unchanged = {img.slot: img.data for img in CardImage.query.filter_by(card_id=card.id).all()}
+    incoming_images = dict(payload.get("images") or {})
+    existing = {img.slot: img.data for img in CardImage.query.filter_by(card_id=card.id).all()}
+
+    # App 端的卡详情接口不回传 base64（太大），`images` 给的是相对路径
+    # `/card-image/<card_id>/<slot>`，编辑提交时 App 会把它原样带回。这里把
+    # **本卡自己的路径**识别为「这张图没改」：直接用库里存的 data URL 原样保留 ——
+    # 否则会被当成无效图片数据（data_url_to_bytes_and_mime 只认 data:），编辑接口直接 400，
+    # 这正是「App 编辑角色卡无法提交」的根因；顺带也避免每次编辑都把图重编码掉一次画质。
+    # 只认「本卡 + 对应槽位」的路径，其它取值（含别人的/伪造的路径）一律走原有校验。
+    kept_images: dict[str, str] = {}
+    for slot in list(incoming_images):
+        value = incoming_images[slot]
+        if isinstance(value, str) and value.strip() == f"/card-image/{card.id}/{slot}":
+            stored = existing.get(slot)
+            if stored:
+                kept_images[slot] = stored
+            del incoming_images[slot]
+
     try:
-        validate_image_slots(incoming_images, unchanged=unchanged)
+        validate_image_slots(incoming_images, unchanged=existing)
         normalized_images = _normalize_images(incoming_images)
     except ValueError as exc:
         return str(exc)
 
     CardImage.query.filter_by(card_id=card.id).delete()
-    for slot, data_uri in normalized_images.items():
+    for slot, data_uri in {**normalized_images, **kept_images}.items():
         db.session.add(CardImage(card_id=card.id, slot=slot, data=data_uri))
 
     db.session.commit()
