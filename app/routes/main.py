@@ -32,6 +32,7 @@ from ..models import (
     CardTag,
     Comment,
     Punishment,
+    SiteRecommendation,
     Sponsor,
     User,
     UserFollow,
@@ -138,6 +139,22 @@ HOT_FOLLOWER_SPREAD = 0.2  # 分发层粉丝广度上限：粉丝达 P90 的作�
 HOT_FOLLOWER_REF_PCT = 0.90  # 归一化基准取全体作者粉丝数的第 90 百分位
 FOLLOWER_REF_TTL = 3600  # 基准重算间隔（秒）
 
+# 站长推荐（后台「站长推荐」里 kind='user' 的作者）：分发层再加一档**有界**的广度因子。
+#
+# 与粉丝项同一层、同一量级，但理由不同：粉丝数奖励的是作者的历史积累，而站长推荐是
+# **人工编辑信号** —— 站长明确说了「这个作者值得看」。它同样不进入任何排名分
+# （探索页「最热」仍是裸分），只提高这些作者的作品在首页/刷一刷加权抽样里被抽中的概率。
+#
+# 取 0.15（上限 ×1.15）而不是更大：这是**扶一把，不是保送**。加权抽样里 15% 的概率
+# 提升已经能明显抬高曝光（配合同作者窗口衰减，一次 12 位里通常多出 1 个位置），
+# 但不至于把推荐位变成站长的私人版面 —— 作品好不好仍由互动/内容决定。
+# 想调强弱只改这一个数（0 即关闭；上限 ×1.5 这种量级就已经接近"保送"了）。
+#
+# 只认 kind='user'：kind='card' 是"把某一张卡放进推荐展示位"，不改变分发权重 ——
+# 站长想给单张卡加权，用那张卡自己的互动/推荐位即可，不该顺带抬高整个作者。
+HOT_RECOMMEND_SPREAD = 0.15  # 站长推荐作者的抽样权重上限：×(1+0.15)
+RECOMMEND_AUTHOR_TTL = 60  # 推荐作者集合的重算间隔（秒）
+
 # 同作者窗口衰减：同一个推荐窗口内，该作者已入选 k 张时，本张抽样权重再乘 decay^k。
 # 只作用于「一次返回一批」的首页推荐与刷一刷（探索页是分页确定性排序，见 card_lists）。
 AUTHOR_WINDOW_DECAY = 0.5
@@ -215,10 +232,11 @@ def _featured_score_map() -> dict:
     """返回首页推荐候选池（card_id -> (抽样权重, 作者id)），带 60s TTL + LRU 上限缓存。
 
     抽样权重 = 单卡起评分（互动/内容/新鲜度/带图/降权，**不含粉丝项**）
-               × 粉丝广度因子「1 + HOT_FOLLOWER_SPREAD × 归一化粉丝」（见 HOT_FOLLOWER_SPREAD）。
+               × 粉丝广度因子「1 + HOT_FOLLOWER_SPREAD × 归一化粉丝」（见 HOT_FOLLOWER_SPREAD）
+               × 站长推荐因子「1 + HOT_RECOMMEND_SPREAD」（作者被站长推荐时，见该常量）。
 
-    也就是说粉丝数只影响**分发**的抽样概率，不进入任何排名分：探索页「最热」用的是
-    _apply_hot_score 的裸分，与这里的权重刻意不同口径。
+    也就是说粉丝数与站长推荐都只影响**分发**的抽样概率，不进入任何排名分：探索页
+    「最热」用的是 _apply_hot_score 的裸分，与这里的权重刻意不同口径。
     一并带上作者 id，供抽样阶段做「同作者窗口衰减」（见 _sample_weights）。
     """
     vid = current_user.id if current_user.is_authenticated else "anon"
@@ -227,6 +245,7 @@ def _featured_score_map() -> dict:
         return hit
     q, score_expr, follower_expr = _hot_score_parts(Card.visible_to(current_user))
     rows = q.with_entities(Card.id, score_expr, Card.author_id, follower_expr).all()
+    recommended = _recommended_author_ids()
     score_map: dict = {}
     for cid, s, author_id, f in rows:
         try:
@@ -238,6 +257,8 @@ def _featured_score_map() -> dict:
         except (TypeError, ValueError):
             follower = 0.0
         breadth = 1.0 + HOT_FOLLOWER_SPREAD * max(0.0, min(1.0, follower))
+        if str(author_id) in recommended:
+            breadth *= 1.0 + HOT_RECOMMEND_SPREAD
         score_map[cid] = (score * breadth, author_id)
     _FEATURED_SCORE_CACHE.set(vid, score_map)
     return score_map
@@ -540,6 +561,29 @@ def _follower_reference() -> float:
         ref = float(counts[idx])
     _FOLLOWER_REF_CACHE.set("p90", ref)
     return ref
+
+
+_RECOMMEND_AUTHOR_CACHE = TimedCache(ttl=RECOMMEND_AUTHOR_TTL, maxsize=2)
+
+
+def _recommended_author_ids() -> frozenset:
+    """站长推荐里的**作者** id 集合（后台 `SiteRecommendation` 中 kind='user' 的那些）。
+
+    只取 kind='user'：kind='card' 是「把某一张卡放进站长推荐展示位」，不改变分发权重 ——
+    站长想给单张卡加权时用那张卡自己的推荐位即可，不该顺带抬高整个作者（见常量处说明）。
+
+    与新人扶持表同一套做法：全局取一次 + 60s TTL 缓存（后台改推荐后最多 1 分钟生效），
+    可见性过滤交给调用方与推荐池求交集。
+    """
+    hit = _RECOMMEND_AUTHOR_CACHE.get("ids")
+    if hit is not None:
+        return hit
+    rows = (
+        db.session.query(SiteRecommendation.ref_id).filter(SiteRecommendation.kind == "user").all()
+    )
+    ids = frozenset(str(ref_id) for (ref_id,) in rows if ref_id is not None)
+    _RECOMMEND_AUTHOR_CACHE.set("ids", ids)
+    return ids
 
 
 def _sample_weights(pool, score_map, author_seen):
