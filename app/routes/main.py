@@ -16,7 +16,7 @@ from flask import (
 )
 from flask_login import current_user
 from sqlalchemy import case, desc, func, literal_column, or_, text
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import OperationalError, ProgrammingError
 from sqlalchemy.orm import joinedload
 
 from ..caching import TimedCache
@@ -39,6 +39,7 @@ from ..models import (
 from ..models.teahouse import TeaPost
 from ..paging import IdListPagination
 from ..routes.card_lists import explore_cards, recommend_items, search_cards
+from ..services import search_service
 from ..services.card_service import enrich_cards, popular_tags
 from ..services.image_service import send_webp
 
@@ -558,7 +559,7 @@ def _newcomer_ids() -> set:
         )
         .all()
     )
-    ids = {str(cid) for (cid, ) in rows}
+    ids = {str(cid) for (cid,) in rows}
     _NEWCOMER_ID_CACHE.set("ids", ids)
     return ids
 
@@ -598,9 +599,7 @@ def _pick_recommended(pool, score_map, limit):
 
     if len(chosen) < limit:
         avail = [cid for cid in pool if cid not in taken]
-        chosen += _weighted_sample_with_author_decay(
-            avail, score_map, limit - len(chosen)
-        )
+        chosen += _weighted_sample_with_author_decay(avail, score_map, limit - len(chosen))
     return chosen
 
 
@@ -702,11 +701,7 @@ def _apply_hot_score(q):
     # 隐匿标签降权（如「减少推流」×0.2）：boost_factor 由 card_hidden_tags 派生，
     # 是 SQL 可见列，因此首页推荐/刷一刷/探索热门/搜索相关度口径统一。
     score = (
-        engagement
-        * img_mult
-        * content_mult
-        * age_factor
-        * func.coalesce(Card.boost_factor, 1.0)
+        engagement * img_mult * content_mult * age_factor * func.coalesce(Card.boost_factor, 1.0)
     )
     return q, score
 
@@ -758,13 +753,44 @@ def _paginate_hot_cards(build_query, signature, order_fn, page, per_page):
     return IdListPagination(cards, page, per_page, total)
 
 
+# 「当前库是不是 MariaDB」探测结果缓存：进程生命周期内不会变，缓存久一点即可。
+_MARIADB_CACHE = TimedCache(ttl=3600, maxsize=2)
+
+
+def _is_mariadb() -> bool:
+    """当前连接是不是 MariaDB（带进程内缓存）。
+
+    关键：**MariaDB 没有 ngram 解析器**（`ngram_token_size` 变量不存在），
+    默认解析器会把一整段中文当一个 token，且 `innodb_ft_min_token_size=3`
+    直接丢掉短词 —— 生产实测「搜卡名片段全部 0 命中」。所以在 MariaDB 上
+    全文索引对中文毫无价值，一律不走 MATCH（走自带 bigram 倒排或 LIKE）。
+    """
+    hit = _MARIADB_CACHE.get("v")
+    if hit is not None:
+        return hit
+    is_maria = False
+    try:
+        version = db.session.execute(text("SELECT VERSION()")).scalar()
+        is_maria = bool(version) and "mariadb" in str(version).lower()
+    except Exception:  # noqa: BLE001 - 探测失败就当作不是（保持旧行为）
+        is_maria = False
+    _MARIADB_CACHE.set("v", is_maria)
+    return is_maria
+
+
 def _fulltext_enabled() -> bool:
     """搜索是否启用 MySQL 全文索引（FULLTEXT / ngram）加速。
 
-    仅 MySQL 且配置开启时返回 True；SQLite 等不支持 FULLTEXT 的引擎一律回退
-    到 LIKE，保证开发 / 测试环境行为与原有一致（可回归、可移植）。
+    仅 **MySQL 且**配置开启时返回 True；MariaDB 与 SQLite 等一律 False：
+    * SQLite 不支持 FULLTEXT；
+    * **MariaDB 有 FULLTEXT 但没有 ngram**，中文片段检索恒为 0 命中，
+      只会把「本该用 LIKE / 自带倒排」的查询变成空结果（实测过）。
     """
-    return db.engine.name == "mysql" and current_app.config.get("FULLTEXT_SEARCH", True)
+    if db.engine.name != "mysql":
+        return False
+    if _is_mariadb():
+        return False
+    return bool(current_app.config.get("FULLTEXT_SEARCH", True))
 
 
 def _ft_match(cols, q):
@@ -782,17 +808,21 @@ def _ft_match(cols, q):
 
 def _fulltext_fallback(ft_query, like_query):
     """优先执行 MySQL 全文检索；若 FULLTEXT 索引缺失/未迁移导致 MATCH...AGAINST
-    报错（OperationalError），回退到 LIKE 查询。
+    报错，回退到 LIKE 查询。
 
     否则一旦生产 MySQL 未跑全文索引迁移，所有搜索（含联想）都会因 500 空结果。
     LIMIT 0 仅用于触发一次执行以探测索引是否可用，不扫描实际数据。
+
+    注意：这里必须连 `ProgrammingError` 一起兜住 —— 布尔模式会把用户输入当语法，
+    实测搜索 `C++` / `(傲` / `@傲` 会直接抛 1064 语法错误，此前只捕
+    OperationalError，导致整个搜索页 500。
     """
     if not _fulltext_enabled():
         return like_query
     try:
         ft_query.limit(0).all()
         return ft_query
-    except OperationalError:
+    except (OperationalError, ProgrammingError):
         return like_query
 
 
@@ -802,15 +832,23 @@ def _card_search_query(q, sort, tag=None, viewer=None):
     viewer 为可选的可见性视角（App 传 JWT 用户，Web 传 current_user），
     缺省回退到 current_user，保持向后兼容。
 
-    MySQL 且开启 FULLTEXT 时，name/intro/persona 的检索走全文索引（MATCH
-    AGAINST），tag 仍用 LIKE（标签表未建全文索引）；否则回退到原有的
-    全表 LIKE，语义不变。索引缺失时自动回退 LIKE，避免搜索 500。
+    **匹配优先级（三级兜底，任何一级不可用都往下掉，绝不 500、绝不空结果）：**
+
+    1. **自带 bigram 倒排 + BM25F**（`app.services.search_service`）：中文片段、
+       二字词、前缀都能命中，且按字段权重排序（卡名 ≫ 标签 > 简介/人设）。
+       这是生产（MariaDB）唯一真正可用的中文检索方式。
+    2. **MySQL FULLTEXT**：仅 MySQL+ngram 环境启用（MariaDB 没有 ngram，
+       中文片段恒 0 命中，已在 `_fulltext_enabled()` 里排除）。
+    3. **全表 LIKE**：单字查询（bigram 覆盖不到）、索引未回填、索引表未迁移时兜底。
+
+    对外的**参数与返回类型完全不变**（仍是 Query，支持 count/paginate/limit），
+    所以网页、App、联想接口以及老版本客户端都不需要改动。
     """
     like = f"%{q}%"
-    base = Card.visible_to(viewer if viewer is not None else current_user).outerjoin(
-        CardTag, CardTag.card_id == Card.id
-    )
-    use_ft = _fulltext_enabled() and bool(q.strip())
+    q_stripped = (q or "").strip()
+    viewer = viewer if viewer is not None else current_user
+    base = Card.visible_to(viewer).outerjoin(CardTag, CardTag.card_id == Card.id)
+    use_ft = _fulltext_enabled() and bool(q_stripped)
     if use_ft:
         ft = _ft_match("cards.name, cards.intro, cards.persona", q)
         filters = [or_(ft, CardTag.tag.like(like))]
@@ -827,13 +865,20 @@ def _card_search_query(q, sort, tag=None, viewer=None):
         filters.append(CardTag.tag == tag)
     base = base.filter(*filters).distinct()
 
-    def _apply_order(query, use_fulltext=None):
-        use_fulltext = use_ft if use_fulltext is None else use_fulltext
+    def _apply_order(query, use_fulltext=None, relevance=None):
         if sort == "hot":
             return _order_by_hot(query)
         if sort == "new":
             return query.order_by(Card.created_at.desc())
-        # relevance：全文检索直接用 MATCH 相关度排序，否则用命中列加权 CASE。
+        # relevance：自带索引用 BM25F 名次，全文检索用 MATCH 相关度，
+        # 否则用命中列加权 CASE（历史口径，保持 LIKE 兜底路径行为不变）。
+        if relevance is not None:
+            return query.order_by(
+                relevance,
+                Card.view_count.desc(),
+                Card.created_at.desc(),
+            )
+        use_fulltext = use_ft if use_fulltext is None else use_fulltext
         if use_fulltext:
             return query.order_by(
                 desc(ft),
@@ -848,6 +893,26 @@ def _card_search_query(q, sort, tag=None, viewer=None):
         )
         return query.order_by(score.desc(), Card.view_count.desc(), Card.created_at.desc())
 
+    # ---- 1) 自带 bigram 倒排 + BM25F（首选）----
+    # 注意这里**不 join 标签表、也不 distinct**：MySQL 的 SELECT DISTINCT 不允许
+    # ORDER BY 引用不在选择列表里的表达式（错误 3065），而 BM25F 名次正是一个
+    # CASE 表达式。标签过滤改用 IN 子查询，效果等价且不触发该限制。
+    if q_stripped and search_service.index_available():
+        ranked = search_service.rank_card_ids(q_stripped)
+        if ranked:
+            relevance = case(
+                {cid: idx for idx, cid in enumerate(ranked)},
+                value=Card.id,
+                else_=len(ranked),
+            )
+            query = Card.visible_to(viewer).filter(Card.id.in_(ranked))
+            if tag:
+                query = query.filter(
+                    Card.id.in_(db.session.query(CardTag.card_id).filter(CardTag.tag == tag))
+                )
+            return _apply_order(query, relevance=relevance)
+
+    # ---- 2) MySQL 全文检索（MariaDB 上 _fulltext_enabled() 恒 False）----
     # 同时构造 LIKE 版本作为兜底：FULLTEXT 索引缺失时由 _fulltext_fallback 切换。
     if use_ft:
         ft_base = base.filter(or_(ft, CardTag.tag.like(like)))
@@ -865,11 +930,11 @@ def _card_search_query(q, sort, tag=None, viewer=None):
         ]
         if tag:
             like_filters.append(CardTag.tag == tag)
-        like_base = Card.visible_to(viewer if viewer is not None else current_user).outerjoin(
-            CardTag, CardTag.card_id == Card.id
-        )
+        like_base = Card.visible_to(viewer).outerjoin(CardTag, CardTag.card_id == Card.id)
         like_query = _apply_order(like_base.filter(*like_filters).distinct(), use_fulltext=False)
         return _fulltext_fallback(ft_query, like_query)
+
+    # ---- 3) LIKE 兜底（单字查询 / 索引不可用）----
     return _apply_order(base)
 
 

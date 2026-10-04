@@ -146,6 +146,12 @@ def create_app(config_object=None):
 
     init_commands(app)
 
+    # 检索索引：注册 SQLAlchemy 事件，卡片内容一变就自动重建该卡的倒排
+    # （索引失败只记日志，绝不影响业务写入；表未迁移时静默跳过）。
+    from .services.search_service import register_events as _register_search_events
+
+    _register_search_events()
+
     import re as _re
     from datetime import datetime, timedelta
 

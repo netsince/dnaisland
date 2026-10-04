@@ -16,6 +16,7 @@ from .proxy import ProxyConfig, ProxyLog
 from .punishment import Punishment
 from .recommendation import SiteRecommendation
 from .report import Report
+from .search_index import SearchDocStat, SearchGram
 from .site import Article, SiteConfig
 from .sponsor import Sponsor
 from .sticker import Sticker, StickerSeries
@@ -60,6 +61,8 @@ __all__ = [
     "Punishment",
     "SiteRecommendation",
     "Report",
+    "SearchGram",
+    "SearchDocStat",
     "SiteConfig",
     "Article",
     "Sponsor",
