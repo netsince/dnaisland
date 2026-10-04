@@ -520,9 +520,7 @@ def test_featured_reserves_slots_for_newcomers(app, monkeypatch):
             random.seed(20261101)
             picked = [c.id for c in featured_cards(limit=12)]
 
-        assert rookie_card.id in picked, (
-            "新人保底名额没有生效：分数垫底的新人卡被加权池挤掉了"
-        )
+        assert rookie_card.id in picked, "新人保底名额没有生效：分数垫底的新人卡被加权池挤掉了"
         assert len(picked) == 12, "结果条数应保持 limit（名额不足时由加权池补满）"
         assert len(set(picked)) == 12, "同一批里不应出现重复卡"
 
