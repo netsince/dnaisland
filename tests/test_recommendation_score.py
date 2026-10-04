@@ -14,10 +14,10 @@ from app.routes.main import (
     _FOLLOWER_REF_CACHE,
     _NEWCOMER_ID_CACHE,
     AUTHOR_WINDOW_DECAY,
-    HOT_W_FOLLOWER,
+    HOT_FOLLOWER_SPREAD,
     _apply_hot_score,
     _follower_reference,
-    _newcomer_ids,
+    _newcomer_support_map,
     _sample_weights,
     _weighted_sample_with_author_decay,
 )
@@ -102,39 +102,60 @@ def test_follower_reference_is_p90(app):
         assert ref == 9.0, f"P90 应为 9（1..10 的第 90 分位），实际 {ref}"
 
 
-def test_follower_term_raises_score_and_saturates(app):
-    """粉丝多的作者得分更高；但达到基准后不再继续加分（防头部）。"""
+def _follower_fixture():
+    """造 10 位作者（粉丝数 1..10），各发一张同质卡。返回 {粉丝数: card}。"""
+    followers = [_user(f"g{i}") for i in range(10)]
+    cards = {}
+    for n in range(1, 11):
+        a = _user(f"b{n}")
+        for i in range(n):
+            db.session.add(UserFollow(follower_id=followers[i].id, following_id=a.id))
+        cards[n] = _card(a, "x")
+    db.session.commit()
+    return cards
+
+
+def test_follower_does_not_change_base_score(app):
+    """回归：粉丝数**不再**影响单卡起评分（探索排序与分发基础分都只看互动/内容/新鲜度）。
+
+    旧实现把粉丝项作为 engagement 内的固定加数，同质卡得分随粉丝数单调上升，
+    一张「老作者的零互动卡」的抽样权重是新人的 2.33 倍（7.0/3.0）。现在它退出起评分。
+    """
     with app.app_context():
-        followers = [_user(f"g{i}") for i in range(10)]
-        cards = {}
-        for n in range(1, 11):
-            a = _user(f"b{n}")
-            for i in range(n):
-                db.session.add(UserFollow(follower_id=followers[i].id, following_id=a.id))
-            cards[n] = _card(a, "x")
-        db.session.commit()
-
+        cards = _follower_fixture()
         scores = _score_map()
-        low = scores[cards[1].id]
-        mid = scores[cards[5].id]
-        at_ref = scores[cards[9].id]  # 恰好 P90
-        above = scores[cards[10].id]  # 高于 P90
+        baseline = scores[cards[1].id]
+        assert baseline > 0
+        for n in range(2, 11):
+            assert scores[cards[n].id] == pytest.approx(baseline), (
+                f"粉丝数 {n} 的卡起评分不应不同于 1 粉的卡（粉丝项已退出起评分）"
+            )
 
-        assert low < mid < at_ref, "粉丝越多得分应越高"
-        assert above == pytest.approx(at_ref), "超过基准后应封顶，不再额外加分"
 
-        # 粉丝项本身必须与「冷启动基线」无关地成立：基线对每张卡等量相加，
-        # 会稀释直接比值。改用差分——同组内 img/age/boost 相同（记为 K），
-        #   score(f) - score(f') = HOT_W_FOLLOWER * (t_f - t_f') * K
-        # 两个差分之比可消掉未知的 K，直接检验对数归一化的线性。
-        t1 = math.log10(2) / math.log10(10)  # 1 粉
-        t5 = math.log10(6) / math.log10(10)  # 5 粉
-        t9 = 1.0  # 达到 P90 基准 → 打满
-        per_unit_mid = (mid - low) / (t5 - t1)
-        per_unit_ref = (at_ref - low) / (t9 - t1)
-        assert per_unit_mid == pytest.approx(per_unit_ref, rel=0.02), (
-            "粉丝项应按 log10(1+f)/log10(1+基准) 归一化后线性加权"
+def test_follower_spread_only_affects_distribution(app):
+    """粉丝数只影响**分发**抽样权重：随粉丝数上升、达到 P90 封顶，且上限 ×1.25。"""
+    from app.routes.main import _featured_score_map
+
+    with app.app_context():
+        cards = _follower_fixture()
+        with app.test_request_context("/"):
+            smap = _featured_score_map()
+        w = {n: smap[cards[n].id][0] for n in range(1, 11)}
+
+        assert w[1] < w[5] < w[9], "分发权重应随粉丝数上升"
+        assert w[10] == pytest.approx(w[9]), "达到 P90 后应封顶，不再额外加分"
+
+        # 上限 = 起评分 ×(1 + HOT_FOLLOWER_SPREAD)；用两点之比消掉未知的起评分，
+        # 反推广度因子确实是 1 + HOT_FOLLOWER_SPREAD × log10(1+f)/log10(1+P90)。
+        t1 = math.log10(2) / math.log10(10)  # 1 粉（P90=9 ⇒ log10(10)=1）
+        expected = (1.0 + HOT_FOLLOWER_SPREAD) / (1.0 + HOT_FOLLOWER_SPREAD * t1)
+        assert w[9] / w[1] == pytest.approx(expected, rel=0.02), (
+            "粉丝广度因子应为 1 + HOT_FOLLOWER_SPREAD × 归一化粉丝，上限 ×1.25"
         )
+
+        # 同一批卡在「排名分」口径下仍然同分，证明确实只有分发层受影响。
+        base = _score_map()
+        assert base[cards[9].id] == pytest.approx(base[cards[1].id])
 
 
 def test_follower_reference_scales_with_platform(app):
@@ -422,6 +443,30 @@ def test_content_counts_dialogue_examples(app):
         )
 
 
+def test_tiny_card_is_starved_not_boosted(app):
+    """只有几个字/几十个字的敷衍卡：权重压到最低内容线以下（≈没有流量），但非 0。
+
+    旧口径下限 0.4 意味着一张 10 个字的卡照样拿 40% 权重，在加权抽样里和正常卡同一量级。
+    """
+    from app.routes.main import HOT_CONTENT_EMPTY_MULT, HOT_CONTENT_MIN_CHARS
+
+    with app.app_context():
+        a = _user("tiny_a")
+        now = datetime.now()
+        empty = _card(a, "empty", created=now)  # 0 字
+        at_line = _rich_card(a, "at_line", chars=int(HOT_CONTENT_MIN_CHARS), created=now)
+        just_over = _rich_card(a, "just_over", chars=int(HOT_CONTENT_MIN_CHARS) + 50, created=now)
+        normal = _rich_card(a, "normal", chars=750, created=now)  # 内容系数 0.7
+
+        s = _score_map()
+        assert s[empty.id] == pytest.approx(s[at_line.id]), "最低内容线及以下一律按空壳处理"
+        assert s[empty.id] > 0, "仍然 > 0：还可能被推荐到，只是没有流量"
+        # 空壳卡系数就是 HOT_CONTENT_EMPTY_MULT，与 750 字卡（系数 0.7）之比固定。
+        assert s[empty.id] / s[normal.id] == pytest.approx(HOT_CONTENT_EMPTY_MULT / 0.7, rel=0.01)
+        # 线上沿用原口径：只加 50 个字就立刻回到正常轨道，不是「一刀切全灭」。
+        assert s[just_over.id] > s[at_line.id] * 10
+
+
 def test_content_multiplier_cannot_bypass_reduce_boost(app):
     """内容分量在乘法括号内：降权卡的「内容收益」同样被 ×0.2 压制，不是后门。"""
     with app.app_context():
@@ -445,20 +490,27 @@ def test_content_multiplier_cannot_bypass_reduce_boost(app):
 
 
 def test_newcomer_pool_definition(app):
-    """新人作品口径：作者作品数 ≤ 3 且本卡发布 ≤ 14 天。"""
-    from app.routes.main import NEWCOMER_CARD_MAX_AGE_DAYS, NEWCOMER_MAX_APPROVED_CARDS
+    """新人作品口径：作者**前 N 张**作品（按 created_at 位次），且卡龄未过扶持期。"""
+    from app.routes.main import (
+        NEWCOMER_FADE_END_DAYS,
+        NEWCOMER_MAX_APPROVED_CARDS,
+        NEWCOMER_MAX_TOTAL_CARDS,
+    )
 
     with app.app_context():
         fresh_author = _user("nc_fresh")
         first = _card(fresh_author, "first")  # 第 1 张、刚发布 ⇒ 新人作品
-        old_card = _card(
+        expired = _card(
             fresh_author,
-            "old",
-            created=datetime.now() - timedelta(days=NEWCOMER_CARD_MAX_AGE_DAYS + 1),
+            "expired",
+            created=datetime.now() - timedelta(days=NEWCOMER_FADE_END_DAYS + 1),
         )
 
         prolific = _user("nc_prolific")
         cards = [_card(prolific, f"p{i}") for i in range(NEWCOMER_MAX_APPROVED_CARDS + 1)]
+
+        mass = _user("nc_mass")
+        mass_cards = [_card(mass, f"m{i}") for i in range(NEWCOMER_MAX_TOTAL_CARDS + 1)]
 
         hidden = _user("nc_hidden")
         hidden_card = _card(hidden, "hidden")
@@ -468,14 +520,51 @@ def test_newcomer_pool_definition(app):
         pending_card.status = "pending"
         db.session.commit()
 
-        ids = _newcomer_ids()
+        ids = _newcomer_support_map()
         assert first.id in ids, "刚发布的第一张卡应算新人作品"
-        assert old_card.id not in ids, "超过保底天数的卡不再参与"
-        assert all(c.id not in ids for c in cards), (
-            f"作者已通过 {len(cards)} 张卡（>{NEWCOMER_MAX_APPROVED_CARDS}）就不算新人了"
+        assert expired.id not in ids, "超过扶持期的卡不再参与"
+        # 位次按卡固定：发到第 4 张不再连坐，前 N 张仍是新人作品。
+        assert all(c.id in ids for c in cards[:NEWCOMER_MAX_APPROVED_CARDS]), (
+            "作者的前 N 张作品即使又发了新卡，也应保持新人作品身份（去掉第 4 张连坐）"
+        )
+        assert cards[NEWCOMER_MAX_APPROVED_CARDS].id not in ids, (
+            f"第 {NEWCOMER_MAX_APPROVED_CARDS + 1} 张已超出新人位次"
+        )
+        assert all(c.id not in ids for c in mass_cards), (
+            f"作者总卡数超过 {NEWCOMER_MAX_TOTAL_CARDS} 张后整作者退出扶持（防批量发卡霸位）"
         )
         assert hidden_card.id not in ids, "隐藏卡不参与"
         assert pending_card.id not in ids, "未通过审核的卡不参与"
+
+
+def test_newcomer_support_fades_with_card_age(app):
+    """扶持权重随卡龄递减（而不是 14 天一刀切），到 FADE_END 归零。"""
+    from app.routes.main import (
+        NEWCOMER_FADE_END_DAYS,
+        NEWCOMER_FULL_SUPPORT_DAYS,
+        _newcomer_support,
+    )
+
+    assert _newcomer_support(0.0) == 1.0
+    assert _newcomer_support(NEWCOMER_FULL_SUPPORT_DAYS) == 1.0
+    midpoint = (NEWCOMER_FULL_SUPPORT_DAYS + NEWCOMER_FADE_END_DAYS) / 2
+    assert 0.0 < _newcomer_support(midpoint) < 1.0, "扶持期中点应是部分权重，不是 0/1 二值"
+    assert _newcomer_support(NEWCOMER_FADE_END_DAYS) == 0.0
+    assert _newcomer_support(NEWCOMER_FADE_END_DAYS + 5) == 0.0
+
+    # 端到端：同一位次、不同卡龄的新人卡，越老扶持越低（而不是直接归零）。
+    with app.app_context():
+        a = _user("nc_fade")
+        young = _card(a, "young")
+        older = _card(
+            a,
+            "older",
+            created=datetime.now() - timedelta(days=NEWCOMER_FULL_SUPPORT_DAYS + 7),
+        )
+        db.session.commit()
+        support = _newcomer_support_map()
+        assert support[young.id] == 1.0
+        assert 0.0 < support[older.id] < 1.0, "过了满权重期应拿到递减扶持，而不是直接归零"
 
 
 def _veteran_cards(author, n, prefix, with_image=False):

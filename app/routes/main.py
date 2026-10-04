@@ -70,6 +70,11 @@ HOT_IMG_MULT = 1.3  # 带图卡整体得分 ×1.3
 # 必须加在乘法括号**内**：这样 boost_factor（减少推流）与带图系数对基线同样生效，
 # 不会变成绕过降权的后门（见 tests/test_recommendation_score.py）。
 # 回滚：置 0.0 即精确恢复旧行为（零互动新卡重新恒为 0 分）。
+#
+# 注意：**不要为了「抬新人」而调大它**。它对所有卡等量相加，压缩的是相对差距；而新人卡
+# 本来就因为「年轻」在权重里超配（实测占池子 3.7% 却拿到 11.7% 权重），压缩差距反而
+# 降低其份额（3.0 → 5.0 实测 11.7% → 11.3%）。它的职责只是保证零互动新卡不为 0，
+# 不是倾斜工具；真正有效的倾斜手段是 NEWCOMER_SLOTS。
 HOT_COLD_START_BASE = 3.0
 
 # 内容分量乘数（HOT_CONTENT_FLOOR ~ 1.0）：**惩罚空壳，而不是奖励长度**。
@@ -83,14 +88,21 @@ HOT_COLD_START_BASE = 3.0
 # 设计取向：
 #   * **饱和曲线**：内容量到「及格线」就打满 1.0，超过不再加分 —— 避免
 #     「谁字多谁赢」的字数军备竞赛，也堵住堆砌废话刷分；
-#   * 低于及格线线性下滑，**下限 0.4**：空壳卡抽样权重只剩 40%，但既不为 0
-#     （仍可能被抽到），也仍能靠真实互动爬回来 —— 我们只是不再给它同等待遇；
+#   * **最低可用内容线** HOT_CONTENT_MIN_CHARS：只有几个字、几十个字的敷衍卡不再是
+#     「打 4 折」—— 旧口径下限 0.4 意味着一张 10 个字的卡照样拿 40% 权重，在加权抽样里
+#     和正常卡同一量级（冷启动基线 +3.0 再乘 0.4，仍是可观的权重）。现在低于这条线
+#     一律压到 HOT_CONTENT_EMPTY_MULT ≈ 1/50 权重：**基本没有流量，但保持非 0** ——
+#     仍可能被抽到，也仍能靠真实互动爬回来；
+#   * 线**以上**（> 最低内容线）沿用原来的线性下滑、**下限 0.4**，口径一字未改，
+#     所以正常卡完全不受影响。实测只影响 3% 的卡（10~98 字），且新人卡一张都不在其中；
 #   * 放在**乘法括号内**（与带图/年龄/boost 同级）：降权卡（减少推流 ×0.2）的
 #     内容收益同样被压制，不会变成绕过降权的后门，与冷启动基线同一原则。
 #
-# 回滚：HOT_CONTENT_FLOOR 置 1.0 即精确恢复旧行为（内容量不再影响分数）。
+# 回滚：HOT_CONTENT_FLOOR 置 1.0 且 HOT_CONTENT_EMPTY_MULT 置 1.0 即恢复旧行为。
 HOT_CONTENT_FULL = 1500.0  # 及格线（字符数）：内容量达到它即打满 1.0
-HOT_CONTENT_FLOOR = 0.4  # 下限乘数：完全空壳卡的得分系数
+HOT_CONTENT_FLOOR = 0.4  # 最低内容线以上、及格线以下的线性下限
+HOT_CONTENT_MIN_CHARS = 100.0  # 最低可用内容（字符数）：≤ 此值一律按敷衍空壳处理
+HOT_CONTENT_EMPTY_MULT = 0.02  # 敷衍空壳卡系数：≈没有流量，但保持 > 0
 HOT_CONTENT_DIALOGUE_CHARS = 200.0  # 每组对话示例折算的等效字数（示例同样是投入）
 # 探索页「热门」排序的年龄权重曲线（三段式，是整个 engagement 的乘数）：
 #   0~5 日  ：上升权重 —— 新卡整体得分被放大（最新 ×1.4），到 5 日回落到 ×1.0；
@@ -101,12 +113,28 @@ HOT_RISE_END_DAYS = 5  # 上升段终点（含）
 HOT_RISE_BOOST = 0.4  # 上升段额外权重：最新卡 ×(1+0.4)=1.4，线性回落到 5 日时 ×1.0
 HOT_STABLE_END_DAYS = 8  # 平稳段终点（含）；6~8 日权重固定 ×1.0
 HOT_DECAY_START_DAYS = 8  # 下降段起点（>8 日即衰减）
+# 注意：**不要为了「给新卡更多时间」而调大半衰期**。它同时把老卡权重抬回来，反而稀释
+# 新卡份额（实测半衰期 7 → 14 天，新人卡占加权池权重 11.7% → 10.1%）。这个参数控制的是
+# 「曝光窗口有多长」，不是「新人有多少曝光」；要倾斜新人请用 NEWCOMER_SLOTS。
 HOT_DECAY_HALF_DAYS = 7  # 下降段半衰期（天）：每过 7 天权重减半，值越小衰减越快
 
-# 作者影响力项：以「全体作者粉丝数的 P90」为归一化基准，而不是写死绝对粉丝数。
-# 平台整体涨粉时基准同步抬高（见 _follower_reference），永远只有头部约 10% 打满，
-# 因此不会出现「平台火了、人人都有 100 粉」导致该阈值失效的问题。
-HOT_W_FOLLOWER = 4.0  # 作者影响力权重（归一化后 0~1，达到基准即打满）
+# 作者影响力（粉丝数）：**不参与单卡起评分**，只在分发层（首页/刷一刷的加权抽样）
+# 作为有界的「广度因子」生效。
+#
+# 旧实现把它当作 engagement 内的固定加数（最多 +4）：与卡片质量无关，且冷启动基线
+# 只有 3.0，于是一张「老作者的零互动卡」抽样权重是新人的 7.0/3.0 = 2.33 倍。粉丝数
+# 奖励的是作者资历而不是这张卡好不好，这是整个系统里最不该存在的偏置。
+#
+# 现在：探索页「最热」排序与分发的基础分都只看互动/内容/新鲜度（见 _hot_score_parts），
+# 粉丝项改在 _featured_score_map 里以「1 + HOT_FOLLOWER_SPREAD × 归一化粉丝」乘进
+# **抽样权重**；归一化仍以全体作者粉丝数的 P90 为基准（见 _follower_reference），
+# 达到基准即封顶，头部不再额外受益，也不依赖绝对粉丝数。
+#
+# 取 0.2（上限 ×1.20）不是拍的：旧实现在一张「中等互动」卡上（engagement ≈ 20、粉丝达
+# 基准）的粉丝优势是 (20 + 4) / 20 = 1.20。也就是说旧口径里**只有冷启动卡**才被放大到
+# 2.33 倍，成熟卡本来就只有 1.2 倍。乘性因子取 0.2 恰好保住成熟卡的原有效应，同时消掉
+# 冷启动卡那部分畸高 —— 而畸高的那部分正是「奖励资历而不是奖励内容」的来源。
+HOT_FOLLOWER_SPREAD = 0.2  # 分发层粉丝广度上限：粉丝达 P90 的作者抽样权重 ×(1+0.2)
 HOT_FOLLOWER_REF_PCT = 0.90  # 归一化基准取全体作者粉丝数的第 90 百分位
 FOLLOWER_REF_TTL = 3600  # 基准重算间隔（秒）
 
@@ -116,18 +144,35 @@ AUTHOR_WINDOW_DECAY = 0.5
 
 # 新人保底名额：首页「为你推荐」与「刷一刷」每次固定留几个名额给**新人作品**。
 #
-# 为什么不能只靠分数：作者影响力项（粉丝 P90 归一化，最多 +4）是加在 engagement
-# 里的固定加数、与卡片质量无关，于是「老作者的零互动空壳卡」比「新人的零互动
-# 充实卡」高 2.3 倍。而新人真正缺的是**曝光位** ——「没曝光 → 没互动 → 更没曝光」
-# 是个死锁，冷启动基线只能让他不为 0 分，给不了位置。
+# 为什么不能只靠分数：新人真正缺的是**曝光位** ——「没曝光 → 没互动 → 更没曝光」
+# 是个死锁，冷启动基线只能让他不为 0 分，给不了位置。（作者影响力项已改为只在
+# 分发层生效，见 HOT_FOLLOWER_SPREAD；但保底名额仍是新人最可靠的曝光来源。）
 #
-# 「新人」口径取**作品数**而非注册时间：注册一年后才发第一张卡的人同样是新人；
-# 同时要求本卡发布不久，避免旧卡被永久钉在前排。名额与「纯随机」名额并存
-# （后者负责偶遇感），三池互不重叠，池子不够时由加权池补满。
-NEWCOMER_SLOTS = 2  # 每次推荐固定留给新人作品的名额数
-NEWCOMER_MAX_APPROVED_CARDS = 3  # 作者「已通过」卡数 ≤ 此值算新人作者
-NEWCOMER_CARD_MAX_AGE_DAYS = 14  # 只有发布不超过此天数的卡参与保底
-NEWCOMER_TTL = 60  # 新人卡集合的重算间隔（秒）
+# 「新人」口径取**作者的前 N 张作品**而非注册时间：注册一年后才发第一张卡的人
+# 同样是新人。关键是位次**按卡固定**（见 _newcomer_support_map）：作者再发第 4 张，
+# 前 3 张仍然算新人作品 —— 旧实现按「作者当前总卡数」判定，发到第 4 张会把前 3 张
+# 一起踢出保底池（连坐），已修正。
+#
+# 但位次不能单独用：完全不看总量的话，一次性发 30 张的作者也能靠「前 3 张」长期占住
+# 保底位（这正是旧口径在防的事，见 tests/test_recommendation_score.py 的回归用例）。
+# 因此再加一个**宽松的总量上限** NEWCOMER_MAX_TOTAL_CARDS（取 N 的 3 倍）：作者总卡数
+# 没超过它时，前 N 张一直是新人作品（第 4~9 张都不连坐）；超过之后整作者退出扶持。
+#
+# 扶持强度随**卡龄递减**而不是 14 天一刀切：≤ FULL_SUPPORT_DAYS 满权重，之后线性
+# 退出，到 FADE_END_DAYS 归零。避免「第 15 天突然断崖」，也避免旧卡被永久钉在前排。
+# 名额与「纯随机」名额并存（后者负责偶遇感），三池互不重叠，池子不够时由加权池补满。
+# 取 3 而不是 2：它是所有旋钮里对新人曝光**最直接、副作用最小**的一个 —— 只挪位置，
+# 不改任何单卡评分口径。实测新人卡只占候选池 3.7%，靠这 3 个名额 + 加权池，能拿到
+# 约 32% 的首页位置（2 个名额时约 25%）。
+NEWCOMER_SLOTS = 3  # 每次推荐固定留给新人作品的名额数（首页 12 位里固定 3 位）
+NEWCOMER_MAX_APPROVED_CARDS = 3  # 作者**前 N 张**作品（按 created_at 位次）算新人作品
+# 总量上限取 N 的 3 倍：给作者留出 3 倍于新人配额的发布余量（第 4~9 张都不连坐），又能在
+# 作者明显进入「批量产出」状态后把他整体移出扶持池。写成倍数而不是写死数字，是为了将来
+# 调整 N 时这个「宽松上限」跟着走。
+NEWCOMER_MAX_TOTAL_CARDS = NEWCOMER_MAX_APPROVED_CARDS * 3  # 超过则整作者退出扶持
+NEWCOMER_FULL_SUPPORT_DAYS = 14  # 卡龄 ≤ 此值：保底扶持满权重
+NEWCOMER_FADE_END_DAYS = 30  # 卡龄 ≥ 此值：扶持归零（14~30 天线性递减）
+NEWCOMER_TTL = 60  # 新人扶持表的重算间隔（秒）
 
 
 def _has_image_subquery():
@@ -167,23 +212,33 @@ _FEATURED_SCORE_CACHE = TimedCache(ttl=60, maxsize=100)  # viewer -> {card_id: s
 
 
 def _featured_score_map() -> dict:
-    """返回首页推荐候选池（card_id -> (热度分, 作者id)），带 60s TTL + LRU 上限缓存。
+    """返回首页推荐候选池（card_id -> (抽样权重, 作者id)），带 60s TTL + LRU 上限缓存。
 
+    抽样权重 = 单卡起评分（互动/内容/新鲜度/带图/降权，**不含粉丝项**）
+               × 粉丝广度因子「1 + HOT_FOLLOWER_SPREAD × 归一化粉丝」（见 HOT_FOLLOWER_SPREAD）。
+
+    也就是说粉丝数只影响**分发**的抽样概率，不进入任何排名分：探索页「最热」用的是
+    _apply_hot_score 的裸分，与这里的权重刻意不同口径。
     一并带上作者 id，供抽样阶段做「同作者窗口衰减」（见 _sample_weights）。
     """
     vid = current_user.id if current_user.is_authenticated else "anon"
     hit = _FEATURED_SCORE_CACHE.get(vid)
     if hit is not None:
         return hit
-    q, score_expr = _apply_hot_score(Card.visible_to(current_user))
-    rows = q.with_entities(Card.id, score_expr, Card.author_id).all()
+    q, score_expr, follower_expr = _hot_score_parts(Card.visible_to(current_user))
+    rows = q.with_entities(Card.id, score_expr, Card.author_id, follower_expr).all()
     score_map: dict = {}
-    for cid, s, author_id in rows:
+    for cid, s, author_id, f in rows:
         try:
             score = float(s) if s is not None else 0.0
         except (TypeError, ValueError):
             score = 0.0
-        score_map[cid] = (score, author_id)
+        try:
+            follower = float(f) if f is not None else 0.0
+        except (TypeError, ValueError):
+            follower = 0.0
+        breadth = 1.0 + HOT_FOLLOWER_SPREAD * max(0.0, min(1.0, follower))
+        score_map[cid] = (score * breadth, author_id)
     _FEATURED_SCORE_CACHE.set(vid, score_map)
     return score_map
 
@@ -521,15 +576,36 @@ def _weighted_sample_with_author_decay(pool, score_map, n):
     return chosen
 
 
-# 「新人作品」卡 id 集合缓存：条件只与发布/审核时间有关，60s 重算一次足够。
+# 「新人作品」扶持表缓存：只与发布/审核时间有关，60s 重算一次足够。
 _NEWCOMER_ID_CACHE = TimedCache(ttl=NEWCOMER_TTL, maxsize=2)
 
 
-def _newcomer_ids() -> set:
-    """「新人作品」卡 id 集合（已通过、未隐藏、发布不久、作者作品数还很少）。
+def _newcomer_support(age_days: float) -> float:
+    """卡龄 → 保底扶持权重（0~1）。
 
-    口径见 NEWCOMER_SLOTS 处的说明：按**作品数**而不是注册时间认定新人，且要求
-    本卡发布不超过 NEWCOMER_CARD_MAX_AGE_DAYS 天。
+    ≤ NEWCOMER_FULL_SUPPORT_DAYS 满权重 1.0；之后在 FULL_SUPPORT_DAYS ~ FADE_END_DAYS
+    之间线性退出到 0。旧实现是 14 天硬窗口，第 15 天扶持直接归零，与年龄权重的衰减
+    叠在一起形成断崖（14 天时年龄权重已降到 0.55）。
+    """
+    if age_days <= NEWCOMER_FULL_SUPPORT_DAYS:
+        return 1.0
+    if age_days >= NEWCOMER_FADE_END_DAYS:
+        return 0.0
+    span = NEWCOMER_FADE_END_DAYS - NEWCOMER_FULL_SUPPORT_DAYS
+    return (NEWCOMER_FADE_END_DAYS - age_days) / span
+
+
+def _newcomer_support_map() -> dict:
+    """「新人作品」扶持表 {card_id: 扶持权重(0~1]}（已通过、未隐藏、位次靠前、卡龄未过期）。
+
+    口径见 NEWCOMER_SLOTS 处的说明。位次**按卡固定**：把每位作者已通过且未隐藏的作品
+    按 created_at 排序，前 NEWCOMER_MAX_APPROVED_CARDS 张即新人作品 —— 作者之后再发第 4
+    张也不会把前面几张踢出扶持池（旧实现按作者「当前总卡数」判定，会连坐）。
+    另有 NEWCOMER_MAX_TOTAL_CARDS 这个宽松上限：作者总卡数超过它之后整作者退出扶持，
+    否则批量发卡者可以靠「前 N 张」长期霸占保底位。
+
+    位次在 Python 侧算而不是 SQL：窗口函数在 SQLite / MySQL 版本间可用性不一，而这里
+    本来就是「取一次全表再筛」的缓存函数（60s TTL），代价可接受。
 
     只按**全局**条件取一次并缓存：可见性过滤（屏蔽作者、被处罚隐藏）交给调用方
     与推荐池求交集，这样与 `_featured_score_map()` 的口径天然一致。
@@ -538,30 +614,30 @@ def _newcomer_ids() -> set:
     if hit is not None:
         return hit
 
-    cutoff = datetime.now() - timedelta(days=NEWCOMER_CARD_MAX_AGE_DAYS)
-    per_author = (
-        db.session.query(
-            Card.author_id.label("author_id"),
-            func.count(Card.id).label("n"),
-        )
-        .filter(Card.status == "approved", Card.is_hidden.is_(False))
-        .group_by(Card.author_id)
-        .subquery("author_approved_count")
-    )
     rows = (
-        db.session.query(Card.id)
-        .join(per_author, per_author.c.author_id == Card.author_id)
-        .filter(
-            Card.status == "approved",
-            Card.is_hidden.is_(False),
-            Card.created_at >= cutoff,
-            per_author.c.n <= NEWCOMER_MAX_APPROVED_CARDS,
-        )
+        db.session.query(Card.id, Card.author_id, Card.created_at)
+        .filter(Card.status == "approved", Card.is_hidden.is_(False))
         .all()
     )
-    ids = {str(cid) for (cid,) in rows}
-    _NEWCOMER_ID_CACHE.set("ids", ids)
-    return ids
+    by_author: dict = {}
+    for cid, author_id, created_at in rows:
+        if created_at is None:
+            continue
+        by_author.setdefault(author_id, []).append((created_at, str(cid)))
+
+    now = datetime.now()
+    support: dict = {}
+    for author_cards in by_author.values():
+        if len(author_cards) > NEWCOMER_MAX_TOTAL_CARDS:
+            # 批量发卡者（总卡数已超上限）不享受保底，避免用「前 N 张」长期霸位。
+            continue
+        author_cards.sort(key=lambda item: item[0])
+        for created_at, cid in author_cards[:NEWCOMER_MAX_APPROVED_CARDS]:
+            weight = _newcomer_support((now - created_at).total_seconds() / 86400.0)
+            if weight > 0.0:
+                support[cid] = weight
+    _NEWCOMER_ID_CACHE.set("ids", support)
+    return support
 
 
 def _pick_recommended(pool, score_map, limit):
@@ -587,8 +663,14 @@ def _pick_recommended(pool, score_map, limit):
     taken = set(chosen)
 
     if newcomer_n:
-        fresh = [cid for cid in pool if cid not in taken and cid in _newcomer_ids()]
-        chosen += _weighted_sample_with_author_decay(fresh, score_map, newcomer_n)
+        support = _newcomer_support_map()
+        fresh = [cid for cid in pool if cid not in taken and cid in support]
+        if fresh:
+            # 扶持权重随卡龄递减：把它乘进这一池的抽样分，而不是「扶持期内必中」。
+            fresh_map = {
+                cid: (score_map[cid][0] * support[cid], score_map[cid][1]) for cid in fresh
+            }
+            chosen += _weighted_sample_with_author_decay(fresh, fresh_map, newcomer_n)
         taken = set(chosen)
 
     if pure:
@@ -603,16 +685,18 @@ def _pick_recommended(pool, score_map, limit):
     return chosen
 
 
-def _apply_hot_score(q):
-    """对查询 q 做探索热度所需的 outerjoin，并返回 (q, score_expr)。
+def _hot_score_parts(q):
+    """对查询 q 做热度所需的 outerjoin，返回 (q, 单卡起评分, 粉丝广度项)。
 
-    score_expr 与探索页排序同款：
+    单卡起评分（**不含粉丝项**，粉丝只影响分发，见 HOT_FOLLOWER_SPREAD）：
         (互动加权 + 冷启动基线) × 带图系数 × 内容分量 × 三段年龄权重 × boost_factor。
-    互动加权为 评论6/收藏3/复制4/点赞2/浏览1，并叠加**作者影响力项**（粉丝数相对 P90 归一化，
-    权重 HOT_W_FOLLOWER，封顶 1.0）；冷启动基线 HOT_COLD_START_BASE 保证零互动新卡不为 0 分；
-    内容分量 HOT_CONTENT_FLOOR~1.0 惩罚空壳卡（见常量处说明）。
-    供 `_order_by_hot` 排序与首页加权随机复用，确保两处推荐口径一致。
-    复制数取近 30 天并经对数压缩（HOT_W_COPY / COPY_WINDOW_DAYS）。
+    互动加权为 评论6/收藏3/复制4/点赞2/浏览1；冷启动基线 HOT_COLD_START_BASE 保证零互动
+    新卡不为 0 分；内容分量惩罚空壳卡（最低内容线以下压到 HOT_CONTENT_EMPTY_MULT，
+    线上沿用 HOT_CONTENT_FLOOR~1.0，见常量处说明）。
+    供 `_order_by_hot` 排序（只取前两项）与 `_featured_score_map` 分发（再乘粉丝广度）复用，
+    保证两处的**基础口径**一致。复制数取近 30 天并经对数压缩（HOT_W_COPY / COPY_WINDOW_DAYS）。
+
+    第三项是 0~1 的归一化粉丝项，只有分发层用得到，因此单独返回而不是并进 engagement。
     """
     la = _likes_agg_subquery()
     fa = _favorites_agg_subquery()
@@ -659,6 +743,7 @@ def _apply_hot_score(q):
 
     # 作者影响力项：以 P90 为基准做对数归一化并封顶 1.0（达到基准即打满，头部不再额外受益）。
     # 基准由 _follower_reference() 动态给出，随平台整体涨粉自动抬高，不依赖绝对粉丝数。
+    # **不再并进 engagement**：只作为第三项返回，由分发层决定怎么用（见 HOT_FOLLOWER_SPREAD）。
     follower_ref = _follower_reference()
     if follower_ref > 1.0:
         follower_log = _log_base(func.coalesce(ufa.c.fcnt, 0) + 1.0, HOT_VIEW_LOG_BASE)
@@ -674,7 +759,6 @@ def _apply_hot_score(q):
         + func.coalesce(la.c.lc, 0) * HOT_W_LIKE
         + copy_term * HOT_W_COPY
         + view_term * HOT_W_VIEW
-        + follower_term * HOT_W_FOLLOWER
         # 冷启动基线：保证零互动新卡得分 > 0（理由见 HOT_COLD_START_BASE）。
         + HOT_COLD_START_BASE
     )
@@ -696,18 +780,31 @@ def _apply_hot_score(q):
         (content_chars >= HOT_CONTENT_FULL, 1.0),
         else_=content_chars / HOT_CONTENT_FULL,
     )
-    content_mult = HOT_CONTENT_FLOOR + (1.0 - HOT_CONTENT_FLOOR) * content_ratio
+    content_mult = case(
+        # 最低可用内容线及以下：直接判定为敷衍空壳（见 HOT_CONTENT_MIN_CHARS 处说明）。
+        (content_chars <= HOT_CONTENT_MIN_CHARS, HOT_CONTENT_EMPTY_MULT),
+        else_=HOT_CONTENT_FLOOR + (1.0 - HOT_CONTENT_FLOOR) * content_ratio,
+    )
 
     # 隐匿标签降权（如「减少推流」×0.2）：boost_factor 由 card_hidden_tags 派生，
     # 是 SQL 可见列，因此首页推荐/刷一刷/探索热门/搜索相关度口径统一。
     score = (
         engagement * img_mult * content_mult * age_factor * func.coalesce(Card.boost_factor, 1.0)
     )
+    return q, score, follower_term
+
+
+def _apply_hot_score(q):
+    """探索页「热门」排序用的单卡起评分（**不含粉丝项**，见 _hot_score_parts）。
+
+    首页/刷一刷的分发权重另有口径（起评分 × 粉丝广度因子），见 _featured_score_map。
+    """
+    q, score, _follower = _hot_score_parts(q)
     return q, score
 
 
 def _order_by_hot(q):
-    """探索页「热门」排序：按与首页同款的加权得分降序。"""
+    """探索页「热门」排序：按单卡起评分降序（不含粉丝项，纯互动/内容/新鲜度）。"""
     q, score = _apply_hot_score(q)
     return q.order_by(score.desc(), Card.created_at.desc())
 
