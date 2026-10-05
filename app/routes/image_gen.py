@@ -318,24 +318,29 @@ from sqlalchemy.orm import defer
 def api_logs():
     page = request.args.get("page", 1, type=int)
     per_page = request.args.get("per_page", 12, type=int)
-    pagination = (
-        GenerationLog.query.options(
-            defer(GenerationLog.images),
-            defer(GenerationLog.reference_images),
-        )
-        .filter_by(user_id=current_user.id)
-        .order_by(GenerationLog.created_at.desc())
-        .paginate(page=page, per_page=per_page, error_out=False)
+    # 可选状态过滤：`?status=failed` 时**连失败记录一起返回**（失败记录没有产出图，
+    # 平时会被下面的 img_count>0 跳过）。「生成失败记录」页就是靠它取数据的。
+    status = (request.args.get("status") or "").strip()
+    query = GenerationLog.query.options(
+        defer(GenerationLog.images),
+        defer(GenerationLog.reference_images),
+    ).filter_by(user_id=current_user.id)
+    if status in ("success", "partial", "failed"):
+        query = query.filter(GenerationLog.status == status)
+    pagination = query.order_by(GenerationLog.created_at.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
     )
     items = []
     for item in pagination.items:
         img_count = (item.count or 1) if item.status != "failed" else 0
         ref_count = item.references_count or 0
-        if img_count > 0:
+        if img_count > 0 or status:
             items.append(
                 {
                     "id": item.id,
-                    "first_image": url_for("image_gen.output_image", log_id=item.id, idx=0),
+                    "first_image": url_for("image_gen.output_image", log_id=item.id, idx=0)
+                    if img_count > 0
+                    else "",
                     "images": [
                         url_for("image_gen.output_image", log_id=item.id, idx=i)
                         for i in range(img_count)
@@ -350,6 +355,7 @@ def api_logs():
                     "count": item.count,
                     "points_spent": points_to_str(item.points_spent),
                     "status": item.status,
+                    "error": item.error or "",
                     "created_at": (item.created_at + timedelta(hours=8)).strftime("%Y-%m-%d %H:%M")
                     if item.created_at
                     else "",
@@ -385,3 +391,23 @@ def log_detail(log_id):
         abort(404)
     ensure_owner_or_admin(log.user_id)
     return render_template("image_gen/log_detail.html", log=log)
+
+
+@image_gen_bp.route("/failed")
+@login_required
+def failed_logs():
+    """生成失败记录：单独一页，列出自己**所有失败的生成**及其完整信息。
+
+    用户反馈：失败之后只能看到一句错误提示，看不到自己当时填的提示词、选的模型/尺寸/张数、
+    传了哪些参考图 —— 想复现或改提示词都无从下手。这里把失败记录单独成页。
+
+    参考图用现成的 `/image-gen/reference/<id>/<idx>` 端点按序号取，**不读 LONGTEXT**，
+    所以列表再长也不会把几 MB 的 base64 全捞出来。
+    """
+    page = request.args.get("page", 1, type=int)
+    pagination = (
+        GenerationLog.query.filter_by(user_id=current_user.id, status="failed")
+        .order_by(GenerationLog.created_at.desc())
+        .paginate(page=page, per_page=20, error_out=False)
+    )
+    return render_template("image_gen/failed.html", pagination=pagination)

@@ -2478,23 +2478,27 @@ def image_gen_logs():
 
     page = request.args.get("page", 1, type=int)
     per_page = request.args.get("per_page", 12, type=int)
-    pagination = (
-        GenerationLog.query.options(
-            defer(GenerationLog.images),
-            defer(GenerationLog.reference_images),
-        )
-        .filter_by(user_id=_ensure_self().id)
-        .order_by(GenerationLog.created_at.desc())
-        .paginate(page=page, per_page=per_page, error_out=False)
+    # 可选状态过滤：`?status=failed` 只返回失败记录（App 的「生成失败」页靠它翻页，
+    # 否则客户端得先翻过一堆成功记录才能凑齐失败的那些）。
+    status = (request.args.get("status") or "").strip()
+    query = GenerationLog.query.options(
+        defer(GenerationLog.images),
+        defer(GenerationLog.reference_images),
+    ).filter_by(user_id=_ensure_self().id)
+    if status in ("success", "partial", "failed"):
+        query = query.filter(GenerationLog.status == status)
+    pagination = query.order_by(GenerationLog.created_at.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
     )
     items = []
     # 失败记录默认**仍然不返回**：老版本 App 的历史瀑布流只认图片，多出无图条目会渲染成
-    # 空白卡片。需要"失败也出现在历史里"的客户端显式带 ?include_failed=1（新 App 就是这么调的）。
+    # 空白卡片。需要"失败也出现在历史里"的客户端显式带 ?include_failed=1（新 App 就是这么调的）；
+    # 显式按 status=failed 筛选时当然要返回它们。
     include_failed = (request.args.get("include_failed") or "").lower() in ("1", "true", "yes")
     for item in pagination.items:
         failed = item.status == "failed"
         img_count = 0 if failed else (item.count or 1)
-        if img_count == 0 and not include_failed:
+        if img_count == 0 and not include_failed and status != "failed":
             continue
         ref_count = item.references_count or 0
         items.append(

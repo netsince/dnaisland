@@ -15,6 +15,9 @@
     </div>
     <div class="d-flex align-items-center gap-2">
       <span class="pill d-none" id="mgTotalPill"></span>
+      <a class="btn btn-sm btn-outline-danger" href="{{ url_for('image_gen.failed_logs') }}">
+        <i class="bi bi-exclamation-triangle me-1"></i>生成失败记录
+      </a>
       <a class="btn btn-sm btn-primary" href="{{ url_for('image_gen.workbench') }}">去生图</a>
     </div>
   </div>

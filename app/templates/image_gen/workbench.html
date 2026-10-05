@@ -77,12 +77,14 @@
  <div class="ig-bar">
  <button class="ig-chip ig-log-btn" id="igLogBtn" type="button">生图日志</button>
  <a class="ig-chip ig-log-link" href="{{ url_for('image_gen.logs') }}">我的记录 →</a>
+ <a class="ig-chip ig-log-link" href="{{ url_for('image_gen.failed_logs') }}">失败记录 →</a>
  </div>
 
 <div class="ig-sheet" id="igLogSheet">
  <div class="ig-sheet__bar">
  <span class="ig-sheet__title">生图日志</span>
  <a class="ig-sheet__detail" href="{{ url_for('image_gen.logs') }}">详细日志 →</a>
+ <a class="ig-sheet__detail" href="{{ url_for('image_gen.failed_logs') }}">失败记录 →</a>
  <button class="ig-sheet__close" id="igSheetClose" type="button" aria-label="关闭">✕</button>
  </div>
  <div class="ig-sheet__body">
