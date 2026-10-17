@@ -44,6 +44,7 @@ from .ticket import (
 )
 from .user import User, UserFollow
 from .verification_code import VerificationCode
+from .world import WorldCard, WorldCopyStat, WorldFavorite, WorldTag
 
 __all__ = [
     "User",
@@ -76,6 +77,10 @@ __all__ = [
     "TeaPollOption",
     "TeaPollVote",
     "VerificationCode",
+    "WorldCard",
+    "WorldTag",
+    "WorldCopyStat",
+    "WorldFavorite",
     "PointTransaction",
     "RedemptionKey",
     "KeyUsageLog",
