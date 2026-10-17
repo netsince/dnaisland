@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% from "macros/user_badge.html" import user_badge with context %}
+
+{% block title %}{{ world.name }} · DNAISLAND{% endblock %}
+
+{% block content %}
+<div class="mx-auto" style="max-width:860px;">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{{ url_for('worlds.index') }}">世界卡</a></li>
+      <li class="breadcrumb-item active" aria-current="page">{{ world.name }}</li>
+    </ol>
+  </nav>
+
+  <h1 class="mb-2">{{ world.name }}</h1>
+  <div class="text-muted small mb-3">
+    {% if world.entry_count %}{{ world.entry_count }} 词条{% endif %}
+    {% if world.entry_count and world.payload_bytes %} · {% endif %}
+    {% if world.payload_bytes %}{{ (world.payload_bytes / 1024) | round | int }} KB{% endif %}
+    {% if world.view_count %} · {{ world.view_count }} 次浏览{% endif %}
+    {% if world.copy_count %} · 被复制 {{ world.copy_count }} 次{% endif %}
+    {% if world.author %} · {{ user_badge(world.author, link=false) }}{% endif %}
+    {% if world.created_at %} · {{ world.created_at|cst }}{% endif %}
+  </div>
+
+  {% if world.summary %}<p>{{ world.summary }}</p>{% endif %}
+
+  {% if tags %}
+  <div class="mb-3">
+    {% for t in tags %}<span class="badge text-bg-light me-1">{{ t }}</span>{% endfor %}
+  </div>
+  {% endif %}
+
+  {# 世界书的形态：词条按「人物 / 名词」分组、可折叠、可搜索。
+     只给名字和触发词，正文只给一条示例 —— 全展示没人愿意发布，
+     全不展示没人愿意导入。 #}
+  <div class="d-flex align-items-center justify-content-between mt-4 mb-2 flex-wrap gap-2">
+    <h2 class="dna-section-title h6 mb-0">
+      包含的词条
+      <span class="text-muted small">（{{ world.entry_count or 0 }} 条）</span>
+    </h2>
+    {% if entry_groups %}
+    <input type="search" id="entryFilter" class="form-control form-control-sm"
+           style="max-width:240px;" placeholder="搜索词条名 / 触发词" aria-label="搜索词条">
+    {% endif %}
+  </div>
+
+  {% if entry_groups %}
+  <div id="entryGroups">
+    {% for key, label, items in entry_groups %}
+    <details class="mb-2" {% if loop.first %}open{% endif %}>
+      <summary class="fw-semibold small py-1">
+        {{ label }}
+        <span class="text-muted">（{{ items | length }}）</span>
+      </summary>
+      <div class="d-flex flex-wrap gap-2 pt-2 pb-1">
+        {% for e in items %}
+        {# 注意：这里必须用下标 e['keys']。Jinja 里 e.keys 会取到 dict 的
+           .keys() 方法（同理 items/values/get），不是我们的字段。 #}
+        <span class="badge text-bg-light world-entry"
+              data-search="{{ (e['name'] ~ ' ' ~ (e['keys'] | join(' '))) | lower }}">
+          {{ e['name'] }}{% if e['keys'] %}<span class="text-muted"> · {{ e['keys'] | join('、') }}</span>{% endif %}
+        </span>
+        {% endfor %}
+      </div>
+    </details>
+    {% endfor %}
+  </div>
+  <p class="text-muted small mt-2" id="entryNoMatch" style="display:none;">没有匹配的词条。</p>
+  {% if entry_shown < (world.entry_count or 0) %}
+  <p class="text-muted small">（只显示前 {{ entry_shown }} 条，完整内容请下载）</p>
+  {% endif %}
+  {% else %}
+  <p class="text-muted small">这个世界没有词条，或者词条名全部为空。</p>
+  {% endif %}
+
+  {% if sample_entry %}
+  <h2 class="dna-section-title h6 mt-4">示例词条</h2>
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <div class="d-flex align-items-center justify-content-between mb-1">
+        <strong>{{ sample_entry.get('name', '') }}</strong>
+        <span class="text-muted small">{{ '人物' if sample_entry.get('type') == 'person' else '名词' }}</span>
+      </div>
+      {% if sample_entry.get('description') %}
+      <div class="small">{{ sample_entry.get('description') }}</div>
+      {% endif %}
+      {% if sample_entry.get('keys') %}
+      <div class="text-muted small mt-1">触发词：{{ sample_entry.get('keys') | join('、') }}</div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="d-flex flex-wrap gap-2 mb-5">
+    {% if current_user.is_authenticated %}
+    <a class="btn btn-primary" href="{{ url_for('worlds.download', world_id=world.id) }}">
+      <i class="bi bi-download me-1"></i>下载世界
+    </a>
+    {% else %}
+    <a class="btn btn-outline-primary" href="{{ url_for('auth.login') }}">登录后下载</a>
+    {% endif %}
+    {% if current_user.is_authenticated %}
+    <form method="post" action="{{ url_for('worlds.favorite', world_id=world.id) }}">
+      <button class="btn btn-outline-primary" type="submit">
+        <i class="bi bi-bookmark{{ '-fill' if favorited else '' }} me-1"></i>
+        {{ '已收藏' if favorited else '收藏' }}{% if favorite_count %}（{{ favorite_count }}）{% endif %}
+      </button>
+    </form>
+    {% endif %}
+    <a class="btn btn-outline-secondary" href="{{ url_for('worlds.index') }}">返回列表</a>
+    {% if current_user.is_authenticated and current_user.id != world.author_id %}
+    <a class="btn btn-outline-danger ms-auto"
+       href="{{ url_for('user.report', type='world', id=world.id) }}">
+      <i class="bi bi-flag me-1"></i>举报
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+(function () {
+  var input = document.getElementById('entryFilter');
+  if (!input) return;
+  var entries = Array.prototype.slice.call(document.querySelectorAll('.world-entry'));
+  var noMatch = document.getElementById('entryNoMatch');
+  var groups = Array.prototype.slice.call(document.querySelectorAll('#entryGroups details'));
+
+  input.addEventListener('input', function () {
+    var q = input.value.trim().toLowerCase();
+    var hits = 0;
+    entries.forEach(function (el) {
+      var hit = !q || (el.getAttribute('data-search') || '').indexOf(q) >= 0;
+      el.style.display = hit ? '' : 'none';
+      if (hit) hits++;
+    });
+    if (q) groups.forEach(function (d) { d.open = true; });
+    if (noMatch) noMatch.style.display = hits === 0 ? '' : 'none';
+  });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}发布世界卡 · DNAISLAND{% endblock %}
+
+{% block content %}
+<div class="mx-auto" style="max-width:760px;">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{{ url_for('worlds.index') }}">世界卡</a></li>
+      <li class="breadcrumb-item active" aria-current="page">发布</li>
+    </ol>
+  </nav>
+
+  <h1 class="h4 mb-3">发布世界卡</h1>
+
+  <div class="alert alert-light border small">
+    <div class="fw-semibold mb-1">怎么拿到世界内容</div>
+    在 App 里打开世界编辑器 → 右上角 <strong>⋮</strong> → <strong>导出世界观</strong>，
+    把导出内容粘到下面；或者直接把导出的 <code>.dnaworld</code> 文件传上来。
+    <div class="mt-1 text-muted">提交后进入审核队列，通过后会出现在「世界卡」栏目里。</div>
+  </div>
+
+  <form method="post" enctype="multipart/form-data">
+    <div class="mb-3">
+      <label class="form-label">世界 JSON</label>
+      <textarea class="form-control font-monospace" name="payload" rows="14"
+                placeholder='{"name": "世界名", "entries": [...]}'
+                style="font-size:0.85rem;">{{ payload }}</textarea>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">或上传文件（可选）</label>
+      <input class="form-control" type="file" name="file" accept=".dnaworld,.json,.txt">
+      <div class="form-text">上传会覆盖上面的文本框内容。</div>
+    </div>
+    <button class="btn btn-primary" type="submit">提交审核</button>
+    <a class="btn btn-outline-secondary" href="{{ url_for('worlds.index') }}">取消</a>
+  </form>
+</div>
+{% endblock %}

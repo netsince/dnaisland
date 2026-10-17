@@ -58,6 +58,9 @@ from ..models.search_index import SearchDocStat, SearchGram
 # ---------------------------------------------------------------------------
 
 DOC_CARD = "card"
+# 世界卡。索引表从第一天起就预留了 doc_type（见 models/search_index.py 的注释），
+# 所以把世界卡纳入检索**不需要改表结构**。
+DOC_WORLD = "world"
 
 # BM25 饱和参数：越大越"奖励词频"，1.2 是通用默认值。
 BM25_K1 = 1.2
@@ -82,6 +85,26 @@ FIELD_B: dict[str, float] = {
 # 可检索字段（与既有口径一致：卡名 / 简介 / 人设 / 标签）。
 # 想扩到开场白或对话示例，只需在此加一项 + 在 _card_field_texts 里补一行。
 CARD_FIELDS: tuple[str, ...] = ("name", "intro", "persona", "tag")
+
+# 世界卡的可检索字段。**词条名与触发词也算进去** —— 这是世界卡检索与角色卡最大
+# 的不同：用户会按「王都」这种词条名去找世界书，而不是记得世界书叫什么。
+# 词条正文（description）不入索引：几百 KB 的内容会把索引撑爆，也没人按正文搜。
+WORLD_FIELDS: tuple[str, ...] = ("name", "summary", "entries")
+
+# 世界卡的字段权重：世界书名 ≫ 词条名 > 简介。
+WORLD_FIELD_WEIGHTS: dict[str, float] = {
+    "name": 6.0,
+    "entries": 3.0,
+    "summary": 1.5,
+}
+
+# 词条名是一串短词的拼接，b 取中间值：词条多的世界不该被过度惩罚，
+# 但也别让 500 条的世界霸榜。
+WORLD_FIELD_B: dict[str, float] = {
+    "name": 0.0,
+    "entries": 0.5,
+    "summary": 0.75,
+}
 
 # 查询词切出的 gram 数上限：超长查询只取前若干个参与召回，避免倒排扫描过大。
 MAX_QUERY_GRAMS = 16
@@ -206,22 +229,53 @@ def _card_field_texts(card_id: str) -> dict[str, str]:
     }
 
 
-def reindex_card(card_id: str) -> int:
-    """重建一张卡的倒排（先删该卡旧行再写新行），返回写入的 gram 行数。
+def _world_field_texts(world_id: str) -> dict[str, str]:
+    """取一个世界卡各可检索字段的文本。
 
-    只动这张卡自己的索引行；卡片本身与任何业务数据都不碰。
+    entries 字段是**所有词条名 + 触发词**拼起来 —— 用户按词条名搜世界书。
+    词条正文（description）不入索引。
     """
-    SearchGram.query.filter_by(doc_type=DOC_CARD, doc_id=card_id).delete(synchronize_session=False)
-    stat = db.session.get(SearchDocStat, (DOC_CARD, card_id))
+    from ..models import WorldCard
+    from .world_service import entry_index
+
+    world = db.session.get(WorldCard, world_id)
+    if world is None:
+        return {}
+    words: list[str] = []
+    for entry in entry_index(world, limit=0):
+        words.append(entry["name"])
+        words.extend(entry["keys"])
+    return {
+        "name": world.name or "",
+        "summary": world.summary or "",
+        "entries": " ".join(words),
+    }
+
+
+def reindex_card(card_id: str) -> int:
+    """重建一张卡的倒排。只动这张卡自己的索引行，卡片本身与任何业务数据都不碰。"""
+    return _reindex_doc(DOC_CARD, CARD_FIELDS, card_id, _card_field_texts(card_id))
+
+
+def reindex_world(world_id: str) -> int:
+    """重建一个世界卡的倒排。口径与 [reindex_card] 完全一致，只是换了 doc_type。"""
+    return _reindex_doc(DOC_WORLD, WORLD_FIELDS, world_id, _world_field_texts(world_id))
+
+
+def _reindex_doc(
+    doc_type: str, fields: tuple[str, ...], doc_id: str, texts: dict[str, str]
+) -> int:
+    """重建一篇文档的倒排（先删旧行再写新行），返回写入的 gram 行数。"""
+    SearchGram.query.filter_by(doc_type=doc_type, doc_id=doc_id).delete(synchronize_session=False)
+    stat = db.session.get(SearchDocStat, (doc_type, doc_id))
     if stat is None:
-        stat = SearchDocStat(doc_type=DOC_CARD, doc_id=card_id)
+        stat = SearchDocStat(doc_type=doc_type, doc_id=doc_id)
         db.session.add(stat)
 
-    texts = _card_field_texts(card_id)
     field_lens: dict[str, int] = {}
     rows: list[SearchGram] = []
     total_len = 0
-    for field in CARD_FIELDS:
+    for field in fields:
         text = texts.get(field, "")
         field_lens[field] = len(normalize(text))
         total_len += field_lens[field]
@@ -230,8 +284,8 @@ def reindex_card(card_id: str) -> int:
                 continue
             rows.append(
                 SearchGram(
-                    doc_type=DOC_CARD,
-                    doc_id=card_id,
+                    doc_type=doc_type,
+                    doc_id=doc_id,
                     field=field,
                     gram=gram,
                     tf=tf,
@@ -362,7 +416,9 @@ def register_events() -> None:
 # ---------------------------------------------------------------------------
 
 
-def index_available(force: bool = False, cache: bool = True) -> bool:
+def index_available(
+    force: bool = False, cache: bool = True, doc_type: str = DOC_CARD
+) -> bool:
     """倒排索引是否可用（表存在且有数据）。
 
     返回 False 时调用方回退 LIKE —— 这是「先部署后迁移」「索引尚未回填」等情况的
@@ -373,7 +429,7 @@ def index_available(force: bool = False, cache: bool = True) -> bool:
     把紧接着刚写好的索引也判成不可用。
     """
     if not force:
-        hit = _AVAILABLE_CACHE.get("v")
+        hit = _AVAILABLE_CACHE.get(doc_type)
         if hit is not None:
             return hit
     ok = False
@@ -381,45 +437,74 @@ def index_available(force: bool = False, cache: bool = True) -> bool:
         ok = bool(
             db.session.query(func.count())
             .select_from(SearchDocStat)
-            .filter(SearchDocStat.doc_type == DOC_CARD)
+            .filter(SearchDocStat.doc_type == doc_type)
             .scalar()
         )
     except Exception:  # noqa: BLE001 - 表不存在/无权限：当作不可用
         ok = False
     if cache:
-        _AVAILABLE_CACHE.set("v", ok)
+        _AVAILABLE_CACHE.set(doc_type, ok)
     return ok
 
 
-def _avg_field_lens() -> tuple[dict[str, float], int]:
-    """各字段平均长度与文档总数（BM25 的长度归一化基准），带缓存。"""
-    hit = _AVG_LEN_CACHE.get("v")
+def _avg_field_lens(
+    doc_type: str = DOC_CARD, fields: tuple[str, ...] = CARD_FIELDS
+) -> tuple[dict[str, float], int]:
+    """各字段平均长度与文档总数（BM25 的长度归一化基准），按 doc_type 缓存。"""
+    hit = _AVG_LEN_CACHE.get(doc_type)
     if hit is not None:
         return hit
     rows = (
-        db.session.query(SearchDocStat.field_lens).filter(SearchDocStat.doc_type == DOC_CARD).all()
+        db.session.query(SearchDocStat.field_lens)
+        .filter(SearchDocStat.doc_type == doc_type)
+        .all()
     )
-    totals: dict[str, float] = dict.fromkeys(CARD_FIELDS, 0.0)
+    totals: dict[str, float] = dict.fromkeys(fields, 0.0)
     for (lens,) in rows:
         if not isinstance(lens, dict):
             continue
-        for f in CARD_FIELDS:
+        for f in fields:
             totals[f] += float(lens.get(f) or 0)
     n = len(rows)
-    avgs = {f: (totals[f] / n if n else 1.0) for f in CARD_FIELDS}
+    avgs = {f: (totals[f] / n if n else 1.0) for f in fields}
     result = (avgs, n)
-    _AVG_LEN_CACHE.set("v", result)
+    _AVG_LEN_CACHE.set(doc_type, result)
     return result
 
 
 def rank_card_ids(q: str, limit: int = MAX_CANDIDATES) -> list[str]:
-    """按 BM25F 相关度返回卡 id 列表（高相关在前）。
+    """按 BM25F 相关度返回**角色卡** id 列表（高相关在前）。"""
+    return _rank_ids(
+        q, DOC_CARD, CARD_FIELDS, FIELD_WEIGHTS, FIELD_B, limit
+    )
+
+
+def rank_world_ids(q: str, limit: int = MAX_CANDIDATES) -> list[str]:
+    """按 BM25F 相关度返回**世界卡** id 列表。
+
+    与角色卡共用同一套倒排与打分，只是字段与权重不同 —— 世界卡把词条名/触发词
+    也纳入检索，所以「按词条名找世界书」能搜到。
+    """
+    return _rank_ids(
+        q, DOC_WORLD, WORLD_FIELDS, WORLD_FIELD_WEIGHTS, WORLD_FIELD_B, limit
+    )
+
+
+def _rank_ids(
+    q: str,
+    doc_type: str,
+    fields: tuple[str, ...],
+    weights: dict[str, float],
+    field_b: dict[str, float],
+    limit: int = MAX_CANDIDATES,
+) -> list[str]:
+    """按 BM25F 相关度返回某类文档的 id 列表（高相关在前）。
 
     调用前应先用 [index_available] / [query_tokens] 判断是否走这条路：
     索引不可用或查询切不出 token 时返回空列表，调用方回退 LIKE。
     """
     tokens = query_tokens(q)
-    if not tokens or not index_available():
+    if not tokens or not index_available(doc_type=doc_type):
         return []
 
     postings = (
@@ -429,7 +514,7 @@ def rank_card_ids(q: str, limit: int = MAX_CANDIDATES) -> list[str]:
             SearchGram.gram,
             SearchGram.tf,
         )
-        .filter(SearchGram.doc_type == DOC_CARD, SearchGram.gram.in_(tokens))
+        .filter(SearchGram.doc_type == doc_type, SearchGram.gram.in_(tokens))
         .limit(MAX_POSTING_ROWS)
         .all()
     )
@@ -450,7 +535,7 @@ def rank_card_ids(q: str, limit: int = MAX_CANDIDATES) -> list[str]:
     if not candidates:
         return []
 
-    avgs, n_docs = _avg_field_lens()
+    avgs, n_docs = _avg_field_lens(doc_type, fields)
     # N 至少取到最大文档频率，避免 df>N 时 IDF 变负（索引与统计短暂不一致时兜底）。
     n_docs = max(n_docs, max((len(v) for v in df.values()), default=0), 1)
     idf = {
@@ -462,7 +547,7 @@ def rank_card_ids(q: str, limit: int = MAX_CANDIDATES) -> list[str]:
         doc_id: (lens if isinstance(lens, dict) else {})
         for doc_id, lens in db.session.query(SearchDocStat.doc_id, SearchDocStat.field_lens)
         .filter(
-            SearchDocStat.doc_type == DOC_CARD,
+            SearchDocStat.doc_type == doc_type,
             SearchDocStat.doc_id.in_(candidates[:MAX_CANDIDATES]),
         )
         .all()
@@ -470,20 +555,23 @@ def rank_card_ids(q: str, limit: int = MAX_CANDIDATES) -> list[str]:
 
     scored: list[tuple[str, float]] = []
     for doc_id in candidates[:MAX_CANDIDATES]:
-        fields = per_doc[doc_id]
+        # 注意别用 fields 这个名字：它是本函数的参数（字段清单），这里要的是
+        # 这篇文档的 {字段: {gram: tf}}。原先叫 fields，通用化后遮蔽了参数
+        # （mypy 报的正是这个）。
+        doc_fields = per_doc[doc_id]
         lens = stats.get(doc_id, {})
         score = 0.0
         for t in tokens:
             # BM25F：先按字段长度归一化 tf、按字段权重合成虚拟 tf，再套 BM25 饱和函数。
             virtual_tf = 0.0
-            for field, weight in FIELD_WEIGHTS.items():
-                tf = fields.get(field, {}).get(t)
+            for field, weight in weights.items():
+                tf = doc_fields.get(field, {}).get(t)
                 if not tf:
                     continue
-                b = FIELD_B.get(field, 0.75)
+                fb = field_b.get(field, 0.75)
                 flen = float(lens.get(field) or 0.0)
                 avg = avgs.get(field) or 1.0
-                norm = 1.0 - b + b * (flen / avg if avg else 1.0)
+                norm = 1.0 - fb + fb * (flen / avg if avg else 1.0)
                 virtual_tf += weight * (tf / norm if norm > 0 else tf)
             if virtual_tf <= 0:
                 continue

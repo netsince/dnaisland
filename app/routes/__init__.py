@@ -10,6 +10,7 @@ from .sticker import sticker_bp
 from .system import system_bp
 from .teahouse import teahouse_bp
 from .user import user_bp
+from .worlds import worlds_bp, worlds_web
 
 __all__ = [
     "admin_bp",
@@ -24,4 +25,6 @@ __all__ = [
     "image_gen_bp",
     "sticker_bp",
     "proxy_bp",
+    "worlds_bp",
+    "worlds_web",
 ]

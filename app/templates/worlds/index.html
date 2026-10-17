@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% from "macros/pagination.html" import render_pagination %}
+{% from "macros/user_badge.html" import user_badge with context %}
+
+{% block title %}世界卡 · DNAISLAND{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h2 class="dna-section-title h4 mb-0">世界卡</h2>
+  {% if current_user.is_authenticated %}
+  <div class="d-flex gap-2">
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('worlds.favorites') }}">
+      <i class="bi bi-bookmark me-1"></i>我的收藏
+    </a>
+    <a class="btn btn-sm btn-primary" href="{{ url_for('worlds.publish') }}">
+      <i class="bi bi-plus-lg me-1"></i>发布世界卡
+    </a>
+  </div>
+  {% endif %}
+</div>
+
+<form class="dna-filterbar" method="get" action="{{ url_for('worlds.index') }}">
+  <div class="dna-filterbar__group">
+    <input type="search" name="q" class="form-control form-control-sm"
+           placeholder="搜索世界名称 / 简介" value="{{ q or '' }}"
+           style="max-width:340px;" aria-label="搜索世界卡">
+    <button type="submit" class="btn btn-sm btn-primary">搜索</button>
+    {% if q %}<a class="dna-chip-btn" href="{{ url_for('worlds.index', sort=sort or none) }}">清除</a>{% endif %}
+  </div>
+  <div class="dna-filterbar__group">
+    <span class="dna-filterbar__label">排序</span>
+    <a class="dna-chip-btn {{ 'is-active' if sort == 'new' }}"
+       href="{{ url_for('worlds.index', q=q or none) }}">最新</a>
+    <a class="dna-chip-btn {{ 'is-active' if sort == 'copies' }}"
+       href="{{ url_for('worlds.index', sort='copies', q=q or none) }}">最多复制</a>
+  </div>
+</form>
+
+{% if worlds %}
+<div class="row g-3">
+  {% for w in worlds %}
+  <div class="col-12 col-md-6 col-lg-4">
+    <div class="card h-100 shadow-sm">
+      <div class="card-body d-flex flex-column">
+        <h5 class="card-title mb-1">
+          <a href="{{ url_for('worlds.detail', world_id=w.id) }}" class="text-decoration-none">{{ w.name }}</a>
+        </h5>
+        {% if w.summary %}<p class="card-text text-muted small">{{ w.summary }}</p>{% endif %}
+        <div class="small text-muted mb-2">
+          {% if w.entry_count %}{{ w.entry_count }} 词条{% endif %}
+          {% if w.entry_count and w.payload_bytes %} · {% endif %}
+          {% if w.payload_bytes %}{{ (w.payload_bytes / 1024) | round | int }} KB{% endif %}
+          {% if w.copy_count %} · 复制 {{ w.copy_count }}{% endif %}
+        </div>
+        {% set wtags = tags.get(w.id, []) %}
+        {% if wtags %}
+        <div class="mb-2">
+          {% for t in wtags %}<span class="badge text-bg-light me-1">{{ t }}</span>{% endfor %}
+        </div>
+        {% endif %}
+        <div class="mt-auto small text-muted">
+          {% if w.author %}{{ user_badge(w.author, link=false) }}{% endif %}
+          {% if w.created_at %} · {{ w.created_at|cst }}{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{{ render_pagination(pagination, 'worlds.index', {'q': q, 'sort': sort}) }}
+{% else %}
+<p class="text-muted text-center py-5">还没有人发布世界卡。</p>
+{% endif %}
+{% endblock %}

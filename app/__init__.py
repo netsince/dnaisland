@@ -127,6 +127,8 @@ def create_app(config_object=None):
         system_bp,
         teahouse_bp,
         user_bp,
+        worlds_bp,
+        worlds_web,
     )
 
     app.register_blueprint(main_bp)
@@ -141,6 +143,8 @@ def create_app(config_object=None):
     app.register_blueprint(sticker_bp)
     app.register_blueprint(proxy_bp)
     app.register_blueprint(api_bp)
+    app.register_blueprint(worlds_bp)
+    app.register_blueprint(worlds_web)
 
     from .commands import init_commands
 
