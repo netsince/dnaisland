@@ -447,6 +447,10 @@ def _notification_item(n: Notification) -> dict:
         "type": n.type,
         "message": n.message,
         "related_card_id": n.related_card_id,
+        # 通用关联。老数据只有 related_card_id，这里补一个等价回退，
+        # 客户端就只需要看 related_type / related_id 一套逻辑。
+        "related_type": n.related_type or ("card" if n.related_card_id else None),
+        "related_id": n.related_id or n.related_card_id,
         "is_read": bool(n.is_read),
         "created_at": n.created_at.isoformat() if n.created_at else "",
     }

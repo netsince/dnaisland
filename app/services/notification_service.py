@@ -6,13 +6,35 @@ from ..models import Notification
 _unread_cache = TimedCache(ttl=30)
 
 
-def notify(user_id: int, message: str, type_: str = "system", related_card_id=None):
-    """创建一条通知。"""
+def notify(
+    user_id: int,
+    message: str,
+    type_: str = "system",
+    related_card_id=None,
+    related_type=None,
+    related_id=None,
+):
+    """创建一条通知。
+
+    关联对象有两种传法：
+
+    * **新写法**（推荐）：`related_type="world", related_id="<id>"`
+    * **旧写法**：`related_card_id="<id>"`，等价于 `related_type="card"`
+
+    两个字段都写：related_card_id 是给已发布的老客户端做跳转用的，删不得；
+    related_type/related_id 是新口径，客户端按 type 决定跳到哪里。
+    """
+    if related_card_id is not None and related_type is None:
+        related_type, related_id = "card", related_card_id
+    if related_type == "card" and related_card_id is None:
+        related_card_id = related_id
     n = Notification(
         user_id=user_id,
         message=message,
         type=type_,
         related_card_id=related_card_id,
+        related_type=related_type,
+        related_id=related_id,
     )
     db.session.add(n)
     db.session.flush()
