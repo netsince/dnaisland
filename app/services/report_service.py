@@ -14,7 +14,7 @@
 from flask import url_for
 
 # 举报目标类型与原因：Web 与 App 共用同一份定义，避免两端口径分叉。
-REPORT_TARGETS = ("card", "comment", "user", "teapost")
+REPORT_TARGETS = ("card", "comment", "user", "teapost", "world")
 REPORT_REASONS = [
     ("spam", "垃圾广告 / 刷屏"),
     ("porn", "色情低俗"),
@@ -72,6 +72,25 @@ def describe_report_target(target_type: str, raw_id: str):
             "display": f"{author.nickname if author else '某用户'} 的茶馆帖子",
             "url": url_for("teahouse.post_detail", post_id=p.id),
             "snippet": (p.content or "")[:500],
+        }
+
+    if target_type == "world":
+        from ..models import WorldCard
+
+        w = db_get(WorldCard, raw_id)
+        if not w or w.is_hidden:
+            return None
+        author = w.author
+        return {
+            "id": str(w.id),
+            "display": f"世界卡《{w.name or '未命名'}》",
+            "url": url_for("worlds.detail", world_id=w.id),
+            "snippet": (
+                f"名称：{w.name or ''}\n"
+                f"作者：{author.nickname if author else '未知'}\n"
+                f"词条数：{w.entry_count or 0}\n"
+                f"简介：{w.summary or ''}"
+            ),
         }
 
     if target_type == "user":

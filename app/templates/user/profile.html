@@ -130,6 +130,9 @@
  <a class="nav-link {% if tab == 'cards' %}active{% endif %}" href="{{ url_for('user.profile', username=u.username, tab='cards') }}">角色卡</a>
  </li>
  <li class="nav-item">
+ <a class="nav-link {% if tab == 'worlds' %}active{% endif %}" href="{{ url_for('user.profile', username=u.username, tab='worlds') }}">世界卡</a>
+ </li>
+ <li class="nav-item">
  <a class="nav-link {% if tab == 'teahouse_posts' %}active{% endif %}" href="{{ url_for('user.profile', username=u.username, tab='teahouse_posts') }}">茶馆帖子</a>
  </li>
 <li class="nav-item">
@@ -148,6 +151,47 @@
  {% else %}
  {{ card_grid(cards, show_status=(is_self or is_admin), show_pin=True) }}
  {{ render_pagination(pagination, 'user.profile', args) }}
+ {% endif %}
+ {% elif tab == 'worlds' %}
+ <h2 class="dna-section-title h5">发布的世界卡（{{ w_pagination.total }}）</h2>
+ {% if w_pagination.total == 0 %}
+ <div class="text-center text-muted py-4">还没有发布任何世界卡。</div>
+ {% else %}
+ <div class="row g-3">
+   {% for w in worlds %}
+   <div class="col-12 col-md-6 col-lg-4">
+     <div class="card h-100 shadow-sm">
+       <div class="card-body d-flex flex-column">
+         <h6 class="card-title mb-1">
+           {% if w.status == 'approved' and not w.is_hidden %}
+           <a href="{{ url_for('worlds.detail', world_id=w.id) }}" class="text-decoration-none">{{ w.name }}</a>
+           {% else %}{{ w.name }}{% endif %}
+         </h6>
+         {% if w.summary %}<p class="card-text text-muted small">{{ w.summary }}</p>{% endif %}
+         <div class="small text-muted mb-2">
+           {{ w.entry_count or 0 }} 词条 · {{ (w.payload_bytes or 0) // 1024 }} KB
+           {% if w.copy_count %} · 复制 {{ w.copy_count }}{% endif %}
+         </div>
+         {% if is_self or is_admin %}
+         <div class="mb-2">
+           {% if w.status == 'approved' %}<span class="badge text-bg-success">已通过</span>
+           {% elif w.status == 'rejected' %}<span class="badge text-bg-danger">已拒绝</span>
+           {% elif w.status == 'deleted' %}<span class="badge text-bg-secondary">已删除</span>
+           {% else %}<span class="badge text-bg-warning">待审核</span>{% endif %}
+           {% if w.is_hidden %}<span class="badge text-bg-secondary ms-1">已下架</span>{% endif %}
+         </div>
+         {% endif %}
+         {% set wtags = world_tags.get(w.id, []) %}
+         {% if wtags %}
+         <div class="mb-2">{% for t in wtags %}<span class="badge text-bg-light me-1">{{ t }}</span>{% endfor %}</div>
+         {% endif %}
+         <div class="mt-auto small text-muted">{{ w.created_at|cst if w.created_at else '' }}</div>
+       </div>
+     </div>
+   </div>
+   {% endfor %}
+ </div>
+ {{ render_pagination(w_pagination, 'user.profile', w_args) }}
  {% endif %}
  {% elif tab == 'teahouse_posts' %}
  <h2 class="dna-section-title h5">茶馆帖子（{{ tp_pagination.total }}）</h2>

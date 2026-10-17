@@ -186,6 +186,21 @@ def profile(username):
         attach_covers(cm_cards, slot="square")
         comment_cards = {c.id: c for c in cm_cards}
 
+    # 世界卡：作者发布的世界。本人 / 管理员看全部（含待审、已拒），他人只看
+    # 已通过且未下架 —— 与 WorldCard.visible_to 同口径，这里直接写清楚。
+    from ..models import WorldCard
+    from ..services.world_service import tags_map as _world_tags_map
+
+    w_query = WorldCard.query.filter_by(author_id=u.id)
+    if not (is_self or is_admin):
+        w_query = w_query.filter(
+            WorldCard.status == "approved", WorldCard.is_hidden.is_(False)
+        )
+    w_pagination = w_query.order_by(WorldCard.created_at.desc()).paginate(
+        page=page, per_page=12, error_out=False
+    )
+    world_tags = _world_tags_map([w.id for w in w_pagination.items])
+
     follower_count = UserFollow.query.filter_by(following_id=u.id).count()
     following_count = UserFollow.query.filter_by(follower_id=u.id).count()
     is_following = (
@@ -209,6 +224,10 @@ def profile(username):
         cm_pagination=cm_pagination,
         comment_cards=comment_cards,
         cm_args={"username": username, "tab": "comments"},
+        worlds=w_pagination.items,
+        w_pagination=w_pagination,
+        world_tags=world_tags,
+        w_args={"username": username, "tab": "worlds"},
         is_self=is_self,
         is_admin=is_admin,
         restricted=restricted,
