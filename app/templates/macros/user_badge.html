@@ -12,8 +12,12 @@
 {% macro user_badge(user, class='', title='', name=None, link=true) %}
  {% if user %}
  {% set _name = name if name is not none else (user.display_name or user.username) %}
- {% set _attrs = 'class="text-decoration-none text-reset ' ~ (class if class else '') ~ '"' ~ (' title="' ~ title ~ '"' if title else '') %}
- {% if link %}<a href="{{ url_for('user.profile', username=user.username) }}" {{ _attrs }}>{{ _name }}</a>{% else %}<span {{ _attrs }}>{{ _name }}</span>{% endif %}{% if is_sponsor(user.id) %}<i class="bi bi-star-fill text-danger ms-1" title="赞助者" style="font-size: 0.8rem;"></i>{% endif %}
+ {# 属性**逐条直接输出**，不要拼成一个字符串再 {{ }} 出去。
+   那样做的话 Jinja 会把里面的双引号转义成 &#34;，浏览器解析出的 class 只剩
+   「"text-decoration-none」，后面的 dna-chip 变成一个无意义的伪属性 —— 表现
+   就是作者那一行的药丸整个消失（这个宏全站复用，卡片/文章/茶馆/世界卡都中招）。 #}
+ {% set _cls = 'text-decoration-none text-reset' ~ (' ' ~ class if class else '') %}
+ {% if link %}<a href="{{ url_for('user.profile', username=user.username) }}" class="{{ _cls }}"{% if title %} title="{{ title }}"{% endif %}>{{ _name }}</a>{% else %}<span class="{{ _cls }}"{% if title %} title="{{ title }}"{% endif %}>{{ _name }}</span>{% endif %}{% if is_sponsor(user.id) %}<i class="bi bi-star-fill text-danger ms-1" title="赞助者" style="font-size: 0.8rem;"></i>{% endif %}
  {{ badge(user) }}
  {% endif %}
 {% endmacro %}
