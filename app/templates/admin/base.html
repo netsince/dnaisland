@@ -2,7 +2,7 @@
 
 {% block content %}
 {# 待办角标：审核员只统计他能看到的三个审核队列，不含举报/申诉（那些他没有权限）。 #}
-{% set review_badges_total = admin_badges.cards + admin_badges.comments + admin_badges.tea + (0 if current_user.is_reviewer else admin_badges.reports + admin_badges.appeals) %}
+{% set review_badges_total = admin_badges.cards + admin_badges.worlds + admin_badges.comments + admin_badges.tea + (0 if current_user.is_reviewer else admin_badges.reports + admin_badges.appeals) %}
 <div class="container-fluid px-lg-4 py-3">
   <div class="row g-4">
     <!-- 侧边栏导航 -->
@@ -39,7 +39,7 @@
           }
         </style>
 
-        {% set is_review_active = request.endpoint and (request.endpoint.startswith('admin.review') or request.endpoint.startswith('admin.reports') or request.endpoint.startswith('admin.comment_moderation') or request.endpoint.startswith('admin.tea_moderation') or request.endpoint.startswith('admin.punish_appeals') or request.endpoint.startswith('admin.tickets') or request.endpoint.startswith('admin.ticket_categories')) %}
+        {% set is_review_active = request.endpoint and (request.endpoint.startswith('admin.world') or request.endpoint.startswith('admin.review') or request.endpoint.startswith('admin.reports') or request.endpoint.startswith('admin.comment_moderation') or request.endpoint.startswith('admin.tea_moderation') or request.endpoint.startswith('admin.punish_appeals') or request.endpoint.startswith('admin.tickets') or request.endpoint.startswith('admin.ticket_categories')) %}
         {% set is_community_active = request.endpoint and (request.endpoint.startswith('admin.users') or request.endpoint.startswith('admin.user_') or request.endpoint.startswith('admin.comments') or request.endpoint.startswith('admin.tea_posts') or request.endpoint.startswith('admin.notify_send') or request.endpoint.startswith('admin.articles') or request.endpoint.startswith('admin.article_')) %}
         {% set is_content_active = request.endpoint and (request.endpoint.startswith('admin.cards') or request.endpoint.startswith('admin.card_') or request.endpoint.startswith('admin.recommend') or request.endpoint.startswith('admin.image_models') or request.endpoint == 'admin.image_logs' or request.endpoint == 'admin.stickers' or request.endpoint.startswith('admin.sponsors') or request.endpoint.startswith('admin.proxy_logs')) %}
         {% set is_system_active = request.endpoint and (request.endpoint.startswith('admin.keys') or request.endpoint == 'admin.copy_stats' or request.endpoint == 'admin.system_config') %}
@@ -79,6 +79,15 @@
                     <span><i class="bi bi-person-badge me-2"></i>角色卡审核</span>
                     {% if admin_badges.cards > 0 %}
                     <span class="badge bg-danger rounded-pill" style="font-size: 0.68rem;">{{ admin_badges.cards }}</span>
+                    {% endif %}
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link rounded-3 d-flex align-items-center justify-content-between {% if request.endpoint.startswith('admin.world') %}active fw-semibold{% endif %}"
+                     href="{{ url_for('admin.worlds') }}">
+                    <span><i class="bi bi-globe2 me-2"></i>世界卡审核</span>
+                    {% if admin_badges.worlds > 0 %}
+                    <span class="badge bg-danger rounded-pill" style="font-size: 0.68rem;">{{ admin_badges.worlds }}</span>
                     {% endif %}
                   </a>
                 </li>

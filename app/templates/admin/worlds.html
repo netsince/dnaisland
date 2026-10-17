@@ -1,0 +1,165 @@
+{% extends "admin/base.html" %}
+{% from "macros/pagination.html" import render_pagination %}
+
+{% block title %}世界卡管理 · DNAISLAND{% endblock %}
+
+{% block admin_content %}
+<h2 class="h4 mb-3">世界卡管理</h2>
+
+{# 审核队列与列表管理合成一页：世界卡没有图片、没有对话样例，检查内容时直接点
+   「查看」打开 /worlds/<id>（超管能看 pending 的），不需要单独一页详情。 #}
+<ul class="nav nav-pills mb-3 gap-1">
+  {% for key, label in [('pending', '待审核'), ('approved', '已通过'), ('rejected', '已拒绝'), ('deleted', '已删除'), ('all', '全部')] %}
+  <li class="nav-item">
+    <a class="nav-link py-1 px-3 {% if status == key %}active{% endif %}"
+       href="{{ url_for('admin.worlds', status=key, q=q or none) }}">
+      {{ label }}
+      {% if key != 'all' %}<span class="badge text-bg-light ms-1">{{ counts.get(key, 0) }}</span>{% endif %}
+    </a>
+  </li>
+  {% endfor %}
+</ul>
+
+<form class="row g-2 align-items-end mb-3" method="get">
+  <input type="hidden" name="status" value="{{ status }}">
+  <div class="col-12 col-sm-auto flex-grow-1">
+    <label class="form-label small text-muted mb-1">名称 / 简介</label>
+    <input type="text" class="form-control form-control-sm" name="q" value="{{ q }}" placeholder="搜索名称或简介">
+  </div>
+  <div class="col-auto d-flex gap-2">
+    <button class="btn btn-sm btn-primary" type="submit"><i class="bi bi-search me-1"></i>筛选</button>
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin.worlds', status=status) }}">重置</a>
+  </div>
+</form>
+
+{% if worlds %}
+<form method="post" action="{{ url_for('admin.world_batch') }}" id="worldBatchForm">
+  <div class="d-flex align-items-center gap-2 mb-2">
+    <button class="btn btn-sm btn-success" type="submit" name="action" value="approve">
+      <i class="bi bi-check2-all me-1"></i>批量通过
+    </button>
+    <button class="btn btn-sm btn-outline-danger" type="submit" name="action" value="reject">
+      <i class="bi bi-x-circle me-1"></i>批量拒绝
+    </button>
+    <span class="text-muted small">勾选后批量处理（会逐个通知作者）</span>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table table-sm align-middle">
+      <thead class="table-light">
+        <tr>
+          <th style="width:32px;"><input type="checkbox" class="form-check-input" id="worldCheckAll"></th>
+          <th>世界</th>
+          <th>作者</th>
+          <th class="text-nowrap">词条 / 体积</th>
+          <th class="text-nowrap">复制</th>
+          <th class="text-nowrap">提交时间</th>
+          <th class="text-nowrap">状态</th>
+          <th style="width:1%;">操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for w in worlds %}
+        <tr>
+          <td><input type="checkbox" class="form-check-input world-check" name="ids" value="{{ w.id }}"></td>
+          <td>
+            <a href="{{ url_for('worlds.detail', world_id=w.id) }}" target="_blank" class="text-decoration-none">
+              {{ w.name }}
+            </a>
+            {% if w.is_hidden %}<span class="badge text-bg-secondary ms-1">已下架</span>{% endif %}
+            {% for t in tags.get(w.id, []) %}<span class="badge text-bg-light ms-1">{{ t }}</span>{% endfor %}
+          </td>
+          <td class="small">
+            {% if w.author %}
+            <a href="{{ url_for('user.profile', username=w.author.username) }}" class="text-decoration-none">
+              {{ w.author.nickname or w.author.username }}
+            </a>
+            {% else %}<span class="text-muted">已注销</span>{% endif %}
+          </td>
+          <td class="small text-nowrap">{{ w.entry_count or 0 }} 条 / {{ (w.payload_bytes or 0) // 1024 }} KB</td>
+          <td class="small">{{ w.copy_count or 0 }}</td>
+          <td class="small text-nowrap">{{ w.created_at | cst if w.created_at else '' }}</td>
+          <td class="small text-nowrap">
+            {% if w.status == 'approved' %}<span class="badge text-bg-success">已通过</span>
+            {% elif w.status == 'rejected' %}<span class="badge text-bg-danger">已拒绝</span>
+            {% elif w.status == 'deleted' %}<span class="badge text-bg-secondary">已删除</span>
+            {% else %}<span class="badge text-bg-warning">待审核</span>{% endif %}
+          </td>
+          <td class="text-nowrap">
+            <div class="d-flex gap-1">
+              {% if w.status != 'approved' %}
+              <form method="post" action="{{ url_for('admin.world_approve', world_id=w.id) }}">
+                <button class="btn btn-sm btn-success" type="submit" title="通过">通过</button>
+              </form>
+              {% endif %}
+              {% if w.status != 'rejected' %}
+              <button class="btn btn-sm btn-outline-danger" type="button"
+                      data-bs-toggle="modal" data-bs-target="#rejectModal"
+                      data-world-id="{{ w.id }}" data-world-name="{{ w.name }}">拒绝</button>
+              {% endif %}
+              <form method="post" action="{{ url_for('admin.world_hide', world_id=w.id) }}">
+                <button class="btn btn-sm btn-outline-secondary" type="submit">
+                  {{ '恢复' if w.is_hidden else '下架' }}
+                </button>
+              </form>
+              <form method="post" action="{{ url_for('admin.world_delete', world_id=w.id) }}"
+                    onsubmit="return confirm('确定删除《{{ w.name }}》？软删后对所有接口不可见。');">
+                <button class="btn btn-sm btn-outline-dark" type="submit">删除</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</form>
+
+{{ render_pagination(pagination, 'admin.worlds', {'status': status, 'q': q or none}) }}
+
+{# 拒绝原因弹窗：一个弹窗复用给所有行，靠 data-* 传目标。 #}
+<div class="modal fade" id="rejectModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <form class="modal-content" method="post" id="rejectForm">
+      <div class="modal-header">
+        <h5 class="modal-title h6">拒绝《<span id="rejectWorldName"></span>》</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <label class="form-label small text-muted">原因（会发给作者，可留空）</label>
+        <textarea class="form-control" name="reason" rows="3" placeholder="例如：内容与简介不符 / 含违规内容"></textarea>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">取消</button>
+        <button class="btn btn-danger" type="submit">确认拒绝</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function () {
+  var checkAll = document.getElementById('worldCheckAll');
+  if (checkAll) {
+    checkAll.addEventListener('change', function () {
+      document.querySelectorAll('.world-check').forEach(function (el) {
+        el.checked = checkAll.checked;
+      });
+    });
+  }
+  var modal = document.getElementById('rejectModal');
+  if (modal) {
+    modal.addEventListener('show.bs.modal', function (e) {
+      var btn = e.relatedTarget;
+      if (!btn) return;
+      document.getElementById('rejectForm').action =
+        '/admin/worlds/' + btn.getAttribute('data-world-id') + '/reject';
+      document.getElementById('rejectWorldName').textContent = btn.getAttribute('data-world-name');
+    });
+  }
+})();
+</script>
+{% else %}
+<p class="text-muted py-5 text-center">这里没有世界卡。</p>
+{% endif %}
+{% endblock %}

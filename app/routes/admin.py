@@ -138,11 +138,21 @@ def inject_admin_badges():
         pending_comments = Comment.query.filter_by(status="pending").count()
         pending_tea = TeaPost.query.filter_by(status="pending").count()
         pending_appeals = Punishment.query.filter_by(appeal_status="pending").count()
-        total = pending_cards + pending_reports + pending_comments + pending_tea + pending_appeals
+        from ..models import WorldCard
+
+        pending_worlds = WorldCard.query.filter_by(status="pending").count()
+        total = (
+            pending_cards
+            + pending_reports
+            + pending_comments
+            + pending_tea
+            + pending_appeals
+            + pending_worlds
+        )
     except Exception:
         pending_cards = pending_reports = pending_comments = pending_tea = pending_appeals = (
-            total
-        ) = 0
+            pending_worlds
+        ) = total = 0
 
     return {
         "admin_badges": {
@@ -150,6 +160,7 @@ def inject_admin_badges():
             "reports": pending_reports,
             "comments": pending_comments,
             "tea": pending_tea,
+            "worlds": pending_worlds,
             "appeals": pending_appeals,
             "total": total,
         }
@@ -3085,3 +3096,178 @@ def stats_trends():
         cumul_users=cumul_users,
         totals=totals,
     )
+
+# ---------------------------------------------------------------------------
+# 世界卡：审核 + 管理
+#
+# 世界卡和角色卡一样走 status 流水线（pending → approved / rejected），但**不另起
+# 两套页面**：审核队列和列表管理合成一页，按状态筛选即可。理由是世界的「内容」
+# 没有图片也没有对话样例，检查时直接点开 /worlds/<id>（超管能看 pending 的）就行，
+# 不需要再做一页 review_detail。
+#
+# 与角色卡一致的两条硬规则：
+# * 审核结果**必须通知作者**（type_="review"），且用通用的 related_type="world"
+#   让客户端知道该跳到哪；
+# * 通过时顺手把 is_hidden 复位，避免「先下架后通过」留下一个看不见的已通过条目。
+# ---------------------------------------------------------------------------
+
+
+def _notify_world_author(world, message):
+    from ..services.notification_service import notify
+
+    notify(
+        world.author_id,
+        message,
+        type_="review",
+        related_type="world",
+        related_id=world.id,
+    )
+
+
+@admin_bp.route("/worlds")
+@review_required
+def worlds():
+    """世界卡审核队列 / 管理列表（同一个页面，按 status 筛选）。"""
+    from ..models import WorldCard, WorldTag
+
+    status = (request.args.get("status") or "pending").strip()
+    keyword = (request.args.get("q") or "").strip()
+    page = request.args.get("page", 1, type=int)
+
+    q = WorldCard.query
+    if status != "all":
+        q = q.filter(WorldCard.status == status)
+    if keyword:
+        like = f"%{keyword}%"
+        q = q.filter(or_(WorldCard.name.like(like), WorldCard.summary.like(like)))
+    q = q.order_by(WorldCard.created_at.desc())
+    pagination = q.paginate(page=page, per_page=30, error_out=False)
+
+    tags: dict = {}
+    ids = [w.id for w in pagination.items]
+    if ids:
+        for row in WorldTag.query.filter(WorldTag.world_id.in_(ids)).all():
+            tags.setdefault(row.world_id, []).append(row.tag)
+
+    counts = {
+        s: WorldCard.query.filter(WorldCard.status == s).count()
+        for s in ("pending", "approved", "rejected", "deleted")
+    }
+    return render_template(
+        "admin/worlds.html",
+        pagination=pagination,
+        worlds=pagination.items,
+        tags=tags,
+        counts=counts,
+        status=status,
+        q=keyword,
+    )
+
+
+@admin_bp.route("/worlds/<world_id>/approve", methods=["POST"])
+@review_required
+def world_approve(world_id):
+    from ..models import WorldCard
+
+    world = db.session.get(WorldCard, world_id)
+    if not world or world.status == "approved":
+        return redirect(url_for("admin.worlds"))
+    world.status = "approved"
+    world.is_hidden = False
+    db.session.commit()
+    _notify_world_author(world, f'你的世界卡"{world.name}"已通过审核并发布。')
+    db.session.commit()
+    flash(f'已通过："{world.name}"', "success")
+    return redirect(url_for("admin.worlds"))
+
+
+@admin_bp.route("/worlds/<world_id>/reject", methods=["POST"])
+@review_required
+def world_reject(world_id):
+    from ..models import WorldCard
+
+    world = db.session.get(WorldCard, world_id)
+    if not world or world.status == "rejected":
+        return redirect(url_for("admin.worlds"))
+    reason = (request.form.get("reason") or "").strip()
+    world.status = "rejected"
+    db.session.commit()
+    msg = f'你的世界卡"{world.name}"未通过审核'
+    msg += f"，原因：{reason}。" if reason else "。"
+    msg += "可修改后重新提交。"
+    _notify_world_author(world, msg)
+    db.session.commit()
+    flash(f'已拒绝："{world.name}"', "success")
+    return redirect(url_for("admin.worlds"))
+
+
+@admin_bp.route("/worlds/<world_id>/hide", methods=["POST"])
+@review_required
+def world_hide(world_id):
+    """下架 / 恢复（is_hidden 开关）。审核之外的管理动作。"""
+    from ..models import WorldCard
+
+    world = db.session.get(WorldCard, world_id)
+    if not world:
+        abort(404)
+    world.is_hidden = not world.is_hidden
+    db.session.commit()
+    flash(
+        ("已下架：" if world.is_hidden else "已恢复：") + f'"{world.name}"',
+        "success",
+    )
+    return redirect(url_for("admin.worlds"))
+
+
+@admin_bp.route("/worlds/<world_id>/delete", methods=["POST"])
+@review_required
+def world_delete(world_id):
+    """删除（软删）。
+
+    不提供硬删除：world_copy_stats 是版权溯源记录，硬删会连带丢掉它。
+    软删（status=deleted + is_hidden）之后对所有接口都不可见。
+    """
+    from ..models import WorldCard
+
+    world = db.session.get(WorldCard, world_id)
+    if not world:
+        abort(404)
+    world.status = "deleted"
+    world.is_hidden = True
+    db.session.commit()
+    flash(f'已删除："{world.name}"', "success")
+    return redirect(url_for("admin.worlds"))
+
+
+@admin_bp.route("/worlds/batch", methods=["POST"])
+@review_required
+def world_batch():
+    """批量通过 / 驳回。"""
+    from ..models import WorldCard
+
+    action = (request.form.get("action") or "").strip()
+    ids = request.form.getlist("ids")
+    if action not in ("approve", "reject") or not ids:
+        flash("请先勾选要处理的世界卡", "warning")
+        return redirect(url_for("admin.worlds"))
+
+    done = 0
+    for world_id in ids:
+        world = db.session.get(WorldCard, world_id)
+        if not world:
+            continue
+        if action == "approve" and world.status != "approved":
+            world.status = "approved"
+            world.is_hidden = False
+            _notify_world_author(world, f'你的世界卡"{world.name}"已通过审核并发布。')
+            done += 1
+        elif action == "reject" and world.status != "rejected":
+            world.status = "rejected"
+            _notify_world_author(
+                world, f'你的世界卡"{world.name}"未通过审核，可修改后重新提交。'
+            )
+            done += 1
+    db.session.commit()
+    flash(f"已处理 {done} 个世界卡", "success")
+    return redirect(url_for("admin.worlds"))
+
