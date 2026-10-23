@@ -99,9 +99,17 @@ def test_tag_filter_matches_on_both_ends(app, client):
 
 
 def test_keyword_search_matches_on_both_ends(app, client):
+    """按关键词找世界卡：两端都能找到，但**入口不同**。
+
+    App 走 /api/v1/worlds?q=，网页走统一的全站搜索 /search?type=world ——
+    网页的栏目页故意不再放搜索框（否则「找世界书」有两个入口）。
+    """
     _seed(app)
     assert _api_names(client, "?q=星海") == ["星海纪元"]
-    assert _web_names(client, "?q=星海") == ["星海纪元"]
+
+    html = client.get("/search?q=星海&type=world").get_data(as_text=True)
+    assert "星海纪元" in html
+    assert "幻想大陆" not in html
 
 
 def test_sort_copies_matches_on_both_ends(app, client):

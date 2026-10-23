@@ -1,34 +1,45 @@
 {% extends "admin/base.html" %}
 {% from "macros/pagination.html" import render_pagination %}
 
-{% block title %}角色卡审核 · 管理控制台{% endblock %}
+{% block title %}{{ '世界卡审核' if review_type == 'world' else '角色卡审核' }} · 管理控制台{% endblock %}
 
 {% block admin_content %}
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
   <div>
-    <h1 class="h4 fw-bold mb-1">角色卡审核队列</h1>
+    <h1 class="h4 fw-bold mb-1">{{ '世界卡审核队列' if review_type == 'world' else '角色卡审核队列' }}</h1>
     <div class="small text-muted">
       待审核 <span class="badge bg-danger rounded-pill badge-cards-count">{{ stats.get('pending', 0) }}</span> · 
       已通过 <span class="badge bg-success rounded-pill">{{ stats.get('approved', 0) }}</span> · 
       已拒绝 <span class="badge bg-secondary rounded-pill">{{ stats.get('rejected', 0) }}</span>
     </div>
   </div>
-  <div class="d-flex align-items-center gap-2">
+  <div class="d-flex align-items-center gap-2 flex-wrap">
+    {# 类型切换：角色卡与世界卡共用同一套审核页面、表格样式与批量动作 #}
+    <div class="btn-group btn-group-sm rounded-pill shadow-sm" role="group" aria-label="内容类型">
+      <a class="btn btn-outline-primary {% if review_type == 'card' %}active fw-bold{% endif %}"
+         href="{{ url_for('admin.review', type='card', status=status) }}">角色卡</a>
+      <a class="btn btn-outline-primary {% if review_type == 'world' %}active fw-bold{% endif %}"
+         href="{{ url_for('admin.review', type='world', status=status) }}">世界卡</a>
+    </div>
+    {% if review_type == 'card' %}
     <div class="small text-muted d-none d-lg-block bg-body-tertiary px-3 py-1 rounded-pill border">
       快捷键：<kbd>J</kbd>/<kbd>K</kbd> 移动 · <kbd>A</kbd> 通过 · <kbd>R</kbd> 驳回 · <kbd>X</kbd> 勾选
     </div>
+    {% endif %}
     <div class="btn-group btn-group-sm rounded-pill shadow-sm" role="group">
       <a class="btn btn-outline-secondary {% if status == 'pending' %}active fw-bold{% endif %}"
-         href="{{ url_for('admin.review', status='pending') }}">待审核</a>
+         href="{{ url_for('admin.review', type=review_type, status='pending') }}">待审核</a>
       <a class="btn btn-outline-secondary {% if status == 'approved' %}active fw-bold{% endif %}"
-         href="{{ url_for('admin.review', status='approved') }}">已通过</a>
+         href="{{ url_for('admin.review', type=review_type, status='approved') }}">已通过</a>
       <a class="btn btn-outline-secondary {% if status == 'rejected' %}active fw-bold{% endif %}"
-         href="{{ url_for('admin.review', status='rejected') }}">已拒绝</a>
+         href="{{ url_for('admin.review', type=review_type, status='rejected') }}">已拒绝</a>
       <a class="btn btn-outline-secondary {% if status == 'all' %}active fw-bold{% endif %}"
-         href="{{ url_for('admin.review', status='all') }}">全部</a>
+         href="{{ url_for('admin.review', type=review_type, status='all') }}">全部</a>
     </div>
   </div>
 </div>
+
+{% if review_type == 'card' %}
 
 <!-- 批量操作悬浮工具栏（选中项 >= 1 时自动弹出） -->
 <div id="batch-toolbar" class="card border-0 shadow-lg rounded-4 p-2 px-3 mb-3 bg-primary text-white d-none position-sticky" style="top: 76px; z-index: 1020;">
@@ -235,6 +246,173 @@
 
 {{ render_pagination(pagination, 'admin.review', args) }}
 
+{% else %}
+{# 世界卡队列：与角色卡同一套表格、同一套批量动作，只是列不同。
+   世界卡没有图片与对话样例，检查时点「详情」直接看 /worlds/<id>（审核员能看
+   pending 的），所以不需要单独一页 review_detail。 #}
+<form method="post" action="{{ url_for('admin.review_batch') }}" id="worldBatchForm">
+  <input type="hidden" name="type" value="world">
+
+  <div class="card border-0 shadow-sm rounded-4 overflow-hidden mb-4">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0" id="review-table">
+        <thead class="table-light">
+          <tr>
+            <th style="width: 44px;" class="text-center">
+              <input class="form-check-input" type="checkbox" id="world-select-all" title="全选/取消全选">
+            </th>
+            <th style="width: 260px;">世界卡</th>
+            <th>简介与词条</th>
+            <th style="width: 130px;">作者</th>
+            <th style="width: 110px;">状态</th>
+            <th style="width: 140px;">提交时间</th>
+            <th style="width: 210px;" class="text-end">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for w in worlds %}
+          <tr id="card-row-{{ w.id }}">
+            <td class="text-center">
+              <input class="form-check-input world-select" type="checkbox" name="card_ids" value="{{ w.id }}">
+            </td>
+            <td>
+              <a href="{{ url_for('worlds.detail', world_id=w.id) }}" target="_blank"
+                 class="fw-bold text-decoration-none d-block text-truncate" style="max-width: 190px;" title="{{ w.name }}">
+                {{ w.name }}
+              </a>
+              <div class="d-flex align-items-center gap-1 flex-wrap mt-1">
+                <span class="badge bg-secondary" style="font-size: 0.68rem;">{{ w.entry_count or 0 }} 词条</span>
+                <span class="badge bg-body-tertiary text-muted border" style="font-size: 0.68rem;">{{ ((w.payload_bytes or 0) / 1024) | round | int }} KB</span>
+                {% if w.copy_count %}<span class="badge bg-body-tertiary text-muted border" style="font-size: 0.68rem;">复制 {{ w.copy_count }}</span>{% endif %}
+              </div>
+              {% set wtags = tags_map.get(w.id, []) %}
+              {% if wtags %}
+              <div class="d-flex flex-wrap gap-1 mt-1">
+                {% for t in wtags[:3] %}<span class="badge bg-secondary" style="font-size: 0.65rem;">#{{ t }}</span>{% endfor %}
+              </div>
+              {% endif %}
+            </td>
+            <td>
+              <div class="small text-muted" style="max-width: 420px;">{{ w.summary or '（没有简介）' }}</div>
+              {% set names = w.preview_list %}
+              {% if names %}
+              <div class="d-flex flex-wrap gap-1 mt-1">
+                {% for n in names[:6] %}<span class="badge bg-body-tertiary text-muted border" style="font-size: 0.65rem;">{{ n }}</span>{% endfor %}
+              </div>
+              {% endif %}
+            </td>
+            <td>
+              <div class="small fw-semibold text-truncate" style="max-width: 130px;">
+                {{ w.author.display_name if w.author else '未知' }}
+              </div>
+              {% if w.author %}<div class="text-muted" style="font-size: 0.7rem;">@{{ w.author.username }}</div>{% endif %}
+            </td>
+            <td>
+              {% if w.status == 'approved' %}<span class="badge bg-success rounded-pill">已通过</span>
+              {% elif w.status == 'rejected' %}<span class="badge bg-danger rounded-pill">已拒绝</span>
+              {% elif w.status == 'deleted' %}<span class="badge bg-secondary rounded-pill">已撤回</span>
+              {% else %}<span class="badge bg-warning text-dark rounded-pill">待审核</span>{% endif %}
+              {% if w.is_hidden %}<span class="badge bg-secondary rounded-pill ms-1">已下架</span>{% endif %}
+            </td>
+            <td>
+              <span class="small text-muted">{{ w.created_at.strftime('%Y-%m-%d %H:%M') if w.created_at else '-' }}</span>
+            </td>
+            <td class="text-end">
+              <div class="d-flex flex-column align-items-end gap-1">
+                <div class="d-flex gap-1">
+                  <button type="button" class="btn btn-sm btn-success btn-world-approve"
+                          data-id="{{ w.id }}" {% if w.status == 'approved' %}disabled{% endif %} title="通过">
+                    <i class="bi bi-check-lg"></i>
+                  </button>
+                  <a class="btn btn-sm btn-outline-primary" href="{{ url_for('worlds.detail', world_id=w.id) }}" target="_blank">详情</a>
+                </div>
+                <div class="input-group input-group-sm" style="max-width: 200px;">
+                  <input class="form-control form-control-sm world-reason" data-for="{{ w.id }}"
+                         placeholder="驳回原因（可选）">
+                  <button type="button" class="btn btn-outline-danger btn-world-reject"
+                          data-id="{{ w.id }}" {% if w.status == 'rejected' %}disabled{% endif %}>驳回</button>
+                </div>
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="7" class="text-center text-muted py-5">
+              <i class="bi bi-inbox fs-2 text-muted d-block mb-2"></i>
+              当前队列暂无世界卡
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="d-flex align-items-center gap-2 flex-wrap mb-3">
+    <span class="small text-muted">已选 <strong id="world-batch-count">0</strong> 项</span>
+    <input class="form-control form-control-sm rounded-3" name="reason" style="max-width: 260px;"
+           placeholder="批量驳回原因（可选）">
+    <button type="submit" name="action" value="approve" class="btn btn-sm btn-success rounded-pill px-3">批量通过</button>
+    <button type="submit" name="action" value="reject" class="btn btn-sm btn-danger rounded-pill px-3">批量驳回</button>
+  </div>
+</form>
+
+{{ render_pagination(pagination, 'admin.review', args) }}
+
+<script>
+(function () {
+  var all = document.getElementById('world-select-all');
+  var boxes = function () {
+    return Array.prototype.slice.call(document.querySelectorAll('.world-select'));
+  };
+  var countEl = document.getElementById('world-batch-count');
+  function sync() {
+    var n = boxes().filter(function (b) { return b.checked; }).length;
+    if (countEl) countEl.textContent = n;
+  }
+  if (all) {
+    all.addEventListener('change', function () {
+      boxes().forEach(function (b) { b.checked = all.checked; });
+      sync();
+    });
+  }
+  boxes().forEach(function (b) { b.addEventListener('change', sync); });
+  sync();
+
+  // 单条通过 / 驳回：动态建一个表单提交，避免和「批量」那个 form 抢提交。
+  function post(action, id, reason) {
+    var f = document.createElement('form');
+    f.method = 'post';
+    f.action = {{ url_for('admin.review_batch') | tojson }};
+    var fields = { type: 'world', action: action, card_ids: id, reason: reason || '' };
+    Object.keys(fields).forEach(function (k) {
+      var i = document.createElement('input');
+      i.type = 'hidden';
+      i.name = k;
+      i.value = fields[k];
+      f.appendChild(i);
+    });
+    document.body.appendChild(f);
+    f.submit();
+  }
+
+  document.querySelectorAll('.btn-world-approve').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      post('approve', btn.getAttribute('data-id'), '');
+    });
+  });
+  document.querySelectorAll('.btn-world-reject').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var id = btn.getAttribute('data-id');
+      var input = document.querySelector('.world-reason[data-for="' + id + '"]');
+      post('reject', id, input ? input.value : '');
+    });
+  });
+})();
+</script>
+{% endif %}
+
+{% if review_type == 'card' %}
 <script>
 // ---------------- 异步 AJAX 审批与批量操作逻辑 ----------------
 var focusedIndex = -1;
@@ -594,4 +772,5 @@ document.addEventListener('click', function(e) {
   }
 });
 </script>
+{% endif %}
 {% endblock %}

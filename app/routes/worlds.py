@@ -21,6 +21,10 @@ WorldExportImportService 解析。所以服务端不解析、不校验词条结�
 """
 
 
+import json
+import re
+import uuid
+
 from flask import (
     Blueprint,
     Response,
@@ -35,6 +39,7 @@ from flask_login import current_user, login_required
 
 from ..extensions import db
 from ..models import WorldCard, WorldCopyStat
+from ..services.world_import_service import parse_imported_world
 from ..services.world_service import (
     can_view as _can_view,
 )
@@ -42,7 +47,11 @@ from ..services.world_service import (
     entry_index,
     favorite_state,
     popular_tags,
+    preview_names,
     publish_world,
+    resubmit_world,
+    set_hidden,
+    update_world,
     user_worlds_query,
     world_list_query,
 )
@@ -89,6 +98,8 @@ def _world_light(world, tags=None):
         "status": world.status,
         "is_hidden": bool(world.is_hidden),
         "tags": tags if tags is not None else [],
+        # 卡片上的词条名预览（发布/编辑时算好的快照，不解析 payload）。
+        "preview_names": preview_names(world),
         "author": _user_public(world.author) if world.author else None,
         "created_at": world.created_at.isoformat() if world.created_at else None,
         # 更新时间：世界书是会改的，只给创建时间看不出「这本是不是还在维护」。
@@ -392,38 +403,100 @@ def worlds_delete(world_id):
     return ok({"id": world.id})
 
 
+@worlds_bp.route("/worlds/<world_id>", methods=["PUT"])
+@api_login_required
+def worlds_update(world_id):
+    """作者编辑自己的世界卡。
+
+    请求体与发布一致：**世界 JSON 原文**。编辑语义是「整份世界书重写」而不是
+    「改几个字段」—— 编辑器给的是完整世界观，词条可能被增删改。
+
+    替换后状态回到 pending：审核过的是旧内容，新内容没人看过。
+    """
+    viewer = _ensure_self()
+    world = db.session.get(WorldCard, world_id)
+    if world is None or world.author_id != viewer.id:
+        return err("世界卡不存在", 404)
+
+    world, error = update_world(world, request.get_data(as_text=True) or "")
+    if error is not None:
+        return err(error, 400)
+    return ok({"id": world.id, "status": world.status})
+
+
+@worlds_bp.route("/worlds/<world_id>/source", methods=["GET"])
+@api_login_required
+def worlds_source(world_id):
+    """作者取自己的世界卡原文，**用于编辑，不记复制统计**。
+
+    不能用 /export：那是「复制」动作，会 +1 复制量并写一条溯源记录。作者改自己的
+    东西不该被算成别人复制了一次。
+    """
+    viewer = _ensure_self()
+    world = db.session.get(WorldCard, world_id)
+    if world is None or world.author_id != viewer.id:
+        return err("世界卡不存在", 404)
+    return Response(
+        world.payload or "{}",
+        mimetype="application/json",
+    )
+
+
+@worlds_bp.route("/worlds/<world_id>/hide", methods=["POST"])
+@api_login_required
+def worlds_hide(world_id):
+    """作者下架 / 恢复自己的世界卡（toggle，不动审核状态）。"""
+    viewer = _ensure_self()
+    world = db.session.get(WorldCard, world_id)
+    if world is None or world.author_id != viewer.id:
+        return err("世界卡不存在", 404)
+    world = set_hidden(world, not world.is_hidden)
+    return ok({"id": world.id, "hidden": bool(world.is_hidden)})
+
+
+@worlds_bp.route("/worlds/<world_id>/resubmit", methods=["POST"])
+@api_login_required
+def worlds_resubmit(world_id):
+    """被拒绝 / 已撤回的世界卡重新提审。"""
+    viewer = _ensure_self()
+    world = db.session.get(WorldCard, world_id)
+    if world is None or world.author_id != viewer.id:
+        return err("世界卡不存在", 404)
+    if world.status not in ("rejected", "deleted"):
+        return err("只有被拒绝或已撤回的世界卡需要重新提审", 400)
+    world = resubmit_world(world)
+    return ok({"id": world.id, "status": world.status})
+
+
 # ---------------------------------------------------------------------------
-# 网页版（列表 / 详情 / 下载）
+# 网页版（列表 / 详情 / 下载 / 发布 / 编辑）
 # ---------------------------------------------------------------------------
 
 
 @worlds_web.route("/")
 def index():
-    """世界卡列表页。
+    """世界卡列表页：探索页形态（排序 + 标签筛选 + 卡片网格）。
 
-    与 App 一致：**列表不展示正文**。世界书动辄几百 KB，列表页带上它就没法
-    翻页了；想看内容去详情页（那里给词条名 + 一条示例）。
+    **不设搜索框** —— 全站搜索（/search?type=world）才是统一入口；栏目里再放
+    一个搜索框，就等于「找世界书」有两个入口，两边还各自演化。
+
+    与 App 一致：列表不展示正文。世界书动辄几百 KB，列表页带上它就没法翻页。
     """
     page = _page_arg("page", 1)
     sort = (request.args.get("sort") or "new").strip()
-    keyword = (request.args.get("q") or "").strip()
+    tag = (request.args.get("tag") or "").strip()
 
-    # 与 App 的 /api/v1/worlds 共用同一个查询构造函数 —— 网页版此前**漏了 tag
-    # 筛选**，就是"两份代码各自演化"的直接后果。
-    query = world_list_query(
-        current_user,
-        keyword=keyword,
-        tag=request.args.get("tag") or "",
-        sort=sort,
-    )
+    # 与 App 的 /api/v1/worlds 共用同一个查询构造函数。
+    query = world_list_query(current_user, tag=tag, sort=sort)
 
-    pagination = query.paginate(page=page, per_page=20, error_out=False)
+    pagination = query.paginate(page=page, per_page=24, error_out=False)
     return render_template(
         "worlds/index.html",
         pagination=pagination,
         worlds=pagination.items,
         tags=_tags_map([w.id for w in pagination.items]),
-        q=keyword,
+        hot_tags=popular_tags(current_user, limit=24),
+        tag=tag,
         sort=sort,
     )
 
@@ -505,36 +578,348 @@ def favorite(world_id):
     return redirect(url_for("worlds.detail", world_id=world.id))
 
 
+# ---------------------------------------------------------------------------
+# 网页版编辑器：表单 <-> 世界 JSON
+#
+# 网页端的发布/编辑用的是**完整世界观编辑器**（名称/背景/简介/标签/禁词 +
+# 词条列表，含 keyRegex、递归、冷却、延迟、装饰符）。表单提交上来的是普通
+# 字段 + 一段 entries_json，这里负责拼回客户端认识的 World JSON。
+#
+# 关键：**顶层必须带 id**。客户端 World.fromJson 把 id 当非空字符串读，缺了
+# 直接崩 —— 别人下载这份世界再导入时会炸，所以这里必须给一个 UUID。
+# ---------------------------------------------------------------------------
+
+
+def _split_list(raw):
+    """逗号 / 中文逗号 / 换行分隔的标签或禁词。"""
+    return [t.strip() for t in re.split(r"[,，\n]", raw or "") if t.strip()]
+
+
+def _empty_state():
+    """空白的编辑器 state。"""
+    return {
+        "id": "",
+        "name": "",
+        "summary": "",
+        "description": "",
+        "tags": "",
+        "forbidden_words": "",
+        "entries": [],
+    }
+
+
+def _import_state(req):
+    """从「导入」表单里取内容并解析。返回 (state, error)。
+
+    支持两种投喂方式：上传 .dnaworld / .json 文件，或直接把 JSON 粘进文本框。
+    """
+    raw = ""
+    upload = req.files.get("file")
+    if upload is not None and upload.filename:
+        try:
+            raw = upload.read().decode("utf-8")
+        except UnicodeDecodeError:
+            return None, "文件不是 UTF-8 文本，无法解析"
+    if not raw.strip():
+        raw = req.form.get("payload") or ""
+    return parse_imported_world(raw)
+
+
+def _as_int(value, default=0):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _state_from_request():
+    """把表单读成一个可回填的 state（出错时原样还给模板，不丢用户输入）。"""
+    entries = []
+    raw_entries = request.form.get("entries_json") or "[]"
+    try:
+        parsed = json.loads(raw_entries)
+        if isinstance(parsed, list):
+            entries = [e for e in parsed if isinstance(e, dict)]
+    except ValueError:
+        entries = []
+    return {
+        "id": (request.form.get("world_id") or "").strip(),
+        "name": (request.form.get("name") or "").strip(),
+        "summary": (request.form.get("summary") or "").strip(),
+        "description": (request.form.get("description") or "").strip(),
+        "tags": request.form.get("tags") or "",
+        "forbidden_words": request.form.get("forbidden_words") or "",
+        "entries": entries,
+    }
+
+
+def _state_from_world(world):
+    """把已发布的世界读回成 state（编辑页回填）。"""
+    try:
+        data = json.loads(world.payload or "{}")
+    except (ValueError, TypeError):
+        data = {}
+    if not isinstance(data, dict):
+        data = {}
+    entries = data.get("entries")
+    tags = _tags_map([world.id]).get(world.id, [])
+    return {
+        "id": world.id,
+        "name": data.get("name") or world.name or "",
+        "summary": data.get("summary") or world.summary or "",
+        "description": data.get("description") or "",
+        "tags": ", ".join(tags),
+        "forbidden_words": ", ".join(
+            [w for w in (data.get("forbiddenWords") or []) if isinstance(w, str)]
+        ),
+        "entries": [e for e in entries if isinstance(e, dict)]
+        if isinstance(entries, list)
+        else [],
+    }
+
+
+def _validate_state(state):
+    """表单校验。返回错误文案；通过返回 None。
+
+    与本体编辑器一致：**世界必须有名字，词条也必须有名字**。本体那边是弹窗直接
+    拦住；网页这边如果放过去，会得到一条「有正文但没名字」的词条 —— 它既不会
+    出现在详情页的词条目录里，也永远触发不了（没有主触发词），属于静默坏数据。
+    """
+    if not (state.get("name") or "").strip():
+        return "世界需要一个名称"
+    for idx, entry in enumerate(state.get("entries") or [], 1):
+        name = entry.get("name")
+        name = name.strip() if isinstance(name, str) else ""
+        desc = entry.get("description")
+        desc = desc if isinstance(desc, str) else ""
+        if not name and desc.strip():
+            return f"第 {idx} 条词条没有名称（有正文的词条必须有名字，否则永远触发不了）"
+    return None
+
+
+def _state_to_payload(state):
+    """state -> 世界 JSON 原文（与客户端 World.toJson 同构）。"""
+    clean = []
+    for item in state["entries"]:
+        name = item.get("name")
+        name = name.strip() if isinstance(name, str) else ""
+        description = item.get("description")
+        description = description if isinstance(description, str) else ""
+        # 空词条（名字和正文都空）直接丢，别让它占一个位置。
+        if not name and not description.strip():
+            continue
+        keys = item.get("keys")
+        is_person = item.get("type") == "person"
+
+        # 人物专属字段只在人物词条上保留（与本体编辑器一致：切回名词就清空）。
+        gender = item.get("gender") if is_person else None
+        if gender not in ("male", "female", "other"):
+            gender = None
+        age = item.get("age") if is_person else None
+        if not (isinstance(age, str) and age.strip()):
+            age = None
+        status = item.get("status") if is_person else None
+        if status not in ("normal", "dead"):
+            status = None
+        relation = None
+        if is_person:
+            target_id = item.get("relationTarget")
+            rel_content = item.get("relationContent")
+            if (
+                isinstance(target_id, str)
+                and target_id
+                and isinstance(rel_content, str)
+                and rel_content.strip()
+            ):
+                relation = {"targetId": target_id, "content": rel_content.strip()}
+
+        clean.append(
+            {
+                "id": (item.get("id") or str(uuid.uuid4())),
+                "name": name,
+                "description": description,
+                "type": "person" if is_person else "noun",
+                "gender": gender,
+                "age": age,
+                "status": status,
+                "relation": relation,
+                "keys": (
+                    [k for k in keys if isinstance(k, str) and k.strip()]
+                    if isinstance(keys, list)
+                    else []
+                ),
+                "keyRegex": (item.get("keyRegex") or None),
+                "caseSensitive": bool(item.get("caseSensitive")),
+                "matchWholeWords": bool(item.get("matchWholeWords")),
+                "recursive": bool(item.get("recursive")),
+                # 与本体一致：轮数收在 0–100，避免手滑输入把世界书弄成永不触发。
+                "order": max(0, _as_int(item.get("order"))),
+                "cooldownRounds": max(0, min(100, _as_int(item.get("cooldownRounds")))),
+                "delayRounds": max(0, min(100, _as_int(item.get("delayRounds")))),
+                "decorator": item.get("decorator") or None,
+            }
+        )
+
+    data = {
+        "id": state["id"] or str(uuid.uuid4()),
+        "name": state["name"],
+        "summary": state["summary"],
+        "description": state["description"],
+        "tags": _split_list(state["tags"]),
+        "forbiddenWords": _split_list(state["forbidden_words"]),
+        "entries": clean,
+        "archived": False,
+    }
+    return json.dumps(data, ensure_ascii=False)
+
+
+def _export_response(state):
+    """把当前表单导出成 .dnaworld 附件（与客户端 exportWorld 同一套信封）。
+
+    网页端原来没有「导出」：写了一半的世界只能先发布、再从详情页下载。这里让
+    编辑器直接吐一份文件，三端对齐。
+    """
+    from datetime import UTC, datetime
+    from urllib.parse import quote
+
+    payload = json.loads(_state_to_payload(state))
+    package = {
+        "version": 1,
+        "exportType": "world",
+        "exportedAt": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+        "world": payload,
+    }
+    text = json.dumps(package, ensure_ascii=False, indent=2)
+
+    raw_name = (state.get("name") or "world").strip() or "world"
+    safe = re.sub(r'[\\/:*?"<>|\s]+', "_", raw_name)[:60] or "world"
+    return Response(
+        text,
+        mimetype="application/json",
+        headers={
+            # ASCII 兜底 + RFC 5987 的中文名，浏览器都能落对文件名。
+            "Content-Disposition": (
+                'attachment; filename="world.dnaworld"; '
+                f"filename*=UTF-8''{quote(safe + '.dnaworld')}"
+            )
+        },
+    )
+
+
+def _render_editor(mode, world, state, form_action):
+    """渲染编辑器。
+
+    热门标签是**社区**的东西，由服务端在这里取好交给模板 —— 编辑器模板自己
+    不该去猜，更不该让别的端（比如本体）为了候选去请求社区接口。
+    """
+    return render_template(
+        "worlds/editor.html",
+        mode=mode,
+        world=world,
+        state=state,
+        form_action=form_action,
+        hot_tags=[t["tag"] for t in popular_tags(current_user, limit=12)],
+    )
+
+
 @worlds_web.route("/publish", methods=["GET", "POST"])
 @login_required
 def publish():
-    """网页版发布入口：粘贴世界 JSON 原文，或上传导出的文件。
+    """网页版发布：完整世界观编辑器（不是贴 JSON 的文本框）。
 
     与 App 的 POST /api/v1/worlds **共用 publish_world 一个函数** —— 原文原样
     入库、内容指纹幂等、发布后建索引，两端口径完全一致。
     """
-    raw = ""
-    if request.method == "POST":
-        raw = (request.form.get("payload") or "").strip()
-        upload = request.files.get("file")
-        if upload is not None and upload.filename:
-            try:
-                raw = upload.read().decode("utf-8")
-            except UnicodeDecodeError:
-                flash("文件不是 UTF-8 文本，无法解析", "danger")
-                return render_template("worlds/publish.html", payload=raw)
+    publish_action = url_for("worlds.publish")
 
+    if request.method == "POST":
+        # 「导入」表单：只解析并回填编辑器，不发布。
+        if (request.form.get("do") or "") == "import":
+            state, error = _import_state(request)
+            if error is not None:
+                flash(error, "danger")
+                state = _empty_state()
+            else:
+                flash(
+                    f"已识别：{len(state['entries'])} 个词条，检查后点「保存并提交审核」",
+                    "success",
+                )
+            return _render_editor("publish", None, state, publish_action)
+
+        # 「导出」：把当前表单落成 .dnaworld 文件，不写库。
+        if (request.form.get("do") or "") == "export":
+            state = _state_from_request()
+            invalid = _validate_state(state)
+            if invalid is not None:
+                flash(invalid, "danger")
+                return _render_editor("publish", None, state, publish_action)
+            return _export_response(state)
+
+        state = _state_from_request()
+        invalid = _validate_state(state)
+        if invalid is not None:
+            flash(invalid, "danger")
+            return _render_editor("publish", None, state, publish_action)
+
+        raw = _state_to_payload(state)
         world, error, reused = publish_world(current_user, raw)
         if error is not None:
             flash(error, "danger")
-            return render_template("worlds/publish.html", payload=raw)
+            return _render_editor("publish", None, state, publish_action)
         if reused:
             flash("这个内容之前已经提交过，正在审核中", "warning")
         else:
             flash("已提交，等待审核", "success")
         return redirect(url_for("worlds.detail", world_id=world.id))
 
-    return render_template("worlds/publish.html", payload=raw)
+    return _render_editor("publish", None, _empty_state(), publish_action)
+
+
+@worlds_web.route("/<world_id>/edit", methods=["GET", "POST"])
+@login_required
+def edit(world_id):
+    """作者编辑自己的世界卡：同一个编辑器，保存后重新走审核。"""
+    world = db.session.get(WorldCard, world_id)
+    if world is None or world.author_id != current_user.id:
+        abort(404)
+    edit_action = url_for("worlds.edit", world_id=world.id)
+
+    if request.method == "POST":
+        if (request.form.get("do") or "") == "import":
+            state, error = _import_state(request)
+            if error is not None:
+                flash(error, "danger")
+                state = _state_from_world(world)
+            else:
+                flash(
+                    f"已识别：{len(state['entries'])} 个词条，保存后会替换当前世界并重新审核",
+                    "success",
+                )
+            return _render_editor("edit", world, state, edit_action)
+
+        if (request.form.get("do") or "") == "export":
+            state = _state_from_request()
+            invalid = _validate_state(state)
+            if invalid is not None:
+                flash(invalid, "danger")
+                return _render_editor("edit", world, state, edit_action)
+            return _export_response(state)
+
+        state = _state_from_request()
+        invalid = _validate_state(state)
+        if invalid is not None:
+            flash(invalid, "danger")
+            return _render_editor("edit", world, state, edit_action)
+
+        raw = _state_to_payload(state)
+        world, error = update_world(world, raw)
+        if error is not None:
+            flash(error, "danger")
+            return _render_editor("edit", world, state, edit_action)
+        flash("已保存，正在等待重新审核", "success")
+        return redirect(url_for("worlds.mine"))
+
+    return _render_editor("edit", world, _state_from_world(world), edit_action)
 
 
 @worlds_web.route("/favorites")
@@ -562,3 +947,51 @@ def favorites():
         worlds=pagination.items,
         tags=_tags_map([w.id for w in pagination.items]),
     )
+
+
+@worlds_web.route("/mine")
+@login_required
+def mine():
+    """我的世界卡：含待审核 / 已拒绝 / 已下架，带状态与操作。
+
+    **不套 visible_to**：作者要看到自己的全部条目，visible_to 对本人会过滤掉
+    已下架的。
+    """
+    page = _page_arg("page", 1)
+    query = WorldCard.query.filter_by(author_id=current_user.id).order_by(
+        WorldCard.created_at.desc()
+    )
+    pagination = query.paginate(page=page, per_page=20, error_out=False)
+    return render_template(
+        "worlds/mine.html",
+        pagination=pagination,
+        worlds=pagination.items,
+        tags=_tags_map([w.id for w in pagination.items]),
+    )
+
+
+@worlds_web.route("/<world_id>/hide", methods=["POST"])
+@login_required
+def hide(world_id):
+    """作者下架 / 恢复（表单 POST，跳回我的世界卡）。"""
+    world = db.session.get(WorldCard, world_id)
+    if world is None or world.author_id != current_user.id:
+        abort(404)
+    world = set_hidden(world, not world.is_hidden)
+    flash("已下架，其他人看不到了" if world.is_hidden else "已恢复", "success")
+    return redirect(url_for("worlds.mine"))
+
+
+@worlds_web.route("/<world_id>/resubmit", methods=["POST"])
+@login_required
+def resubmit(world_id):
+    """被拒绝 / 已撤回的世界卡重新提审（表单 POST）。"""
+    world = db.session.get(WorldCard, world_id)
+    if world is None or world.author_id != current_user.id:
+        abort(404)
+    if world.status not in ("rejected", "deleted"):
+        flash("只有被拒绝或已撤回的世界卡需要重新提审", "warning")
+        return redirect(url_for("worlds.mine"))
+    resubmit_world(world)
+    flash("已重新提审，等待审核", "success")
+    return redirect(url_for("worlds.mine"))

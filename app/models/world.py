@@ -1,3 +1,5 @@
+import json
+
 from sqlalchemy import and_, or_
 from sqlalchemy.dialects.mysql import LONGTEXT
 
@@ -32,6 +34,12 @@ class WorldCard(db.Model):
     entry_count = db.Column(db.Integer, nullable=False, server_default="0")
     payload_bytes = db.Column(db.Integer, nullable=False, server_default="0")
 
+    # ---- 列表卡片用的词条名预览 ----
+    # 存发布/编辑时算好的 JSON 数组（前若干条词条名）。**不在列表接口里解析
+    # payload**：一页 20 个世界、每个几百 KB，解析一遍就是几十 MB 的 CPU，
+    # 而卡片上只需要几个名字。
+    preview_names = db.Column(db.Text, server_default="[]")
+
     # ---- 原文 ----
     # 用 LONGTEXT 而不是 db.Text：MySQL 的 TEXT 只有 64KB，几百 KB 的世界书
     # 会直接存不进去。这里**不设产品级体积上限**，让基础设施的天花板说话
@@ -58,6 +66,17 @@ class WorldCard(db.Model):
     )
 
     author = db.relationship("User", backref="world_cards")
+
+    @property
+    def preview_list(self):
+        """词条名预览（模板直接读）。解析失败一律降级成空。"""
+        try:
+            names = json.loads(self.preview_names or "[]")
+        except (ValueError, TypeError):
+            return []
+        if not isinstance(names, list):
+            return []
+        return [str(n) for n in names if str(n).strip()]
 
     @classmethod
     def visible_to(cls, viewer=None):

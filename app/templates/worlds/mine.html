@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% from "macros/pagination.html" import render_pagination %}
+{% from "macros/worlds.html" import world_status_badge %}
+{% from "macros/cards.html" import empty_state %}
+
+{% block title %}我的世界卡 · DNAISLAND{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+  <h1 class="h4 mb-0 fw-bold">我的世界卡</h1>
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-sm btn-outline-secondary rounded-pill" href="{{ url_for('worlds.index') }}">浏览全部</a>
+    <a class="btn btn-sm btn-primary rounded-pill" href="{{ url_for('worlds.publish') }}">发布世界卡</a>
+  </div>
+</div>
+
+{# 与「我的角色卡」同一套：状态徽章 + 编辑 / 隐藏 / 重新提审 / 查看。
+   作者要能一眼看出自己那本卡在哪一步，也要能改、能撤。 #}
+{% if pagination.items %}
+<div class="row g-3">
+  {% for w in worlds %}
+  <div class="col-12 col-sm-6 col-lg-4">
+    <div class="dna-world-card h-100">
+      <div class="d-flex align-items-start justify-content-between gap-2 mb-1">
+        <a class="dna-world-card__name" href="{{ url_for('worlds.detail', world_id=w.id) }}">{{ w.name }}</a>
+        {{ world_status_badge(w) }}
+      </div>
+
+      {% if w.summary %}<div class="dna-world-card__summary">{{ w.summary }}</div>{% endif %}
+
+      {% set names = w.preview_list %}
+      {% if names %}
+      <div class="dna-world-card__entries">
+        {% for n in names[:4] %}<span class="dna-world-card__entry">{{ n }}</span>{% endfor %}
+        {% if (w.entry_count or 0) > 4 %}<span class="dna-world-card__entry dna-world-card__entry--more">+{{ (w.entry_count or 0) - 4 }}</span>{% endif %}
+      </div>
+      {% endif %}
+
+      {% set wtags = tags.get(w.id, []) %}
+      {% if wtags %}
+      <div class="d-flex flex-wrap gap-1 mb-2">
+        {% for t in wtags[:4] %}<span class="badge text-bg-light">#{{ t }}</span>{% endfor %}
+      </div>
+      {% endif %}
+
+      <div class="dna-world-card__meta">
+        <span>{{ w.entry_count or 0 }} 词条 · {{ ((w.payload_bytes or 0) / 1024) | round | int }} KB{% if w.copy_count %} · 复制 {{ w.copy_count }}{% endif %}</span>
+        <span>{{ w.created_at | cst }}</span>
+      </div>
+
+      <div class="d-flex flex-wrap gap-2 mt-2">
+        <a class="btn btn-sm btn-outline-secondary rounded-pill" href="{{ url_for('worlds.edit', world_id=w.id) }}">编辑</a>
+        {% if w.status in ('rejected', 'deleted') %}
+        <form method="post" action="{{ url_for('worlds.resubmit', world_id=w.id) }}" class="d-inline">
+          <button class="btn btn-sm btn-primary rounded-pill" type="submit">重新提审</button>
+        </form>
+        {% endif %}
+        {% if w.status == 'approved' %}
+        <form method="post" action="{{ url_for('worlds.hide', world_id=w.id) }}" class="d-inline">
+          <button class="btn btn-sm btn-outline-secondary rounded-pill" type="submit">{{ '恢复' if w.is_hidden else '下架' }}</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+<div class="mt-4">{{ render_pagination(pagination, 'worlds.mine', {}) }}</div>
+{% else %}
+{{ empty_state('你还没有发布过世界卡。', '') }}
+{% endif %}
+{% endblock %}

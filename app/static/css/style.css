@@ -635,6 +635,69 @@ a { color: var(--dna-link); }
 }
 .dna-tile__tags { margin-top: auto; display: flex; flex-wrap: wrap; gap: .3rem; }
 
+/* 世界卡瓦片：没有封面图，靠「简介 + 词条名 + 数据」三行结构立住形态，
+   让它和角色卡（封面网格）、茶馆（图文帖）并列时仍认得出是资料型内容。 */
+.dna-world-card {
+  display: flex; flex-direction: column; gap: .45rem;
+  padding: .95rem 1rem 1rem;
+  border: 1px solid var(--dna-border);
+  border-radius: var(--dna-radius);
+  background: var(--dna-surface);
+  transition: transform .2s ease, border-color .25s ease;
+}
+.dna-world-card:hover { transform: translateY(-3px); border-color: var(--dna-border-strong); }
+.dna-world-card__name {
+  font-size: 1.02rem; font-weight: 700; color: var(--dna-emphasis);
+  text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.dna-world-card__name:hover { color: var(--dna-link-hover); }
+.dna-world-card__summary {
+  font-size: .84rem; color: var(--dna-muted); margin: 0;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.dna-world-card__entries { display: flex; flex-wrap: wrap; gap: .3rem; }
+.dna-world-card__entry {
+  font-size: .72rem; color: var(--dna-text);
+  padding: .1rem .5rem; border-radius: var(--dna-radius-sm);
+  background: var(--dna-chip-bg); border: 1px solid var(--dna-border);
+  max-width: 9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.dna-world-card__entry--more { color: var(--dna-muted); }
+.dna-world-card__meta {
+  margin-top: auto; padding-top: .55rem;
+  border-top: 1px dashed var(--dna-border);
+  display: flex; align-items: center; justify-content: space-between; gap: .5rem;
+  font-size: .76rem; color: var(--dna-muted);
+}
+/* 世界卡详情：资料卡头部 */
+.dna-world-head {
+  border: 1px solid var(--dna-border);
+  border-radius: var(--dna-radius);
+  background: var(--dna-surface);
+  padding: 1.1rem 1.2rem;
+}
+.dna-world-head__title { font-size: 1.45rem; font-weight: 700; color: var(--dna-emphasis); margin: 0 0 .35rem; }
+.dna-world-head__meta { font-size: .8rem; color: var(--dna-muted); }
+.dna-world-head__actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .9rem; }
+
+/* 世界卡编辑器：词条默认收起，点标题展开编辑（几百条时全展开会拉成长龙） */
+.dna-entry__details { border-radius: var(--dna-radius); }
+.dna-entry__summary {
+  display: flex; align-items: center; gap: .5rem;
+  padding: .7rem 1rem; cursor: pointer; list-style: none;
+}
+.dna-entry__summary::-webkit-details-marker { display: none; }
+.dna-entry__summary::before {
+  content: "▸"; display: inline-block; color: var(--dna-muted);
+  font-size: .8rem; transition: transform .15s ease;
+}
+.dna-entry__details[open] .dna-entry__summary::before { transform: rotate(90deg); }
+.dna-entry__name {
+  font-weight: 600; color: var(--dna-text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60%;
+}
+.dna-entry__spacer { flex: 1; }
+
 /* 标签片 */
 .dna-chip {
   display: inline-flex; align-items: center;

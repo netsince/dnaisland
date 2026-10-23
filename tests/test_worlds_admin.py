@@ -1,8 +1,12 @@
-"""后台的世界卡审核与管理（/admin/worlds）。
+"""后台的世界卡审核与管理。
 
-守三件事：
+世界卡审核**并进了角色卡审核中心**（/admin/review?type=world），不再是独立一页；
+/admin/worlds 只保留一个跳转，老书签不会 404。
+
+守四件事：
 * 审核权限：非审核员进不去；
 * 通过/驳回**必须通知作者**，且用通用关联 related_type="world"（客户端靠它跳转）；
+* 批量操作与角色卡共用 /admin/review/batch，靠 type 区分；
 * 下架/删除都是软操作，且对公开接口立即可见地生效。
 """
 
@@ -101,12 +105,51 @@ def test_requires_review_permission(app, client):
     assert resp.status_code in (302, 401, 403)
 
 
+def test_old_entry_redirects_to_review(app, client):
+    """旧入口 /admin/worlds 跳到审核中心的世界卡队列。"""
+    _seed(app)
+    _login(client)
+    resp = client.get("/admin/worlds")
+    assert resp.status_code == 302
+    assert "type=world" in resp.headers["Location"]
+
+
 def test_list_renders_pending(app, client):
     _seed(app)
     _login(client)
-    resp = client.get("/admin/worlds?status=pending")
+    resp = client.get("/admin/review?type=world&status=pending")
     assert resp.status_code == 200
-    assert "幻想大陆" in resp.get_data(as_text=True)
+    html = resp.get_data(as_text=True)
+    assert "幻想大陆" in html
+    # 与角色卡审核同一个页面：类型切换 + 同一张表
+    assert "世界卡审核队列" in html
+    assert "角色卡" in html
+
+
+def test_reviewer_can_open_pending_world(app, client):
+    """审核员点「详情」要能打开待审核的世界卡，不能 404。
+
+    审核中心用的是 /worlds/<id> 做预览，而那条路由走 can_view —— 早先只放
+    超管，审核员会点出一个 404。
+    """
+    world_id, _ = _seed(app)
+    _login(client)
+    with app.app_context():
+        # 把当前审核员降成普通审核员（不是超管）
+        admin = User.query.filter_by(username="wadmin").first()
+        admin.role = "reviewer"
+        db.session.commit()
+
+    assert client.get(f"/worlds/{world_id}").status_code == 200
+
+
+def test_card_queue_still_works(app, client):
+    """合并不是把角色卡审核挤掉：type 缺省仍然是角色卡队列。"""
+    _seed(app)
+    _login(client)
+    resp = client.get("/admin/review")
+    assert resp.status_code == 200
+    assert "角色卡审核队列" in resp.get_data(as_text=True)
 
 
 def test_approve_publishes_and_notifies(app, client):
@@ -167,13 +210,33 @@ def test_delete_is_soft(app, client):
 
 
 def test_batch_approve(app, client):
+    """批量通过走审核中心的共用入口，用 type=world 区分对象。"""
     world_id, author_id = _seed(app)
     _login(client)
     client.post(
-        "/admin/worlds/batch", data={"action": "approve", "ids": [world_id]}
+        "/admin/review/batch",
+        data={"type": "world", "action": "approve", "card_ids": [world_id]},
     )
     with app.app_context():
         assert db.session.get(WorldCard, world_id).status == "approved"
         assert (
             Notification.query.filter_by(user_id=author_id, type="review").count() == 1
         )
+
+
+def test_batch_reject_with_reason(app, client):
+    world_id, author_id = _seed(app)
+    _login(client)
+    client.post(
+        "/admin/review/batch",
+        data={
+            "type": "world",
+            "action": "reject",
+            "card_ids": [world_id],
+            "reason": "词条太少",
+        },
+    )
+    with app.app_context():
+        assert db.session.get(WorldCard, world_id).status == "rejected"
+        note = Notification.query.filter_by(user_id=author_id, type="review").first()
+        assert note is not None and "词条太少" in note.message

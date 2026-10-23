@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "macros/user_badge.html" import user_badge with context %}
+{% from "macros/worlds.html" import world_status_badge %}
 
 {% block title %}{{ world.name }} · DNAISLAND{% endblock %}
 
@@ -12,29 +13,70 @@
     </ol>
   </nav>
 
-  <h1 class="mb-2">{{ world.name }}</h1>
-  <div class="text-muted small mb-3">
-    {% if world.entry_count %}{{ world.entry_count }} 词条{% endif %}
-    {% if world.entry_count and world.payload_bytes %} · {% endif %}
-    {% if world.payload_bytes %}{{ (world.payload_bytes / 1024) | round | int }} KB{% endif %}
-    {% if world.view_count %} · {{ world.view_count }} 次浏览{% endif %}
-    {% if world.copy_count %} · 被复制 {{ world.copy_count }} 次{% endif %}
-    {% if world.author %} · {{ user_badge(world.author, link=false) }}{% endif %}
-    {% if world.created_at %} · {{ world.created_at|cst }}{% endif %}
-  </div>
+  {# 头部按「资料卡」排版：先给身份与统计，再给目录。
+     之前是一屏文章式排版，读起来像公告，不像一份可以下载使用的资料。 #}
+  <div class="dna-world-head mb-4">
+    <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap">
+      <h1 class="dna-world-head__title">{{ world.name }}</h1>
+      {% if world.status != 'approved' or world.is_hidden %}
+      <div class="d-flex gap-1">{{ world_status_badge(world) }}</div>
+      {% endif %}
+    </div>
 
-  {% if world.summary %}<p>{{ world.summary }}</p>{% endif %}
+    <div class="dna-world-head__meta">
+      {{ world.entry_count or 0 }} 词条
+      · {{ ((world.payload_bytes or 0) / 1024) | round | int }} KB
+      {% if world.view_count %} · {{ world.view_count }} 次浏览{% endif %}
+      {% if world.copy_count %} · 被复制 {{ world.copy_count }} 次{% endif %}
+      {% if favorite_count %} · 收藏 {{ favorite_count }}{% endif %}
+      {% if world.created_at %} · {{ world.created_at | cst }}{% endif %}
+    </div>
 
-  {% if tags %}
-  <div class="mb-3">
-    {% for t in tags %}<span class="badge text-bg-light me-1">{{ t }}</span>{% endfor %}
+    {% if world.summary %}<p class="mt-2 mb-0">{{ world.summary }}</p>{% endif %}
+
+    {% if tags %}
+    <div class="mt-2 d-flex flex-wrap gap-1">
+      {% for t in tags %}
+      <a class="badge text-bg-light text-decoration-none" href="{{ url_for('worlds.index', tag=t) }}">#{{ t }}</a>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mt-3">
+      <div class="d-flex align-items-center gap-2">
+        {% if world.author %}{{ user_badge(world.author) }}{% endif %}
+      </div>
+
+      <div class="dna-world-head__actions">
+        {% if current_user.is_authenticated %}
+        <a class="btn btn-sm btn-primary rounded-pill" href="{{ url_for('worlds.download', world_id=world.id) }}">
+          <i class="bi bi-download me-1"></i>下载世界
+        </a>
+        <form method="post" action="{{ url_for('worlds.favorite', world_id=world.id) }}" class="d-inline">
+          <button class="btn btn-sm btn-outline-primary rounded-pill" type="submit">
+            <i class="bi bi-bookmark{{ '-fill' if favorited else '' }} me-1"></i>{{ '已收藏' if favorited else '收藏' }}
+          </button>
+        </form>
+        {% if current_user.id == world.author_id %}
+        <a class="btn btn-sm btn-outline-secondary rounded-pill" href="{{ url_for('worlds.edit', world_id=world.id) }}">编辑</a>
+        {% endif %}
+        {% else %}
+        <a class="btn btn-sm btn-outline-primary rounded-pill" href="{{ url_for('auth.login') }}">登录后下载</a>
+        {% endif %}
+        {% if current_user.is_authenticated and current_user.id != world.author_id %}
+        <a class="btn btn-sm btn-outline-danger rounded-pill ms-auto"
+           href="{{ url_for('user.report', type='world', id=world.id) }}">
+          <i class="bi bi-flag me-1"></i>举报
+        </a>
+        {% endif %}
+      </div>
+    </div>
   </div>
-  {% endif %}
 
   {# 世界书的形态：词条按「人物 / 名词」分组、可折叠、可搜索。
      只给名字和触发词，正文只给一条示例 —— 全展示没人愿意发布，
      全不展示没人愿意导入。 #}
-  <div class="d-flex align-items-center justify-content-between mt-4 mb-2 flex-wrap gap-2">
+  <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
     <h2 class="dna-section-title h6 mb-0">
       包含的词条
       <span class="text-muted small">（{{ world.entry_count or 0 }} 条）</span>
@@ -76,6 +118,7 @@
 
   {% if sample_entry %}
   <h2 class="dna-section-title h6 mt-4">示例词条</h2>
+  <p class="text-muted small mb-2">其余词条只给名字与触发词，正文在下载后可见。</p>
   <div class="card shadow-sm mb-4">
     <div class="card-body">
       <div class="d-flex align-items-center justify-content-between mb-1">
@@ -91,31 +134,6 @@
     </div>
   </div>
   {% endif %}
-
-  <div class="d-flex flex-wrap gap-2 mb-5">
-    {% if current_user.is_authenticated %}
-    <a class="btn btn-primary" href="{{ url_for('worlds.download', world_id=world.id) }}">
-      <i class="bi bi-download me-1"></i>下载世界
-    </a>
-    {% else %}
-    <a class="btn btn-outline-primary" href="{{ url_for('auth.login') }}">登录后下载</a>
-    {% endif %}
-    {% if current_user.is_authenticated %}
-    <form method="post" action="{{ url_for('worlds.favorite', world_id=world.id) }}">
-      <button class="btn btn-outline-primary" type="submit">
-        <i class="bi bi-bookmark{{ '-fill' if favorited else '' }} me-1"></i>
-        {{ '已收藏' if favorited else '收藏' }}{% if favorite_count %}（{{ favorite_count }}）{% endif %}
-      </button>
-    </form>
-    {% endif %}
-    <a class="btn btn-outline-secondary" href="{{ url_for('worlds.index') }}">返回列表</a>
-    {% if current_user.is_authenticated and current_user.id != world.author_id %}
-    <a class="btn btn-outline-danger ms-auto"
-       href="{{ url_for('user.report', type='world', id=world.id) }}">
-      <i class="bi bi-flag me-1"></i>举报
-    </a>
-    {% endif %}
-  </div>
 </div>
 
 <script>

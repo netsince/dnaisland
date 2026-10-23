@@ -1631,10 +1631,54 @@ def card_delete(card_id):
 
 
 # ---------------- 审核 ----------------
+def _review_worlds(status):
+    """世界卡审核队列：与角色卡审核**同一个页面、同一套表格与批量操作**。
+
+    世界卡没有图片也没有对话样例，检查时点开 /worlds/<id> 即可（审核员/超管
+    能看 pending 的），所以不需要单独一页 review_detail。
+    """
+    from ..models import WorldCard, WorldTag
+
+    query = WorldCard.query.options(joinedload(WorldCard.author))
+    if status != "all":
+        query = query.filter(WorldCard.status == status)
+    page = request.args.get("page", 1, type=int)
+    pagination = query.order_by(WorldCard.created_at.asc()).paginate(
+        page=page, per_page=20, error_out=False
+    )
+    ids = [w.id for w in pagination.items]
+    tags_map = {}
+    if ids:
+        for t in WorldTag.query.filter(WorldTag.world_id.in_(ids)).all():
+            tags_map.setdefault(t.world_id, []).append(t.tag)
+    stats = {
+        s: WorldCard.query.filter_by(status=s).count()
+        for s in ("pending", "approved", "rejected", "deleted")
+    }
+    return render_template(
+        "admin/review_list.html",
+        review_type="world",
+        worlds=pagination.items,
+        cards=[],
+        pagination=pagination,
+        args={"status": status, "type": "world"},
+        status=status,
+        stats=stats,
+        tags_map=tags_map,
+        slots_map={},
+        dialogue_count_map={},
+    )
+
+
 @admin_bp.route("/review")
 @review_required
 def review():
+    review_type = (request.args.get("type") or "card").strip()
+    if review_type not in ("card", "world"):
+        review_type = "card"
     status = request.args.get("status", "pending").strip() or "pending"
+    if review_type == "world":
+        return _review_worlds(status)
     query = Card.query.options(joinedload(Card.author))
     if status != "all":
         query = query.filter(Card.status == status)
@@ -1678,9 +1722,11 @@ def review():
     stats = status_counts(Card)
     return render_template(
         "admin/review_list.html",
+        review_type="card",
+        worlds=[],
         cards=pagination.items,
         pagination=pagination,
-        args={"status": status},
+        args={"status": status, "type": "card"},
         status=status,
         stats=stats,
         tags_map=tags_map,
@@ -1799,6 +1845,33 @@ def review_batch():
     if isinstance(card_ids, str):
         card_ids = [c.strip() for c in card_ids.split(",") if c.strip()]
     reason = (data.get("reason") or "").strip()
+
+    # 世界卡走同一批入口（同一个表格、同一个批量条），只是对象不同。
+    if (data.get("type") or "card").strip() == "world":
+        from ..models import WorldCard
+
+        count = 0
+        for wid in card_ids:
+            world = db.session.get(WorldCard, wid)
+            if not world:
+                continue
+            if action == "approve" and world.status != "approved":
+                world.status = "approved"
+                world.is_hidden = False
+                _notify_world_author(world, f'你的世界卡"{world.name}"已通过审核并发布。')
+                count += 1
+            elif action == "reject" and world.status != "rejected":
+                world.status = "rejected"
+                msg = f'你的世界卡"{world.name}"未通过审核'
+                msg += f"，原因：{reason}。" if reason else "。"
+                msg += "可修改后重新提交。"
+                _notify_world_author(world, msg)
+                count += 1
+        db.session.commit()
+        if _is_ajax():
+            return jsonify(ok=True, count=count)
+        flash(f"已批量处理 {count} 个世界卡", "success")
+        return redirect(url_for("admin.review", type="world"))
 
     count = 0
     for cid in card_ids:
@@ -3127,41 +3200,11 @@ def _notify_world_author(world, message):
 @admin_bp.route("/worlds")
 @review_required
 def worlds():
-    """世界卡审核队列 / 管理列表（同一个页面，按 status 筛选）。"""
-    from ..models import WorldCard, WorldTag
+    """旧入口：世界卡审核已经并进角色卡审核中心（/review?type=world）。
 
-    status = (request.args.get("status") or "pending").strip()
-    keyword = (request.args.get("q") or "").strip()
-    page = request.args.get("page", 1, type=int)
-
-    q = WorldCard.query
-    if status != "all":
-        q = q.filter(WorldCard.status == status)
-    if keyword:
-        like = f"%{keyword}%"
-        q = q.filter(or_(WorldCard.name.like(like), WorldCard.summary.like(like)))
-    q = q.order_by(WorldCard.created_at.desc())
-    pagination = q.paginate(page=page, per_page=30, error_out=False)
-
-    tags: dict = {}
-    ids = [w.id for w in pagination.items]
-    if ids:
-        for row in WorldTag.query.filter(WorldTag.world_id.in_(ids)).all():
-            tags.setdefault(row.world_id, []).append(row.tag)
-
-    counts = {
-        s: WorldCard.query.filter(WorldCard.status == s).count()
-        for s in ("pending", "approved", "rejected", "deleted")
-    }
-    return render_template(
-        "admin/worlds.html",
-        pagination=pagination,
-        worlds=pagination.items,
-        tags=tags,
-        counts=counts,
-        status=status,
-        q=keyword,
-    )
+    这里只保留一个 301 式的跳转，老书签与后台旧链接不会 404。
+    """
+    return redirect(url_for("admin.review", type="world"))
 
 
 @admin_bp.route("/worlds/<world_id>/approve", methods=["POST"])
@@ -3171,14 +3214,14 @@ def world_approve(world_id):
 
     world = db.session.get(WorldCard, world_id)
     if not world or world.status == "approved":
-        return redirect(url_for("admin.worlds"))
+        return redirect(url_for("admin.review", type="world"))
     world.status = "approved"
     world.is_hidden = False
     db.session.commit()
     _notify_world_author(world, f'你的世界卡"{world.name}"已通过审核并发布。')
     db.session.commit()
     flash(f'已通过："{world.name}"', "success")
-    return redirect(url_for("admin.worlds"))
+    return redirect(url_for("admin.review", type="world"))
 
 
 @admin_bp.route("/worlds/<world_id>/reject", methods=["POST"])
@@ -3188,7 +3231,7 @@ def world_reject(world_id):
 
     world = db.session.get(WorldCard, world_id)
     if not world or world.status == "rejected":
-        return redirect(url_for("admin.worlds"))
+        return redirect(url_for("admin.review", type="world"))
     reason = (request.form.get("reason") or "").strip()
     world.status = "rejected"
     db.session.commit()
@@ -3198,7 +3241,7 @@ def world_reject(world_id):
     _notify_world_author(world, msg)
     db.session.commit()
     flash(f'已拒绝："{world.name}"', "success")
-    return redirect(url_for("admin.worlds"))
+    return redirect(url_for("admin.review", type="world"))
 
 
 @admin_bp.route("/worlds/<world_id>/hide", methods=["POST"])
@@ -3216,7 +3259,7 @@ def world_hide(world_id):
         ("已下架：" if world.is_hidden else "已恢复：") + f'"{world.name}"',
         "success",
     )
-    return redirect(url_for("admin.worlds"))
+    return redirect(url_for("admin.review", type="world"))
 
 
 @admin_bp.route("/worlds/<world_id>/delete", methods=["POST"])
@@ -3236,38 +3279,7 @@ def world_delete(world_id):
     world.is_hidden = True
     db.session.commit()
     flash(f'已删除："{world.name}"', "success")
-    return redirect(url_for("admin.worlds"))
+    return redirect(url_for("admin.review", type="world"))
 
 
-@admin_bp.route("/worlds/batch", methods=["POST"])
-@review_required
-def world_batch():
-    """批量通过 / 驳回。"""
-    from ..models import WorldCard
-
-    action = (request.form.get("action") or "").strip()
-    ids = request.form.getlist("ids")
-    if action not in ("approve", "reject") or not ids:
-        flash("请先勾选要处理的世界卡", "warning")
-        return redirect(url_for("admin.worlds"))
-
-    done = 0
-    for world_id in ids:
-        world = db.session.get(WorldCard, world_id)
-        if not world:
-            continue
-        if action == "approve" and world.status != "approved":
-            world.status = "approved"
-            world.is_hidden = False
-            _notify_world_author(world, f'你的世界卡"{world.name}"已通过审核并发布。')
-            done += 1
-        elif action == "reject" and world.status != "rejected":
-            world.status = "rejected"
-            _notify_world_author(
-                world, f'你的世界卡"{world.name}"未通过审核，可修改后重新提交。'
-            )
-            done += 1
-    db.session.commit()
-    flash(f"已处理 {done} 个世界卡", "success")
-    return redirect(url_for("admin.worlds"))
 

@@ -1,0 +1,71 @@
+{# 世界卡共用的展示宏：列表页 / 搜索页 / 个人主页 / 我的世界卡共用一份。
+
+   卡片形态是「数据 + 内容」两条锚点（没有封面图）：
+   * 内容：简介 + 前几个词条名
+   * 数据：词条数 / 体积 / 复制量
+   这样它在角色卡（封面网格）和茶馆（图文帖子）旁边仍然认得出是「资料型」内容。 #}
+{% from "macros/user_badge.html" import user_badge with context %}
+
+
+{% macro world_status_badge(w) %}
+  {% if w.status == 'approved' %}
+    {% if w.is_hidden %}
+    <span class="badge text-bg-secondary">已下架</span>
+    {% else %}
+    <span class="badge text-bg-success">已通过</span>
+    {% endif %}
+  {% elif w.status == 'rejected' %}
+  <span class="badge text-bg-danger">已拒绝</span>
+  {% elif w.status == 'deleted' %}
+  <span class="badge text-bg-secondary">已撤回</span>
+  {% else %}
+  <span class="badge text-bg-warning">待审核</span>
+  {% endif %}
+{% endmacro %}
+
+
+{% macro world_card(w, tags=None, show_status=False) %}
+<div class="col-12 col-sm-6 col-lg-4">
+  <div class="dna-world-card h-100">
+    <div class="d-flex align-items-start justify-content-between gap-2 mb-1">
+      <a class="dna-world-card__name" href="{{ url_for('worlds.detail', world_id=w.id) }}">{{ w.name }}</a>
+      {% if show_status %}{{ world_status_badge(w) }}{% endif %}
+    </div>
+
+    {% if w.summary %}
+    <div class="dna-world-card__summary">{{ w.summary }}</div>
+    {% endif %}
+
+    {% set names = w.preview_list %}
+    {% if names %}
+    <div class="dna-world-card__entries">
+      {% for n in names[:4] %}<span class="dna-world-card__entry">{{ n }}</span>{% endfor %}
+      {% if (w.entry_count or 0) > 4 %}<span class="dna-world-card__entry dna-world-card__entry--more">+{{ (w.entry_count or 0) - 4 }}</span>{% endif %}
+    </div>
+    {% endif %}
+
+    {% set wtags = tags or [] %}
+    {% if wtags %}
+    <div class="d-flex flex-wrap gap-1 mb-2">
+      {% for t in wtags[:4] %}<span class="badge text-bg-light">#{{ t }}</span>{% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="dna-world-card__meta">
+      <span>
+        {{ w.entry_count or 0 }} 词条 · {{ ((w.payload_bytes or 0) / 1024) | round | int }} KB{% if w.copy_count %} · 复制 {{ w.copy_count }}{% endif %}
+      </span>
+      {% if w.author %}{{ user_badge(w.author, link=false) }}{% endif %}
+    </div>
+  </div>
+</div>
+{% endmacro %}
+
+
+{% macro world_grid(worlds, tags_map=None, show_status=False) %}
+<div class="row g-3">
+  {% for w in worlds %}
+  {{ world_card(w, tags=(tags_map or {}).get(w.id, []), show_status=show_status) }}
+  {% endfor %}
+</div>
+{% endmacro %}

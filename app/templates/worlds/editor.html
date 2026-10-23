@@ -1,0 +1,540 @@
+{% extends "base.html" %}
+
+{% block title %}{{ '编辑世界卡' if mode == 'edit' else '发布世界卡' }} · DNAISLAND{% endblock %}
+
+{% block content %}
+{# 网页端的世界卡编辑器 = 完整世界观编辑器（不是贴 JSON 的文本框）。
+   字段与客户端 WorldEditorPage 对齐：名称/简介/背景/标签/禁词 + 词条列表，
+   词条含 keyRegex、递归、冷却、延迟、装饰符等高级规则。
+
+   提交时把词条序列化成 entries_json，服务端拼回客户端认识的 World JSON。 #}
+
+{# 导入：粘贴导出的世界 JSON，或上传 .dnaworld / .json 文件，直接填进下面的表单。
+   与 App 编辑器里的「导入世界观」同一口径（信封格式 / 裸 World JSON / 第三方世界书），
+   不用手打。 #}
+<form method="post" action="{{ form_action }}" enctype="multipart/form-data" class="mb-3">
+  <input type="hidden" name="do" value="import">
+  <details class="card border-0 shadow-sm rounded-4">
+    <summary class="p-3" style="cursor: pointer;">
+      <i class="bi bi-box-arrow-in-down me-1"></i>从 JSON / .dnaworld 文件导入
+      <span class="text-muted small ms-1">（不想手打就贴进来）</span>
+    </summary>
+    <div class="px-3 pb-3">
+      <textarea class="form-control form-control-sm rounded-3 mb-2" name="payload" rows="5"
+                placeholder="把导出的世界 JSON 粘到这里…"></textarea>
+      <div class="d-flex flex-wrap align-items-center gap-2">
+        <input type="file" class="form-control form-control-sm rounded-3" name="file"
+               accept=".dnaworld,.json,.txt" style="max-width: 320px;">
+        <button class="btn btn-sm btn-outline-primary rounded-pill" type="submit">识别并填入</button>
+      </div>
+      <div class="form-text">
+        支持：本应用导出的 .dnaworld、裸世界 JSON、第三方世界书（entries 为对象的格式）。
+        识别后只会填进下面的表单，**不会直接发布**。
+      </div>
+    </div>
+  </details>
+</form>
+<form method="post" action="{{ form_action }}" id="worldEditor">
+  <input type="hidden" name="world_id" value="{{ state.id }}">
+  <input type="hidden" name="entries_json" id="entriesJson" value="">
+
+  <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+    <div>
+      <h1 class="h4 mb-1 fw-bold">{{ '编辑世界卡' if mode == 'edit' else '发布世界卡' }}</h1>
+      <div class="small text-muted">
+        {% if mode == 'edit' %}
+        保存后会替换整份世界书并**重新进入审核**（审核过的是旧内容）。
+        {% else %}
+        提交后进入审核，通过后其他人才能看到并导入。
+        {% endif %}
+      </div>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      {# 导出当前表单（不写库）：与客户端的「导出世界观」同一套 .dnaworld 信封 #}
+      <button class="btn btn-sm btn-outline-secondary rounded-pill" type="submit"
+              name="do" value="export">
+        <i class="bi bi-box-arrow-up me-1"></i>导出 .dnaworld
+      </button>
+      <a class="btn btn-sm btn-outline-secondary rounded-pill"
+         href="{{ url_for('worlds.mine') if mode == 'edit' else url_for('worlds.index') }}">取消</a>
+      <button class="btn btn-sm btn-primary rounded-pill" type="submit">保存并提交审核</button>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-7">
+      <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-body">
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">世界名称 <span class="text-danger">*</span></label>
+            <input class="form-control form-control-sm rounded-3" name="name" maxlength="120" required
+                   value="{{ state.name }}" placeholder="例如：废土纪元">
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">简介</label>
+            <input class="form-control form-control-sm rounded-3" name="summary" maxlength="200"
+                   value="{{ state.summary }}" placeholder="一句话介绍，显示在列表卡片上">
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">世界背景</label>
+            <textarea class="form-control form-control-sm rounded-3" name="description" rows="6"
+                      placeholder="这个世界的基本设定。会随世界书一起被 AI 读取。">{{ state.description }}</textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">分类标签</label>
+            {# 与角色卡发布页同一套 chips 交互：回车/逗号落成标签，点 × 移除。
+               真正提交的是隐藏字段 tags（逗号分隔），服务端拆开入库。 #}
+            <input type="hidden" name="tags" id="tagsInput" value="{{ state.tags }}">
+            <div id="tagChips" class="d-flex flex-wrap gap-2 mb-2"></div>
+            <input type="text" class="form-control form-control-sm rounded-3" id="tagText"
+                   placeholder="输入标签后按回车或逗号添加，例如：科幻、废土">
+            <div class="form-text">点击标签上的 × 可移除，最多 20 个。列表页的标签筛选按它聚合。</div>
+            {% if hot_tags %}
+            <div class="mt-2 d-flex flex-wrap align-items-center gap-1">
+              <span class="text-muted small me-1">热门标签</span>
+              {% for t in hot_tags %}
+              <button type="button" class="badge text-bg-light border js-suggest-tag"
+                      data-tag="{{ t }}">{{ t }}</button>
+              {% endfor %}
+            </div>
+            {% endif %}
+          </div>
+          <div>
+            <label class="form-label small fw-semibold">禁止输出词语</label>
+            <textarea class="form-control form-control-sm rounded-3" name="forbidden_words" rows="2"
+                      placeholder="逗号或换行分隔，强制要求 AI 绝不提及的词汇">{{ state.forbidden_words }}</textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-5">
+      <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-body">
+          <div class="fw-semibold mb-2">词条</div>
+          <div class="display-6 fw-bold" id="entryCount">0</div>
+          <div class="small text-muted mb-3">条</div>
+          <ul class="small text-muted mb-0 ps-3">
+            <li class="mb-1">词条正文是 AI 真正读取的内容，请写完整。</li>
+            <li class="mb-1">触发词命中任意一个就会激活该词条。</li>
+            <li class="mb-1">详情页只展示词条名与 1 条示例，正文不会公开。</li>
+            <li>保存后整份世界书会重新进入审核。</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="d-flex align-items-center justify-content-between mt-4 mb-2 flex-wrap gap-2">
+    <h2 class="h5 mb-0">词条列表</h2>
+    <button type="button" class="btn btn-sm btn-outline-primary rounded-pill" id="addEntry">＋ 添加词条</button>
+  </div>
+
+  <div id="entryList"></div>
+  <div id="entryEmpty" class="text-center text-muted small py-4 d-none">
+    还没有词条。点上面的「添加词条」开始写。
+  </div>
+
+  <div class="d-flex justify-content-end mt-4 mb-5">
+    <button class="btn btn-primary rounded-pill px-4" type="submit">保存并提交审核</button>
+  </div>
+</form>
+
+{# 词条卡片模板：JS 克隆它，避免在 JS 里拼 HTML 字符串（转义容易出错）。
+
+   默认收起、点标题展开编辑：几百条的世界书全展开会拉成一条长龙，
+   而收起时标题栏显示「名字 + 类型」，仍然一眼能扫。 #}
+<template id="entryTemplate">
+  <div class="card border-0 shadow-sm rounded-4 mb-2 dna-entry">
+    <details class="dna-entry__details">
+      <summary class="dna-entry__summary">
+        <span class="dna-entry__name">未命名词条</span>
+        <span class="badge bg-secondary dna-entry__type">名词</span>
+        <span class="dna-entry__spacer"></span>
+        <button type="button" class="btn btn-sm btn-outline-danger rounded-pill" data-remove>删除</button>
+      </summary>
+      <div class="card-body pt-0">
+      <div class="d-flex align-items-start gap-2 mb-2">
+        <input class="form-control form-control-sm rounded-3" data-f="name" placeholder="词条名（如：王都）">
+        <select class="form-select form-select-sm rounded-3 flex-shrink-0" data-f="type" style="width:120px;">
+          <option value="noun">名词 / 设定</option>
+          <option value="person">人物</option>
+        </select>
+      </div>
+      <input class="form-control form-control-sm rounded-3 mb-2" data-f="keys"
+             placeholder="触发词，逗号分隔（可留空）">
+      <textarea class="form-control form-control-sm rounded-3" data-f="description" rows="3"
+                placeholder="词条正文：AI 会读取这段内容"></textarea>
+
+      {# 人物专属字段：与本体编辑器（_WorldEntryModal）一致。
+         少了这几项，网页上编辑一次人物的性别/年龄/状态/关联就会被清空。 #}
+      <div class="row g-2 mt-2" data-person>
+        <div class="col-6 col-md-4">
+          <label class="form-label small text-muted mb-1">性别</label>
+          <select class="form-select form-select-sm rounded-3" data-f="gender">
+            <option value="">未指定</option>
+            <option value="male">男</option>
+            <option value="female">女</option>
+            <option value="other">其他</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-4">
+          <label class="form-label small text-muted mb-1">年龄</label>
+          <input class="form-control form-control-sm rounded-3" data-f="age" placeholder="例如：24">
+        </div>
+        <div class="col-6 col-md-4">
+          <label class="form-label small text-muted mb-1">状态</label>
+          <select class="form-select form-select-sm rounded-3" data-f="status">
+            <option value="normal">正常</option>
+            <option value="dead">死亡</option>
+          </select>
+        </div>
+        <div class="col-12 col-md-5">
+          <label class="form-label small text-muted mb-1">关联其他词条</label>
+          <select class="form-select form-select-sm rounded-3" data-f="relationTarget">
+            <option value="">无关联</option>
+          </select>
+        </div>
+        <div class="col-12 col-md-7">
+          <label class="form-label small text-muted mb-1">关联关系描述</label>
+          <input class="form-control form-control-sm rounded-3" data-f="relationContent"
+                 placeholder="例如：导师、宿敌、挚友">
+        </div>
+      </div>
+
+      <details class="mt-2">
+        <summary class="small text-muted" style="cursor:pointer;">高级规则（正则触发 / 递归 / 冷却 / 延迟 / 装饰符）</summary>
+        <div class="row g-2 mt-2">
+          <div class="col-md-6">
+            <label class="form-label small text-muted mb-1">正则触发</label>
+            <input class="form-control form-control-sm rounded-3" data-f="keyRegex" placeholder="可留空">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label small text-muted mb-1">排序</label>
+            <input type="number" class="form-control form-control-sm rounded-3" data-f="order" value="0">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label small text-muted mb-1">冷却轮数</label>
+            <input type="number" class="form-control form-control-sm rounded-3" data-f="cooldownRounds" value="0">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label small text-muted mb-1">延迟轮数</label>
+            <input type="number" class="form-control form-control-sm rounded-3" data-f="delayRounds" value="0">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small text-muted mb-1">装饰符</label>
+            <select class="form-select form-select-sm rounded-3" data-f="decorator">
+              <option value="">无</option>
+              <option value="activate">强制激活</option>
+              <option value="dont_activate">禁止激活</option>
+            </select>
+          </div>
+          <div class="col-md-12 d-flex flex-wrap gap-3 mt-2">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" data-f="caseSensitive" id="cs-__IDX__">
+              <label class="form-check-label small" for="cs-__IDX__">大小写敏感</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" data-f="matchWholeWords" id="mww-__IDX__">
+              <label class="form-check-label small" for="mww-__IDX__">全词匹配</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" data-f="recursive" id="rec-__IDX__">
+              <label class="form-check-label small" for="rec-__IDX__">递归扫描</label>
+            </div>
+          </div>
+        </div>
+      </details>
+      </div>
+    </details>
+  </div>
+</template>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const initial = {{ state.entries | tojson }};
+  const list = document.getElementById('entryList');
+  const tpl = document.getElementById('entryTemplate');
+  const empty = document.getElementById('entryEmpty');
+  const countEl = document.getElementById('entryCount');
+  const form = document.getElementById('worldEditor');
+  const hidden = document.getElementById('entriesJson');
+  let seq = 0;
+
+  function uid() {
+    return 'e' + Date.now().toString(36) + (seq++).toString(36);
+  }
+
+  function refreshCount() {
+    const n = list.querySelectorAll('.dna-entry').length;
+    countEl.textContent = n;
+    empty.classList.toggle('d-none', n > 0);
+  }
+
+  function fill(node, data) {
+    const set = (sel, value) => {
+      const el = node.querySelector(sel);
+      if (el) el.value = value === undefined || value === null ? '' : value;
+    };
+    const check = (sel, value) => {
+      const el = node.querySelector(sel);
+      if (el) el.checked = !!value;
+    };
+    set('[data-f="name"]', data.name);
+    set('[data-f="type"]', data.type === 'person' ? 'person' : 'noun');
+    // keys 可能是数组（本应用格式）也可能是字符串（第三方转换过来的）：
+    // 直接 .join 会抛错，而 fill 一抛错，后面的 togglePerson 就不会跑 ——
+    // 表现就是「人物字段整块不显示」。
+    set(
+      '[data-f="keys"]',
+      Array.isArray(data.keys) ? data.keys.join(', ') : (data.keys || '')
+    );
+    set('[data-f="description"]', data.description);
+    set('[data-f="keyRegex"]', data.keyRegex);
+    set('[data-f="order"]', data.order || 0);
+    set('[data-f="cooldownRounds"]', data.cooldownRounds || 0);
+    set('[data-f="delayRounds"]', data.delayRounds || 0);
+    set('[data-f="decorator"]', data.decorator || '');
+    set('[data-f="gender"]', data.gender || '');
+    set('[data-f="age"]', data.age);
+    set('[data-f="status"]', data.status || 'normal');
+    set('[data-f="relationTarget"]', (data.relation && data.relation.targetId) || '');
+    set('[data-f="relationContent"]', (data.relation && data.relation.content) || '');
+    check('[data-f="caseSensitive"]', data.caseSensitive);
+    check('[data-f="matchWholeWords"]', data.matchWholeWords);
+    check('[data-f="recursive"]', data.recursive);
+    togglePerson(node);
+    syncSummary(node);
+  }
+
+  /// 收起状态下标题栏显示「名字 + 类型」，改名 / 换类型时同步。
+  function syncSummary(node) {
+    const nameEl = node.querySelector('[data-f="name"]');
+    const name = ((nameEl && nameEl.value) || '').trim();
+    const title = node.querySelector('.dna-entry__name');
+    if (title) title.textContent = name || '未命名词条';
+    const typeEl = node.querySelector('[data-f="type"]');
+    const badge = node.querySelector('.dna-entry__type');
+    if (badge) {
+      const isPerson = !!(typeEl && typeEl.value === 'person');
+      badge.textContent = isPerson ? '人物' : '名词';
+      badge.className = 'badge dna-entry__type ' + (isPerson ? 'bg-primary' : 'bg-secondary');
+    }
+  }
+
+  /// 人物专属字段只在「人物」类型下显示（与本体编辑器一致）。
+  function togglePerson(node) {
+    const typeEl = node.querySelector('[data-f="type"]');
+    const block = node.querySelector('[data-person]');
+    if (!typeEl || !block) return;
+    block.classList.toggle('d-none', typeEl.value !== 'person');
+  }
+
+  /// 关联词条的下拉：选项来自「其他词条」，增删 / 改名后重建。
+  function refreshRelationOptions() {
+    const nodes = Array.from(list.querySelectorAll('.dna-entry'));
+    const items = nodes.map(function (el) {
+      return {
+        el: el,
+        id: el.dataset.id,
+        name: (el.querySelector('[data-f="name"]').value || '').trim()
+      };
+    });
+    nodes.forEach(function (el) {
+      const sel = el.querySelector('[data-f="relationTarget"]');
+      if (!sel) return;
+      const current = sel.value;
+      sel.innerHTML = '<option value="">无关联</option>';
+      items.forEach(function (it) {
+        if (it.el === el) return; // 不能关联自己
+        const opt = document.createElement('option');
+        opt.value = it.id;
+        opt.textContent = it.name || '未命名词条';
+        sel.appendChild(opt);
+      });
+      if (current && items.some(function (it) { return it.el !== el && it.id === current; })) {
+        sel.value = current;
+      }
+    });
+  }
+
+  function addEntry(data, expanded) {
+    const idx = seq++;
+    const node = tpl.content.firstElementChild.cloneNode(true);
+    node.dataset.id = (data && data.id) || uid();
+    // 复选框的 label for 要唯一，否则点标签会串到别的词条上。
+    node.querySelectorAll('input[type="checkbox"]').forEach(function (el) {
+      const oldId = el.id;
+      el.id = oldId + idx;
+      const label = node.querySelector('label[for="' + oldId + '"]');
+      if (label) label.setAttribute('for', el.id);
+    });
+    // 先挂进 DOM 并建好「关联词条」的选项，再 fill ——
+    // select 里没有对应 option 时，给它赋 targetId 会被静默丢掉。
+    list.appendChild(node);
+    refreshRelationOptions();
+    fill(node, data || {});
+    togglePerson(node);
+    const details = node.querySelector('.dna-entry__details');
+    if (details) details.open = !!expanded;
+    const typeEl = node.querySelector('[data-f="type"]');
+    if (typeEl) {
+      typeEl.addEventListener('change', function () {
+        togglePerson(node);
+        syncSummary(node);
+      });
+    }
+    const nameEl = node.querySelector('[data-f="name"]');
+    if (nameEl) {
+      nameEl.addEventListener('input', function () {
+        syncSummary(node);
+        refreshRelationOptions();
+      });
+    }
+    node.querySelector('[data-remove]').addEventListener('click', function (ev) {
+      // 删除按钮在 <summary> 里：不拦住的话点它会顺手把卡片展开/收起。
+      ev.preventDefault();
+      ev.stopPropagation();
+      node.remove();
+      refreshCount();
+      refreshRelationOptions();
+    });
+    refreshCount();
+    refreshRelationOptions();
+    return node;
+  }
+
+  function collect() {
+    return Array.from(list.querySelectorAll('.dna-entry')).map(function (el) {
+      const val = (sel) => {
+        const input = el.querySelector(sel);
+        return input ? input.value.trim() : '';
+      };
+      const num = (sel) => {
+        const n = parseInt(val(sel), 10);
+        return Number.isFinite(n) ? n : 0;
+      };
+      const on = (sel) => {
+        const input = el.querySelector(sel);
+        return !!(input && input.checked);
+      };
+      return {
+        id: el.dataset.id,
+        name: val('[data-f="name"]'),
+        type: val('[data-f="type"]') === 'person' ? 'person' : 'noun',
+        keys: val('[data-f="keys"]')
+          .split(/[,，]/)
+          .map(function (s) { return s.trim(); })
+          .filter(Boolean),
+        description: el.querySelector('[data-f="description"]').value,
+        keyRegex: val('[data-f="keyRegex"]') || null,
+        gender: val('[data-f="gender"]') || null,
+        age: val('[data-f="age"]') || null,
+        status: val('[data-f="status"]') || null,
+        relation: (function () {
+          const targetId = val('[data-f="relationTarget"]');
+          const content = val('[data-f="relationContent"]');
+          return targetId && content ? { targetId: targetId, content: content } : null;
+        })(),
+        order: num('[data-f="order"]'),
+        cooldownRounds: num('[data-f="cooldownRounds"]'),
+        delayRounds: num('[data-f="delayRounds"]'),
+        decorator: val('[data-f="decorator"]') || null,
+        caseSensitive: on('[data-f="caseSensitive"]'),
+        matchWholeWords: on('[data-f="matchWholeWords"]'),
+        recursive: on('[data-f="recursive"]')
+      };
+    });
+  }
+
+  document.getElementById('addEntry').addEventListener('click', function () {
+    const node = addEntry({}, true);
+    const name = node.querySelector('[data-f="name"]');
+    if (name) name.focus();
+  });
+
+  form.addEventListener('submit', function () {
+    hidden.value = JSON.stringify(collect());
+  });
+
+  // ---- 标签 chips（与角色卡发布页同一套） ----
+  let tagsArr = (document.getElementById('tagsInput').value || '')
+    .replace(/[，]/g, ',').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+  const tagChips = document.getElementById('tagChips');
+  const tagText = document.getElementById('tagText');
+
+  function escapeHtml(s) {
+    return (s || '').replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function syncTags() {
+    document.getElementById('tagsInput').value = tagsArr.join(',');
+  }
+
+  function renderTags() {
+    tagChips.innerHTML = '';
+    tagsArr.forEach(function (t, i) {
+      const chip = document.createElement('span');
+      chip.className = 'badge bg-primary d-inline-flex align-items-center gap-1';
+      chip.innerHTML = '<span>' + escapeHtml(t) + '</span>' +
+        '<button type="button" class="btn-close" style="font-size:.6rem" data-idx="' + i + '" aria-label="移除"></button>';
+      tagChips.appendChild(chip);
+    });
+    tagChips.querySelectorAll('[data-idx]').forEach(function (b) {
+      b.addEventListener('click', function (ev) {
+        tagsArr.splice(+ev.target.dataset.idx, 1);
+        renderTags();
+        syncTags();
+      });
+    });
+  }
+
+  function addTag(raw) {
+    const parts = (raw || '').split(/[，,]/).map(function (s) { return s.trim(); }).filter(Boolean);
+    parts.forEach(function (t) {
+      if (!t || tagsArr.includes(t) || tagsArr.length >= 20) return;
+      tagsArr.push(t);
+    });
+    if (parts.length) {
+      renderTags();
+      syncTags();
+    }
+  }
+
+  tagText.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' || e.key === ',' || e.key === '，') {
+      e.preventDefault();
+      addTag(tagText.value);
+      tagText.value = '';
+    } else if (e.key === 'Backspace' && tagText.value === '' && tagsArr.length) {
+      tagsArr.pop();
+      renderTags();
+      syncTags();
+    }
+  });
+  tagText.addEventListener('blur', function () {
+    if (tagText.value.trim()) {
+      addTag(tagText.value);
+      tagText.value = '';
+    }
+  });
+  renderTags();
+  syncTags();
+
+  // 热门标签候选：点一下直接加（重复的会被 addTag 忽略）。
+  document.querySelectorAll('.js-suggest-tag').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      addTag(btn.getAttribute('data-tag') || '');
+    });
+  });
+
+  // 已有的词条默认收起；新加的展开（addEntry 里传 true）。
+  (initial || []).forEach(function (d) { addEntry(d, false); });
+  refreshCount();
+})();
+</script>
+{% endblock %}

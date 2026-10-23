@@ -1122,6 +1122,25 @@ def _post_search_query(q):
     return base.filter(TeaPost.content.ilike(f"%{q}%")).order_by(TeaPost.created_at.desc())
 
 
+def _world_search_query(q, tag=None):
+    """世界卡搜索。
+
+    与 /worlds 列表共用 world_list_query —— 那里已经封好了「倒排优先、LIKE
+    兜底」的取词逻辑，而且索引里**包含词条名与触发词**，所以按词条名也能
+    找到世界书。全站搜索没有理由再写一套。
+    """
+    from ..services.world_service import world_list_query
+
+    return world_list_query(current_user, keyword=q, tag=tag or "", sort="new")
+
+
+def _world_tags_for(world_ids):
+    """批量取世界卡标签（搜索结果的卡片要显示）。"""
+    from ..services.world_service import tags_map
+
+    return tags_map(world_ids)
+
+
 @main_bp.route("/search")
 def search():
     q = (request.args.get("q") or "").strip()
@@ -1130,7 +1149,7 @@ def search():
     tag = (request.args.get("tag") or "").strip() or None
     page = request.args.get("page", 1, type=int)
 
-    valid_types = ("all", "card", "user", "post")
+    valid_types = ("all", "card", "world", "user", "post")
     if search_type not in valid_types:
         search_type = "all"
     valid_sorts = ("relevance", "hot", "new")
@@ -1143,11 +1162,14 @@ def search():
 
     cards = []
     cards_pagination = None
+    worlds = []
+    worlds_pagination = None
     users = []
     users_pagination = None
     posts = []
     posts_pagination = None
     cards_count = 0
+    worlds_count = 0
     users_count = 0
     posts_count = 0
 
@@ -1155,9 +1177,11 @@ def search():
         if search_type == "all":
             # 汇总视图：需三类总数 + 各取少量样例，分别 count 一次（此处无分页，故无重复计数）
             cards_count = _card_search_query(q, sort, tag).count()
+            worlds_count = _world_search_query(q, tag).count()
             users_count = _user_search_query(q, sort).count()
             posts_count = _post_search_query(q).count()
             cards = enrich_cards(_card_search_query(q, sort, tag).limit(4).all())
+            worlds = _world_search_query(q, tag).limit(4).all()
             users = _user_search_query(q, sort).limit(3).all()
             posts = _post_search_query(q).limit(4).all()
         elif search_type == "card":
@@ -1166,6 +1190,12 @@ def search():
                 current_user, q, sort=sort, tag=tag, page=page, per_page=12
             )
             cards_count = cards_pagination.total  # 复用分页的 total，避免重复 COUNT
+        elif search_type == "world":
+            worlds_pagination = _world_search_query(q, tag).paginate(
+                page=page, per_page=12, error_out=False
+            )
+            worlds = worlds_pagination.items
+            worlds_count = worlds_pagination.total
         elif search_type == "user":
             users_pagination = _user_search_query(q, sort).paginate(
                 page=page, per_page=20, error_out=False
@@ -1199,6 +1229,10 @@ def search():
         cards=cards,
         cards_pagination=cards_pagination,
         cards_count=cards_count,
+        worlds=worlds,
+        worlds_pagination=worlds_pagination,
+        worlds_count=worlds_count,
+        world_tags=_world_tags_for([w.id for w in worlds]),
         users=users,
         users_pagination=users_pagination,
         users_count=users_count,

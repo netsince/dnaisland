@@ -3,12 +3,14 @@
 {% from "macros/verified.html" import badge %}
 {% from "macros/highlight.html" import hl %}
 {% from "macros/cards.html" import card_grid, empty_state %}
+{% from "macros/worlds.html" import world_grid %}
 {% from "macros/user_badge.html" import user_badge with context %}
 
 {% block title %}搜索：{{ q }} · DNAISLAND{% endblock %}
 
 {% set counts = {
  'card': cards_count,
+ 'world': worlds_count,
  'user': users_count,
  'post': posts_count,
 } %}
@@ -26,8 +28,9 @@
  {# 类型切换 + 排序 #}
  <div class="d-flex flex-wrap align-items-center gap-2 mb-4">
  <div class="btn-group btn-group-sm" role="group" aria-label="搜索类型">
- <a class="btn {{ 'btn-primary' if search_type=='all' else 'btn-outline-primary' }}" href="{{ url_for('main.search', q=q, type='all', sort=sort, tag=tag) }}">全部{% if q %} <span class="badge text-bg-dark">{{ counts.card + counts.user + counts.post }}</span>{% endif %}</a>
+ <a class="btn {{ 'btn-primary' if search_type=='all' else 'btn-outline-primary' }}" href="{{ url_for('main.search', q=q, type='all', sort=sort, tag=tag) }}">全部{% if q %} <span class="badge text-bg-dark">{{ counts.card + counts.world + counts.user + counts.post }}</span>{% endif %}</a>
  <a class="btn {{ 'btn-primary' if search_type=='card' else 'btn-outline-primary' }}" href="{{ url_for('main.search', q=q, type='card', sort=sort, tag=tag) }}">角色卡 <span class="badge text-bg-dark">{{ counts.card }}</span></a>
+ <a class="btn {{ 'btn-primary' if search_type=='world' else 'btn-outline-primary' }}" href="{{ url_for('main.search', q=q, type='world', tag=tag) }}">世界卡 <span class="badge text-bg-dark">{{ counts.world }}</span></a>
  <a class="btn {{ 'btn-primary' if search_type=='post' else 'btn-outline-primary' }}" href="{{ url_for('main.search', q=q, type='post', sort=sort, tag=tag) }}">茶馆动态 <span class="badge text-bg-dark">{{ counts.post }}</span></a>
  <a class="btn {{ 'btn-primary' if search_type=='user' else 'btn-outline-primary' }}" href="{{ url_for('main.search', q=q, type='user', sort=sort, tag=tag) }}">作者 <span class="badge text-bg-dark">{{ counts.user }}</span></a>
  </div>
@@ -105,6 +108,19 @@
  </section>
  {% endif %}
 
+ {# 2.5 世界卡板块 #}
+ {% if worlds %}
+ <section class="mb-5">
+ <h2 class="dna-section-title h5">世界卡 <span class="text-muted small">（{{ counts.world }}）</span></h2>
+ {{ world_grid(worlds, tags_map=world_tags) }}
+ {% if counts.world > 4 %}
+ <div class="text-center mt-3">
+ <a class="btn btn-outline-primary btn-sm rounded-pill" href="{{ url_for('main.search', q=q, type='world', tag=tag) }}">查看全部世界卡 </a>
+ </div>
+ {% endif %}
+ </section>
+ {% endif %}
+
  {# 3. 社区热门讨论 (茶馆动态) 板块 #}
  {% if posts %}
  <section class="mb-5">
@@ -150,7 +166,7 @@
  {% endif %}
 
  {# 若全空 #}
- {% if not users and not cards and not posts %}
+ {% if not users and not cards and not worlds and not posts %}
  {{ empty_state('没有找到相关结果。', '') }}
  {% endif %}
  {% endif %}
@@ -163,6 +179,18 @@
  {% if cards_pagination %}{{ render_pagination(cards_pagination, 'main.search', args) }}{% endif %}
  {% else %}
  {{ empty_state('没有找到相关角色卡。', '') }}
+ {% endif %}
+ </section>
+ {% endif %}
+
+ {# 当 search_type == 'world' 时 #}
+ {% if search_type == 'world' %}
+ <section class="mb-5">
+ {% if worlds %}
+ {{ world_grid(worlds, tags_map=world_tags) }}
+ {% if worlds_pagination %}{{ render_pagination(worlds_pagination, 'main.search', args) }}{% endif %}
+ {% else %}
+ {{ empty_state('没有找到相关世界卡。', '') }}
  {% endif %}
  </section>
  {% endif %}

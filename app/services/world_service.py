@@ -24,6 +24,9 @@ from ..models import WorldCard, WorldTag
 # 详情页预览最多给这么多词条名（页面上放不下更多，也没必要）。
 MAX_ENTRY_NAMES = 60
 
+# 列表卡片上最多显示这么多条词条名（发布/编辑时算成快照存 preview_names）。
+PREVIEW_NAMES = 8
+
 # 排序口径。
 SORT_NEW = "new"
 SORT_COPIES = "copies"
@@ -181,7 +184,11 @@ def can_view(world, viewer):
     if world is None:
         return False
     if viewer is not None and getattr(viewer, "is_authenticated", False):
-        if getattr(viewer, "is_super_admin", False):
+        # 审核员也要能看 pending 的：审核中心的世界卡队列里点「详情」就是进这里，
+        # 只放超管会让审核员点出一个 404。
+        if getattr(viewer, "is_super_admin", False) or getattr(
+            viewer, "is_reviewer", False
+        ):
             return True
         if world.author_id == viewer.id:
             return not world.is_hidden
@@ -210,6 +217,136 @@ def preview(world):
     sample = entries[0] if entries and isinstance(entries[0], dict) else None
     return names, sample
 
+def entry_names(data, limit=MAX_ENTRY_NAMES):
+    """从**已解析的**世界 JSON 里取词条名（前 [limit] 条，跳过空名）。
+
+    发布/编辑时用它算 preview_names 快照，避免列表接口去解析 payload。
+    """
+    entries = data.get("entries") if isinstance(data, dict) else None
+    if not isinstance(entries, list):
+        return []
+    names = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        name = entry.get("name")
+        if isinstance(name, str) and name.strip():
+            names.append(name.strip())
+        if limit and len(names) >= limit:
+            break
+    return names
+
+
+def preview_names(world, limit=PREVIEW_NAMES):
+    """读发布/编辑时算好的词条名快照（解析在 WorldCard.preview_list 里）。
+
+    快照缺失（老数据还没回填、或原文解析失败）时返回空列表 —— 卡片上少几个
+    词条名，不该让整个列表报错。
+    """
+    return world.preview_list[:limit]
+
+
+def _fingerprint(name, summary, tags, entries):
+    """内容指纹：**只看内容，不看本地 id**。
+
+    为什么不能直接哈希原文：网页编辑器每次提交都会给顶层 id 和新增词条生成新的
+    UUID，原文一变指纹就变，重复提交就再也不幂等了。角色卡的指纹也是按规范化后
+    的文本字段算的，这里对齐同一套做法。
+
+    排序后的 tags 保证提交顺序不影响指纹。
+    """
+
+    def strip(entry):
+        return {k: v for k, v in entry.items() if k != "id"}
+
+    payload = {
+        "name": name,
+        "summary": summary,
+        "tags": sorted(tags),
+        "entries": [strip(e) for e in entries if isinstance(e, dict)],
+    }
+    raw = json.dumps(
+        payload, sort_keys=True, ensure_ascii=False, separators=(",", ":")
+    )
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _parse_payload(raw):
+    """校验世界原文并抽取列表用的元信息。返回 (meta, error)。
+
+    原文**原样入库**：不做 json.dumps(json.loads(...)) 往返，那会改掉键序、
+    空格和数字格式。这里只读顶层字段。
+    """
+    raw = raw or ""
+    if not raw.strip():
+        return None, "世界内容为空"
+    try:
+        data = json.loads(raw)
+    except ValueError:
+        return None, "世界内容不是合法的 JSON"
+    if not isinstance(data, dict):
+        return None, "世界内容不是合法的 JSON 对象"
+
+    name = data.get("name") if isinstance(data.get("name"), str) else ""
+    name = name.strip()[:120]
+    if not name:
+        return None, "世界需要一个名称"
+
+    entries = data.get("entries")
+    raw_tags = data.get("tags")
+    tags = (
+        [str(t)[:50] for t in raw_tags if isinstance(t, (str, int, float))][:20]
+        if isinstance(raw_tags, list)
+        else []
+    )
+    summary = data.get("summary") if isinstance(data.get("summary"), str) else ""
+    return (
+        {
+            "name": name,
+            "summary": summary,
+            "entry_count": len(entries) if isinstance(entries, list) else 0,
+            "tags": tags,
+            "preview_names": entry_names(data, limit=PREVIEW_NAMES),
+            "payload_bytes": len(raw.encode("utf-8")),
+            "content_hash": _fingerprint(name, summary, tags, entries or []),
+        },
+        None,
+    )
+
+
+def _apply_meta(world, raw, meta):
+    """把解析出来的元信息写回模型（发布与编辑共用）。"""
+    world.name = meta["name"]
+    world.summary = meta["summary"]
+    world.entry_count = meta["entry_count"]
+    world.payload_bytes = meta["payload_bytes"]
+    world.payload = raw
+    world.content_hash = meta["content_hash"]
+    world.preview_names = json.dumps(meta["preview_names"], ensure_ascii=False)
+
+
+def _replace_tags(world_id, tags):
+    """整组替换标签（编辑时旧标签可能被删掉）。"""
+    from ..models import WorldTag
+
+    WorldTag.query.filter_by(world_id=world_id).delete(synchronize_session=False)
+    for tag in dict.fromkeys(tags):
+        db.session.add(WorldTag(world_id=world_id, tag=tag))
+
+
+def _reindex_safely(world_id):
+    """重建倒排索引。**索引失败绝不能影响发布/编辑** —— 搜索退化到 LIKE 是
+    可接受的，内容写不进去不可接受。"""
+    try:
+        from .search_service import reindex_world
+
+        reindex_world(world_id)
+        db.session.commit()
+    except Exception as exc:  # noqa: BLE001
+        db.session.rollback()
+        current_app.logger.warning("世界卡建索引失败（不影响发布）: %s", exc)
+
+
 def publish_world(author, raw):
     """用一段世界 JSON 原文创建世界卡。**Web 与 App 共用这一个函数。**
 
@@ -217,44 +354,17 @@ def publish_world(author, raw):
     * 出错 —— (None, 可读错误, False)
     * 幂等复用已有的待审核记录 —— (world, None, True)
     * 新建 —— (world, None, False)
-
-    原文按收到的字节**原样入库**：不做 json.dumps(json.loads(...)) 往返，
-    那会改掉键序、空格和数字格式。服务端只读顶层字段填列表用的元信息。
     """
-    from ..models import WorldCard, WorldTag
+    from ..models import WorldCard
 
-    raw = raw or ""
-    if not raw.strip():
-        return None, "世界内容为空", False
-    try:
-        data = json.loads(raw)
-    except ValueError:
-        return None, "世界内容不是合法的 JSON", False
-    if not isinstance(data, dict):
-        return None, "世界内容不是合法的 JSON 对象", False
-
-    name = data.get("name") if isinstance(data.get("name"), str) else ""
-    name = name.strip()[:120]
-    if not name:
-        return None, "世界需要一个名称", False
-
-    entries = data.get("entries")
-    entry_count = len(entries) if isinstance(entries, list) else 0
-    summary = data.get("summary") if isinstance(data.get("summary"), str) else ""
-    raw_tags = data.get("tags")
-    tags = (
-        [str(t)[:50] for t in raw_tags if isinstance(t, (str, int, float))][:20]
-        if isinstance(raw_tags, list)
-        else []
-    )
-
-    payload_bytes = len(raw.encode("utf-8"))
-    content_hash = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+    meta, error = _parse_payload(raw)
+    if error is not None:
+        return None, error, False
 
     # 同一作者重复提交同样的世界：幂等复用那条待审核记录，不新建。
     existing = WorldCard.query.filter(
         WorldCard.author_id == author.id,
-        WorldCard.content_hash == content_hash,
+        WorldCard.content_hash == meta["content_hash"],
         WorldCard.status == "pending",
     ).first()
     if existing is not None:
@@ -263,29 +373,55 @@ def publish_world(author, raw):
     world = WorldCard(
         id=str(uuid.uuid4()),
         author_id=author.id,
-        name=name,
-        summary=summary,
-        entry_count=entry_count,
-        payload_bytes=payload_bytes,
-        payload=raw,
-        content_hash=content_hash,
         status="pending",
     )
+    _apply_meta(world, raw, meta)
     db.session.add(world)
     db.session.flush()
-    for tag in dict.fromkeys(tags):
-        db.session.add(WorldTag(world_id=world.id, tag=tag))
+    _replace_tags(world.id, meta["tags"])
     db.session.commit()
 
-    # 建倒排索引（含词条名与触发词）。**索引失败绝不能影响发布** ——
-    # 搜索退化到 LIKE 是可接受的，发布失败不可接受。
-    try:
-        from .search_service import reindex_world
-
-        reindex_world(world.id)
-        db.session.commit()
-    except Exception as exc:  # noqa: BLE001
-        db.session.rollback()
-        current_app.logger.warning("世界卡建索引失败（不影响发布）: %s", exc)
-
+    _reindex_safely(world.id)
     return world, None, False
+
+
+def update_world(world, raw):
+    """作者编辑已发布的世界卡：**替换原文并重新走审核**。
+
+    返回 (world, error)。编辑语义是「整份世界书重写」而不是「改几个字段」：
+    编辑器给的是完整世界观，词条可能被增删改，所以只能整份替换。
+
+    替换后必须回到 pending —— 审核过的是旧内容，新内容没人看过。
+    """
+    meta, error = _parse_payload(raw)
+    if error is not None:
+        return None, error
+
+    _apply_meta(world, raw, meta)
+    world.status = "pending"
+    # 之前被下架的，重新提交后应该重新可见（由审核决定是否通过）。
+    world.is_hidden = False
+    _replace_tags(world.id, meta["tags"])
+    db.session.commit()
+
+    _reindex_safely(world.id)
+    return world, None
+
+
+def set_hidden(world, hidden):
+    """作者下架 / 恢复自己的世界卡（不删数据，不改审核状态）。"""
+    world.is_hidden = bool(hidden)
+    db.session.commit()
+    return world
+
+
+def resubmit_world(world):
+    """被拒绝的世界卡重新提审。
+
+    只有 rejected / deleted 需要走这一步：approved 的改动走 update_world，
+    pending 的本来就在队列里。
+    """
+    world.status = "pending"
+    world.is_hidden = False
+    db.session.commit()
+    return world
