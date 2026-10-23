@@ -18,6 +18,8 @@ instance/
 # Misc
 .DS_Store
 *.log
+*.db
+*.sqlite
 .superpowers/
 
 
