@@ -85,7 +85,12 @@ def update_card_from_payload(card, payload):
     与网页 card_edit 一致：编辑后状态置 pending；标签/对话风格/图片整体替换，
     图片不做 export 专用压缩。
     """
-    card.name = (payload.get("name") or "").strip() or card.name
+    # 名称必填，口径与新建一致。留空时沿用原名；原名也是空（历史脏数据）就拒绝，
+    # 逼调用方补一个名字，别让无标题卡继续流转。
+    final_name = (payload.get("name") or "").strip() or str(card.name or "").strip()
+    if not final_name:
+        return "请填写角色卡名称"
+    card.name = final_name
     card.gender = payload.get("gender") or card.gender
     card.persona = payload.get("persona") or ""
     card.intro = payload.get("intro") or ""

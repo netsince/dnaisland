@@ -188,6 +188,12 @@ def create_card_from_payload(author, payload):
     images(dict slot->bytes|data_url)。
     """
     card_id = str(uuid.uuid4())
+    # 名称必填。网页表单靠 HTML 的 required 拦，但 API 这边以前没有任何检查，
+    # App 编辑器也零校验 —— 于是空卡能直接进审核队列（审核员看到一堆无标题卡）。
+    # 校验放在这个唯一入口上，Web / App / 任何直连 API 的调用方都拦得住。
+    name = (payload.get("name") or "").strip()
+    if not name:
+        return None, "请填写角色卡名称"
     gender = (payload.get("gender") or "").strip() or "无性"
     tags = [str(t).strip() for t in (payload.get("tags") or []) if str(t).strip()]
 
@@ -215,7 +221,6 @@ def create_card_from_payload(author, payload):
         payload.get("author_note_interval"), has_note=author_note is not None
     )
 
-    name = (payload.get("name") or "").strip()
     persona = payload.get("persona") or ""
     intro = payload.get("intro") or ""
     opening = payload.get("opening") or ""
