@@ -2566,6 +2566,11 @@ def system_config():
         # 纪念横幅跳转 URL（mourning 状态用户主页横幅可点击跳转）
         cfg.memorial_banner_url = (request.form.get("memorial_banner_url") or "").strip() or None
 
+        # 角色卡图片比例校验（可随时关掉，兼容存量素材）
+        cfg.image_aspect_check_enabled = (
+            request.form.get("image_aspect_check_enabled") == "1"
+        )
+
         # 注册邮箱白名单
         cfg.email_whitelist_enabled = request.form.get("email_whitelist_enabled") == "1"
         cfg.email_whitelist_suffixes = (

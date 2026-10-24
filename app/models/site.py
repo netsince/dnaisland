@@ -53,6 +53,12 @@ class SiteConfig(db.Model):
     # 获取兑换码的跳转地址（可选）；配置后在 /points/ 侧边栏显示「获取积分」
     redeem_code_url = db.Column(db.String(500), nullable=True)
 
+    # —— 角色卡图片比例校验 ——
+    # 关掉后发布/编辑不再强制 1:1 / 16:9 / 9:16（存量与客户端兼容用）。
+    image_aspect_check_enabled = db.Column(
+        db.Boolean, server_default="1", nullable=False
+    )
+
     # —— 赞助页面 ——
     sponsor_enabled = db.Column(db.Boolean, server_default="0", nullable=False)
     sponsor_title = db.Column(db.String(200), nullable=True)  # 页面标题

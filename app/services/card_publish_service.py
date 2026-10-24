@@ -144,7 +144,14 @@ def validate_image_slots(images, *, unchanged=None) -> None:
     [unchanged] 为 {slot: 既有 data URL}：取值与该槽位既有图**完全相同**的视为「未改动」，
     跳过校验。这样编辑老卡片时，不会因为存量图片比例不合规而被卡住（只约束新上传/替换的图）。
     新建时所有图都是新的，传 unchanged=None 即全量校验。
+
+    后台开关 `site_config.image_aspect_check_enabled` 关掉后整体跳过（兼容存量素材）。
     """
+    from .site_service import get_site_config
+
+    if not get_site_config().image_aspect_check_enabled:
+        return
+
     unchanged = unchanged or {}
     for slot in IMAGE_SLOTS:
         val = (images or {}).get(slot)
