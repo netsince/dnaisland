@@ -100,9 +100,30 @@ def data_url_to_bytes_and_mime(data_url: str) -> tuple[bytes, str]:
 
 
 # 图片转码结果缓存：图片在库中以 base64 存储，每次请求都要解码（甚至 PIL 重编码）。
-# 以 (max_edge, quality, data_url 哈希) 为键缓存编码结果，图片不变则命中，
-# 避免重复 CPU 重算。带过期时间与容量上限（LRU），防止内存无限增长。
-_WEBP_CACHE = TimedCache(ttl=3600, maxsize=500)
+# 图片不变则命中，避免重复 CPU 重算。
+#
+# 容量必须按**字节**封顶而不是按条数：本缓存装的是整张图片字节，库内单条
+# reference_images 平均约 1.4MB。若只按 500 条封顶，常驻内存可达数百 MB —— 这正是
+# 线上 5012 两个 worker 各占约 210MB 的原因。32MB 预算下，即使全部是 1.4MB 的大图
+# 也只驻留约 23 张，小而热的图则能放下更多，符合「按体积而非按个数」的内存约束。
+_WEBP_CACHE_MAXBYTES = 32 * 1024 * 1024
+_WEBP_CACHE = TimedCache(ttl=3600, maxsize=500, maxbytes=_WEBP_CACHE_MAXBYTES)
+
+
+def _cache_key(data_url: str, max_edge: int, quality: int) -> str:
+    """按 (max_edge, quality, 图片内容) 生成缓存键。
+
+    用增量 update 而不是 f-string 拼接：后者会为每条图片构造一个与 base64 等长的
+    临时字符串（单条可达数 MB），在高并发图片请求下这段瞬时峰值相当可观。
+    """
+    h = hashlib.sha1()
+    h.update(b"v1|")
+    h.update(str(max_edge).encode())
+    h.update(b"|")
+    h.update(str(quality).encode())
+    h.update(b"|")
+    h.update(data_url.encode("utf-8", "surrogatepass"))
+    return h.hexdigest()
 
 
 def data_url_to_webp_bytes(data_url: str, max_edge: int = 1024, quality: int = 82) -> bytes:
@@ -112,7 +133,7 @@ def data_url_to_webp_bytes(data_url: str, max_edge: int = 1024, quality: int = 8
     发送；非 WebP 才触发 PIL 重编码。结果按 (data_url, max_edge, quality) 缓存，
     避免每次 HTTP GET 都重复解码/重编码。
     """
-    key = hashlib.sha1(f"{max_edge}|{quality}|{data_url}".encode()).hexdigest()
+    key = _cache_key(data_url, max_edge, quality)
     cached = _WEBP_CACHE.get(key)
     if cached is not None:
         return cached

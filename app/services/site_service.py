@@ -31,7 +31,7 @@ def default_public_config():
 
 # 站点公开配置基本不变，加一层 TTL 内存缓存，避免每个请求都查库
 # （enforce_shutdown 与 inject_site 两处都会用到，缓存后同一进程内复用）。
-_cfg_cache = TimedCache(ttl=60)
+_cfg_cache = TimedCache(ttl=60, maxsize=8)
 _CFG_KEY = "site_cfg"
 
 

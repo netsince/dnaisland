@@ -9,8 +9,9 @@ from ..models import Sticker
 # [sticker:CODE]，CODE 允许中文、字母数字下划线连字符
 _STICKER_TOKEN_RE = re.compile(r"\[sticker:([A-Za-z0-9_\u4e00-\u9fff-]+)\]")
 
-# 进程内缓存 {code: image_data}，避免每条内容渲染都查库
-_CACHE = TimedCache(ttl=300)
+# 进程内缓存 {code: image_data}，避免每条内容渲染都查库。
+# 值里含表情图 base64，按体积封顶：表情总量虽小，但不应依赖「它恰好很小」这一假设。
+_CACHE = TimedCache(ttl=300, maxsize=1, maxbytes=16 * 1024 * 1024)
 _CACHE_KEY = "sticker_map"
 
 

@@ -3,7 +3,8 @@ from ..extensions import db
 from ..models import Notification
 
 # 未读计数按用户缓存 30s：角标延迟最多 30s 可接受，省去每个请求查库。
-_unread_cache = TimedCache(ttl=30)
+# 键是 user_id，条目数随活跃用户线性增长，必须封顶（值是一个 int，体积很小）。
+_unread_cache = TimedCache(ttl=30, maxsize=2000)
 
 
 def notify(
