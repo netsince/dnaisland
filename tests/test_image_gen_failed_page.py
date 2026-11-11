@@ -108,7 +108,7 @@ def test_failed_page_lists_all_failures_with_info(app, client):
     assert "multipart: NextPart: EOF" in html
     assert "G Imagine" in html
     assert "768x1024" in html
-    assert f"/image-gen/reference/{bad_id}/0" in html
+    assert f"/image-gen/reference/{bad_id}/0.webp" in html
     assert "成功的那张" not in html, "成功记录不该出现在失败记录页"
     assert f"/image-gen/logs/{bad_id}" in html, "要能从列表点进详情"
 

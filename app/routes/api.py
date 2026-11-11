@@ -2283,12 +2283,12 @@ _IG_MAX_COUNT = 2
 
 def _ig_image_url(log_id, idx):
     """产出图 URL（App 用 Authorization Bearer 头访问）。"""
-    return f"/image-gen/output/{log_id}/{idx}"
+    return f"/image-gen/output/{log_id}/{idx}.webp"
 
 
 def _ig_reference_url(log_id, idx):
     """参考图 URL。"""
-    return f"/image-gen/reference/{log_id}/{idx}"
+    return f"/image-gen/reference/{log_id}/{idx}.webp"
 
 
 @api_bp.route("/image-gen/meta", methods=["GET"])

@@ -27,7 +27,7 @@ from ..extensions import db
 from ..models import GenerationLog, GenerationModel, GenerationTask
 from ..services.generation_worker import process_generation_task, recover_stale_tasks
 from ..services.image_gen_service import effective_credentials
-from ..services.image_service import send_webp
+from ..services.image_service import send_public_webp
 from ..services.site_service import get_site_config
 from ..utils import ensure_owner_or_admin, is_xhr
 
@@ -77,69 +77,38 @@ def workbench():
     )
 
 
-def _serve_webp_from_data_url(data_url):
-    # 复用 image_service.send_webp，避免重复实现 data-url 解析与发送
-    return send_webp(data_url)
 
 
-def _auth_user_id():
-    """解析请求者：优先 App JWT（Authorization: Bearer），回退 flask_login 会话。
-
-    返回用户 id（int）或 None（未认证）。用于产出图/参考图接口，使 App
-    也能用 Bearer 令牌访问自己的生图图片。
-    """
-    auth = request.headers.get("Authorization", "")
-    if auth.startswith("Bearer "):
-        from ..routes.api import _decode_token
-
-        payload = _decode_token(auth[7:])
-        if payload and payload.get("user_id"):
-            return int(payload["user_id"])
-        return None
-    if current_user.is_authenticated:
-        return current_user.id
-    return None
-
-
-def _ensure_owner_or_admin(owner_id):
-    """生图资源归属校验：作者或超管放行（web 会话或 App JWT 均可）。"""
-    uid = _auth_user_id()
-    if uid is None:
-        abort(403, description="无权访问该资源")
-    if uid != int(owner_id):
-        from ..models import User
-
-        u = db.session.get(User, uid)
-        if not u or not u.is_super_admin:
-            abort(403, description="无权访问该资源")
-
-
-@image_gen_bp.route("/output/<int:log_id>/<int:idx>")
+# 生图产物的两个图片接口都是**公开资源**：不做用户隔离，URL 即可寻址。
+#
+# 之所以去掉鉴权：这两个接口按 log_id 定位的是「一次生成的产物」，内容
+# 不随登录状态变化。一旦视图读了 session，Flask 就会给响应加 Vary: Cookie，
+# Cloudflare 据此认定「同 URL 不同 Cookie 有不同内容」而完全放弃缓存 ——
+# 实测线上单张 135KB 的图 TTFB 在 1~12 秒之间，全量回源。
+#
+# URL 特意带 .webp 后缀：Cloudflare 默认**按扩展名**判定可否缓存，
+# 无扩展名路径即使带 Cache-Control: public 也会被当作动态内容放过。
+#
+# 安全边界（已知且接受）：log_id 是自增整数，URL 可枚举。如需防枚举，
+# 应在路径里加一段基于 log_id 的 HMAC 令牌，而不是退回按用户鉴权。
+@image_gen_bp.route("/output/<int:log_id>/<int:idx>.webp")
 def output_image(log_id, idx):
-    """产出图（原图）接口：按 log_id + 序号返回 WEBP 二进制。
-
-    鉴权在 _ensure_owner_or_admin 内完成（兼容 web 会话与 App JWT）。
-    """
+    """产出图（原图）接口：按 log_id + 序号返回 WEBP 二进制（公开、可缓存）。"""
     log = db.session.get(GenerationLog, log_id)
     if not log:
         abort(404)
-    _ensure_owner_or_admin(log.user_id)
     imgs = log.image_list()
     if idx < 0 or idx >= len(imgs):
         abort(404)
-    return _serve_webp_from_data_url(imgs[idx])
+    return send_public_webp(imgs[idx])
 
 
-@image_gen_bp.route("/reference/<int:log_id>/<int:idx>")
+@image_gen_bp.route("/reference/<int:log_id>/<int:idx>.webp")
 def reference_image(log_id, idx):
-    """参考图（垫图）接口：按 log_id + 序号返回 WEBP 二进制。
-
-    鉴权在 _ensure_owner_or_admin 内完成（兼容 web 会话与 App JWT）。
-    """
+    """参考图（垫图）接口：按 log_id + 序号返回 WEBP 二进制（公开、可缓存）。"""
     log = db.session.get(GenerationLog, log_id)
     if not log:
         abort(404)
-    _ensure_owner_or_admin(log.user_id)
     refs = log.reference_image_list()
     if idx < 0 or idx >= len(refs):
         abort(404)
@@ -150,7 +119,7 @@ def reference_image(log_id, idx):
         ref = "data:{};base64,{}".format(
             ref.get("mimetype") or "image/png", ref.get("data_b64") or ""
         )
-    return _serve_webp_from_data_url(ref)
+    return send_public_webp(ref)
 
 
 @image_gen_bp.route("/generate", methods=["POST"])

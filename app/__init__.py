@@ -40,9 +40,61 @@ class AppJSONProvider(DefaultJSONProvider):
         return super().default(o)
 
 
+# 公开静态资源前缀：不读 session、不参与关站检测、可被 CDN 边缘缓存。
+#
+# 为什么必须单独列出来：Flask 只要在这次请求里读过 session（例如
+# before_request 里访问 current_user），就会给响应加上 `Vary: Cookie`。
+# Cloudflare 见到这个头会认为「同一 URL 对不同 Cookie 有不同内容」，
+# 于是完全不缓存 —— 实测线上连 /static/css/style.css 都反复 MISS，
+# 生图图片单张 TTFB 在 1~12 秒之间，全部回源。
+_CACHEABLE_ASSET_PREFIXES = (
+    "/static/",
+    "/card-image/",
+    "/sticker/file/",
+    "/image-gen/output/",
+    "/image-gen/reference/",
+)
+
+
+def _is_cacheable_asset(path: str) -> bool:
+    """该路径是否属于公开静态资源（响应可被 CDN 缓存）。"""
+    return path.startswith(_CACHEABLE_ASSET_PREFIXES)
+
+
+class _AssetCacheMiddleware:
+    """公开静态资源：抹掉 `Vary: Cookie`，只留 `Vary: Accept-Encoding`。
+
+    为什么必须放在 WSGI 层：`Vary: Cookie` 有两个来源，且都在视图返回之后 ——
+      - flask_login 的 after_request（写 remember cookie 时顺带 add）
+      - Flask 的 save_session（发生在**所有** after_request 之后）
+    所以无论 after_request 还是 session_interface 都赶不上最后一步。
+
+    Cloudflare 见到 `Vary: Cookie` 就认为「同 URL 对不同 Cookie 有不同内容」，
+    直接判 DYNAMIC 不缓存 —— 线上静态文件反复 MISS、生图图片 TTFB 1~12 秒
+    都是它。这些路径没有登录态语义（图片按 log_id 公开寻址），去掉是安全的。
+    """
+
+    def __init__(self, wsgi_app):
+        self.wsgi_app = wsgi_app
+
+    def __call__(self, environ, start_response):
+        if not _is_cacheable_asset(environ.get("PATH_INFO", "")):
+            return self.wsgi_app(environ, start_response)
+
+        def _start(status, headers, exc_info=None):
+            cleaned = [(k, v) for (k, v) in headers if k.lower() != "vary"]
+            cleaned.append(("Vary", "Accept-Encoding"))
+            return start_response(status, cleaned, exc_info)
+
+        return self.wsgi_app(environ, _start)
+
+
 def create_app(config_object=None):
     app = Flask(__name__)
     app.config.from_object(config_object or config)
+    # 公开静态资源抹掉 Vary: Cookie（详见类注释），否则 CDN 完全不缓存。
+    # 必须包在 wsgi_app 外层：Flask 内部没有任何钩子能排在 save_session 之后。
+    app.wsgi_app = _AssetCacheMiddleware(app.wsgi_app)
 
     # 自定义 JSON 提供器：支持 Decimal 序列化（积分小数）
     app.json = AppJSONProvider(app)
@@ -260,9 +312,9 @@ def create_app(config_object=None):
     # 管理员（super_admin）与登录/退出/静态资源/站点配置 API 不受影响。
     @app.before_request
     def enforce_shutdown():
-        # 静态资源（CSS/JS/图片等）无需关站检测：直接在最前面放行，
+        # 静态资源与公开图片无需关站检测：直接在最前面放行，
         # 省去每个静态请求都跑一次 public_config() 查库（一页往往伴随数十个静态请求）。
-        if request.endpoint == "static" or request.path.startswith("/static"):
+        if request.endpoint == "static" or _is_cacheable_asset(request.path):
             return
 
         from .services.site_service import public_config
@@ -278,8 +330,6 @@ def create_app(config_object=None):
             return
 
         path = request.path
-        if path.startswith("/static"):
-            return
         if path in ("/auth/login", "/auth/logout") or path.startswith("/auth/login/"):
             return
         if path == "/api/site-config":
@@ -310,6 +360,11 @@ def create_app(config_object=None):
     # 若其处于登录态（如被管理员置为上述状态），在此强制登出并跳回首页。
     @app.before_request
     def enforce_user_lock():
+        # 公开静态资源与图片不能在这里读 current_user：一旦读了 session，
+        # Flask 就会给响应加 Vary: Cookie，Cloudflare 随即拒绝缓存该资源。
+        # 这些路径本身没有登录态语义（图片按 log_id 定位、公开可寻址）。
+        if request.endpoint == "static" or _is_cacheable_asset(request.path):
+            return
         u = current_user
         if not u.is_authenticated:
             return
@@ -324,6 +379,32 @@ def create_app(config_object=None):
         g.want_json = request.headers.get(
             "X-Requested-With"
         ) == "XMLHttpRequest" or request.path.startswith("/api/")
+
+    @app.after_request
+    def _normalize_asset_cache_headers(resp):
+        """公开资源的 `Cache-Control` 收口：确有有效期时补上 `public`。
+
+        只做这一件事。`Vary: Cookie` 不在这里处理 —— 它是在本钩子之后才被
+        flask_login 与 save_session 加上的，只能由 [_AssetCacheMiddleware]
+        在 WSGI 层兜底抹掉。
+        """
+        if not _is_cacheable_asset(request.path):
+            return resp
+        # 只有 Accept-Encoding 会影响这些资源的字节表示。
+        resp.headers.pop("Vary", None)
+        resp.headers["Vary"] = "Accept-Encoding"
+        cc = resp.headers.get("Cache-Control", "")
+        # 只在真的可缓存时补 public：`no-cache` / `private` / `no-store`
+        # 拼上 public 会变成自相矛盾的头（曾出现 `public, no-cache`）。
+        if (
+            "max-age=" in cc
+            and "public" not in cc
+            and "private" not in cc
+            and "no-cache" not in cc
+            and "no-store" not in cc
+        ):
+            resp.headers["Cache-Control"] = "public, " + cc
+        return resp
 
     @app.errorhandler(400)
     @app.errorhandler(403)

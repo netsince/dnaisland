@@ -162,6 +162,46 @@ def _encode_webp_uncached(data_url: str, max_edge: int = 1024, quality: int = 82
         return raw
 
 
+# 公开图片的缓存时长。生成产物写出后不再变更，可以给较长的时间；
+# 配合 ETag，过期后也只是一次 304，不会重传字节。
+PUBLIC_IMAGE_MAX_AGE = 604800  # 7 天
+
+
+def send_public_webp(
+    data_url: str,
+    max_edge: int = 1024,
+    quality: int = 82,
+    max_age: int = PUBLIC_IMAGE_MAX_AGE,
+):
+    """以「公开可缓存」方式返回图片字节。
+
+    与 [send_webp] 的区别只在响应头：
+      - ``Cache-Control: public, max-age=...`` —— 允许 Cloudflare 边缘缓存
+      - ``ETag`` —— 过期后 304，不重传字节
+
+    调用方必须保证该 URL 不含用户私有语义（不随登录状态变化），
+    否则会被 CDN 把 A 的图发给 B。
+    """
+    from flask import Response, request
+
+    if not data_url:
+        return Response(status=404)
+    webp = data_url_to_webp_bytes(data_url, max_edge=max_edge, quality=quality)
+    etag = '"' + hashlib.md5(webp).hexdigest() + '"'
+    cache_control = f"public, max-age={max_age}"
+    # 直接比原始头：werkzeug 的 ETags 容器对带引号的字符串匹配不可靠，
+    # 用子串判断对单值/多值都成立。
+    if_none_match = request.headers.get("If-None-Match", "")
+    if etag in if_none_match:
+        return Response(
+            status=304,
+            headers={"ETag": etag, "Cache-Control": cache_control},
+        )
+    resp = Response(webp, mimetype="image/webp")
+    resp.headers["ETag"] = etag
+    resp.headers["Cache-Control"] = cache_control
+    return resp
+
 def send_webp(data_url: str, max_edge: int = 1024, quality: int = 82):
     """将存储的 Data URL 转为 WebP 字节并以 image/webp 响应返回。
 

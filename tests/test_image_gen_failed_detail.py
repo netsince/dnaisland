@@ -105,8 +105,8 @@ def test_failed_detail_shows_prompt_params_and_references(app, client):
     assert "消耗：0 点" in html, "必须显示消耗（失败不扣费，所以是 0）"
     assert "multipart: NextPart: EOF" in html, "必须显示失败原因"
     # 参考图：列表用 /image-gen/reference/<id>/<idx> 端点按序号取
-    assert f"/image-gen/reference/{bad_id}/0" in html, "必须显示所用参考图"
-    assert f"/image-gen/reference/{bad_id}/1" in html
+    assert f"/image-gen/reference/{bad_id}/0.webp" in html, "必须显示所用参考图"
+    assert f"/image-gen/reference/{bad_id}/1.webp" in html
     assert "所用参考图（2 张）" in html
     # 没有产出图时不给"下载原图"（点了也没用），但给占位说明。
     # 注意别断言 js-dlpng 这个类名：页面脚本里本来就会提到它。
