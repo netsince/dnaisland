@@ -1,8 +1,6 @@
-import base64
 import math
 import random
 from datetime import datetime, timedelta
-from io import BytesIO
 
 from flask import (
     Blueprint,
@@ -11,7 +9,6 @@ from flask import (
     jsonify,
     render_template,
     request,
-    send_file,
     url_for,
 )
 from flask_login import current_user
@@ -42,7 +39,7 @@ from ..paging import IdListPagination
 from ..routes.card_lists import explore_cards, recommend_items, search_cards
 from ..services import search_service
 from ..services.card_service import enrich_cards, popular_tags
-from ..services.image_service import send_webp
+from ..services.image_service import send_public_webp
 
 main_bp = Blueprint("main", __name__)
 
@@ -199,26 +196,19 @@ def _has_image_subquery():
     )
 
 
-@main_bp.route("/article-cover/<int:article_id>")
+@main_bp.route("/article-cover/<int:article_id>.webp")
 def article_cover(article_id):
-    """文章封面：base64 类型走此端点转 WEBP；已为 WebP 的 data URL 直接发送；URL 类型由模板直接引用外链。"""
+    """文章封面：base64 类型走此端点转 WEBP，公开可缓存。
+
+    已是 WebP 的 data URL 由 send_public_webp 原样透传（不二次压缩）；
+    URL 类型的封面由模板直接引用外链，不经过这里。
+    """
     a = db.session.get(Article, article_id)
     if not a or not a.cover:
         abort(404)
-    if a.cover.startswith("data:"):
-        # 上传时已转 WebP 的，直接解码发送，避免二次压缩损失
-        if a.cover.startswith("data:image/webp"):
-            try:
-                b64 = a.cover.split(",", 1)[1]
-                return send_file(
-                    BytesIO(base64.b64decode(b64)),
-                    mimetype="image/webp",
-                    max_age=86400,
-                )
-            except Exception:
-                pass
-        return send_webp(a.cover, max_edge=1024, quality=82)
-    abort(404)
+    if not a.cover.startswith("data:"):
+        abort(404)
+    return send_public_webp(a.cover, max_edge=1024, quality=82)
 
 
 # 首页「为你推荐」候选池（card_id -> 热度分）缓存。
@@ -299,7 +289,7 @@ def featured_cards(limit=12, exclude_ids=None):
     covers_by_card: dict[int, dict[str, str]] = {}
     for img in CardImage.query.filter(CardImage.card_id.in_(result_ids)).all():
         covers_by_card.setdefault(img.card_id, {})[img.slot] = (
-            f"/card-image/{img.card_id}/{img.slot}"
+            f"/card-image/{img.card_id}/{img.slot}.webp"
         )
     for c in cards:
         covers = covers_by_card.get(c.id, {})
@@ -350,7 +340,7 @@ def swipe_cards(limit=12, exclude_ids=None):
     covers_by_card: dict[str, dict[str, str]] = {}
     for img in CardImage.query.filter(CardImage.card_id.in_(result_ids)).all():
         covers_by_card.setdefault(img.card_id, {})[img.slot] = (
-            f"/card-image/{img.card_id}/{img.slot}"
+            f"/card-image/{img.card_id}/{img.slot}.webp"
         )
     for c in cards:
         covers = covers_by_card.get(c.id, {})

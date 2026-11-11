@@ -173,7 +173,7 @@ def enrich_cards(cards):
     covers_by_card: dict[int, dict[str, str]] = {}
     for img in CardImage.query.filter(CardImage.card_id.in_(ids)).all():
         covers_by_card.setdefault(img.card_id, {})[img.slot] = (
-            f"/card-image/{img.card_id}/{img.slot}"
+            f"/card-image/{img.card_id}/{img.slot}.webp"
         )
 
     missing_author_ids = {c.author_id for c in cards if c.author is None and c.author_id}

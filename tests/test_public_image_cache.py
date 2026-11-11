@@ -144,3 +144,55 @@ def test_静态资源也不带_Vary_Cookie(app, client):
 def test_不存在的图片仍然_404(app, client):
     resp = client.get("/image-gen/output/999999/0")
     assert resp.status_code == 404
+
+
+def test_所有_webp_图片端点都必须落在可缓存前缀内(app):
+    """结构性约束：图片端点的约定是「URL 以 .webp 结尾」，
+
+    凡是以 .webp 结尾的路由，都必须被 _CACHEABLE_ASSET_PREFIXES 覆盖 ——
+    否则那个端点的响应会带上 Vary: Cookie，CDN 直接不缓存。
+    新增图片端点忘了登记时，这条会失败。
+    """
+    from app import _is_cacheable_asset
+
+    offenders = []
+    for rule in app.url_map.iter_rules():
+        path = str(rule)
+        if not path.endswith(".webp"):
+            continue
+        if not _is_cacheable_asset(path):
+            offenders.append(path)
+    assert not offenders, f"这些图片端点没登记进 _CACHEABLE_ASSET_PREFIXES：{offenders}"
+
+
+def test_头像端点公开可缓存(app, client):
+    u = User(username="av", nickname="头像用户", email="av@example.com")
+    u.set_password("pass123")
+    u.avatar = IMG_DATA_URL
+    db.session.add(u)
+    db.session.commit()
+
+    resp = client.get(f"/user/avatar/{u.id}.webp")
+    assert resp.status_code == 200
+    _assert_public_cacheable(resp)
+
+
+def test_评论配图端点公开可缓存(app, client):
+    """评论图以前是内联 base64，现在走独立端点。"""
+    from app.models import Card, Comment
+
+    u = User(username="cm", nickname="评论者", email="cm@example.com")
+    u.set_password("pass123")
+    db.session.add(u)
+    db.session.commit()  # 先落库拿到 u.id
+    card = Card(id="card-cm-1", name="卡", author_id=u.id)
+    db.session.add(card)
+    db.session.commit()
+
+    cm = Comment(card_id=card.id, user_id=u.id, content="看", image_data=IMG_DATA_URL)
+    db.session.add(cm)
+    db.session.commit()
+
+    resp = client.get(f"/comment-image/{cm.id}.webp")
+    assert resp.status_code == 200
+    _assert_public_cacheable(resp)

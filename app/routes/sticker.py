@@ -33,7 +33,7 @@ def api_list():
     return jsonify({"series": out})
 
 
-@sticker_bp.route("/file/<code>")
+@sticker_bp.route("/file/<code>.webp")
 def sticker_file(code):
     """按表情 ID 返回图片字节，供前端逐张懒加载（加载一张显示一张）。
 

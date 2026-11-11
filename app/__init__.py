@@ -49,10 +49,18 @@ class AppJSONProvider(DefaultJSONProvider):
 # 生图图片单张 TTFB 在 1~12 秒之间，全部回源。
 _CACHEABLE_ASSET_PREFIXES = (
     "/static/",
+    # 站点上所有「图片端点」都列在这里：它们是按 id 寻址的公开资源，
+    # 内容不随登录态变化，理应被浏览器与 CDN 缓存。
     "/card-image/",
-    "/sticker/file/",
+    "/user/avatar/",
+    "/comment-image/",
+    "/article-cover/",
+    "/stickers/file/",
     "/image-gen/output/",
     "/image-gen/reference/",
+    "/teahouse/images/",
+    "/api/v1/teahouse/images/",
+    "/api/v1/articles/",
 )
 
 

@@ -99,7 +99,7 @@ from ..services.card_service import (
     attach_covers,
     load_card_images,
 )
-from ..services.image_service import send_webp
+from ..services.image_service import send_public_webp
 
 user_bp = Blueprint("user", __name__)
 
@@ -117,29 +117,43 @@ def _default_avatar_svg(ch):
     )
 
 
-@user_bp.route("/user/avatar/<int:user_id>")
+@user_bp.route("/user/avatar/<int:user_id>.webp")
 def avatar(user_id):
-    """用户头像：base64 data URL -> WEBP 二进制，避免内联膨胀 HTML。无头像时返回首字母占位图。"""
+    """用户头像：base64 data URL -> WEBP，公开可缓存。无头像时返回首字母占位图。
+
+    URL 带 .webp 后缀是为了让 Cloudflare 按扩展名走默认缓存规则。
+    """
     u = db.session.get(User, user_id)
     if u and u.avatar:
-        return send_webp(u.avatar, max_edge=256, quality=82)
+        return send_public_webp(u.avatar, max_edge=256, quality=82)
     ch = (u.display_name or u.username or "?")[0] if u else "?"
-    return Response(
-        _default_avatar_svg(ch),
-        mimetype="image/svg+xml",
-        headers={"Cache-Control": "public, max-age=86400"},
-    )
+    resp = Response(_default_avatar_svg(ch), mimetype="image/svg+xml")
+    resp.headers["Cache-Control"] = "public, max-age=86400"
+    return resp
 
 
-@user_bp.route("/card-image/<card_id>/<slot>")
+@user_bp.route("/card-image/<card_id>/<slot>.webp")
 def card_image(card_id, slot):
-    """角色卡图片（square/landscape/portrait）：base64 -> WEBP。"""
+    """角色卡图片（square/landscape/portrait）：base64 -> WEBP，公开可缓存。"""
     if slot not in ("square", "landscape", "portrait"):
         abort(404)
     img = CardImage.query.filter_by(card_id=card_id, slot=slot).first()
     if not img or not img.data:
         abort(404)
-    return send_webp(img.data, max_edge=1024, quality=82)
+    return send_public_webp(img.data, max_edge=1024, quality=82)
+
+
+@user_bp.route("/comment-image/<int:comment_id>.webp")
+def comment_image(comment_id):
+    """评论配图：base64 -> WEBP，公开可缓存。
+
+    以前模板与接口把 data URL 直接塞进 HTML/JSON，图片完全无法被浏览器或 CDN
+    缓存；改成独立端点后每次列表只发一个 URL。
+    """
+    cm = db.session.get(Comment, comment_id)
+    if not cm or not cm.image_data or not cm.image_data.startswith("data:"):
+        abort(404)
+    return send_public_webp(cm.image_data, max_edge=1024, quality=82)
 
 
 @user_bp.route("/user/<username>")

@@ -145,7 +145,7 @@ def update_card_from_payload(card, payload):
     kept_images: dict[str, str] = {}
     for slot in list(incoming_images):
         value = incoming_images[slot]
-        if isinstance(value, str) and value.strip() == f"/card-image/{card.id}/{slot}":
+        if isinstance(value, str) and value.strip() == f"/card-image/{card.id}/{slot}.webp":
             stored = existing.get(slot)
             if stored:
                 kept_images[slot] = stored

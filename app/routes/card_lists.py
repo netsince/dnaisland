@@ -286,7 +286,7 @@ def card_detail_core(card_id, viewer):
     ]
     images = {}
     for img in CardImage.query.filter_by(card_id=card.id).all():
-        images[img.slot] = f"/card-image/{card.id}/{img.slot}"
+        images[img.slot] = f"/card-image/{card.id}/{img.slot}.webp"
 
     # 点赞数 / 收藏数 与「当前用户是否点赞/收藏」各合并为一条聚合查询：
     # 一次返回总数与当前用户的命中数，避免 count + first 两趟查询。

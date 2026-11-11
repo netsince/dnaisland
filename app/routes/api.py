@@ -102,7 +102,7 @@ from ..services.comment_service import (
 )
 from ..services.generation_worker import process_generation_task
 from ..services.image_gen_service import effective_credentials
-from ..services.image_service import send_webp
+from ..services.image_service import send_public_webp
 from ..services.login_service import (
     MSG_BAD_PASSWORD,
     MSG_THROTTLED,
@@ -414,7 +414,7 @@ def _teapost_item(post: TeaPost, stats: dict) -> dict:
     covers: dict[str, str] = {}
     if card is not None:
         for ci in card.images or []:  # type: ignore[union-attr]
-            covers.setdefault(ci.slot, f"/card-image/{card.id}/{ci.slot}")
+            covers.setdefault(ci.slot, f"/card-image/{card.id}/{ci.slot}.webp")
     return {
         "id": post.id,
         "content": post.content,
@@ -423,7 +423,7 @@ def _teapost_item(post: TeaPost, stats: dict) -> dict:
         "image": {
             "id": img.id,
             "sort_order": img.sort_order,
-            "url": f"/api/v1/teahouse/images/{img.id}",
+            "url": f"/api/v1/teahouse/images/{img.id}.webp",
         }
         if img
         else None,
@@ -471,7 +471,7 @@ def _point_tx(tx: PointTransaction) -> dict:
 def _article_item(a: Article, *, include_content: bool = False) -> dict:
     """文章摘要/详情序列化（列表不含正文，详情含正文）。"""
     cover = (
-        f"/api/v1/articles/{a.id}/cover"
+        f"/api/v1/articles/{a.id}/cover.webp"
         if a.cover and a.cover.startswith("data:")
         else (a.cover or "")
     )
@@ -682,27 +682,13 @@ def article_detail(article_id):
     return ok(_article_item(a, include_content=True))
 
 
-@api_bp.route("/articles/<int:article_id>/cover", methods=["GET"])
+@api_bp.route("/articles/<int:article_id>/cover.webp", methods=["GET"])
 def article_cover(article_id):
-    """文章封面（base64/WebP 数据转码为可直接显示的图片）。"""
-    try:
-        a = db.session.get(Article, article_id)
-    except Exception:
-        a = None
+    """文章封面（base64 -> WEBP），公开可缓存。"""
+    a = db.session.get(Article, article_id)
     if not a or not a.cover or not a.cover.startswith("data:"):
         return err("文章封面不存在", 404)
-    try:
-        import base64 as _b64
-
-        if a.cover.startswith("data:image/webp"):
-            raw = _b64.b64decode(a.cover.split(",", 1)[1])
-            return current_app.response_class(raw, mimetype="image/webp")
-        # 其他 data 类型由网页端转码；App 侧直接透传（base64 原文作为图片数据）
-        raw = _b64.b64decode(a.cover.split(",", 1)[1])
-        mime = a.cover.split(";", 1)[0].split(":", 1)[1] if ";" in a.cover else "image/png"
-        return current_app.response_class(raw, mimetype=mime)
-    except Exception:
-        return err("文章封面解析失败", 400)
+    return send_public_webp(a.cover, max_edge=1024, quality=82)
 
 
 @api_bp.route("/cards/<card_id>/export", methods=["GET"])
@@ -2085,14 +2071,14 @@ def me_avatar():
     return ok({"avatar": data_url})
 
 
-@api_bp.route("/teahouse/images/<int:image_id>", methods=["GET"])
+@api_bp.route("/teahouse/images/<int:image_id>.webp", methods=["GET"])
 def teahouse_image(image_id):
-    """按 id 返回茶馆配图（WebP）。供客户端显示上传后的图片。"""
+    """按 id 返回茶馆配图（WebP），公开可缓存。"""
 
     img = db.session.get(TeaPostImage, image_id)
-    if not img:
+    if not img or not img.image_data or not img.image_data.startswith("data:"):
         return ("", 404)
-    return send_webp(img.image_data)
+    return send_public_webp(img.image_data)
 
 
 # ---------------------------------------------------------------------------

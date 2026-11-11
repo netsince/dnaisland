@@ -10,7 +10,7 @@
   对路径直接 `raise ValueError("无效的图片数据")` → 编辑接口 400；
 * 即便不报错，编辑是**覆盖式**替换图片，图片也会被写坏。
 
-修法：把「本卡自己的 `/card-image/<card.id>/<slot>` 路径」识别为"未改动"，用库里存的
+修法：把「本卡自己的 `/card-image/<card.id>/<slot>.webp` 路径」识别为"未改动"，用库里存的
 data URL **原样保留**（顺带避免每次编辑都重编码掉一次画质）。其它取值（data URL、字节、
 以及别人的/伪造的路径）一律走原有校验，不能被这条放宽。
 """
@@ -87,7 +87,7 @@ def test_app_style_relative_path_keeps_the_image(app):
             "name": "改过的卡名",
             "persona": "人设",
             "tags": ["测试"],
-            "images": {"square": f"/card-image/{card.id}/square"},
+            "images": {"square": f"/card-image/{card.id}/square.webp"},
         }
         error = update_card_from_payload(card, payload)
         assert error is None, f"App 式的编辑不该失败，实际返回：{error!r}"
@@ -111,7 +111,7 @@ def test_relative_path_does_not_trigger_aspect_validation(app):
         db.session.commit()
 
         error = update_card_from_payload(
-            card, {"name": "改名", "images": {"square": f"/card-image/{card.id}/square"}}
+            card, {"name": "改名", "images": {"square": f"/card-image/{card.id}/square.webp"}}
         )
         assert error is None, "回传路径视为未改动，不该触发比例校验"
         assert CardImage.query.filter_by(card_id=card.id, slot="square").one().data == bad
@@ -122,9 +122,9 @@ def test_foreign_or_bogus_path_is_still_rejected(app):
     with app.app_context():
         card, _ = _card_with_image()
         for bogus in (
-            "/card-image/other-card/square",
-            "/card-image/card-edit-1/landscape",  # 槽位对不上
-            "/card-image/card-edit-1/square?x=1",
+            "/card-image/other-card/square.webp",
+            "/card-image/card-edit-1/landscape.webp",  # 槽位对不上
+            "/card-image/card-edit-1/square.webp?x=1",
             "/not-an-image",
         ):
             error = update_card_from_payload(card, {"images": {"square": bogus}})
@@ -157,7 +157,7 @@ def test_omitting_images_clears_them(app):
 
 
 def test_app_detail_shape_matches_the_keep_convention(app):
-    """守住约定：卡详情接口给的就是 `/card-image/<id>/<slot>`，与上面的识别规则一致。
+    """守住约定：卡详情接口给的就是 `/card-image/<id>/<slot>.webp`，与上面的识别规则一致。
 
     两处一旦不一致（比如接口改成返回别的形式），这条会红。
     """
@@ -168,5 +168,5 @@ def test_app_detail_shape_matches_the_keep_convention(app):
         owner = db.session.get(User, card.author_id)
         _card, data, error_code = card_detail_core(card.id, owner)
         assert error_code is None
-        assert data["images"] == {"square": f"/card-image/{card.id}/square"}
+        assert data["images"] == {"square": f"/card-image/{card.id}/square.webp"}
         assert json.dumps(data["images"])  # 可 JSON 序列化
