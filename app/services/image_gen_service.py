@@ -13,7 +13,7 @@ import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from PIL import Image
+from .image_service import image_bytes_to_webp_data_url
 
 
 def _build_url(base_url, path):
@@ -40,27 +40,25 @@ def _auth_headers(api_key):
     return {"Authorization": f"Bearer {api_key}"}
 
 
-def _png_data_url_to_webp(png_data_url, quality=90):
-    """将 PNG base64 data URL 转成 WebP data URL；失败则原样返回。"""
-    try:
-        _, b64 = png_data_url.split(",", 1)
-        raw = base64.b64decode(b64)
-        img = Image.open(io.BytesIO(raw))
-        buf = io.BytesIO()
-        img.save(buf, format="WEBP", quality=quality)
-        webp_b64 = base64.b64encode(buf.getvalue()).decode("ascii")
-        return f"data:image/webp;base64,{webp_b64}"
-    except Exception:
-        return png_data_url
-
 
 def _extract_images(payload):
+    """把上游 b64 结果转成 WebP data URL。
+
+    上游**不保证是 PNG**：实测 gpt-image-2.5 在提示词要求动图时返回 GIF89a。
+    所以这里按真实字节判定格式，并且动图必须保留全部帧 —— 过去的实现固定
+    当成 PNG 并只 save 第一帧，导致生成的动图只剩一张静止图。
+    """
     items = (payload or {}).get("data") or []
     out = []
     for it in items:
         b64 = it.get("b64_json") if isinstance(it, dict) else None
-        if b64:
-            out.append(_png_data_url_to_webp(f"data:image/png;base64,{b64}"))
+        if not b64:
+            continue
+        try:
+            raw = base64.b64decode(b64)
+        except Exception:
+            continue
+        out.append(image_bytes_to_webp_data_url(raw))
     if not out:
         raise RuntimeError("生图接口未返回图像数据")
     return out
