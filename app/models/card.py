@@ -49,6 +49,11 @@ class Card(db.Model):
     # 作者注释注入间隔（每多少条历史消息注入一次），0 表示禁用。
     # 仅当 author_note 非空时生效；为空时导出为 0，客户端会自动回退到全局作者注释。
     author_note_interval = db.Column(db.Integer, nullable=False, server_default="0")
+    # 角色卡的「对话策略」（可选）：客户端那组可选提示词策略字段，整组以 JSON 字符串保存。
+    # 键为客户端约定的驼峰名（pov / narrativeStructure / ambientTime / catchphrases …），
+    # 值均为字符串枚举名 / 整数 / 布尔 / 字符串数组；未设置时为 NULL（客户端整个键都不发）。
+    # 规范化与解析的唯一入口见 card_publish_service._normalize_strategy / strategy_to_dict。
+    strategy = db.Column(db.Text, nullable=True)
 
     author = db.relationship("User", backref="cards")
     images = db.relationship("CardImage", backref="card")

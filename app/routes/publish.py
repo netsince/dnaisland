@@ -105,6 +105,9 @@ def edit():
         "dialogue_style": dialogue_style,
         "images": images,
     }
+    # 提示词策略：网页端只在文本框被改动后才提交 strategy_json（未提交 = 不设置）。
+    if "strategy_json" in request.form:
+        payload["strategy"] = request.form.get("strategy_json")
     card, error = create_card_from_payload(current_user, payload)
     if error:
         # 图片比例不合规等校验错误的消息是面向用户的，直接展示（不要再吞成通用文案）。

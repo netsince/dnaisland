@@ -93,7 +93,7 @@ from ..services.card_edit_service import (
     update_card_from_payload,
 )
 from ..services.card_import_service import parse_export_package
-from ..services.card_publish_service import create_card_from_payload
+from ..services.card_publish_service import create_card_from_payload, strategy_to_dict
 from ..services.card_service import attach_covers, enrich_cards, popular_tags
 from ..services.comment_service import (
     delete_comment,
@@ -342,6 +342,8 @@ def _card_detail(card: Card, data: dict) -> dict:
         # 角色卡绑定的作者注释（可选）：未设置时为 None，客户端可回退到全局作者注释
         "authorNote": card.author_note,
         "authorNoteInterval": card.author_note_interval or 0,
+        # 对话策略（可选，整组提示词策略字段）：解析回对象；未设置时为 None。
+        "strategy": strategy_to_dict(card.strategy),
         "view_count": card.view_count or 0,
         "copy_count": card.copy_count or 0,
         "like_count": data["like_count"],
@@ -1639,7 +1641,8 @@ def cards_publish():
 
     body = {name?, gender?, persona?, intro?, opening?, original_link?,
             cover_focus?, seed?, tags?:[str], dialogue_style?:[{user,assistant}],
-            images?:{slot: base64_data_url}}。平台自动分配 id，状态置 pending。
+            strategy?:{...}, images?:{slot: base64_data_url}}。
+    平台自动分配 id，状态置 pending。strategy 为客户端「对话策略」JSON 对象，可选。
     """
     viewer = _ensure_self()
     payload = request.get_json(silent=True) or {}
@@ -1662,7 +1665,8 @@ def cards_edit(card_id):
 
     body = {name?, gender?, persona?, intro?, opening?, original_link?,
             cover_focus?, tags?:[str], dialogue_style?:[{user,assistant}],
-            images?:{slot: base64_data_url}}。
+            strategy?:{...}, images?:{slot: base64_data_url}}。
+    strategy 为客户端「对话策略」JSON 对象：**不传该键即保持原值**（不会被清空）。
     """
     viewer = _ensure_self()
     card = db.session.get(Card, card_id)

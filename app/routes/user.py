@@ -54,6 +54,7 @@ from ..services.card_edit_service import (
     update_card_from_payload,
 )
 from ..services.card_hidden_tags import HIDDEN_TAGS
+from ..services.card_publish_service import strategy_to_dict
 from ..services.comment_service import (
     delete_comment,
     pin_comment,
@@ -945,6 +946,10 @@ def card_edit(card_id):
             "dialogue_style": dialogue_style,
             "images": images,
         }
+        # 提示词策略：只有网页端动过那个文本框才会提交 strategy_json。
+        # 没提交时**不给 payload 加 strategy 键**，编辑逻辑据此保留原值，不会清空。
+        if "strategy_json" in request.form:
+            payload["strategy"] = request.form.get("strategy_json")
         error = update_card_from_payload(card, payload)
         if error:
             flash(error, "warning")
@@ -973,6 +978,8 @@ def card_edit(card_id):
         "cover_focus": card.cover_focus or "",
         "author_note": card.author_note or "",
         "author_note_interval": card.author_note_interval or 0,
+        # 提示词策略：解析回对象交给模板美化展示（None 表示未设置）。
+        "strategy": strategy_to_dict(card.strategy),
     }
     return render_template(
         "publish/edit.html",

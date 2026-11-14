@@ -13,6 +13,7 @@ from ..services.card_publish_service import (
     _normalize_author_note,
     _normalize_author_note_interval,
     _normalize_images,
+    _normalize_strategy,
     validate_image_slots,
 )
 
@@ -103,6 +104,12 @@ def update_card_from_payload(card, payload):
         payload.get("author_note_interval"),
         has_note=card.author_note is not None,
     )
+    # 对话策略（可选，整组 JSON 对象）：**只有 payload 里出现 strategy 键才覆盖**。
+    # 网页编辑页没动那个折叠块时压根不提交该键（见 templates/publish/edit.html），
+    # 若这里无条件覆盖，一次普通编辑就会把已保存的策略清成 NULL。
+    # 客户端 App 的 JSON 接口按需带键，语义相同。
+    if "strategy" in payload:
+        card.strategy = _normalize_strategy(payload.get("strategy"))
     card.status = "pending"  # 编辑后自动重新提审
 
     # 标签覆盖式更新

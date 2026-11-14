@@ -50,6 +50,7 @@ def _content_fingerprint(
     seed,
     author_note,
     author_note_interval,
+    strategy,
     tags,
     dialogue_style,
 ):
@@ -69,6 +70,7 @@ def _content_fingerprint(
         "seed": seed,
         "author_note": author_note,
         "author_note_interval": author_note_interval,
+        "strategy": strategy,
         "tags": sorted(tags),
         "dialogue_style": dialogue_style,
     }
@@ -109,6 +111,60 @@ def _normalize_author_note_interval(raw_interval, has_note):
         except ValueError:
             return 0
     return 0
+
+
+def _normalize_strategy(raw):
+    """规范化「对话策略」：接受 dict / JSON 字符串 / None，返回规范化 JSON 字符串或 None。
+
+    客户端把整组可选提示词策略当成一个 JSON 对象发送（键都是可选的，未设置时整个键都不发）。
+    服务端只做「能不能落库」的规范化，不校验枚举值：
+      - dict：转成 JSON 字符串（键排序，保证同一份策略总是同一字符串）；
+      - JSON 字符串：先解析再同上；
+      - 空字典 / 空串 / None / 解析失败 / 解析出来不是对象（数组、数字、字符串…）→ None（未设置）。
+    脏数据一律吞成 None：策略是可选的装饰项，不能让它把整条发布打回。
+    """
+    if raw is None:
+        return None
+    data = raw
+    if isinstance(raw, (bytes, bytearray)):
+        try:
+            data = raw.decode("utf-8")
+        except UnicodeDecodeError:
+            return None
+    if isinstance(data, str):
+        if not data.strip():
+            return None
+        try:
+            data = json.loads(data)
+        except (ValueError, TypeError):
+            return None
+    if not isinstance(data, dict) or not data:
+        return None
+    try:
+        # sort_keys：键序不影响落库结果，内容指纹（幂等去重）因此稳定。
+        return json.dumps(data, ensure_ascii=False, sort_keys=True)
+    except (TypeError, ValueError):
+        # 含不可 JSON 序列化的值时整条策略视为未设置，而不是让发布失败。
+        return None
+
+
+def strategy_to_dict(raw):
+    """把库里存的 strategy 列解析回 dict；空值 / 脏数据一律返回 None。
+
+    序列化（App 详情、网页预填）的唯一出口：未设置与空对象都返回 None，
+    客户端据此整个键都不发。
+    """
+    if not raw:
+        return None
+    if isinstance(raw, dict):
+        return dict(raw) or None
+    try:
+        data = json.loads(raw)
+    except (ValueError, TypeError):
+        return None
+    if isinstance(data, dict) and data:
+        return data
+    return None
 
 
 def _image_bytes_from_payload(val) -> bytes:
@@ -192,7 +248,7 @@ def create_card_from_payload(author, payload):
 
     payload 字段：name, gender, persona, intro, opening, original_link,
     cover_focus, seed, tags(list), dialogue_style(list[{user,assistant}]),
-    images(dict slot->bytes|data_url)。
+    images(dict slot->bytes|data_url), strategy(dict|JSON 字符串|None)。
     """
     card_id = str(uuid.uuid4())
     # 名称必填。网页表单靠 HTML 的 required 拦，但 API 这边以前没有任何检查，
@@ -227,6 +283,8 @@ def create_card_from_payload(author, payload):
     author_note_interval = _normalize_author_note_interval(
         payload.get("author_note_interval"), has_note=author_note is not None
     )
+    # 对话策略（可选，整组 JSON 对象）：dict / JSON 字符串都能接，脏数据落成 None。
+    strategy = _normalize_strategy(payload.get("strategy"))
 
     persona = payload.get("persona") or ""
     intro = payload.get("intro") or ""
@@ -246,6 +304,7 @@ def create_card_from_payload(author, payload):
         seed=seed,
         author_note=author_note,
         author_note_interval=author_note_interval,
+        strategy=strategy,
         tags=tags,
         dialogue_style=dialogue_style,
     )
@@ -268,6 +327,7 @@ def create_card_from_payload(author, payload):
         seed=seed,
         author_note=author_note,
         author_note_interval=author_note_interval,
+        strategy=strategy,
         content_hash=content_hash,
         status="pending",  # 未审核
     )

@@ -128,6 +128,28 @@
         </div>
       </div>
 
+      <div class="mb-3">
+        <a class="btn btn-sm btn-link p-0 text-decoration-none" data-bs-toggle="collapse"
+           href="#strategyOptions" role="button" aria-expanded="false" aria-controls="strategyOptions">
+          提示词策略（高级） ▾
+        </a>
+        <div class="collapse mt-3" id="strategyOptions">
+          <div class="mb-3">
+            <label class="form-label">对话策略 JSON（可选）</label>
+            <input type="hidden" name="strategy_json" id="strategyJson" value="">
+            <textarea class="form-control font-monospace" id="strategyText" rows="8"
+                      spellcheck="false"
+                      placeholder='{"pov": "third", "pacing": "scene", "emotionTone": "sweet"}'></textarea>
+            <div class="form-text">
+              客户端「对话策略」的原始 JSON 对象（所有键都可选），例如
+              <code>{"pov":"third","narrativeStructure":"threeAct","dialogueRatio":60}</code>。
+              这里不做分项表单：原样提交即可。不改动这一块不会影响已保存的策略；
+              把它清空后提交才会清除策略。
+            </div>
+          </div>
+        </div>
+      </div>
+
       <button type="submit" id="submitBtn" class="btn btn-primary">提交</button>
     </form>
   </div>
@@ -368,6 +390,25 @@
 
   renderDialogue();
 
+  // ---- 提示词策略（高级）----
+  // 客户端「对话策略」是整组可选字段（JSON 对象）：网页不做分项表单，只把当前值
+  // 美化后展示、原样提交。关键约束：文本框与初始值一致时**不提交 strategy_json**，
+  // 服务端据此保留库里原值（见 app/services/card_edit_service.py）——
+  // 否则「网页端没改这一项」会把已保存的策略清空。
+  {% set strategy_dict = prefill.get('strategy', none) if prefill else none %}
+  {% set strategy_raw = prefill.get('strategy_json', none) if prefill else none %}
+  const strategyInitialDict = {{ (strategy_dict if strategy_dict is mapping else none)|tojson }};
+  const strategyInitialRaw = {{ ((strategy_raw if strategy_raw is string else '') or '')|tojson }};
+  const strategyText = document.getElementById('strategyText');
+  const strategyJson = document.getElementById('strategyJson');
+  const strategyBaseline = (strategyInitialDict && Object.keys(strategyInitialDict).length)
+    ? JSON.stringify(strategyInitialDict, null, 2)
+    : '';
+  strategyText.value = strategyBaseline || strategyInitialRaw || '';
+  function syncStrategy() { strategyJson.value = strategyText.value; }
+  strategyText.addEventListener('input', syncStrategy);
+  syncStrategy();
+
   // ---- 提交：将图片作为 multipart 文件直传（不再 base64 内联）----
   const cardForm = document.getElementById('cardForm');
   const submitBtn = document.getElementById('submitBtn');
@@ -387,6 +428,12 @@
       }
     }
     fd.append('images_keep_json', JSON.stringify(keep));
+    // 策略文本框没被改动 → 不带 strategy_json 键，服务端保留原值（不会被清空）。
+    if (strategyText.value === strategyBaseline) {
+      fd.delete('strategy_json');
+    } else {
+      fd.set('strategy_json', strategyText.value);
+    }
     return fd;
   }
 
