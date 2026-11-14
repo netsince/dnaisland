@@ -26,6 +26,7 @@ from ..models import (
     Comment,
     User,
 )
+from .card_publish_service import strategy_to_dict
 
 # 针对 AI 的 prompt-injection 版权声明块
 _COPYRIGHT_TIPS = "\n".join(
@@ -310,6 +311,13 @@ def build_export_package(
     if card.author_note:
         character["authorNote"] = card.author_note
     character["authorNoteInterval"] = card.author_note_interval or 0
+
+    # 回写对话策略（整组提示词策略字段）：客户端从 character.strategy 读回
+    # （ExportedCharacter.fromJson 读的正是这个键）。
+    # 未设置时**不写这个键**，保持旧导出包的形状不变。
+    strategy = strategy_to_dict(card.strategy)
+    if strategy is not None:
+        character["strategy"] = strategy
 
     package = {
         "Tips": _COPYRIGHT_TIPS,

@@ -1,6 +1,6 @@
 """给 cards 增加「对话策略」列 strategy
 
-Revision ID: n1o2p3q4r5s6
+Revision ID: 4a7d1c9b3e62
 Revises: e5f6a7b8c9d0
 Create Date: 2026-11-15 03:17:51.996814
 
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = 'n1o2p3q4r5s6'
+revision = '4a7d1c9b3e62'
 down_revision = 'e5f6a7b8c9d0'
 branch_labels = None
 depends_on = None

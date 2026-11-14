@@ -773,7 +773,42 @@ def _state_to_payload(state):
     return json.dumps(data, ensure_ascii=False)
 
 
-def _export_response(state):
+# 网页编辑器能表达的顶层键。其余键（客户端新加的，如 strategyOverride 叙事策略）
+# 网页端没有输入口 —— 若保存时按白名单重建整份 JSON，它们会被静默丢掉，
+# 用户「只改了个名字，策略就没了」。故编辑/导出时把旧原文里这些键原样带回去。
+_EDITOR_TOP_LEVEL_KEYS = {
+    "id",
+    "name",
+    "summary",
+    "description",
+    "tags",
+    "forbiddenWords",
+    "entries",
+    "archived",
+}
+
+
+def _carry_unrepresented_keys(raw, old_payload):
+    """把编辑器表达不了的顶层键从旧原文带回新原文。
+
+    raw 是 _state_to_payload 按表单重建的 JSON 文本，old_payload 是库里旧原文。
+    旧原文里编辑器没有输入口的键（例如客户端的 strategyOverride）原样保留，
+    避免「在网页上改个名字，客户端的叙事策略就被抹掉」。
+    """
+    try:
+        old = json.loads(old_payload or "{}")
+        new = json.loads(raw)
+    except (ValueError, TypeError):
+        return raw
+    if not isinstance(old, dict) or not isinstance(new, dict):
+        return raw
+    extra = {k: v for k, v in old.items() if k not in _EDITOR_TOP_LEVEL_KEYS}
+    if not extra:
+        return raw
+    return json.dumps({**extra, **new}, ensure_ascii=False)
+
+
+def _export_response(state, carry_from=None):
     """把当前表单导出成 .dnaworld 附件（与客户端 exportWorld 同一套信封）。
 
     网页端原来没有「导出」：写了一半的世界只能先发布、再从详情页下载。这里让
@@ -782,7 +817,10 @@ def _export_response(state):
     from datetime import UTC, datetime
     from urllib.parse import quote
 
-    payload = json.loads(_state_to_payload(state))
+    raw = _state_to_payload(state)
+    if carry_from is not None:
+        raw = _carry_unrepresented_keys(raw, carry_from)
+    payload = json.loads(raw)
     package = {
         "version": 1,
         "exportType": "world",
@@ -903,7 +941,7 @@ def edit(world_id):
             if invalid is not None:
                 flash(invalid, "danger")
                 return _render_editor("edit", world, state, edit_action)
-            return _export_response(state)
+            return _export_response(state, carry_from=world.payload)
 
         state = _state_from_request()
         invalid = _validate_state(state)
@@ -911,7 +949,7 @@ def edit(world_id):
             flash(invalid, "danger")
             return _render_editor("edit", world, state, edit_action)
 
-        raw = _state_to_payload(state)
+        raw = _carry_unrepresented_keys(_state_to_payload(state), world.payload)
         world, error = update_world(world, raw)
         if error is not None:
             flash(error, "danger")

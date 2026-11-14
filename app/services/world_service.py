@@ -246,14 +246,33 @@ def preview_names(world, limit=PREVIEW_NAMES):
     return world.preview_list[:limit]
 
 
-def _fingerprint(name, summary, tags, entries):
+def _fingerprint_strategy(raw):
+    """把顶层 strategyOverride 规范化成稳定字符串，用于内容指纹。
+
+    世界卡的叙事策略（形状与角色卡的对话策略类似，字段集偏叙事）存在 payload 原文里，
+    但原文本身不能参与哈希（顶层 id 每次提交都变）。这里单独取出来按 sort_keys 规范化：
+    **只改策略再发布必须算新内容** —— 否则会命中「待审核卡幂等复用」，用户改完策略点发布
+    看到的还是旧卡，会以为自己的修改没生效。
+    缺失 / 非 dict / 空 dict → None（与「没写这个键」等价）。
+    """
+    if not isinstance(raw, dict) or not raw:
+        return None
+    try:
+        return json.dumps(raw, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    except (TypeError, ValueError):
+        # 含不可 JSON 序列化的值：当作没写策略，不影响发布（原文照旧原样入库）。
+        return None
+
+
+def _fingerprint(name, summary, tags, entries, strategy_override=None):
     """内容指纹：**只看内容，不看本地 id**。
 
     为什么不能直接哈希原文：网页编辑器每次提交都会给顶层 id 和新增词条生成新的
     UUID，原文一变指纹就变，重复提交就再也不幂等了。角色卡的指纹也是按规范化后
     的文本字段算的，这里对齐同一套做法。
 
-    排序后的 tags 保证提交顺序不影响指纹。
+    排序后的 tags 与规范化后的 strategyOverride 保证「书写顺序」不影响指纹，
+    而「策略变了」会改变指纹（只改策略重新发布不会被当成重复提交）。
     """
 
     def strip(entry):
@@ -264,6 +283,7 @@ def _fingerprint(name, summary, tags, entries):
         "summary": summary,
         "tags": sorted(tags),
         "entries": [strip(e) for e in entries if isinstance(e, dict)],
+        "strategy_override": strategy_override,
     }
     raw = json.dumps(
         payload, sort_keys=True, ensure_ascii=False, separators=(",", ":")
@@ -308,7 +328,13 @@ def _parse_payload(raw):
             "tags": tags,
             "preview_names": entry_names(data, limit=PREVIEW_NAMES),
             "payload_bytes": len(raw.encode("utf-8")),
-            "content_hash": _fingerprint(name, summary, tags, entries or []),
+            "content_hash": _fingerprint(
+                name,
+                summary,
+                tags,
+                entries or [],
+                _fingerprint_strategy(data.get("strategyOverride")),
+            ),
         },
         None,
     )

@@ -18,6 +18,7 @@ from app.services.card_publish_service import (
     create_card_from_payload,
     strategy_to_dict,
 )
+from app.services.card_service import build_export_package
 from sqlalchemy.dialects.mysql import LONGTEXT
 from sqlalchemy.ext.compiler import compiles
 
@@ -237,6 +238,30 @@ def test_web_publish_page_renders_empty_strategy_textbox(app, client):
     body = page.get_data(as_text=True)
     assert "提示词策略（高级）" in body
     assert "const strategyInitialDict = null;" in body
+
+
+def test_export_package_carries_strategy(app):
+    """复制/导出：带策略的卡，character.strategy 里是同一份 dict（客户端读这个键）。"""
+    with app.app_context():
+        author = _author("x1")
+        card, error = create_card_from_payload(author, {"name": "导出带策略", "strategy": STRATEGY})
+        assert card is not None and error is None
+        db.session.commit()
+
+        package = build_export_package(card, origin="https://example.com")
+        assert package["character"]["strategy"] == STRATEGY
+
+
+def test_export_package_omits_strategy_when_unset(app):
+    """没有策略时不写这个键 —— 保持旧导出包的形状（客户端整个键都不发）。"""
+    with app.app_context():
+        author = _author("x2")
+        card, error = create_card_from_payload(author, {"name": "导出无策略"})
+        assert card is not None and error is None
+        db.session.commit()
+
+        package = build_export_package(card, origin="https://example.com")
+        assert "strategy" not in package["character"]
 
 
 @pytest.mark.parametrize(

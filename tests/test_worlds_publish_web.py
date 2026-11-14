@@ -570,3 +570,80 @@ def test_import_bad_json_shows_error(app, client):
     assert any("合法的 JSON" in (msg or "") for msg in _flashes(html))
     with app.app_context():
         assert WorldCard.query.count() == 0
+
+
+# ---------------------------------------------------------------------------
+# 客户端的叙事策略 strategyOverride（网页编辑器没有输入口）
+# ---------------------------------------------------------------------------
+
+
+def _publish_via_api(client, world):
+    """按客户端的方式发：裸 World JSON 原文（不是表单字段）。"""
+    return client.post(
+        "/api/v1/worlds",
+        data=json.dumps(world, ensure_ascii=False),
+        content_type="application/json",
+    )
+
+
+def _strategy_world(strategy=None, name="叙事世界"):
+    world = {
+        "id": "local-strategy",
+        "name": name,
+        "entries": [{"id": "e1", "name": "王都", "description": "首都", "type": "noun"}],
+    }
+    if strategy is not None:
+        world["strategyOverride"] = strategy
+    return world
+
+
+def test_strategy_override_change_is_not_reused(app, client):
+    """只改了 strategyOverride 再发布必须是新卡。
+
+    内容指纹早先只看 name/summary/tags/entries，于是「改策略 → 发布」会命中
+    待审核卡的幂等复用，用户改完策略点发布看到的还是旧卡，以为没生效。
+    """
+    _login(app, client)
+    first = _publish_via_api(client, _strategy_world({"pov": "third", "pacing": "scene"}))
+    assert first.status_code == 200
+    assert first.get_json()["data"]["reused"] is False
+
+    # 其余内容一字未改，只换了策略 → 必须算新内容
+    second = _publish_via_api(client, _strategy_world({"pov": "first", "pacing": "slow"}))
+    assert second.status_code == 200
+    assert second.get_json()["data"]["reused"] is False
+    assert second.get_json()["data"]["id"] != first.get_json()["data"]["id"]
+
+    # 完全相同的策略再发一次，才应该幂等复用
+    again = _publish_via_api(client, _strategy_world({"pov": "first", "pacing": "slow"}))
+    assert again.get_json()["data"]["reused"] is True
+
+    with app.app_context():
+        assert WorldCard.query.filter_by(name="叙事世界").count() == 2
+
+
+def test_strategy_override_survives_web_edit(app, client):
+    """网页编辑器表达不了 strategyOverride，保存时也不能把它丢掉。"""
+    _login(app, client)
+    resp = _publish_via_api(client, _strategy_world({"pov": "third", "pacing": "scene"}))
+    world_id = resp.get_json()["data"]["id"]
+
+    client.post(
+        f"/worlds/{world_id}/edit",
+        data={
+            "world_id": world_id,
+            "name": "改了名字",
+            "summary": "新简介",
+            "tags": "",
+            "entries_json": _entries(
+                {"id": "e2", "name": "新词条", "description": "新正文", "type": "noun"}
+            ),
+        },
+    )
+    with app.app_context():
+        world = db.session.get(WorldCard, world_id)
+        data = json.loads(world.payload)
+        assert data["name"] == "改了名字"
+        assert data["entries"][0]["name"] == "新词条"
+        # 客户端新增的顶层键原样保留
+        assert data["strategyOverride"] == {"pov": "third", "pacing": "scene"}
