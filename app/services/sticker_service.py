@@ -46,7 +46,7 @@ def render_stickers_html(text):
         code = mm.group(1)
         if code not in smap:
             return ""
-        url = "/stickers/file/" + quote(code, safe="")
+        url = "/stickers/file/" + quote(code, safe="") + ".webp"
         return f'<img class="dna-sticker" src="{url}" alt="{code}" title="{code}">'
 
     return _STICKER_TOKEN_RE.sub(_repl, text)

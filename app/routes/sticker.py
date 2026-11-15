@@ -25,7 +25,7 @@ def api_list():
                 "slug": s.slug,
                 "name": s.name,
                 "stickers": [
-                    {"code": st.code, "image_url": f"/stickers/file/{st.code}"}
+                    {"code": st.code, "image_url": f"/stickers/file/{st.code}.webp"}
                     for st in sorted(s.stickers, key=lambda x: (x.sort_order, x.id))
                 ],
             }
@@ -34,11 +34,17 @@ def api_list():
 
 
 @sticker_bp.route("/file/<code>.webp")
+@sticker_bp.route("/file/<code>")
 def sticker_file(code):
     """按表情 ID 返回图片字节，供前端逐张懒加载（加载一张显示一张）。
 
     通过 ETag + Cache-Control 让浏览器把图片缓存到本地：同一会话重复打开
     表情面板时，图片直接从本地缓存读取，不再回源请求。
+
+    **两个路由并存**：带 .webp 的是规范形式（Cloudflare 默认按扩展名判定可否
+    缓存，无扩展名不放行）；不带后缀的保留给已经发出去的 URL —— 客户端的
+    /stickers/api 结果在会话内缓存，服务端改了 URL 形状后旧进程仍会请求老路径，
+    直接 404 会让整个表情面板炸掉。
     """
     st = Sticker.query.filter_by(code=code).first_or_404()
     raw = st.image_data
