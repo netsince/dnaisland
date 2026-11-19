@@ -100,7 +100,7 @@ from ..services.comment_service import (
     pin_comment,
     toggle_comment_like,
 )
-from ..services.generation_worker import process_generation_task
+from ..services.generation_worker import live_tasks, process_generation_task
 from ..services.image_gen_history import paginate_logs, parse_flag, serialize_log
 from ..services.image_gen_service import effective_credentials
 from ..services.image_service import send_public_webp
@@ -2376,11 +2376,9 @@ def image_gen_generate():
             f"当前余额 {points_to_str(balance)} 点",
         )
 
-    existing = GenerationTask.query.filter(
-        GenerationTask.user_id == user.id,
-        GenerationTask.status.in_(["pending", "processing"]),
-    ).first()
-    if existing:
+    # 判定走 live_tasks：先收敛死掉的 pending/processing，再查真正在跑的。
+    # 只查数据库会把进程中断留下的行当成正在跑，永久挡住这个用户。
+    if live_tasks(user.id, current_app._get_current_object()):  # type: ignore[attr-defined]
         return err("已有进行中的生图任务，请稍候")
 
     task = GenerationTask(
@@ -2409,16 +2407,8 @@ def image_gen_generate():
 @api_login_required
 def image_gen_tasks():
     """当前用户进行中的生图任务（pending/processing），用于轮询。"""
-    # 复用恢复逻辑（本地导入避免循环依赖）
-    from ..routes.image_gen import recover_stale_tasks as _recover
-
-    _recover(current_app._get_current_object())  # type: ignore[attr-defined]
-    tasks = (
-        GenerationTask.query.filter(GenerationTask.user_id == _ensure_self().id)
-        .filter(GenerationTask.status.in_(["pending", "processing"]))
-        .order_by(GenerationTask.created_at.desc())
-        .all()
-    )
+    # live_tasks 会先收敛掉已经死掉的 pending/processing，再返回真正在跑的。
+    tasks = live_tasks(_ensure_self().id, current_app._get_current_object())  # type: ignore[attr-defined]
     return ok(
         {
             "tasks": [

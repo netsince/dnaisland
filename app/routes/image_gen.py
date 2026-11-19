@@ -25,7 +25,7 @@ from flask_login import current_user, login_required
 from ..constants import points_mul, points_to_str
 from ..extensions import db
 from ..models import GenerationLog, GenerationModel, GenerationTask
-from ..services.generation_worker import process_generation_task, recover_stale_tasks
+from ..services.generation_worker import live_tasks, process_generation_task
 from ..services.image_gen_history import paginate_logs, parse_flag, serialize_log
 from ..services.image_gen_service import effective_credentials
 from ..services.image_service import send_public_webp
@@ -193,12 +193,10 @@ def generate():
         flash(msg, "warning")
         return redirect(url_for("image_gen.workbench"))
 
-    # 同一用户仅允许一个进行中的任务，避免并发超额扣点
-    existing = GenerationTask.query.filter(
-        GenerationTask.user_id == current_user.id,
-        GenerationTask.status.in_(["pending", "processing"]),
-    ).first()
-    if existing:
+    # 同一用户仅允许一个进行中的任务，避免并发超额扣点。
+    # 判定必须走 live_tasks：它会先把已经死掉的任务收敛成 failed。只查数据库会把
+    # 「进程中断留下的 pending/processing」当成正在跑，这个用户就再也生成不了了。
+    if live_tasks(current_user.id, current_app._get_current_object()):  # type: ignore[attr-defined]
         return early("已有进行中的生图任务，请稍候")
 
     # 创建任务即返回，实际生图在后台线程完成（避免反向代理超时）
@@ -232,13 +230,8 @@ def generate():
 @login_required
 def api_tasks():
     """返回当前用户进行中的任务（pending/processing），不含任何历史任务。"""
-    recover_stale_tasks(current_app._get_current_object())  # type: ignore[attr-defined]
-    tasks = (
-        GenerationTask.query.filter(GenerationTask.user_id == current_user.id)
-        .filter(GenerationTask.status.in_(["pending", "processing"]))
-        .order_by(GenerationTask.created_at.desc())
-        .all()
-    )
+    # live_tasks 会先收敛掉已经死掉的 pending/processing，再返回真正在跑的。
+    tasks = live_tasks(current_user.id, current_app._get_current_object())  # type: ignore[attr-defined]
     data = [
         {
             "id": t.id,
