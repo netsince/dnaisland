@@ -101,6 +101,7 @@ from ..services.comment_service import (
     toggle_comment_like,
 )
 from ..services.generation_worker import process_generation_task
+from ..services.image_gen_history import paginate_logs, parse_flag, serialize_log
 from ..services.image_gen_service import effective_credentials
 from ..services.image_service import send_public_webp
 from ..services.login_service import (
@@ -2467,55 +2468,22 @@ def image_gen_task_detail(task_id):
 @api_bp.route("/image-gen/logs", methods=["GET"])
 @api_login_required
 def image_gen_logs():
-    """当前用户生图历史（分页，含产出图/参考图 URL）。"""
-    from sqlalchemy.orm import defer
+    """当前用户生图历史（分页，含产出图/参考图 URL）。
 
-    page = request.args.get("page", 1, type=int)
-    per_page = request.args.get("per_page", 12, type=int)
-    # 可选状态过滤：`?status=failed` 只返回失败记录（App 的「生成失败」页靠它翻页，
-    # 否则客户端得先翻过一堆成功记录才能凑齐失败的那些）。
-    status = (request.args.get("status") or "").strip()
-    query = GenerationLog.query.options(
-        defer(GenerationLog.images),
-        defer(GenerationLog.reference_images),
-    ).filter_by(user_id=_ensure_self().id)
-    if status in ("success", "partial", "failed"):
-        query = query.filter(GenerationLog.status == status)
-    pagination = query.order_by(GenerationLog.created_at.desc()).paginate(
-        page=page, per_page=per_page, error_out=False
+    过滤与分页都在 SQL 里做完再取一页（见 services/image_gen_history.py）：
+    先取一页再在 Python 里筛，会让「最新一页全是失败记录」的用户拿到空列表。
+    """
+    pagination = paginate_logs(
+        _ensure_self().id,
+        page=request.args.get("page", 1, type=int),
+        per_page=request.args.get("per_page", 12, type=int),
+        status=request.args.get("status") or "",
+        include_failed=parse_flag(request.args.get("include_failed")),
     )
-    items = []
-    # 失败记录默认**仍然不返回**：老版本 App 的历史瀑布流只认图片，多出无图条目会渲染成
-    # 空白卡片。需要"失败也出现在历史里"的客户端显式带 ?include_failed=1（新 App 就是这么调的）；
-    # 显式按 status=failed 筛选时当然要返回它们。
-    include_failed = (request.args.get("include_failed") or "").lower() in ("1", "true", "yes")
-    for item in pagination.items:
-        failed = item.status == "failed"
-        img_count = 0 if failed else (item.count or 1)
-        if img_count == 0 and not include_failed and status != "failed":
-            continue
-        ref_count = item.references_count or 0
-        items.append(
-            {
-                "id": item.id,
-                "first_image": _ig_image_url(item.id, 0) if img_count > 0 else "",
-                "images": [_ig_image_url(item.id, i) for i in range(img_count)],
-                "references": [_ig_reference_url(item.id, i) for i in range(ref_count)],
-                "prompt": item.prompt,
-                "model_name": item.model_name,
-                "size": item.size or "auto",
-                "count": item.count,
-                "points_spent": points_to_str(item.points_spent),
-                "status": item.status,
-                # 失败原因（详情页要显示）：其它状态为空串。新增字段，老客户端忽略即可。
-                "error": item.error or "",
-                "created_at": (
-                    (item.created_at + timedelta(hours=8)).strftime("%Y-%m-%d %H:%M")
-                    if item.created_at
-                    else ""
-                ),
-            }
-        )
+    items = [
+        serialize_log(log, image_url=_ig_image_url, reference_url=_ig_reference_url)
+        for log in pagination.items
+    ]
     return ok(
         {
             "items": items,
