@@ -1,3 +1,4 @@
+import mimetypes
 import os
 from datetime import datetime
 from decimal import Decimal
@@ -23,6 +24,14 @@ from .constants import points_to_signed_str, points_to_str
 from .extensions import bcrypt, db, login_manager, mail, migrate
 
 load_dotenv()
+
+
+
+# 字体文件的 MIME 注册：Python 的 mimetypes 在部分环境里不认 woff/woff2，会退回
+# application/octet-stream。图标字体本地化（app/static/vendor/bootstrap-icons）之后
+# 这就成了隐患 —— 浏览器对字体不做严格 MIME 检查，但代理与安全策略会，注册一次即可。
+mimetypes.add_type("font/woff2", ".woff2")
+mimetypes.add_type("font/woff", ".woff")
 
 
 class AppJSONProvider(DefaultJSONProvider):

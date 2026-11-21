@@ -7,7 +7,7 @@
 {% block title %}{{ card.name }} · DNAISLAND{% endblock %}
 {% block body_class %}dna-hide-header-on-mobile dna-page-card-detail{% endblock %}
 {% block head %}
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/glightbox@3.3.0/dist/css/glightbox.min.css">
+<link rel="stylesheet" href="{{ staticv('vendor/glightbox/glightbox.min.css') }}">
 {% endblock %}
 
 {% block content %}
@@ -278,7 +278,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/glightbox@3.3.0/dist/js/glightbox.min.js"></script>
+<script src="{{ staticv('vendor/glightbox/glightbox.min.js') }}"></script>
 <script>
 (function () {
   var lightboxInstance = null;

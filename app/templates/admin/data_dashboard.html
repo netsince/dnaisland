@@ -127,14 +127,11 @@
 
 {% block scripts %}
 <script>
-// ---------- Chart.js 多 CDN 回退加载（加载失败时数字卡片仍正常显示） ----------
+// ---------- Chart.js 加载（走本站 vendor，不再依赖外部 CDN） ----------
+// 早期为绕开 CDN 不稳写了四个源的串行回退；资源已本地化，这里只留一个地址，
+// 失败分支保留（图表库挂了数字卡片仍然要显示）。
 (function () {
-  var CDNS = [
-    'https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js',
-    'https://cdn.staticfile.net/Chart.js/4.4.7/chart.umd.min.js',
-    'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.7/chart.umd.min.js',
-    'https://unpkg.com/chart.js@4.4.7/dist/chart.umd.min.js'
-  ];
+  var CDNS = ['{{ staticv("vendor/chartjs/chart.umd.js") }}'];
   window.__chartLibReady = false;
   window.__chartLibCallbacks = [];
   function tryLoad(i) {

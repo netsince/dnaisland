@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block head %}
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.css">
+<link rel="stylesheet" href="{{ staticv('vendor/cropperjs/cropper.min.css') }}">
 {% endblock %}
 
 {% block title %}编辑角色卡 · DNAISLAND{% endblock %}
@@ -178,7 +178,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.js"></script>
+<script src="{{ staticv('vendor/cropperjs/cropper.min.js') }}"></script>
 <script>
   const dialogueInitial = {{ dialogue_initial|tojson|safe }};
   const imagesInitial = {{ images_initial|tojson|safe }};
