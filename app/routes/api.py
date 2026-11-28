@@ -87,6 +87,7 @@ from ..routes.teahouse import (
     _visible_query as _teahouse_visible_query,
 )
 from ..services.card_edit_service import (
+    delete_card,
     resubmit_card,
     set_card_pinned,
     toggle_card_hidden,
@@ -1723,6 +1724,24 @@ def cards_toggle_pin(card_id):
     if error:
         return err(error, 400)
     return ok({"id": card.id, "pinned": card.pinned_at is not None})
+
+
+@api_bp.route("/cards/<card_id>", methods=["DELETE"])
+@api_login_required
+def cards_delete(card_id):
+    """撤回我自己的角色卡：与网页 user.card_delete 共用 delete_card。
+
+    软删除（status="deleted" + is_hidden=True），别人立刻看不到；
+    作者在「我的角色卡」里仍能看到一条「已撤回」记录。
+    """
+    viewer = _ensure_self()
+    card = db.session.get(Card, card_id)
+    if not card or card.author_id != viewer.id:
+        return err("角色卡不存在", 404)
+    error = delete_card(viewer, card)
+    if error:
+        return err(error, 404)
+    return ok({"id": card.id, "status": card.status})
 
 
 @api_bp.route("/me/profile", methods=["GET"])
