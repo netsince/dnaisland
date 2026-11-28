@@ -48,6 +48,7 @@ from ..models.ticket import (
     TICKET_STATUSES,
 )
 from ..services.card_edit_service import (
+    delete_card,
     resubmit_card,
     set_card_pinned,
     toggle_card_hidden,
@@ -888,6 +889,24 @@ def card_toggle_pin(card_id):
         flash_cat="success",
         action="pinned",
         state=card.pinned_at is not None,
+    )
+
+
+@user_bp.route("/my/card/<card_id>/delete", methods=["POST"])
+@login_required
+def card_delete(card_id):
+    card = db.get_or_404(Card, card_id)
+    if card.author_id != current_user.id:
+        abort(404)
+    error = delete_card(current_user, card)
+    if error:
+        abort(404, description=error)
+    return respond(
+        url_for("user.my_cards"),
+        flash_msg="已撤回该角色卡",
+        flash_cat="success",
+        action="deleted",
+        state=True,
     )
 
 

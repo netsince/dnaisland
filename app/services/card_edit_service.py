@@ -80,6 +80,28 @@ def toggle_card_hidden(viewer, card):
     return None
 
 
+def delete_card(viewer, card):
+    """撤回（软删除）自己的角色卡。返回 error。
+
+    不删行是有意的：点赞 / 收藏 / 评论 / 复制统计都挂着 card_id，
+    硬删会连带丢掉别人那边的时间线与统计，作者也再查不到自己发过什么。
+    所以置 status="deleted" + is_hidden=True：Card.visible_to 只放
+    is_hidden=False 且（本人 或 approved），撤回后访客立刻看不到，
+    作者在「我的角色卡」里仍会看到一条「已撤回」记录。
+    置顶名额随之释放（pinned_at 清空），否则名额被一张看不见的卡占着。
+    幂等：已经是 deleted 再调一次不报错。
+    """
+    if card.author_id != viewer.id:
+        return "无权操作此卡片"
+    if card.status == "deleted":
+        return None
+    card.is_hidden = True
+    card.status = "deleted"
+    card.pinned_at = None
+    db.session.commit()
+    return None
+
+
 def update_card_from_payload(card, payload):
     """用 payload 编辑 card（覆盖式）。返回 error（非空表示校验失败）。
 

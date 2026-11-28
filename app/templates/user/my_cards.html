@@ -73,6 +73,12 @@ data-label-on="取消置顶" data-label-off="置顶">
 </button>
 </form>
 {% endif %}
+{% if card.status != 'deleted' %}
+<form method="post" action="{{ url_for('user.card_delete', card_id=card.id) }}" class="d-inline"
+onsubmit="return confirm('确认撤回这张角色卡？撤回后别人立刻看不到，你自己仍能在本页看到「已撤回」记录。')">
+<button class="btn btn-sm btn-outline-danger">删除</button>
+</form>
+{% endif %}
  </div>
  </div>
  {% else %}
